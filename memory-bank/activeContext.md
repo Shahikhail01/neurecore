@@ -2,85 +2,109 @@
 
 ## Last Updated
 
-2026-03-31T05:53:00Z
+2026-03-31T10:15:00Z
 
-## Contabo Migration (NEW)
+## Architecture Overview
 
-**See**: `docs/CONTABO_MIGRATION_PLAN.md` for full implementation plan.
+- **Production Backend**: NestJS on Contabo (PM2 id 24), port 3003, proxied via LiteSpeed → `brain.neurecore.com`
+- **Production DB**: Neon (cloud PostgreSQL) — `ep-summer-pond-adpkqy1m-pooler.c-2.us-east-1.aws.neon.tech`
+- **Local Dev DB**: Contabo PostgreSQL 16 via SSH tunnel on `localhost:15433` → `neurecore_prod`
+- **Local Dev Redis**: Contabo Redis 7 via SSH tunnel on `localhost:16380`
+- **Docker**: No longer used for local dev — replaced by Contabo tunnel
 
-- **Contabo** → PostgreSQL 16 + Redis 7 for all production workloads
-- **Neon** → Development branching only (dev experiments)
-- **Upstash** → To be replaced by Contabo Redis
-- **Local Docker** → To be removed after Contabo is fully tested
+### Contabo Server
 
-### Contabo Server (Verified via SSH — March 30, 2026)
-
+- **IP**: `109.123.248.253`, SSH alias `contabo` (`~/.ssh/id_contabo`)
 - **OS**: Ubuntu 24.04.3 LTS, 11GB RAM, 96GB disk
-- **PostgreSQL**: 16.13, `neurecore_prod` (29 tables) + `neurecore_dev` (36 tables)
-- **Redis**: 7.0.15, no password, no AOF — **needs hardening**
-- **Security Issues**: Redis no pass, open pg_hba, superuser ownership
+- **PostgreSQL**: 16.13 — `neurecore_prod` (29 tables) + `neurecore_dev` (36 tables)
+- **Redis**: 7.0.15, password protected
+- **LiteSpeed**: PID after last restart ~2309771, `brain.neurecore.com` VHost working
+- **PM2**: Backend at id 24, using Neon DB URL
 
-## Current Infrastructure Status (Dev — Docker)
+## Production Fixes Applied (March 31, 2026) ✅
 
-### Backend (NestJS API)
+### LiteSpeed 404 Root Cause — FIXED
 
-- **Status**: ✅ Running on `http://localhost:3000`
-- **Health Check**: `GET /api/v1/health` → 200 OK
-- **Database**: PostgreSQL connected
-- **Cache**: Redis connected
-- **Initialized Modules**: All 30+ modules loaded successfully
-  - AuthModule, TenantsModule, UsersModule, AgentsModule
-  - RoutinesModule, GoalsModule, ProjectsModule
-  - FinanceModule, CostsModule, ObservabilityModule
-  - SettingsModule, ConnectorsModule, etc.
+- **Root cause**: Missing closing `}` brace in `virtualHost endtime.gec5.com {}` block
+  in `/usr/local/lsws/conf/httpd_config.conf` (line ~388). All subsequent VHosts
+  (including `brain.neurecore.com`) were parsed as nested inside endtime — invisible
+  as top-level VHosts.
+- **Fix**: `sed` inserted missing `}` after the `restrained 1` line.
+- **VHost config** (`/usr/local/lsws/conf/vhosts/brain.neurecore.com/vhost.conf`):
+  restored to CyberPanel format — `extprocessor nodeapi { type proxy; address 127.0.0.1:3003 }`
+- **Result**: `brain.neurecore.com` returns HTTP 200 ✅
 
-### Database (PostgreSQL via Docker)
+### Neon DB Schema Fixes — FIXED
 
-- **Status**: ✅ Running on localhost:5432
-- **Database**: `neurecore_dev`
-- **Migrations**: Applied (20260326\_\*) including:
-  - `tier_agent_pools` table
-  - `tier_agent_pool_items` table
-  - Foreign key constraints
+- `tiers` table: added 13 missing columns (`slug`, `isDefault`, `monthlyPrice`, `yearlyPrice`,
+  `currency`, `sortOrder`, `maxApiCalls`, `maxConversationMessages`, `maxFileSizeMB`,
+  `allowCustomBranding`, `allowApiAccess`, `allowSso`, `allowAuditExport`)
+- Renamed `maxStorageGb` → `maxStorageGB` (Prisma casing match)
+- Set slugs: `starter` (isDefault=true, sortOrder=1), `professional`, `enterprise`
+- `tenants.tierId`: set to `'tier_starter'` for NULL rows; column made NOT NULL with default
 
-### Cache (Redis via Docker)
+### Data Verified via Live API ✅
 
-- **Status**: ✅ Running on localhost:6379
-- **Usage**: Auth blacklisting, session caching
+| Endpoint             | Count                                 |
+| -------------------- | ------------------------------------- |
+| Tenants              | 2 (Demo Tenant, Primary Tenant)       |
+| Users                | 6                                     |
+| Agent Templates      | 99 (platform)                         |
+| Department Templates | 9                                     |
+| Tiers                | 3 (Starter, Professional, Enterprise) |
 
-## Running Services (VERIFIED ✅)
+## Current Running Services (Local Dev — March 31, 2026) ✅
 
-| Service         | Port        | Status     | HTTP Code |
-| --------------- | ----------- | ---------- | --------- |
-| Backend API     | 3000        | ✅ Running | 200       |
-| Frontend Tenant | 3001        | ✅ Running | 200       |
-| Frontend Admin  | 3002        | ✅ Running | 200       |
-| SSH Tunnel      | 15433/16380 | ✅ Running | N/A       |
+| Service         | Port        | PID    | Database                            |
+| --------------- | ----------- | ------ | ----------------------------------- |
+| NestJS Backend  | 3000        | 97911  | Contabo `neurecore_prod` via tunnel |
+| Frontend Tenant | 3001        | 102434 | —                                   |
+| Frontend Admin  | 3002        | 101548 | —                                   |
+| SSH Tunnel      | 15433/16380 | 85338  | Contabo PG + Redis                  |
 
-**Updated**: 2026-03-31 - Fresh Prisma client generated, backend restarted successfully. Database schema errors resolved.
+Backend log confirmed: `Database connected` + `Redis connected` + `Redis ready`
 
-## Environment Configuration
+## Environment Configuration (backend/.env — local dev)
 
 - **NODE_ENV**: development
-- **LOG_LEVEL**: debug
-- **JWT Access Expires**: 15m
-- **JWT Refresh Expires**: 7d
+- **DATABASE_URL**: `postgresql://neurecore_app:...@127.0.0.1:15433/neurecore_prod?sslmode=prefer`
+- **REDIS_URL**: `redis://:...@127.0.0.1:16380/0`
+- **TENANT_FRONTEND_URL**: `http://localhost:3001`
+- **ADMIN_FRONTEND_URL**: `http://localhost:3002`
+- **ADDITIONAL_CORS_ORIGINS**: `http://localhost:3000,http://localhost:3001,http://localhost:3002,https://hq.neurecore.com,https://cc.neurecore.com`
 
-## Active Terminals
+## Superadmin Credentials
 
-- Terminal 10: Backend running (npm run start:dev)
-- Terminal 6: Prisma Studio (inactive)
-- Frontend Tenant: Running (likely Vite dev server)
-- Frontend Admin: Running (likely Vite dev server)
+- **Email**: `mnpiracha@gmail.com`
+- **Password**: `Admin@123!`
+- **Script**: `backend/scripts/make-superadmin.mjs`
 
-## Recent DevOps Operations (March 30, 2026)
+## SSH Tunnel Management
 
-1. SSH'd into Contabo — verified PostgreSQL 16.13, Redis 7.0.15, 11GB RAM
-2. Identified databases: `neurecore_prod` (29 tables), `neurecore_dev` (36 tables), `ecoearthshop`
-3. Found security issues: Redis no pass, open pg_hba, superuser ownership
-4. Created `docs/CONTABO_MIGRATION_PLAN.md` — comprehensive 6-phase plan
-5. Added merge+delete `neurecore_dev`, local Docker cleanup to plan
-6. UMB sync: Updated `progress.md` + `activeContext.md`
+```bash
+# Check tunnel status
+ss -tlnp | grep -E '15433|16380'
+
+# Start tunnel (if down)
+ssh -f -N \
+  -L 15433:localhost:5432 \
+  -L 16380:localhost:6379 \
+  root@109.123.248.253
+
+# PID stored at: /tmp/neurecore_tunnel.pid (currently 85338)
+```
+
+## Recent DevOps Operations (March 31, 2026)
+
+1. Fixed LiteSpeed httpd_config.conf missing `}` → `brain.neurecore.com` now 200
+2. Fixed Neon `tiers` schema drift (13 columns added, slug populated)
+3. Fixed `tenants.tierId` NULL → `'tier_starter'` for existing rows
+4. Verified all production data via live API (brain.neurecore.com)
+5. Updated `backend/.env` for local dev (NODE_ENV=development, localhost CORS)
+6. Started full local dev stack: backend (3000), admin (3002), tenant (3001) — all connected to Contabo DBs via SSH tunnel
+7. Created `docs/CONTABO_MIGRATION_PLAN.md` — comprehensive 6-phase plan
+8. Added merge+delete `neurecore_dev`, local Docker cleanup to plan
+9. UMB sync: Updated `progress.md` + `activeContext.md`
 
 ## Contabo Migration Plan Summary
 
