@@ -17,8 +17,13 @@ export class ObservabilityController {
   /** Tenant KPI summary */
   @Get('kpis')
   getTenantKpis(@CurrentUser() user: JwtPayload) {
-    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
-    return this.observabilityService.getTenantKpis(user.tenantId);
+    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
+      user.role ?? '',
+    );
+    if (!user.tenantId && !isSuperAdmin)
+      throw new ForbiddenException('Tenant context required');
+    const tenantId = user.tenantId ?? null;
+    return this.observabilityService.getTenantKpis(tenantId);
   }
 
   /** Execution logs for the tenant */
@@ -29,8 +34,13 @@ export class ObservabilityController {
     @Query('limit') limit = '20',
     @Query('agentId') agentId?: string,
   ) {
-    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
-    return this.observabilityService.getExecutionLogs(user.tenantId, {
+    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
+      user.role ?? '',
+    );
+    if (!user.tenantId && !isSuperAdmin)
+      throw new ForbiddenException('Tenant context required');
+    const tenantId = user.tenantId ?? null;
+    return this.observabilityService.getExecutionLogs(tenantId, {
       page: Number(page),
       limit: Number(limit),
       agentId,
@@ -46,8 +56,13 @@ export class ObservabilityController {
     @Query('to') to?: string,
     @Query('limit') limit = '100',
   ) {
-    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
-    return this.observabilityService.getMetrics(user.tenantId, {
+    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
+      user.role ?? '',
+    );
+    if (!user.tenantId && !isSuperAdmin)
+      throw new ForbiddenException('Tenant context required');
+    const tenantId = user.tenantId ?? null;
+    return this.observabilityService.getMetrics(tenantId, {
       name,
       from: from ? new Date(from) : undefined,
       to: to ? new Date(to) : undefined,
@@ -65,8 +80,13 @@ export class ObservabilityController {
     @Query('limit') limit = '20',
     @Query('agentId') agentId?: string,
   ) {
-    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
-    return this.observabilityService.getTraces(user.tenantId, {
+    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
+      user.role ?? '',
+    );
+    if (!user.tenantId && !isSuperAdmin)
+      throw new ForbiddenException('Tenant context required');
+    const tenantId = user.tenantId ?? null;
+    return this.observabilityService.getTraces(tenantId, {
       page: Number(page),
       limit: Number(limit),
       agentId,
@@ -82,8 +102,13 @@ export class ObservabilityController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
-    return this.observabilityService.getCosts(user.tenantId, {
+    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
+      user.role ?? '',
+    );
+    if (!user.tenantId && !isSuperAdmin)
+      throw new ForbiddenException('Tenant context required');
+    const tenantId = user.tenantId ?? null;
+    return this.observabilityService.getCosts(tenantId, {
       from: from ? new Date(from) : undefined,
       to: to ? new Date(to) : undefined,
     });

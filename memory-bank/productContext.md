@@ -500,3 +500,71 @@ Phase 1 is complete when all of these tests pass:
 - [ ] Frontends can register → login → access dashboard
 - [ ] Token refresh works seamlessly
 - [ ] WebSocket reconnects on network restore
+
+---
+
+## Onboarding Wizard — Product Flow (9 Steps)
+
+### Step Order (WELCOME is defined but skipped in ACTIVE_STEPS)
+1. **ORGANIZATION** — Company name, slug, industry, size, timezone, currency
+2. **ADMIN** — Admin user profile (first/last name, title)
+3. **PLAN** — Select billing tier (fetched from platform; set by admin)
+4. **DEPARTMENTS** — Create departments (name, description)
+5. **TEAM** — Invite team members (email, firstName, lastName, role)
+6. **INTEGRATIONS** — Toggle integrations (Slack, Google Workspace, etc.)
+7. **AGENTS** — Configure AI agents from platform templates
+8. **SECURITY** — Set 2FA requirements, session policy, IP allowlist
+9. **REVIEW** → triggers `completeWizard` which deploys everything to DB
+
+### Wizard Completion Behavior
+- `completeWizard` is the **only** step that writes to the database for invitations, integrations, and agents
+- Organization + departments are written to DB during their respective steps
+- `completeWizard` is idempotent — safe to call multiple times
+
+### What Admin Pre-configures for Tenants
+Before a tenant can complete the wizard, an admin should have:
+1. Created at least one active **Tier/Plan** — tenants select from these in PLAN step
+2. Created **Platform Agent Templates** — tenants pick from these in AGENTS step
+3. (Optional) Deployed dept templates or agents directly to skip wizard for specific tenants
+
+---
+
+## Admin Portal Control Surface
+
+### Tenant Management
+- List all tenants, view per-tenant stats (agents, users, plan)
+- Deploy department template to specific tenant
+- Deploy agents directly to specific tenant (bypasses wizard)
+
+### Platform Configuration
+- **Tiers**: Create/edit/toggle/reorder plans that appear in tenant wizard
+  - Controls: `maxAgents`, `maxUsers`, features list, price, billing cycle
+- **Agent Templates**: Create platform-level templates for wizard AGENTS step
+  - Only `type: PLATFORM` templates appear in onboarding
+- **Department Templates**: Named department sets admins can deploy to tenants
+
+### Monitoring & Analytics
+- Cross-tenant agent fleet view
+- Global user count and role breakdown
+- Per-tenant KPIs (active agents, invitations, integrations)
+- Platform-wide usage metrics
+
+### Platform Settings
+- Security policy (password requirements, 2FA enforcement)
+- Notification settings
+- Integration configuration
+
+---
+
+## Tenant Portal — Current Implementation Status
+
+| Feature | Status |
+|---|---|
+| Auth (login/register/logout) | ✅ Complete |
+| Onboarding wizard (9 steps) | ✅ Complete |
+| Dashboard | ✅ Shell (needs agent data) |
+| Agent management | 🔲 Planned |
+| Team management | 🔲 Planned |
+| Billing/plan management | 🔲 Planned |
+| Integrations management | 🔲 Planned |
+| Settings | 🔲 Planned |

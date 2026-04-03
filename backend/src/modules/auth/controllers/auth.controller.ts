@@ -17,6 +17,7 @@ import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Public } from '../../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { ValidatedUser } from '../interfaces/auth.interface';
 import type { JwtPayload } from '../interfaces/token.interface';
 import type { Request } from 'express';
@@ -25,7 +26,10 @@ import type { Request } from 'express';
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -67,14 +71,39 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@CurrentUser() user: ValidatedUser) {
+  async me(@CurrentUser() user: ValidatedUser) {
+    // Enrich with tenant data so the frontend can display company name/logo
+    if (user.tenantId) {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: user.tenantId },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          industry: true,
+          tier: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              maxAgents: true,
+              maxUsers: true,
+            },
+          },
+        },
+      });
+      if (tenant) {
+        return { ...user, tenant };
+      }
+    }
     return user;
   }
 
   /** Alias for /me — satisfies spec requirement for GET /auth/profile */
   @UseGuards(JwtAuthGuard)
   @Get('profile')
-  profile(@CurrentUser() user: ValidatedUser) {
-    return user;
+  async profile(@CurrentUser() user: ValidatedUser) {
+    return this.me(user);
   }
 }

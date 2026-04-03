@@ -254,3 +254,139 @@ NEXT_PUBLIC_SENTRY_DSN=...
 - **Guard Pattern**: Auth and role guards on routes
 - **Decorator Pattern**: Custom decorators for tenant context
 - **Observer Pattern**: Socket.IO event emitters
+
+---
+
+## Onboarding Module Technical Details
+
+### Redis Wizard Session
+- Key pattern: `wizard:{wizardId}` (UUID)
+- TTL: 24 hours
+- Client: Upstash REST (via `@upstash/redis`)
+- **Bug fixed**: `RedisService.setJson/getJson` was double-serializing — Upstash REST auto-serializes JSON; fixed by bypassing manual `JSON.stringify/parse` when `upstashClient` is active
+
+### Onboarding DTOs — Required Fields
+**`OrganizationSetupDto`**
+- `name`: string (required)
+- `slug`: string (required, unique)
+- `industry`: Industry enum (e.g. `TECHNOLOGY`)
+- `size`: CompanySize enum (e.g. `SMALL`)
+- `timezone`: string (e.g. `"UTC"`)
+- `currency`: string (e.g. `"USD"`)
+
+**`InvitationInputDto`**
+- `email`: string (required)
+- `firstName`: string (required)
+- `lastName`: string (required)
+- `role`: UserRole enum (required) — use `MANAGER` or `VIEWER`, not TENANT_*
+- `departmentId`: string (**optional** — `@IsOptional()`)
+
+**`AgentConfigInputDto`**
+- `templateId`: string (required)
+- `name`: string (required)
+- `departmentId`: string (**optional** — `@IsOptional()`)
+
+**`IntegrationSetupDto`** (per-integration, one call per type)
+- `type`: string (required, e.g. `SLACK`, `GOOGLE_WORKSPACE`)
+- `name`: string (required)
+
+### Enum Values Reference
+```typescript
+enum Industry {
+  TECHNOLOGY, FINANCE, HEALTHCARE, RETAIL, MANUFACTURING,
+  EDUCATION, LEGAL, CONSULTING, MEDIA, REAL_ESTATE,
+  HOSPITALITY, TRANSPORTATION, ENERGY, GOVERNMENT, NON_PROFIT, OTHER
+}
+
+enum CompanySize { STARTUP, SMALL, MEDIUM, LARGE, ENTERPRISE }
+
+enum UserRole { SUPER_ADMIN, ADMIN, MANAGER, AGENT, VIEWER }
+
+enum BillingCycle { MONTHLY, YEARLY }
+```
+
+### Auth Token Keys by Frontend
+| Frontend | localStorage Key | Role |
+|---|---|---|
+| frontend-admin (3002) | `admin_accessToken` | SUPER_ADMIN |
+| frontend-tenant (3001) | `hq_accessToken` (via `tokenManager`) | ADMIN/MANAGER/VIEWER |
+
+### Wizard Step API Summary
+```
+POST   /onboarding/start-authenticated  → { wizardId, step }  [JWT required]
+PUT    /onboarding/organization         → { step }
+PUT    /onboarding/admin                → { step }
+GET    /onboarding/plans                → PlanDto[]
+PUT    /onboarding/plan                 → { step }
+POST   /onboarding/departments          → DepartmentDto (201)
+POST   /onboarding/invitations          → InvitationDto (201)
+POST   /onboarding/integrations         → IntegrationDto (201)
+GET    /onboarding/agent-templates      → AgentTemplateDto[]
+POST   /onboarding/agents               → AgentDto (201)
+PUT    /onboarding/security             → { step }
+POST   /onboarding/complete             → { tenantId, message }
+GET    /onboarding/progress             → WizardProgress (401 after complete)
+```
+
+### E2E Test File
+**Path**: `backend/e2e-wizard-full.mjs`
+- Pure ESM, no test framework
+- Registers new user, runs all 9 wizard steps, calls completeWizard
+- Verifies `tenantId` in final response
+- Run: `node e2e-wizard-full.mjs` from `backend/` directory
+
+---
+
+## Response Envelope — Critical Pattern for Frontend Developers
+
+### How Every API Response Is Shaped
+
+The global `TransformResponseInterceptor` wraps **all** controller returns:
+```json
+{
+  "status": "success",
+  "data": <what the service/controller returned>,
+  "meta": { "timestamp": "...", "requestId": "..." }
+}
+```
+
+Paginated list services (agents, tasks, workflows, etc.) return their own wrapper:
+```json
+{ "data": [], "total": 42, "page": 1, "limit": 20, "totalPages": 3 }
+```
+
+Combined, a paginated list response via Axios is:
+```
+axiosResponse.data              → { status, data: {...}, meta }
+axiosResponse.data.data         → { data: [], total, page, ... }
+axiosResponse.data.data.data    → []  ← the actual array
+```
+
+### Correct Extraction Pattern (use everywhere)
+```ts
+const payload = res.data?.data?.data ?? res.data?.data ?? res.data ?? [];
+const items = Array.isArray(payload) ? payload : [];
+```
+
+The triple fallback handles:
+1. Paginated list endpoint → `data.data.data`
+2. Non-paginated object returned directly → `data.data`
+3. Endpoint without interceptor (health checks, etc.) → `data`
+
+### WebSocket Auth — Correct Pattern
+```ts
+// ❌ Token captured at socket-creation time (may be null before login)
+auth: { token: tokenManager.getAccessToken() }
+
+// ✅ Callback form — token read fresh on every connect/reconnect
+auth: (cb) => cb({ token: tokenManager.getAccessToken() })
+```
+
+### RegisterDto — lastName is Optional
+`RegisterDto.lastName` is `@IsOptional()` because the register form uses a single name field.
+Backend service defaults `lastName` to `''` (Prisma requires non-null `String`).
+Frontend spreads `lastName` conditionally: `...(lastName && { lastName })`.
+
+### AuthUser Interface — No `name` Field
+`AuthUser` has `firstName: string` and `lastName: string`. There is no `name` field.
+Display full name anywhere with: `` `${user.firstName} ${user.lastName}`.trim() ``

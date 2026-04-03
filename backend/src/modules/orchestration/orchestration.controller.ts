@@ -99,7 +99,8 @@ export class WorkflowsController {
         throw new BadRequestException('tenantId is required for SUPER_ADMIN');
       return tenantId;
     }
-    return user.tenantId!;
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return user.tenantId;
   }
 
   @Get()
@@ -110,8 +111,10 @@ export class WorkflowsController {
     @Query('limit') limit = '20',
     @Query('tenantId') tenantId?: string,
   ) {
-    const resolvedTenantId = this.resolveTenantId(user, tenantId);
-    return this.workflowsService.findAll(resolvedTenantId, {
+    // For findAll, allow null tenantId to return empty results
+    const resolvedTenantId =
+      user.role === UserRole.SUPER_ADMIN ? tenantId : user.tenantId;
+    return this.workflowsService.findAll(resolvedTenantId ?? null, {
       status,
       page: Number(page),
       limit: Number(limit),

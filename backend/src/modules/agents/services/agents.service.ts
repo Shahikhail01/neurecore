@@ -23,31 +23,6 @@ import type {
 @Injectable()
 export class AgentsService implements IAgentService {
   private readonly logger = new Logger(AgentsService.name);
-  private readonly driftSafeAgentSelect = {
-    id: true,
-    name: true,
-    description: true,
-    type: true,
-    status: true,
-    model: true,
-    systemPrompt: true,
-    instructions: true,
-    budgetPerDay: true,
-    totalSpend: true,
-    permissions: true,
-    config: true,
-    metadata: true,
-    isActive: true,
-    tenantId: true,
-    createdById: true,
-    templateId: true,
-    templateVersion: true,
-    isSelected: true,
-    departmentId: true,
-    createdAt: true,
-    updatedAt: true,
-  } as const;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
@@ -79,50 +54,24 @@ export class AgentsService implements IAgentService {
       ...(isActive !== undefined && { isActive }),
     };
 
-    try {
-      const [data, total] = await this.prisma.$transaction([
-        this.prisma.agent.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-          include: { _count: { select: { tasks: true } } },
-        }),
-        this.prisma.agent.count({ where }),
-      ]);
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.agent.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { _count: { select: { tasks: true } } },
+      }),
+      this.prisma.agent.count({ where }),
+    ]);
 
-      return {
-        data,
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      };
-    } catch (error) {
-      this.logger.warn(
-        `Agents.findAll relation/_count failed, retrying without counts: ${(error as Error).message}`,
-      );
-      if (this.isMissingColumnError(error)) {
-        const [data, total] = await Promise.all([
-          this.prisma.agent.findMany({
-            where,
-            skip,
-            take: limit,
-            orderBy: { createdAt: 'desc' },
-            select: this.driftSafeAgentSelect,
-          }),
-          this.prisma.agent.count({ where }),
-        ]);
-        return {
-          data,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        };
-      }
-      throw error;
-    }
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: string, tenantId: string): Promise<unknown> {
@@ -223,11 +172,5 @@ export class AgentsService implements IAgentService {
       select: { id: true },
     });
     if (!exists) throw new NotFoundException(`Agent ${id} not found`);
-  }
-
-  private isMissingColumnError(error: unknown): boolean {
-    if (!(error instanceof Error)) return false;
-    const code = (error as { code?: string }).code;
-    return code === 'P2022' || error.message.includes('does not exist');
   }
 }

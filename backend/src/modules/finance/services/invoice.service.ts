@@ -92,18 +92,19 @@ export class InvoiceService implements IInvoiceService {
   }
 
   async findAll(
-    tenantId: string,
+    tenantId: string | null,
     page = 1,
     limit = 20,
   ): Promise<InvoiceListResult> {
     const skip = (page - 1) * limit;
+    const where = tenantId ? { tenantId } : undefined;
     const data = await this.prisma.invoice.findMany({
-      where: { tenantId },
+      where,
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
     });
-    const total = await this.prisma.invoice.count({ where: { tenantId } });
+    const total = await this.prisma.invoice.count({ where });
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 

@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/stores/authStore';
-import type { AuthUser } from '@/types/auth.types';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/authStore";
+import type { AuthUser } from "@/types/auth.types";
 
 /** Tenant roles that may access the portal */
-const TENANT_ROLES = ['OWNER', 'ADMIN', 'USER', 'AUDITOR'];
+const TENANT_ROLES = ["OWNER", "ADMIN", "USER", "AUDITOR"];
 
 /**
  * Guards all tenant portal pages.
@@ -22,7 +22,10 @@ export function useTenantAuth(): AuthUser | null {
   useEffect(() => {
     if (!hasHydrated) return;
     if (!user || !TENANT_ROLES.includes(user.role)) {
-      router.replace('/login');
+      router.replace("/login");
+    } else if (!user.tenantId) {
+      // User is authenticated but has no tenant - redirect to onboarding
+      router.replace("/onboarding");
     }
   }, [user, hasHydrated, router]);
 

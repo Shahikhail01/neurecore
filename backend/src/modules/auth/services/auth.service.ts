@@ -71,7 +71,7 @@ export class AuthService implements IAuthService {
         email: data.email,
         passwordHash,
         firstName: data.firstName,
-        lastName: data.lastName,
+        lastName: data.lastName ?? '',
         role: data.role ?? UserRole.USER,
         tenantId: data.tenantId ?? null,
       },

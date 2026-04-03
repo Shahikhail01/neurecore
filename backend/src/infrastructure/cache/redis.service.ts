@@ -167,11 +167,23 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async setJson<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
+    // Use Upstash client directly to avoid double-serialization (Upstash auto-serializes)
+    if (this.upstashClient) {
+      if (ttlSeconds)
+        await this.upstashClient.set(key, value, { ex: ttlSeconds });
+      else await this.upstashClient.set(key, value);
+      return;
+    }
     await this.set(key, JSON.stringify(value), ttlSeconds);
   }
 
   async getJson<T>(key: string): Promise<T | null> {
-    const raw = await this.get(key);
+    // Use Upstash client directly: it auto-deserializes JSON so we skip JSON.parse
+    if (this.upstashClient) {
+      const res = await this.upstashClient.get(key);
+      return (res as T) ?? null;
+    }
+    const raw = await this.client.get(key);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as T;

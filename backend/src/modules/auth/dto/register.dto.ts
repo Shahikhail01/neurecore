@@ -22,10 +22,10 @@ export class RegisterDto {
   @MaxLength(64)
   firstName: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(64)
-  lastName: string;
+  lastName?: string;
 
   @IsOptional()
   @IsEnum(UserRole)

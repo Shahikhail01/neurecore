@@ -1,0 +1,310 @@
+Date: 2026-04-01 (update 8 — Full Contabo DB Migration + Infrastructure Hardening — COMPLETE)
+
+## Contabo DB Migration — DONE ✅
+
+### What was done
+
+1. Created `backend/.env` + `.env.local-contabo` pointing to Contabo via SSH tunnel (`127.0.0.1:15433/neurecore_prod`, `NODE_ENV=development`)
+2. Added `start:local-contabo` npm script to `backend/package.json`
+3. Baselined all Prisma migrations on Contabo (11 total: 10 original + `20260401000000_add_agent_is_selected`)
+4. Migrated data Neon → Contabo via CSV: tiers(3), tenants(2), users(8), agent_templates(99), dept_templates(9)
+5. Updated CORRECT production files: `/opt/neurecore/backend/backend/.env` + `.env.production`
+   - `DATABASE_URL` → `postgresql://neurecore_app:NeureCoreApp2026!SecureDBPass@127.0.0.1:5432/neurecore_prod?sslmode=prefer`
+   - `REDIS_URL` → `redis://:kPzbcTiOQBWwTs6dr4xinAWfXhbUv3AFjRdkjhvxQ=@127.0.0.1:6379/0`
+   - `UPSTASH_REDIS_REST_URL` + `TOKEN` cleared (empty)
+6. PM2 id 24 restarted with `--update-env`
+7. Removed `driftSafeTenantSelect` + try/catch fallbacks from `TenantsService`
+8. Removed `driftSafeAgentSelect` + try/catch fallbacks from `AgentsService`
+9. Created formal migration `prisma/migrations/20260401000000_add_agent_is_selected/migration.sql`
+
+### Redis Hardening
+
+- `maxmemory 512MB` (was 0/unlimited → OOM risk)
+- Removed `109.123.248.253` (public IP) from `bind` → now `127.0.0.1 -::1` only
+- Config persisted to `/etc/redis/redis.conf` via `CONFIG REWRITE` + sed
+- `appendonly yes`, `appendfsync everysec` confirmed
+
+### Confirmed Result
+
+- `[PrismaService] Database connected` ✅ (Contabo PG direct)
+- `[RedisService] Redis connected` + `Redis ready` ✅ (ioredis, NOT Upstash REST)
+- `https://brain.neurecore.com/api` responding ✅
+- TypeScript: 0 errors ✅
+
+### Key paths on server
+
+- CORRECT env files: `/opt/neurecore/backend/backend/.env` and `.env.production`
+- WRONG (do not edit): `/opt/neurecore/backend/.env.production` (parent dir — app ignores)
+- PM2 process: id 24 (`neurecore-backend`)
+
+### Contabo DB Tables & Records (April 1, 2026)
+
+- 39 tables total, 11 migrations applied
+- tiers: 3 | tenants: 2 | users: 8 | agent_templates: 99 | dept_templates: 9
+- Everything else: 0 (will populate as users interact with the platform)
+
+### Status: ✅ Complete. Neon and Upstash are no longer used anywhere.
+
+---
+
+Date: 2026-04-01 (update 7 — Registration → Onboarding wizard redirect fix)
+
+## Bug Fixed: New Registration Bypassing Onboarding Wizard
+
+### Root Cause
+
+After registration, `authService.register()` returns the new user (with `tenantId: null`).
+`setUser(result.user)` is called immediately — this triggers the `useEffect` guard in
+`register/page.tsx` which blindly did `router.replace("/dashboard")`, racing with and
+overriding the explicit `router.push("/onboarding")` that followed.
+
+### Files Changed
+
+- `frontend-tenant/src/app/register/page.tsx`
+  - `useEffect` guard updated: `user.tenantId === null` → `/onboarding`; else → `/dashboard`
+- `frontend-tenant/src/app/onboarding/page.tsx`
+  - New auth guard: unauthenticated → `/register`; `user.tenantId` already set → `/dashboard`
+  - `handleNext` on `WizardStep.REVIEW`: after `completeWizard()`, calls `authService.me()`
+    to refresh `user` in auth store with the newly assigned `tenantId` — prevents redirect
+    loop back to onboarding on next navigation
+
+### Flow (correct)
+
+```
+/register → register() → user{tenantId:null} → /onboarding
+/onboarding → wizard steps → completeWizard() → me() → user{tenantId:"..."} → /dashboard
+```
+
+### Status: ✅ Complete. TypeScript 0 errors.
+
+---
+
+Date: 2026-03-31 (update 6 — Frontend Tenant UI: full dashboard refactor + next steps)
+
+Summary:
+
+- All dashboard and supporting components in `frontend-tenant` refactored to match the "AI Office" mockup: 3-column layout, left roster, workflow pipeline/activity center, right context panel.
+- Technical/advanced features moved to right panel or settings for cleaner UX.
+- Build is clean, all major UI tasks complete.
+
+Next steps:
+
+1. Continue updating remaining subpages (Tasks, Workflows, Approvals, Departments, etc.) to use the new 3-column/context-panel layout for consistency.
+2. Start wiring up backend actions for the new UI: real-time pipeline, file uploads, approval actions, agent market slot logic, etc.
+3. Polish and test: add full test coverage for new UI flows, update any failing snapshots, and ensure mobile/responsive behavior.
+
+Status: UI redesign complete for dashboard; subpage refactor and backend wiring in-progress.
+
+Date: 2026-03-31 (next steps)
+
+- Continue updating remaining subpages (Tasks, Workflows, Approvals, Departments, etc.) to match the new 3-column layout and context-panel pattern.
+- Start wiring up backend actions for the new UI (real-time pipeline, file uploads, approval actions, agent market hire/swap, etc.).
+
+- New UI redesign (dashboard, agents, shell, right panel, etc.) is now complete and live in the codebase as of 2026-03-31.
+
+Date: 2026-03-30
+
+Summary:
+
+- Restored `backend/prisma/schema.prisma` to a known-good version (tier system included).
+- Generated Prisma Client where needed and fixed a TypeScript/runtime error in `backend/src/modules/agents/security/security-interceptor.service.ts` (commit 9d30749).
+- Patched `TenantsService` and `AgentsService` to retry queries without relation/includes when DB columns are missing (prevents 500s during schema drift).
+- Inspected migrations: `backend/prisma/migrations/20260330_add_tier_system/migration.sql` exists (adds `tiers`, `tier_agent_pools`, `tenants.tierId`, `agents.tierAgentPoolId`).
+- Attempted migration deployment; environment reported no pending migrations. Applied idempotent DDL manually to ensure `tiers`, `tier_agent_pools`, and the `tierId`/`tierAgentPoolId` columns exist and inserted default tier rows.
+- Restarted backend; health endpoint and admin login succeed, but `/api/v1/tenants` and `/api/v1/agents` still returned `INTERNAL_ERROR` (Prisma/DB schema drift likely); requestIds captured in logs for tracing.
+
+Environment notes:
+
+- DB: `postgresql://neurecore:password@localhost:5432/neurecore_dev?schema=public` (from `backend/.env`).
+- Key files: `backend/prisma/schema.prisma`, `backend/prisma/migrations/20260330_add_tier_system/migration.sql`, `backend/src/modules/tenants/tenants.service.ts`, `backend/src/modules/agents/services/agents.service.ts`.
+
+Next steps / TODOs:
+
+1. Verify applied migrations vs runtime DB: run `pnpm prisma migrate status` and inspect `_prisma_migrations` table for the tier migration.
+2. Run `pnpm prisma generate` in `backend/` to refresh generated client; restart backend.
+3. Reproduce failing endpoints and capture full Prisma error stack traces from server logs to confirm whether missing-column errors persist.
+4. If migration not recorded/applied to the DB used by the running process, run `pnpm prisma migrate deploy` (or apply migration SQL) against the correct `DATABASE_URL`.
+5. If errors persist after DDL and `prisma generate`, check `search_path`/DB/schema and confirm the backend process is connecting to the expected database/schema.
+6. Once endpoints return 200, remove temporary defensive retries in `TenantsService`/`AgentsService` or keep them if desired for robustness; commit and push final fixes.
+
+Status:
+
+- In-progress: migration reconciliation and final verification (steps 1-3).
+- Completed: schema restore, Prisma client regen (partial), TypeScript fix, defensive query patches, manual DDL applied.
+
+Notes for future debugging:
+
+- Keep requestIds from server logs when reproducing errors (they map to stack traces in logs).
+- Avoid re-running manual DDL on production; use migrations in development only.
+
+Date: 2026-03-31 (update 1)
+
+Update:
+
+- Confirmed `/api/v1/tenants` and `/api/v1/agents` 500s reproduced locally with requestIds and Prisma stack traces.
+- Root cause includes env precedence bug in `ConfigurationModule`: `.env.production` was always first, causing local dev to load production DB config unexpectedly.
+- Added `resolveEnvFilePaths()` in `backend/src/config/configuration.module.ts` to use env-aware order and optional `ENV_FILE` override.
+- Hardened schema-drift fallbacks in `TenantsService.findAll/findOne` and `AgentsService.findAll` using explicit safe `select` projections (prevents Prisma default `SELECT *` from requesting missing columns like `tierId` / `tierAgentPoolId`).
+- Verified with scripted probe: login + `GET /api/v1/tenants` + `GET /api/v1/agents` now return 200 after patch.
+
+---
+
+Date: 2026-03-31 (update 2 — Production Fix + Local Dev Stack)
+
+## LiteSpeed Root Cause — FIXED
+
+- `/usr/local/lsws/conf/httpd_config.conf`: missing closing `}` in `virtualHost endtime.gec5.com {}` block
+  caused all subsequent VHosts to parse as nested (brain.neurecore.com never registered as top-level).
+- Fix: `sed -i` added missing `}` after `restrained 1` line (~line 388). Backup at `.bak2`.
+- VHost config restored to CyberPanel format: `extprocessor nodeapi { type proxy; address 127.0.0.1:3003 }`
+- Result: `brain.neurecore.com` → HTTP 200 ✅
+
+## Neon DB Schema Fixes (applied via raw SQL)
+
+- `tiers`: added 13 columns (slug, isDefault, monthlyPrice, yearlyPrice, currency, sortOrder,
+  maxApiCalls, maxConversationMessages, maxFileSizeMB, allowCustomBranding, allowApiAccess, allowSso, allowAuditExport)
+- Renamed `maxStorageGb` → `maxStorageGB` (Prisma schema casing)
+- Slugs set: starter (isDefault=true, sortOrder=1), professional, enterprise
+- `tenants.tierId`: NULLs → `'tier_starter'`, column made NOT NULL
+
+## Production Data (all verified via live API)
+
+- 2 Tenants, 6 Users, 99 Agent Templates, 9 Dept Templates, 3 Tiers
+
+## Local Dev Stack — RUNNING
+
+- SSH tunnel PID 85338 → localhost:15433 (Contabo PG) + localhost:16380 (Contabo Redis)
+- `backend/.env` updated: NODE_ENV=development, localhost CORS origins added
+- Backend (3000, PID 97911): DB connected + Redis connected
+- Frontend Admin (3002, PID 101548): ready
+- Frontend Tenant (3001, PID 102434): ready
+
+## Pending
+
+- `neurecore_prod` on Contabo has ~29 tables; run `npx prisma migrate deploy` to bring up to 34
+- Remove schema-drift fallbacks in TenantsService/AgentsService once Contabo DB is fully migrated
+- Redis AOF hardening on Contabo
+- Create a proper Prisma migration file for `agents.isSelected` (added ad-hoc via raw SQL)
+
+---
+
+Date: 2026-03-31 (update 3 — Local Dev: Neon DB + agents.isSelected fix)
+
+## Root Cause: Local Dev Showing No Data
+
+- Contabo `neurecore_prod` DB has ZERO application data (0 tenants, 0 users, 0 templates)
+- All production data lives on Neon cloud DB
+- Fix: Changed `backend/.env` DATABASE_URL to Neon:
+  `postgresql://neondb_owner:npg_EaF8DrC3hdcm@ep-summer-pond-adpkqy1m-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require`
+- Backend rebuilt (`npm run build`) and restarted as PID 196159
+
+## `agents.isSelected` Column Fix
+
+- `/agents` returned HTTP 500: `The column 'agents.isSelected' does not exist`
+- Column exists in `prisma/schema.prisma` line 493 (`isSelected Boolean @default(true)`)
+  but was never migrated to Neon DB
+- Fix: `ALTER TABLE agents ADD COLUMN IF NOT EXISTS "isSelected" BOOLEAN NOT NULL DEFAULT true;`
+- `npx prisma migrate status` → "Database schema is up to date!" (10 migrations applied)
+
+## All Local Endpoints Now 200
+
+- tenants (2), users (6), tiers (3), agents (0), agent-templates/platform (99), dept-templates (9)
+- Frontend Admin (port 3002) rendering data correctly
+
+## Local Dev Stack State (as of this fix)
+
+- Backend PID: 196159, port 3000, DATABASE_URL → Neon
+- Frontend Admin PID: 101548, port 3002
+- Frontend Tenant PID: 102434, port 3001
+- SSH tunnel PID: 85338 (Contabo ports 15433/16380 — Redis still used via tunnel)
+
+---
+
+Date: 2026-03-31 (update 4 — afternoon: camelCase column drift, chart fix, finance & observability SUPER_ADMIN)
+
+## Neon DB camelCase Column Drift — 4 Tables Fixed
+
+- Backend crashed: `SyncSchedulerService` → `crm_connectors.createdAt` missing
+- Root cause: migration SQL used snake_case (`created_at`) but Prisma schema expects camelCase
+- Fix via raw SQL `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`:
+  - `crm_connectors`: `"createdAt"`, `"updatedAt"`
+  - `analytics_models`: `"tenantId"`, `"createdAt"`, `"updatedAt"`
+  - `analytics_features`: `"tenantId"`, `"createdAt"`
+  - `tenant_limits`: `"tenantId"`, `"createdAt"`, `"updatedAt"`
+
+## Recharts Width Warning Fixed
+
+- `AreaChart.tsx` + `LineChart.tsx`: added `width: "100%"` to container div
+- Fixes `width(-1) height(-1)` warning from `ResponsiveContainer`
+
+## Finance Module — SUPER_ADMIN 500 Fixed
+
+- `resolveTenantId()` throws for SUPER_ADMIN when no tenantId param
+- Fix: controller passes `null` for SUPER_ADMIN; service uses `where = tenantId ? {tenantId} : undefined`
+- Files: `backend/src/modules/finance/services/invoice.service.ts`,
+  `backend/src/modules/finance/controllers/finance.controller.ts`
+- Verified: `GET /finance/invoices` → 200 ✅
+
+## Observability Module — SUPER_ADMIN 403 Fixed
+
+- All 5 endpoints threw `ForbiddenException('Tenant context required')` for SUPER_ADMIN
+- Fix pattern: check `isSuperAdmin` before throwing; pass `null` to service; service omits WHERE when null
+- Files: `backend/src/modules/observability/observability.controller.ts`,
+  `backend/src/modules/observability/services/observability.service.ts`
+- `getTenantKpis(null)` → delegates to `getPlatformSummary()`
+- Verified: `/observability/logs`, `/observability/kpis`, `/observability/metrics` → 200 ✅
+
+## SUPER_ADMIN Guard Pattern (apply to any module hitting this issue)
+
+```typescript
+// Controller
+const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(user.role ?? '');
+if (!user.tenantId && !isSuperAdmin) throw new ForbiddenException('Tenant context required');
+const tenantId = user.tenantId ?? null;
+
+// Service signature
+async someMethod(tenantId: string | null, ...) {
+  where = { ...(tenantId !== null && { tenantId }), ...otherFilters }
+}
+```
+
+## Local Dev Stack State (as of update 4)
+
+- Backend PID: 251433, port 3000, DATABASE_URL → Neon
+- Frontend Admin PID: 101548, port 3002
+- Frontend Tenant PID: 102434, port 3001
+- SSH tunnel PID: 85338
+
+## Potential Remaining Issues (same SUPER_ADMIN pattern)
+
+- Check: CRM connectors, analytics, billing-events, quota-usage, approvals modules
+
+Date: 2026-03-31 (update 5 — Frontend: Tenant UI redesign)
+
+Update:
+
+- Rewrote `frontend-tenant` UI: `TenantShell` navigation grouped, `TopBar` redesigned, `RightPanel` sidebar + widgets, `MorningBriefing`, `AgentTeamRoster`.
+- Rewrote `/app/dashboard/page.tsx` into a 3-column layout (left roster, center command center with KPIs/charts/activity, right contextual sidebar).
+- Transformed `/app/agents/page.tsx` into "Team & Employee Market" with tabs for team vs marketplace, slot-tracking using tenant tier `maxAgents`, and marketplace templates fetch.
+- Added `.hide-scrollbar` utility to `src/app/globals.css` and confirmed `animate-pulse-slow` exists in `tailwind.config.js`.
+- Verified build: ran `npx next build` in `frontend-tenant` — build succeeded (28 pages pre-rendered).
+
+Files changed (not exhaustive):
+
+- frontend-tenant/src/components/TenantShell.tsx
+- frontend-tenant/src/components/layout/TopBar.tsx
+- frontend-tenant/src/components/layout/RightPanel.tsx
+- frontend-tenant/src/components/dashboard/MorningBriefing.tsx
+- frontend-tenant/src/components/dashboard/AgentTeamRoster.tsx
+- frontend-tenant/src/app/dashboard/page.tsx
+- frontend-tenant/src/app/agents/page.tsx
+- frontend-tenant/src/app/globals.css
+
+Next steps:
+
+1. Wire backend tier data to frontend (ensure tenant payload includes `tier.maxAgents`).
+2. Implement API endpoints for hiring/swapping templates (hire/swap actions) and handle tier slot validation server-side.
+3. Add tests for new UI flows and update any failing snapshots.
+4. Consider removing defensive schema-drift fallbacks after DB fully migrated.
+
+Status: In-progress — frontend changes implemented and built; backend wiring + market hire API pending.

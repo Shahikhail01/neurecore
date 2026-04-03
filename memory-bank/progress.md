@@ -1,32 +1,34 @@
 # Progress Tracking — NeureCore Gold Phase 1
 
-**Last Updated**: March 31, 2026
+**Last Updated**: April 1, 2026 (late evening — register race condition + legacy dashboard redirect fixed)
 **Current Phase**: Phase 1 Foundation + Production Stabilization
-**Overall Status**: 🟢 Phase 1 Complete — Production Verified, Local Dev Stack Running
+**Overall Status**: 🟢 Phase 1 Complete — Production on Contabo DB ✅
 
 ---
 
 ## High-Level Status Summary
 
-| Component                  | Status       | % Complete | Notes                                                                                |
-| -------------------------- | ------------ | :--------: | ------------------------------------------------------------------------------------ |
-| **Backend (Contabo)**      | 🟢 Running   |    100%    | PM2 id 24, port 3003, LiteSpeed proxy fixed, brain.neurecore.com → HTTP 200          |
-| **Admin Portal (Vercel)**  | 🟢 DNS Ready |    98%     | CNAME → cname.vercel-dns.com; cc.neurecore.com                                       |
-| **Tenant Portal (Vercel)** | 🟢 DNS Ready |    98%     | CNAME → cname.vercel-dns.com; hq.neurecore.com                                       |
-| **Wildcard Subdomain**     | 🟢 DNS Ready |    100%    | \*.neurecore.com → Vercel                                                            |
-| **Database (Neon)**        | 🟢 Fixed     |    100%    | tiers schema fixed (13 cols added), tierId NULLs fixed, all data verified            |
-| **Database (Contabo)**     | 🟡 Dev Use   |    80%     | `neurecore_prod` (29 tables) used for local dev via SSH tunnel. May need migrations. |
-| **Redis (Contabo)**        | 🟢 Connected |    90%     | Password set. Local dev connected via SSH tunnel (port 16380).                       |
-| **LiteSpeed Proxy**        | 🟢 Fixed     |    100%    | Missing `}` in httpd_config.conf fixed → brain.neurecore.com working                 |
-| **CORS Configuration**     | 🟢 Fixed     |    100%    | Production + localhost origins in backend/.env                                       |
-| **Auth Module**            | 🟢 Complete  |    100%    | Full auth with token rotation                                                        |
-| **Tenants Module**         | 🟢 Complete  |    100%    | Full CRUD with role guards                                                           |
-| **Users Module**           | 🟢 Complete  |    100%    | Full CRUD with tenantId filtering                                                    |
-| **Health Module**          | 🟢 Complete  |    100%    | /health routes (public)                                                              |
-| **Events (WebSocket)**     | 🟡 Complete  |    90%     | JWT auth, tenant namespacing                                                         |
-| **Guard & Filter Layer**   | 🟢 Complete  |    100%    | Global guards, filters, interceptors                                                 |
-| **Testing**                | 🔴 To Do     |    10%     | Integration testing needed                                                           |
-| **Local Dev Stack**        | 🟢 Running   |    100%    | Backend (3000) + Admin (3002) + Tenant (3001) all running, connected to Contabo      |
+| Component                  | Status        | % Complete | Notes                                                                                                      |
+| -------------------------- | ------------- | :--------: | ---------------------------------------------------------------------------------------------------------- |
+| **Backend (Contabo)**      | 🟢 Running    |    100%    | PM2 id 24, port 3003, LiteSpeed proxy fixed, brain.neurecore.com → HTTP 200                                |
+| **Admin Portal (Vercel)**  | 🟢 DNS Ready  |    98%     | CNAME → cname.vercel-dns.com; cc.neurecore.com                                                             |
+| **Tenant Portal (Vercel)** | 🟢 DNS Ready  |    98%     | CNAME → cname.vercel-dns.com; hq.neurecore.com                                                             |
+| **Wildcard Subdomain**     | 🟢 DNS Ready  |    100%    | \*.neurecore.com → Vercel                                                                                  |
+| **Database (Neon)**        | 🟢 Fixed      |    100%    | tiers schema fixed (13 cols added), tierId NULLs fixed, all data verified                                  |
+| **Database (Contabo)**     | 🟢 Production |    100%    | `neurecore_prod` (39 tables, 11 migrations). **NOW used by BOTH local dev AND production**. Neon retired.  |
+| **Database (Neon)**        | ⛔ Retired    |    100%    | Migrated to Contabo April 1, 2026. No longer used.                                                         |
+| **Redis (Contabo)**        | 🟢 Hardened   |    100%    | `maxmemory 512MB`, bind `127.0.0.1` only, AOF on. Production + local dev both use this.                    |
+| **LiteSpeed Proxy**        | 🟢 Fixed      |    100%    | Missing `}` in httpd_config.conf fixed → brain.neurecore.com working                                       |
+| **CORS Configuration**     | 🟢 Fixed      |    100%    | Production + localhost origins in backend/.env                                                             |
+| **Auth Module**            | 🟢 Complete   |    100%    | Full auth with token rotation                                                                              |
+| **Tenants Module**         | 🟢 Complete   |    100%    | Full CRUD with role guards                                                                                 |
+| **Users Module**           | 🟢 Complete   |    100%    | Full CRUD with tenantId filtering                                                                          |
+| **Health Module**          | 🟢 Complete   |    100%    | /health routes (public)                                                                                    |
+| **Events (WebSocket)**     | 🟡 Complete   |    90%     | JWT auth, tenant namespacing                                                                               |
+| **Guard & Filter Layer**   | 🟢 Complete   |    100%    | Global guards, filters, interceptors                                                                       |
+| **Testing**                | 🔴 To Do      |    10%     | Integration testing needed                                                                                 |
+| **Onboarding Wizard**      | 🟢 Fixed      |    100%    | Full flow + race condition fixed: setUser() moved after startWizard(); /dashboard → /dashboard-v2 redirect |
+| **Local Dev Stack**        | 🟢 Running    |    100%    | Backend (3000) + Admin (3002) + Tenant (3001) all running, connected to **Contabo** via SSH tunnel         |
 
 ---
 
@@ -40,13 +42,14 @@
 
 **Contabo Server**: `109.123.248.253` (LiteSpeed + PM2)
 
-**Production Data (Neon DB — verified March 31, 2026)**:
+**Production Data (Contabo DB — verified April 1, 2026)**:
 
-- 2 Tenants (Demo Tenant, Primary Tenant)
-- 6 Users
+- 3 Tiers (Starter, Professional, Enterprise)
+- 2 Tenants
+- 8 Users
 - 99 Agent Templates (platform)
 - 9 Department Templates
-- 3 Tiers (Starter, Professional, Enterprise)
+- 39 tables total, 11 migrations
 
 ---
 
@@ -64,24 +67,104 @@
 - Populated slug values: `starter`, `professional`, `enterprise`
 - `tenants.tierId`: NULLs set to `'tier_starter'`, column made NOT NULL
 
-### 3. Local Dev Stack — RUNNING
+### 3. Local Dev Stack — RUNNING (updated: now using Neon)
 
-- SSH tunnel up (PID 85338) → Contabo ports 15433 (PG) + 16380 (Redis)
-- `backend/.env` updated: NODE_ENV=development, localhost CORS origins added
-- All three servers started and confirmed listening
+- **Root discovery**: Contabo `neurecore_prod` has 0 tenants/users/templates — it is empty.
+  All production data lives on Neon. Switched `backend/.env` `DATABASE_URL` to Neon.
+- Agent PID: 196159 (rebuilt dist after .env change)
+- Missing `agents.isSelected` column detected; added via `ALTER TABLE` on Neon.
+- All local API endpoints verified: tenants (2), users (6), tiers (3), agents (0),
+  agent-templates (99), dept-templates (9) — all HTTP 200 ✅
+
+### 4. Neon DB camelCase Column Drift — RESOLVED (March 31, 2026 afternoon)
+
+- Backend crashed during `SyncSchedulerService` startup: `crm_connectors.createdAt` missing
+- Root cause: 4 tables had migration SQL with snake_case names but Prisma schema expects camelCase
+- Fix via raw SQL `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`:
+  - `crm_connectors`: `"createdAt"`, `"updatedAt"`
+  - `analytics_models`: `"tenantId"`, `"createdAt"`, `"updatedAt"`
+  - `analytics_features`: `"tenantId"`, `"createdAt"`
+  - `tenant_limits`: `"tenantId"`, `"createdAt"`, `"updatedAt"`
+
+### 5. Recharts Width Warning — RESOLVED
+
+- `AreaChart.tsx` and `LineChart.tsx`: added `width: "100%"` to container div
+- Fixes `ResponsiveContainer` measuring -1 before layout
+
+### 6. Finance Module SUPER_ADMIN 500 — RESOLVED (March 31, 2026 afternoon)
+
+- `FinanceService.listInvoices` threw 500 for SUPER_ADMIN: `resolveTenantId()` rejects when no tenantId
+- Fixed: `findAll(tenantId: string | null)` — null omits WHERE; controller passes null for SUPER_ADMIN
+- Files: `invoice.service.ts`, `finance.controller.ts`
+- Verified: `GET /finance/invoices` → 200 (total=0) ✅
+
+### 7. Observability Module SUPER_ADMIN 403 — RESOLVED (March 31, 2026 afternoon)
+
+- All 5 observability endpoints threw `ForbiddenException('Tenant context required')` for SUPER_ADMIN
+- Fixed controller: check `isSuperAdmin` before throwing; pass `null` to service
+- Fixed service: all methods accept `tenantId: string | null`; null omits tenant WHERE filter
+- Files: `observability.controller.ts`, `observability.service.ts`
+- Verified: `/observability/logs`, `/observability/kpis`, `/observability/metrics` → 200 ✅
+- Backend rebuilt and restarted (PID 251433)
+
+### 10. Register Race Condition + Legacy Dashboard Redirect — FIXED (April 1, 2026 late evening)
+
+- **Race condition** (`register/page.tsx`): `setUser()` was called immediately after `/auth/register`, firing the `useEffect` auth guard before `startAuthenticatedWizard()` resolved — onboarding page mounted with no `wizardId`. Fixed by reordering: `startWizard()` → `setCurrentStep()` → `setUser()` (last).
+- **Legacy `/dashboard`** (`dashboard/page.tsx`): added `useRouter` import + `useEffect(() => router.replace("/dashboard-v2"), [router])` at mount. Prevents stale sessions from looping through the dead legacy page.
+- 0 TypeScript errors ✅, dev server hot-reloaded ✅
+
+### 9. Full Registration → Onboarding → Dashboard-v2 Flow — RESOLVED (April 1, 2026 evening)
+
+Five root causes fixed across backend + frontend:
+
+**Backend:**
+
+- `onboarding.service.ts` — `completeWizard()`: checks if user exists by email; updates `tenantId` if so, creates new user only if not. Tenant created inline if departments step was skipped.
+- `onboarding.service.ts` — new `startAuthenticatedWizard(email)`: wizard init with no email-conflict check.
+- `onboarding.controller.ts` — `POST /onboarding/start-authenticated` (JWT-guarded).
+- `auth.controller.ts` — `me()` / `profile()` return enriched `{ ...user, tenant: { id, name, slug, logoUrl, industry, tier } }`.
+
+**Frontend:**
+
+- `types/auth.types.ts`: `TenantProfile` type + `AuthUser.tenant?` field.
+- `services/onboarding.service.ts`: `startAuthenticatedWizard(accessToken)` added.
+- `app/register/page.tsx`: dark-themed 2-step form (account → plan selection with 3 tier cards → calls `/auth/register` + `startAuthenticatedWizard` → `/onboarding`).
+- `app/onboarding/page.tsx`: auto-starts wizard for authenticated users; skips `WelcomeStep`; redirects to `/dashboard-v2` on completion. Dark theme.
+- `components/TenantShell.tsx`: brand shows `user.tenant.logoUrl` (or letter-avatar) + `user.tenant.name` + tier name subtitle.
+- `components/onboarding/AgentsStep.tsx`: tier-aware grid of 8 named AI employees (sliced to `tier.maxAgents`).
+
+**Build**: 30 pages, 0 errors ✅
+
+### 8. Next.js Metadata `themeColor` Warning — RESOLVED (March 31, 2026)
+
+- **Issue**: Next.js 15.5.12 warning: "Unsupported metadata themeColor is configured in metadata export in /login. Please move it to viewport export instead."
+- **Root Cause**: `themeColor` should be in `viewport` export, not `metadata` export (Next.js 15 API change)
+- **Fix**: Updated `frontend-tenant/src/app/layout.tsx`:
+  - Imported `Viewport` type from 'next'
+  - Removed `themeColor: '#09090b'` from `metadata` export
+  - Added new `viewport` export with `themeColor` property
+- **Files Modified**: `frontend-tenant/src/app/layout.tsx`
+- **Verified**: No more warnings; all pages (/login, /dashboard, /departments, etc.) use correct viewport configuration ✅
 
 ---
 
 ## ⏳ Pending / Next Steps
 
-1. **Contabo DB migrations**: `neurecore_prod` has 29 tables vs Neon's 34. Run
-   `npx prisma migrate deploy` against Contabo to bring it up to date before using
-   for production workloads.
+1. **Contabo DB migrations**: `neurecore_prod` has 29 tables vs Neon's 34. If Contabo
+   ever needs to be used as a DB source, run `npx prisma migrate deploy` against it.
+   Currently not needed — Neon is the canonical DB.
 2. **Redis hardening**: Add AOF persistence on Contabo Redis.
-3. **Integration tests**: Need coverage for tenants, users, agents, auth endpoints.
-4. **Vercel Admin/Tenant portals**: Confirm they hit production API correctly after LiteSpeed fix.
-5. **Remove defensive service patches**: `TenantsService`/`AgentsService` schema-drift
+3. **Integration testing**: E2E tests for agents, tenants, auth flows.
+4. **`agents.isSelected` migration**: The column was added ad-hoc via raw SQL.
+   A proper Prisma migration should exist to track this formally (`prisma migrate dev`
+   on a clean branch to generate the migration file).
+5. **Integration tests**: Need coverage for tenants, users, agents, auth endpoints.
+6. **Vercel Admin/Tenant portals**: Confirm they hit production API correctly after LiteSpeed fix.
+7. **Remove defensive service patches**: `TenantsService`/`AgentsService` schema-drift
    fallbacks can be revisited once Contabo DB is fully migrated.
+8. **Audit other SUPER_ADMIN guards**: Check remaining modules (CRM, analytics, billing-events,
+   quota-usage, approvals) for the `if (!user.tenantId) throw ForbiddenException` pattern
+   and apply the null-tenantId fix if they serve admin-facing pages.
 
 ---
 
@@ -1427,3 +1510,193 @@ backend/src/modules/connectors/
 frontend-tenant/src/
 └── app/agents/[id]/tools/       # NEW - Agent tool configuration UI
 ```
+
+---
+
+## 🆕 ONBOARDING WIZARD — IMPLEMENTED (March 31, 2026)
+
+### Status: ✅ Backend Complete — Frontend Pending
+
+**Documentation:** [`docs/ONBOARDING_WIZARD_IMPLEMENTATION_GUIDE.md`](docs/ONBOARDING_WIZARD_IMPLEMENTATION_GUIDE.md)
+
+### Backend Files Created
+
+```
+backend/src/modules/onboarding/
+├── onboarding.module.ts                    ✅ Created
+├── onboarding.controller.ts               ✅ Created
+├── onboarding.service.ts                  ✅ Created
+├── interfaces/
+│   └── onboarding-state.interface.ts     ✅ Created
+├── dto/
+│   └── onboarding.dto.ts                  ✅ Created
+└── decorators/
+    └── wizard-id.decorator.ts            ✅ Created (simplified)
+```
+
+### API Endpoints
+
+| Method | Endpoint                         | Description         | Auth      |
+| ------ | -------------------------------- | ------------------- | --------- |
+| POST   | `/onboarding/start`              | Start wizard        | Public    |
+| PUT    | `/onboarding/organization`       | Update company info | Wizard ID |
+| PUT    | `/onboarding/admin`              | Update admin info   | Wizard ID |
+| GET    | `/onboarding/plans`              | Get available plans | Public    |
+| PUT    | `/onboarding/plan`               | Select plan         | Wizard ID |
+| POST   | `/onboarding/departments`        | Create departments  | Wizard ID |
+| POST   | `/onboarding/invitations`        | Invite team         | Wizard ID |
+| POST   | `/onboarding/integrations`       | Add integration     | Wizard ID |
+| GET    | `/onboarding/agent-templates`    | List templates      | Public    |
+| POST   | `/onboarding/agents`             | Configure agents    | Wizard ID |
+| PUT    | `/onboarding/security`           | Update security     | Wizard ID |
+| POST   | `/onboarding/complete`           | Complete wizard     | Wizard ID |
+| GET    | `/onboarding/progress/:wizardId` | Get progress        | Public    |
+
+### Frontend Status (Updated: March 31, 2026 17:38)
+
+- ✅ `frontend-tenant/src/app/onboarding/page.tsx` — Created (TypeScript verified ✅)
+- ✅ `frontend-tenant/src/types/onboarding.types.ts` — Created (all enums, DTOs, helpers)
+- ✅ `frontend-tenant/src/services/onboarding.service.ts` — Created (API methods)
+- ✅ `frontend-tenant/src/stores/onboardingStore.ts` — Created (Zustand state)
+- ✅ `frontend-tenant/src/components/onboarding/` — ALL 10 STEP COMPONENTS CREATED ✅
+  - ProgressBar.tsx, WelcomeStep.tsx, OrganizationStep.tsx, AdminStep.tsx
+  - PlanStep.tsx, TeamStep.tsx, DepartmentsStep.tsx, AgentsStep.tsx
+  - IntegrationsStep.tsx, WorkflowsStep.tsx, SecurityStep.tsx, ReviewStep.tsx
+- ✅ Route already registered via Next.js app router (app/onboarding/page.tsx)
+
+### 10-Step Wizard Flow
+
+1. Welcome → Account Creation
+2. Organization Details
+3. Admin User Setup
+4. Plan Selection
+5. Department Structure
+6. Invite Team Members (optional)
+7. Connect Integrations (optional)
+8. Configure Agents (optional)
+9. Security & Compliance
+10. Review & Launch
+
+---
+
+## April 2-3, 2026 — Full Wizard Rebuild + E2E Complete ✅
+
+### Backend Changes
+- `onboarding.dto.ts`: `InvitationInputDto.departmentId` → `@IsOptional()`; `AgentConfigInputDto.departmentId` → `@IsOptional()`
+- `onboarding-state.interface.ts`: Both `departmentId` fields optional in `WizardData`
+- `onboarding.service.ts`: `configureAgents` creates tenant if missing; `completeWizard` idempotently deploys agents/invitations/integrations from wizard state
+- `redis.service.ts`: Upstash double-serialization bug fixed — bypass JSON ops when using upstashClient
+
+### Frontend Changes (frontend-tenant)
+- `app/onboarding/page.tsx`: `ACTIVE_STEPS` expanded 5 → 9 (added TEAM, INTEGRATIONS, AGENTS, SECURITY)
+- `AgentsStep.tsx`: Full rewrite (was 330 lines with duplicate); now 191 lines — fetches real templates, calls `configureAgents` API
+- `TeamStep.tsx`: Full rewrite — firstName/lastName/email/role form, calls invitations API; 238 lines clean
+- `IntegrationsStep.tsx`: Full rewrite (was 121 lines with duplicate interface); now 115 lines — toggle UI, local store only
+- `src/types/onboarding.types.ts`: `InvitationInputDto.departmentId` → optional
+
+### E2E Test Created
+- **File**: `backend/e2e-wizard-full.mjs`
+- **Coverage**: register → POST start-authenticated → all 9 steps → POST complete → tenantId verified
+- **Result**: ✅ ALL 11 STEPS PASS
+
+### Wizard Step Component Status
+
+| Component | Status | Notes |
+|---|---|---|
+| WelcomeStep | Skipped | Not in ACTIVE_STEPS |
+| OrganizationStep | ✅ Connected | PUT /onboarding/organization |
+| AdminStep | ✅ Connected | PUT /onboarding/admin |
+| PlanStep | ✅ Connected | GET /onboarding/plans + PUT /onboarding/plan |
+| DepartmentsStep | ✅ Connected | POST /onboarding/departments (201) |
+| TeamStep | ✅ Rewritten | POST /onboarding/invitations (201) |
+| IntegrationsStep | ✅ Rewritten | Local store → completeWizard |
+| AgentsStep | ✅ Rewritten | GET /onboarding/agent-templates + POST /onboarding/agents (201) |
+| SecurityStep | ✅ Connected | PUT /onboarding/security |
+| ReviewStep | ✅ Connected | POST /onboarding/complete |
+
+### Build Status
+| Target | Status |
+|---|---|
+| Backend | ✅ Clean |
+| Frontend-tenant | ✅ Clean (29 pages) |
+| Frontend-admin | ✅ Clean (unchanged) |
+
+### Known Behavior
+- `GET /onboarding/progress` returns 401 after `completeWizard` — wizard session cleared, expected
+- All wizard step endpoints are `@Public()` — secured by wizardId (Redis, 24h TTL), not JWT
+- Only `POST /onboarding/start-authenticated` requires JWT
+
+### Admin ↔ Tenant Architecture Documented
+- Both frontends connect to same backend — no direct cross-frontend calls
+- Admin controls tenant capabilities through tier caps and platform agent templates
+- Admin can deploy dept templates and agents directly into any tenant
+- Auth separation enforced server-side by role guards (SUPER_ADMIN vs TENANT roles)
+
+---
+
+## April 3, 2026 — Bug Fix Session 2 ✅
+
+### Auth Register Fix
+- `RegisterDto.lastName` now `@IsOptional()` — single-word names register without 400
+- `RegisterInput.lastName?: string` in backend interface
+- `RegisterPayload.lastName?: string` in frontend types
+- Service defaults to `''` if omitted (Prisma non-null constraint)
+- Register page: `lastName = undefined` when no space in name, omitted from payload via spread
+
+### Response Envelope Fix (CRITICAL — affects all list pages)
+**Pattern**: `TransformResponseInterceptor { status, data: <service_return>, meta }` + paginated service `{ data: [], total, page, ... }` = array at `axiosResponse.data.data.data`
+
+Fixed extraction in all affected pages:
+```
+const payload = res.data?.data?.data ?? res.data?.data ?? res.data ?? [];
+const items = Array.isArray(payload) ? payload : [];
+```
+
+| Page | Fixed |
+|---|---|
+| `dashboard/page.tsx` (rawAgents + rawTasks) | ✅ |
+| `agents/page.tsx` | ✅ |
+| `workflows/page.tsx` | ✅ |
+
+**Any new page that calls a paginated list endpoint must use this pattern.**
+
+### WebSocket Auth Fix
+Socket.IO `auth` must use callback form so token is read at connection time, not creation time:
+```js
+// ❌ Wrong — token captured at creation (may be null)
+auth: { token: tokenManager.getAccessToken() }
+
+// ✅ Correct — token read fresh on each connect/reconnect
+auth: (cb) => cb({ token: tokenManager.getAccessToken() })
+```
+Fixed in `services/socket.ts` and `core/infrastructure/socket/SocketManager.ts`.
+
+### Lint / Type Fixes
+- Removed unused imports: `UserRole` (onboarding.service), `Version` (onboarding.controller), `IsPhoneNumber` (onboarding.dto)
+- Replaced all `user?.name` with `user.firstName`/`user.lastName` (AuthUser interface has no `name` field)
+- Removed conflicting `block` class from flex label in agents/new/page.tsx
+- Added `/* eslint-disable no-console */` to e2e-wizard-full.mjs
+
+---
+
+## April 3, 2026 — Dashboard Flow E2E + Connector Fix
+
+### Connector Duplicate Bug Fixed
+`onboarding.service.ts` `addIntegration` was pushing `integration.id` (UUID) into wizard state instead of `dto.type` (string like `CRM_SALESFORCE`). `completeWizard` used those values as provider type strings in its idempotency check → UUID never matched → second connector created per integration.
+**Fix**: `integrations.push(dto.type)` — one line change.
+
+### E2E Dashboard Flow Test Created
+`backend/e2e-dashboard-flow.mjs` — tests full journey:
+- Register → wizard (all steps) → complete → re-login → verify tenant data
+- Verifies departments, agents, connectors match what was set in wizard
+- All 6 phases pass ✅
+
+### Confirmed Architecture
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `GET /departments` | JWT (tenant-scoped) | returns tenant's departments |
+| `GET /agents` | JWT (tenant-scoped) | returns tenant's agents |
+| `GET /connectors` | JWT (tenant-scoped) | returns tenant's integrations |
+| `GET /users` | JWT (platform roles only) | SUPER_ADMIN/PLATFORM_ADMIN/SUPPORT |
+
+Re-login after `completeWizard` is required — initial register token has no tenantId or ADMIN role.

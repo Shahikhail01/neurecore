@@ -18,7 +18,7 @@ export interface RegisterInput {
   email: string;
   password: string;
   firstName: string;
-  lastName: string;
+  lastName?: string;
   role?: UserRole;
   tenantId?: string;
 }

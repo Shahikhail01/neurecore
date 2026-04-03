@@ -65,7 +65,11 @@ export class FinanceController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const tenantId = resolveTenantId(user, qTenantId);
+    // SUPER_ADMIN without explicit tenantId lists all invoices across tenants
+    const tenantId =
+      user.role === UserRole.SUPER_ADMIN && !qTenantId
+        ? null
+        : resolveTenantId(user, qTenantId);
     return this.invoiceService.findAll(
       tenantId,
       Number(page ?? 1),

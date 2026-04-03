@@ -46,9 +46,9 @@ export class ObservabilityService {
     });
   }
 
-  /** Get aggregated metrics for a tenant */
+  /** Get aggregated metrics for a tenant (or all tenants when tenantId is null) */
   async getMetrics(
-    tenantId: string,
+    tenantId: string | null,
     opts: {
       name?: string;
       from?: Date;
@@ -59,7 +59,7 @@ export class ObservabilityService {
     const { name, from, to, limit = 100 } = opts;
     return this.prisma.tenantMetric.findMany({
       where: {
-        tenantId,
+        ...(tenantId !== null && { tenantId }),
         ...(name && { name }),
         ...((from || to) && {
           recordedAt: {
@@ -179,8 +179,9 @@ export class ObservabilityService {
     };
   }
 
-  /** Get per-tenant KPIs */
-  async getTenantKpis(tenantId: string) {
+  /** Get per-tenant KPIs (platform summary when tenantId is null for SUPER_ADMIN) */
+  async getTenantKpis(tenantId: string | null) {
+    if (tenantId === null) return this.getPlatformSummary();
     const [agents, runningAgents, tasks, completedTasks, pendingApprovals] =
       await this.prisma.$transaction([
         this.prisma.agent.count({ where: { tenantId } }),
@@ -223,16 +224,20 @@ export class ObservabilityService {
     };
   }
 
-  /** Execution logs for a tenant with pagination */
+  /** Execution logs for a tenant with pagination (all tenants when tenantId is null) */
   async getExecutionLogs(
-    tenantId: string,
+    tenantId: string | null,
     opts: { page?: number; limit?: number; agentId?: string } = {},
   ) {
     const { page = 1, limit = 20, agentId } = opts;
     const skip = (page - 1) * limit;
 
     const where = {
-      ...(agentId ? { agentId } : { agent: { tenantId } }),
+      ...(agentId
+        ? { agentId }
+        : tenantId !== null
+          ? { agent: { tenantId } }
+          : {}),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -257,14 +262,18 @@ export class ObservabilityService {
    * SRP: shapes data for the traces UI; does not mutate state.
    */
   async getTraces(
-    tenantId: string,
+    tenantId: string | null,
     opts: { page?: number; limit?: number; agentId?: string } = {},
   ) {
     const { page = 1, limit = 20, agentId } = opts;
     const skip = (page - 1) * limit;
 
     const where = {
-      ...(agentId ? { agentId } : { agent: { tenantId } }),
+      ...(agentId
+        ? { agentId }
+        : tenantId !== null
+          ? { agent: { tenantId } }
+          : {}),
       taskId: { not: null },
     };
 
@@ -312,13 +321,16 @@ export class ObservabilityService {
    * Token/cost breakdown by agent and model for a tenant.
    * SRP: aggregation only; no side-effects.
    */
-  async getCosts(tenantId: string, opts: { from?: Date; to?: Date } = {}) {
+  async getCosts(
+    tenantId: string | null,
+    opts: { from?: Date; to?: Date } = {},
+  ) {
     const { from, to } = opts;
 
     const agentCosts = await this.prisma.executionLog.groupBy({
       by: ['agentId'],
       where: {
-        agent: { tenantId },
+        ...(tenantId !== null && { agent: { tenantId } }),
         ...(from || to
           ? {
               createdAt: { ...(from && { gte: from }), ...(to && { lte: to }) },

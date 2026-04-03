@@ -9,11 +9,19 @@ export class WorkflowsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(
-    tenantId: string,
+    tenantId: string | null,
     options?: { status?: WorkflowStatus; page?: number; limit?: number },
   ) {
     const { status, page = 1, limit = 20 } = options ?? {};
     const skip = (page - 1) * limit;
+
+    // Return empty results if no tenant context
+    if (!tenantId) {
+      return {
+        data: [],
+        meta: { total: 0, page, limit, totalPages: 0 },
+      };
+    }
 
     const where = { tenantId, ...(status && { status }) };
     const [data, total] = await this.prisma.$transaction([

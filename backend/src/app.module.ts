@@ -41,6 +41,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { TiersModule } from './modules/tiers/tiers.module';
 import { HealthModule } from './modules/health/health.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -115,6 +116,9 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
 
     // Phase 5 — Paperclip Projects
     ProjectsModule,
+
+    // Phase 5 — Onboarding Wizard
+    OnboardingModule,
   ],
   providers: [
     // Global rate-limit guard

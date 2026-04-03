@@ -14,20 +14,6 @@ import { TierProvisioningService } from '../tiers/services/tier-provisioning.ser
 @Injectable()
 export class TenantsService {
   private readonly logger = new Logger(TenantsService.name);
-  private readonly driftSafeTenantSelect = {
-    id: true,
-    name: true,
-    slug: true,
-    status: true,
-    logoUrl: true,
-    website: true,
-    industry: true,
-    settings: true,
-    metadata: true,
-    createdAt: true,
-    updatedAt: true,
-  } as const;
-
   constructor(
     private readonly prisma: PrismaService,
     @Optional()
@@ -46,63 +32,26 @@ export class TenantsService {
       ];
     }
 
-    try {
-      const [items, total] = await Promise.all([
-        this.prisma.tenant.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-          include: { tier: true },
-        }),
-        this.prisma.tenant.count({ where }),
-      ]);
-      return { items, total, page, limit };
-    } catch (error) {
-      this.logger.warn(
-        `Tenants.findAll relation include failed, retrying without relations: ${(error as Error).message}`,
-      );
-      // If DB is missing relation/backfilled columns, retry with a projection
-      // that avoids selecting drifted fields (e.g. tierId).
-      if (this.isMissingColumnError(error)) {
-        const [items, total] = await Promise.all([
-          this.prisma.tenant.findMany({
-            where,
-            skip,
-            take: limit,
-            orderBy: { createdAt: 'desc' },
-            select: this.driftSafeTenantSelect,
-          }),
-          this.prisma.tenant.count({ where }),
-        ]);
-        return { items, total, page, limit };
-      }
-      throw error;
-    }
+    const [items, total] = await Promise.all([
+      this.prisma.tenant.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { tier: true },
+      }),
+      this.prisma.tenant.count({ where }),
+    ]);
+    return { items, total, page, limit };
   }
 
   async findOne(id: string) {
-    try {
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { id },
-        include: { tier: true },
-      });
-      if (!tenant) throw new NotFoundException(`Tenant ${id} not found`);
-      return tenant;
-    } catch (error) {
-      this.logger.warn(
-        `Tenants.findOne relation include failed, retrying without relations: ${(error as Error).message}`,
-      );
-      if (this.isMissingColumnError(error)) {
-        const tenant = await this.prisma.tenant.findUnique({
-          where: { id },
-          select: this.driftSafeTenantSelect,
-        });
-        if (!tenant) throw new NotFoundException(`Tenant ${id} not found`);
-        return tenant;
-      }
-      throw error;
-    }
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+      include: { tier: true },
+    });
+    if (!tenant) throw new NotFoundException(`Tenant ${id} not found`);
+    return tenant;
   }
 
   async create(dto: CreateTenantDto) {
@@ -223,11 +172,5 @@ export class TenantsService {
       where: { id },
       data: { status: TenantStatus.SUSPENDED },
     });
-  }
-
-  private isMissingColumnError(error: unknown): boolean {
-    if (!(error instanceof Error)) return false;
-    const code = (error as { code?: string }).code;
-    return code === 'P2022' || error.message.includes('does not exist');
   }
 }
