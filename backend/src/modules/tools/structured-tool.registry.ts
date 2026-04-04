@@ -11,6 +11,8 @@ import {
   ToolDefinition,
   ToolCategory,
 } from './interfaces/structured-tool.interface';
+import type { SecurityInterceptorService } from '../agents/security/security-interceptor.service';
+import type { ISecurityContext } from '../agents/security/interfaces/security.interfaces';
 
 /**
  * Registry for managing IStructuredTool instances
@@ -168,6 +170,61 @@ export class StructuredToolRegistry {
     }
 
     return result.data as T;
+  }
+
+  /**
+   * Convert all registered tools to LangChain DynamicStructuredTool instances
+   * compatible with @langchain/langgraph ToolNode.
+   *
+   * Security validation is performed before every tool execution when a
+   * securityContext and securityInterceptor are supplied.
+   *
+   * SOLID — OCP: new method; existing get/register/execute unchanged.
+   * LSP:  DynamicStructuredTool wraps IStructuredTool without subclassing it.
+   */
+  async toLangChainTools(
+    securityContext?: Pick<
+      ISecurityContext,
+      'tenantId' | 'agentType' | 'userId'
+    >,
+    securityInterceptor?: SecurityInterceptorService,
+  ): Promise<any[]> {
+    const { DynamicStructuredTool } = await import('@langchain/core/tools');
+
+    return Array.from(this.tools.values()).map(
+      (tool) =>
+        new DynamicStructuredTool({
+          name: tool.name,
+          description: tool.description,
+          schema: tool.inputSchema as import('zod').ZodObject<any>,
+          func: async (input: Record<string, unknown>) => {
+            // SECURITY: validate before every tool execution
+            if (securityInterceptor && securityContext) {
+              const check = await securityInterceptor.validate(
+                tool,
+                input,
+                securityContext,
+              );
+              if (!check.allowed) {
+                throw new Error(`Security blocked: ${check.reason}`);
+              }
+              input =
+                (check.sanitizedInput as Record<string, unknown>) ?? input;
+            }
+
+            const result = await tool.execute(input, {
+              tenantId: securityContext?.tenantId ?? '',
+              agentId: securityContext?.agentType,
+            });
+
+            if (!result.success) {
+              throw new Error(result.error ?? 'Tool execution failed');
+            }
+
+            return JSON.stringify(result.data ?? null);
+          },
+        }),
+    );
   }
 
   /**

@@ -406,4 +406,92 @@ export class LLMFactory {
       throw error;
     }
   }
+
+  /**
+   * Create a LangChain BaseChatModel configured for the given task type.
+   *
+   * All supported providers expose an OpenAI-compatible REST API, so
+   * ChatOpenAI with a custom baseURL works for all of them.
+   *
+   * Returns null when no API key is available for any provider, so callers
+   * can fall back to stub/heuristic behaviour without crashing.
+   *
+   * SOLID — OCP: new provider support added here without touching callers.
+   * DIP: callers receive BaseChatModel abstraction, not ChatOpenAI concrete.
+   */
+  async createLangChainLLM(
+    taskType:
+      | 'planning'
+      | 'execution'
+      | 'evaluation'
+      | 'conversation'
+      | 'coding'
+      | 'reasoning',
+    options?: { temperature?: number; maxTokens?: number },
+  ): Promise<
+    import('@langchain/core/language_models/chat_models').BaseChatModel | null
+  > {
+    const { ChatOpenAI } = await import('@langchain/openai');
+
+    const { provider, model } = this.selectModel(taskType);
+
+    const providerConfigs: Record<
+      LLMProvider,
+      { envKey: string; defaultBaseUrl?: string }
+    > = {
+      openai: { envKey: 'OPENAI_API_KEY' },
+      minimax: {
+        envKey: 'MINIMAX_API_KEY',
+        defaultBaseUrl:
+          this.config.get<string>('MINIMAX_BASE_URL') ??
+          'https://api.minimax.chat/v1',
+      },
+      deepseek: {
+        envKey: 'DEEPSEEK_API_KEY',
+        defaultBaseUrl: 'https://api.deepseek.com/v1',
+      },
+      mimo: {
+        envKey: 'MIMO_API_KEY',
+        defaultBaseUrl:
+          this.config.get<string>('MIMO_BASE_URL') ?? 'https://api.mimo.ai/v1',
+      },
+    };
+
+    // Try the recommended provider first, then fall back through others
+    const orderedProviders: LLMProvider[] = [
+      provider,
+      'deepseek',
+      'minimax',
+      'mimo',
+      'openai',
+    ];
+    const dedupedProviders = [...new Set(orderedProviders)];
+
+    for (const p of dedupedProviders) {
+      const { envKey, defaultBaseUrl } = providerConfigs[p];
+      const apiKey = this.config.get<string>(envKey);
+      if (!apiKey) continue;
+
+      const llm = new ChatOpenAI({
+        apiKey,
+        model: model.id,
+        temperature: options?.temperature ?? 0.2,
+        maxTokens: options?.maxTokens ?? 1024,
+        ...(defaultBaseUrl
+          ? { configuration: { baseURL: defaultBaseUrl } }
+          : {}),
+      });
+
+      this.logger.log(
+        `createLangChainLLM: using ${p} / ${model.id} for task=${taskType}`,
+      );
+
+      return llm as unknown as import('@langchain/core/language_models/chat_models').BaseChatModel;
+    }
+
+    this.logger.warn(
+      `createLangChainLLM: no API key found for any provider (task=${taskType})`,
+    );
+    return null;
+  }
 }

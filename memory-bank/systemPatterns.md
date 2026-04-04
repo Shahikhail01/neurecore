@@ -26,6 +26,28 @@
 
 ---
 
+## NestJS Build & SWC Watch Mode (discovered April 4, 2026)
+
+`nest start --watch` (SWC mode) compiles to `dist/` (flat, no `src/` prefix).
+`start:prod` / `node dist/src/main.js` uses the **production build path** `dist/src/`.
+
+These are **different output directories** — watch mode does NOT feed `start:prod`.
+
+**Reliable local dev startup pattern:**
+
+```bash
+# After code changes: rebuild production path
+cd backend && pnpm run build     # compiles to dist/src/
+node dist/src/main.js &          # or: node dist/main.js (SWC flat output)
+
+# Check logs
+tail -f /tmp/nodetest.log
+```
+
+**Rule**: If a new module is added and the running backend can't find it, kill the process, run `pnpm run build`, and restart with `node dist/src/main.js`.
+
+---
+
 ## SOLID Principles Implementation
 
 ### Single Responsibility Principle (SRP)
@@ -598,6 +620,7 @@ Before committing code:
 ## Admin ↔ Tenant Isolation Pattern
 
 ### Connection Model
+
 ```
 Admin Frontend (port 3002)       Tenant Frontend (port 3001)
         │                                 │
@@ -613,6 +636,7 @@ Admin Frontend (port 3002)       Tenant Frontend (port 3001)
 ```
 
 ### Key Design Points
+
 - **No cross-frontend calls** — all control flows through shared backend
 - **Admin creates resources tenants consume**: Tier caps limit `maxAgents`/`maxUsers`; Platform agent templates are the only source for wizard AGENTS step
 - **Admin can deploy directly**: `/deploy/tenants/{id}/dept-template` and `/deploy/tenants/{id}/agents` bypass tenant wizard
@@ -620,36 +644,41 @@ Admin Frontend (port 3002)       Tenant Frontend (port 3001)
 - **Role enforcement**: `@Roles(UserRole.SUPER_ADMIN)` guard on all admin endpoints; tenants cannot call admin routes
 
 ### Admin→Tenant Control Surface
-| Admin Action | Backend Endpoint | Tenant Effect |
-|---|---|---|
-| Create/edit Tier | `POST/PATCH /tiers` | Caps maxAgents, maxUsers, features |
-| Toggle Tier active | `PATCH /tiers/{id}/toggle` | Tenant can/cannot subscribe |
-| Create Platform Agent Template | `POST /agent-templates/platform` | Appears in wizard AGENTS step |
-| Deploy Dept Template | `POST /deploy/tenants/{id}/dept-template` | Creates Department in tenant DB |
-| Deploy Agents directly | `POST /deploy/tenants/{id}/agents` | Creates agents in tenant, bypasses wizard |
-| Update Platform Settings | `PATCH /platform/security` etc. | Global policy applied system-wide |
+
+| Admin Action                   | Backend Endpoint                          | Tenant Effect                             |
+| ------------------------------ | ----------------------------------------- | ----------------------------------------- |
+| Create/edit Tier               | `POST/PATCH /tiers`                       | Caps maxAgents, maxUsers, features        |
+| Toggle Tier active             | `PATCH /tiers/{id}/toggle`                | Tenant can/cannot subscribe               |
+| Create Platform Agent Template | `POST /agent-templates/platform`          | Appears in wizard AGENTS step             |
+| Deploy Dept Template           | `POST /deploy/tenants/{id}/dept-template` | Creates Department in tenant DB           |
+| Deploy Agents directly         | `POST /deploy/tenants/{id}/agents`        | Creates agents in tenant, bypasses wizard |
+| Update Platform Settings       | `PATCH /platform/security` etc.           | Global policy applied system-wide         |
 
 ---
 
 ## Onboarding Wizard Session Pattern
 
 ### Session Lifecycle
+
 1. `POST /onboarding/start-authenticated` (JWT required) → creates Redis key `wizard:{wizardId}`, returns `wizardId`
 2. All 9 step endpoints accept `wizardId` in body, are `@Public()` (no JWT needed)
 3. `POST /onboarding/complete` → deploys all state from Redis to DB, clears session
 4. After completion: `GET /onboarding/progress` returns 401 (session gone — correct)
 
 ### Security Model
+
 - `wizardId` is a UUID — acts as bearer token for the wizard session
 - Redis TTL: 24 hours
 - No JWT on steps → prevents auth chicken-and-egg (tenant not yet created)
 - Only start-authenticated requires JWT to establish which user owns the wizard
 
 ### Idempotency
+
 - `completeWizard` deploys everything from wizard state — even if individual step API calls failed during wizard
 - Agent/invitation/integration creation is safe to re-run (upsert patterns)
 
 ### DTO Optional Fields
+
 - `InvitationInputDto.departmentId`: `@IsOptional()` — service assigns dept after tenant is created
 - `AgentConfigInputDto.departmentId`: `@IsOptional()` — same reason
 
@@ -657,24 +686,25 @@ Admin Frontend (port 3002)       Tenant Frontend (port 3001)
 
 ## Onboarding Wizard Correct HTTP Methods
 
-| Step | Method | Endpoint | response |
-|---|---|---|---|
-| Start | POST | `/onboarding/start-authenticated` | 201 |
-| Organization | PUT | `/onboarding/organization` | 200 |
-| Admin | PUT | `/onboarding/admin` | 200 |
-| Get Plans | GET | `/onboarding/plans` | 200 |
-| Select Plan | PUT | `/onboarding/plan` | 200 |
-| Add Department | POST | `/onboarding/departments` | 201 |
-| Add Invitation | POST | `/onboarding/invitations` | 201 |
-| Add Integration | POST | `/onboarding/integrations` | 201 (one per integration) |
-| Get Templates | GET | `/onboarding/agent-templates` | 200 |
-| Add Agent | POST | `/onboarding/agents` | 201 |
-| Security | PUT | `/onboarding/security` | 200 |
-| Complete | POST | `/onboarding/complete` | 200 |
+| Step            | Method | Endpoint                          | response                  |
+| --------------- | ------ | --------------------------------- | ------------------------- |
+| Start           | POST   | `/onboarding/start-authenticated` | 201                       |
+| Organization    | PUT    | `/onboarding/organization`        | 200                       |
+| Admin           | PUT    | `/onboarding/admin`               | 200                       |
+| Get Plans       | GET    | `/onboarding/plans`               | 200                       |
+| Select Plan     | PUT    | `/onboarding/plan`                | 200                       |
+| Add Department  | POST   | `/onboarding/departments`         | 201                       |
+| Add Invitation  | POST   | `/onboarding/invitations`         | 201                       |
+| Add Integration | POST   | `/onboarding/integrations`        | 201 (one per integration) |
+| Get Templates   | GET    | `/onboarding/agent-templates`     | 200                       |
+| Add Agent       | POST   | `/onboarding/agents`              | 201                       |
+| Security        | PUT    | `/onboarding/security`            | 200                       |
+| Complete        | POST   | `/onboarding/complete`            | 200                       |
 
 ---
 
 ## Wizard State — Store Type Strings, Not Record IDs
+
 When the wizard accumulates items across steps (e.g. integration types), store the **type/enum string** in wizard state, not the database record ID. `completeWizard` uses wizard state values as lookup keys for idempotency checks — if IDs are stored instead, the idempotency check (`findFirst({ provider: id })`) will never match and duplicates will be created.
 
 ```ts
@@ -682,8 +712,9 @@ When the wizard accumulates items across steps (e.g. integration types), store t
 integrations.push(integration.id);
 
 // ✅ Correct — stores the type string completeWizard expects
-integrations.push(dto.type);  // e.g. 'CRM_SALESFORCE'
+integrations.push(dto.type); // e.g. 'CRM_SALESFORCE'
 ```
 
 ## Post-Wizard JWT Note
+
 The initial registration JWT has `role: USER, tenantId: null`. After `completeWizard`, the user is updated to `role: ADMIN, tenantId: <id>`. The old token is still valid but lacks the correct claims — the user must re-login (or the app must refresh the token) before calling any tenant-scoped endpoint.

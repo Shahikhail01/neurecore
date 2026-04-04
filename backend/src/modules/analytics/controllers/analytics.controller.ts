@@ -48,6 +48,22 @@ export class AnalyticsController {
     );
   }
 
+  /** GET /v1/analytics/summary — dashboard KPI summary for tenant */
+  @Get('summary')
+  async getSummary(
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    const tid =
+      user.role === UserRole.SUPER_ADMIN && tenantId
+        ? tenantId
+        : (user.tenantId ?? null);
+    if (!tid && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Tenant context required');
+    }
+    return this.analyticsService.getSummary(tid);
+  }
+
   /** GET /v1/analytics/report */
   @Get('report')
   getReport(

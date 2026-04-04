@@ -22,6 +22,7 @@ export interface OpenClawConfig {
   timeout: number;
   retryAttempts: number;
   enableTracing: boolean;
+  rateLimitRps: number;
 }
 
 /**
@@ -59,10 +60,11 @@ export interface AgentResponse {
           config.get<string>('OPENCLAW_ENDPOINT') ??
           'https://api.openclaw.ai/v1',
         // Use SecretProviderService for centralized secret access
-        apiKey: secrets.getOpenClawApiKey(),
+        apiKey: secrets.getOpenClawApiKey() ?? '',
         timeout: config.get<number>('OPENCLAW_TIMEOUT') ?? 30000,
         retryAttempts: config.get<number>('OPENCLAW_RETRY_ATTEMPTS') ?? 3,
         enableTracing: config.get<boolean>('OPENCLAW_ENABLE_TRACING') ?? true,
+        rateLimitRps: config.get<number>('OPENCLAW_RATE_LIMIT_RPS') ?? 10,
       }),
       inject: [ConfigService, SecretProviderService],
     },

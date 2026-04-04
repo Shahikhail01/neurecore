@@ -23,6 +23,14 @@ export enum ToolCategory {
   CODE = 'CODE',
   AI = 'AI',
   CUSTOM = 'CUSTOM',
+  PRODUCTIVITY = 'PRODUCTIVITY',
+  BUSINESS = 'BUSINESS',
+  DATA = 'DATA',
+  MARKETING = 'MARKETING',
+  INFORMATION = 'INFORMATION',
+  MONITORING = 'MONITORING',
+  FINANCE = 'FINANCE',
+  LOCATION = 'LOCATION',
 }
 
 // ─────────────────────────────────────────────────────────────

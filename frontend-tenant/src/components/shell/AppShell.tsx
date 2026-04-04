@@ -227,7 +227,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <p className="text-xs font-medium text-[var(--text-primary)] truncate">
                   {user
                     ? `${user.firstName} ${user.lastName}`.trim() || user.email
-                    : user?.email}
+                    : ""}
                 </p>
                 <p className="text-[10px] text-[var(--text-secondary)] truncate capitalize">
                   {user?.role?.toLowerCase() ?? "user"}

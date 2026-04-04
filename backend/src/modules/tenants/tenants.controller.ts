@@ -28,6 +28,15 @@ import { UserRole } from '@prisma/client';
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
 
+  /** GET /tenants/me — returns the authenticated user's own tenant */
+  @Get('me')
+  getMyTenant(@CurrentUser() user: any) {
+    if (!user?.tenantId) {
+      throw new ForbiddenException('No tenant associated with this account');
+    }
+    return this.tenantsService.findOne(user.tenantId);
+  }
+
   @Get()
   @Roles(
     UserRole.SUPER_ADMIN,

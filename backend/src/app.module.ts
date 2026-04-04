@@ -26,6 +26,7 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { DepartmentTemplatesModule } from './modules/department-templates/department-templates.module';
 import { ModelsModule } from './modules/models/models.module';
 import { AIGatewayModule } from './modules/ai-gateway/ai-gateway.module';
+import { OpenClawAdapterModule } from './modules/ai-gateway/openclaw-adapter.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
@@ -42,6 +43,8 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { TiersModule } from './modules/tiers/tiers.module';
 import { HealthModule } from './modules/health/health.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { WorkspaceProvisioningModule } from './modules/workspace-provisioning/workspace-provisioning.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -82,6 +85,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     DepartmentTemplatesModule,
     ModelsModule,
     AIGatewayModule,
+    OpenClawAdapterModule, // OpenClaw channel adapter — POST /api/v1/openclaw/message
 
     // Phase 4 — Analytics Engine, CRM Connectors, Financial Module & Reliability
     AnalyticsModule,
@@ -119,6 +123,10 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
 
     // Phase 5 — Onboarding Wizard
     OnboardingModule,
+
+    // Workspace Provisioning — corporate email + cloud folder auto-provisioning
+    WorkspaceProvisioningModule,
+    ChatModule,
   ],
   providers: [
     // Global rate-limit guard

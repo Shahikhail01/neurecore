@@ -4,7 +4,9 @@ import { EventsGateway } from '../../events/events.gateway';
 import { AgentEvaluatorService } from './agent-evaluator.service';
 import { ToolsService } from '../../tools/tools.service';
 import { GovernanceRulesService } from '../../governance/services/governance-rules.service';
+import { ApprovalsService } from '../../governance/services/approvals.service';
 import { OfficialAgentGraph } from '../langgraph/langgraph-official';
+import { OpenClawGatewayService } from '../../ai-gateway/openclaw-gateway.service';
 import type {
   IAgentExecutor,
   ExecutionContext,
@@ -37,6 +39,8 @@ export class AgentExecutorService implements IAgentExecutor {
     private readonly tools: ToolsService,
     private readonly governance: GovernanceRulesService,
     private readonly officialGraph: OfficialAgentGraph,
+    private readonly openClawGateway: OpenClawGatewayService,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   async execute(context: ExecutionContext): Promise<StepResult> {
@@ -225,6 +229,30 @@ export class AgentExecutorService implements IAgentExecutor {
           stepIndex++;
         }
 
+        // Interrupt detection: LangGraph emits { __interrupt__: [...] } when interrupt() is called
+        if ('__interrupt__' in chunk) {
+          await this.prisma.task.update({
+            where: { id: taskId },
+            data: { status: TaskStatus.PENDING },
+          });
+          this.events.emitToTenant(tenantId, 'task:approval:required', {
+            taskId,
+            agentId,
+            interrupt: (chunk as Record<string, unknown>).__interrupt__,
+          });
+          this.runningTasks.delete(taskId);
+          return {
+            taskId,
+            agentId,
+            success: false,
+            steps,
+            error: 'Task paused pending human approval',
+            totalDurationMs: Date.now() - start,
+            totalTokensUsed: 0,
+            totalCostUsd: 0,
+          };
+        }
+
         // Check for errors
         if (chunk.error) {
           const stepId = `step-${stepIndex}`;
@@ -261,6 +289,33 @@ export class AgentExecutorService implements IAgentExecutor {
           error: success ? null : 'One or more steps failed',
         },
       });
+
+      // ─── Outbound relay: if the task originated from OpenClaw, send the result back ───
+      if (success) {
+        const taskRow = await this.prisma.task.findUnique({
+          where: { id: taskId },
+          select: { input: true },
+        });
+        const taskInput = taskRow?.input as Record<string, unknown> | null;
+        if (taskInput?.channelSource === 'openclaw') {
+          const channelCtx = taskInput.channelContext as Record<
+            string,
+            unknown
+          >;
+          const finalOutput = steps[steps.length - 1]?.output;
+          const message =
+            typeof finalOutput === 'string'
+              ? finalOutput
+              : JSON.stringify(finalOutput);
+          await this.openClawGateway.sendMessage(
+            String(channelCtx.openClawAgentId),
+            'response',
+            { taskId, message },
+            {},
+            tenantId,
+          );
+        }
+      }
 
       // Update agent status
       await this.prisma.agent.update({
@@ -344,6 +399,31 @@ export class AgentExecutorService implements IAgentExecutor {
       where: { id: taskId },
       data: { status: TaskStatus.CANCELLED },
     });
+  }
+
+  /**
+   * Resume a HITL-interrupted graph.
+   *
+   * Flow:
+   *   1. Record the human decision in the ApprovalRequest (via ApprovalsService).
+   *   2. Resume the LangGraph from the interrupt point.
+   *
+   * The threadId is the sessionId passed to stream() — which is the taskId.
+   */
+  async resumeGraph(
+    threadId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    approvalId: string,
+    tenantId: string,
+    reviewerId: string,
+  ): Promise<void> {
+    // Persist the review decision in the DB
+    await this.approvals.review(approvalId, tenantId, reviewerId, {
+      status: decision,
+    });
+
+    // Resume the LangGraph — interrupt() will return the decision string
+    await this.officialGraph.resumeGraph({ threadId, decision });
   }
 
   // ───────────────────────────────────────────────────────────

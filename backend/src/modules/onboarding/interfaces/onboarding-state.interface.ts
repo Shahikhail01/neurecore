@@ -134,6 +134,14 @@ export interface WizardData {
   // Step 7: Integrations
   integrations?: string[]; // Integration IDs
 
+  // Step 7 (sub): Workspace provisioning — captured alongside storage integration selection
+  workspaceProvisioning?: {
+    enabled: boolean;
+    provider: 'GOOGLE_WORKSPACE' | 'MICROSOFT_365';
+    emailDomain: string;
+    emailPattern: 'FIRST_DOT_LAST' | 'FIRSTLAST' | 'F_DOT_LAST';
+    folderStructure: 'BY_DEPARTMENT' | 'FLAT';
+  };
   // Step 8: Agents
   agents?: Array<{
     templateId: string;

@@ -103,4 +103,48 @@ export class AnalyticsService {
       generatedAt: new Date().toISOString(),
     };
   }
+
+  // ─── Summary (dashboard KPI aggregate) ───────────────────────────────────
+
+  async getSummary(tenantId: string | null) {
+    const where = tenantId ? { tenantId } : {};
+    const taskWhere = tenantId ? { tenantId } : {};
+
+    const [
+      totalAgents,
+      runningAgents,
+      totalTasks,
+      completedTasks,
+      failedTasks,
+      totalWorkflows,
+      activeWorkflows,
+    ] = await Promise.all([
+      this.prisma.agent.count({ where }),
+      this.prisma.agent.count({ where: { ...where, status: 'RUNNING' } }),
+      this.prisma.task.count({ where: taskWhere }),
+      this.prisma.task.count({ where: { ...taskWhere, status: 'COMPLETED' } }),
+      this.prisma.task.count({ where: { ...taskWhere, status: 'FAILED' } }),
+      this.prisma.workflow.count({ where }),
+      this.prisma.workflow.count({ where: { ...where, status: 'ACTIVE' } }),
+    ]);
+
+    const successRate =
+      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    return {
+      agents: {
+        total: totalAgents,
+        running: runningAgents,
+        idle: totalAgents - runningAgents,
+      },
+      tasks: {
+        total: totalTasks,
+        completed: completedTasks,
+        failed: failedTasks,
+        successRate,
+      },
+      workflows: { total: totalWorkflows, active: activeWorkflows },
+      generatedAt: new Date().toISOString(),
+    };
+  }
 }

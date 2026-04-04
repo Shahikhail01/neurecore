@@ -23,7 +23,6 @@ export {
   evaluationPassed,
 } from './agent.state';
 
-export { AgentStateMachine } from './agent-state-machine';
 export { OfficialAgentGraph } from './langgraph-official';
 export { AgentCheckpointService } from './checkpoint.service';
 export type { CheckpointOptions } from './checkpoint.service';

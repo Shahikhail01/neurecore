@@ -10,6 +10,7 @@ import { OnboardingService } from './onboarding.service';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
+import { WorkspaceProvisioningModule } from '../workspace-provisioning/workspace-provisioning.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PassportModule } from '@nestjs/passport';
       }),
       inject: [ConfigService],
     }),
+    WorkspaceProvisioningModule,
   ],
   controllers: [OnboardingController],
   providers: [OnboardingService],

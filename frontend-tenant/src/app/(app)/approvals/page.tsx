@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "@/services/api";
 import { cn } from "@/lib/utils";
+import { hqEventBus } from "@/core/infrastructure/socket/EventBus";
 
 interface Approval {
   id: string;
@@ -26,7 +27,8 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchApprovals = useCallback(() => {
+    setLoading(true);
     api
       .get("/approvals")
       .catch(() => ({ data: { data: [] } }))
@@ -36,14 +38,30 @@ export default function ApprovalsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    fetchApprovals();
+  }, [fetchApprovals]);
+
+  // Real-time: re-fetch when a new approval is requested by any agent
+  useEffect(() => {
+    const unsub = hqEventBus.on("approval:requested", () => fetchApprovals());
+    return unsub;
+  }, [fetchApprovals]);
+
   const handle = async (id: string, action: "approve" | "deny") => {
     setProcessing(id);
     try {
-      await api.post(`/approvals/${id}/${action}`, {});
+      // PATCH /approvals/:id/review — matches ApprovalsController.review()
+      await api.patch(`/approvals/${id}/review`, {
+        status: action === "approve" ? "APPROVED" : "REJECTED",
+      });
       setApprovals((prev) =>
         prev.map((a) =>
           a.id === id
-            ? { ...a, status: action === "approve" ? "approved" : "denied" }
+            ? {
+                ...a,
+                status: action === "approve" ? "APPROVED" : "REJECTED",
+              }
             : a,
         ),
       );
@@ -54,8 +72,11 @@ export default function ApprovalsPage() {
     }
   };
 
-  const pending = approvals.filter((a) => a.status === "pending");
-  const resolved = approvals.filter((a) => a.status !== "pending");
+  // Status comparison is case-insensitive to handle both backend enum and
+  // locally-set values gracefully
+  const isPending = (status: string) => status.toLowerCase() === "pending";
+  const pending = approvals.filter((a) => isPending(a.status));
+  const resolved = approvals.filter((a) => !isPending(a.status));
 
   return (
     <div className="h-full flex flex-col">

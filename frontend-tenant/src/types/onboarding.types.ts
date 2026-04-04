@@ -88,6 +88,55 @@ export enum AgentAutonomyLevel {
 }
 
 // ============================================================================
+// Workspace Provisioning Enums + Types
+// ============================================================================
+
+export enum ProvisioningProvider {
+  GOOGLE_WORKSPACE = "GOOGLE_WORKSPACE",
+  MICROSOFT_365 = "MICROSOFT_365",
+}
+
+export enum EmailPattern {
+  FIRST_DOT_LAST = "FIRST_DOT_LAST",
+  FIRSTLAST = "FIRSTLAST",
+  F_DOT_LAST = "F_DOT_LAST",
+}
+
+export enum FolderStructure {
+  BY_DEPARTMENT = "BY_DEPARTMENT",
+  FLAT = "FLAT",
+}
+
+export interface WorkspaceProvisioningConfig {
+  enabled: boolean;
+  provider: ProvisioningProvider;
+  emailDomain: string;
+  emailPattern: EmailPattern;
+  folderStructure: FolderStructure;
+}
+
+export interface ProvisioningStatusDto {
+  hasPendingSetup: boolean;
+  provider: ProvisioningProvider | null;
+  status: string | null;
+  pendingCount: number;
+}
+
+export interface ProvisioningJobDto {
+  id: string;
+  inviteeEmail: string;
+  inviteeFirstName: string;
+  inviteeLastName: string;
+  departmentName?: string;
+  provisionedEmail?: string;
+  provisionedFolderId?: string;
+  status: string;
+  errorMessage?: string;
+  provisionedAt?: string;
+  createdAt: string;
+}
+
+// ============================================================================
 // DTOs (Data Transfer Objects)
 // ============================================================================
 
@@ -303,6 +352,8 @@ export interface WizardData {
   departments?: DepartmentInputDto[];
   invitations?: InvitationInputDto[];
   integrations?: string[];
+  // Step 7 (sub): Workspace provisioning intent captured alongside storage integration
+  workspaceProvisioning?: WorkspaceProvisioningConfig;
   agents?: AgentConfigInputDto[];
   security?: {
     dataResidency: DataResidency;

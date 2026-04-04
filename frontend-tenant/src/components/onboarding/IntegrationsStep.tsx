@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useOnboardingStore } from "@/stores/onboardingStore";
-import { INTEGRATION_TYPE_OPTIONS } from "@/types/onboarding.types";
+import {
+  INTEGRATION_TYPE_OPTIONS,
+  ProvisioningProvider,
+  EmailPattern,
+  FolderStructure,
+} from "@/types/onboarding.types";
+import type { WorkspaceProvisioningConfig } from "@/types/onboarding.types";
 
 interface IntegrationsStepProps {
   onSubmit?: (data: { integrations: string[] }) => void;
@@ -23,22 +29,53 @@ const INTEGRATION_ICONS: Record<string, string> = {
   COMMUNICATION_TEAMS: "🟦",
 };
 
+const STORAGE_TRIGGERS = ["STORAGE_GOOGLE_DRIVE", "STORAGE_ONEDRIVE"];
+
+const DEFAULT_WP_CONFIG: WorkspaceProvisioningConfig = {
+  enabled: false,
+  provider: ProvisioningProvider.GOOGLE_WORKSPACE,
+  emailDomain: "",
+  emailPattern: EmailPattern.FIRST_DOT_LAST,
+  folderStructure: FolderStructure.BY_DEPARTMENT,
+};
+
 export function IntegrationsStep({ onSubmit, onSkip }: IntegrationsStepProps) {
-  const { setIntegrationsData } = useOnboardingStore();
+  const { setIntegrationsData, setWorkspaceProvisioningData } =
+    useOnboardingStore();
+
   const [selected, setSelected] = useState<string[]>([]);
+  const [wpConfig, setWpConfig] =
+    useState<WorkspaceProvisioningConfig>(DEFAULT_WP_CONFIG);
   const [isLoading, setIsLoading] = useState(false);
 
-  const toggle = (value: string) =>
+  const showWorkspacePanel = selected.some((v) => STORAGE_TRIGGERS.includes(v));
+
+  const toggle = (value: string) => {
     setSelected((prev) =>
       prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
     );
+    // Auto-detect provider when a storage option is selected
+    if (value === "STORAGE_GOOGLE_DRIVE" && !selected.includes(value)) {
+      setWpConfig((prev) => ({
+        ...prev,
+        provider: ProvisioningProvider.GOOGLE_WORKSPACE,
+      }));
+    } else if (value === "STORAGE_ONEDRIVE" && !selected.includes(value)) {
+      setWpConfig((prev) => ({
+        ...prev,
+        provider: ProvisioningProvider.MICROSOFT_365,
+      }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      // Store selections in wizard state — connectors are created when wizard completes
       setIntegrationsData(selected);
+      if (showWorkspacePanel && wpConfig.enabled) {
+        setWorkspaceProvisioningData(wpConfig);
+      }
       onSubmit?.({ integrations: selected });
     } finally {
       setIsLoading(false);
@@ -58,6 +95,7 @@ export function IntegrationsStep({ onSubmit, onSkip }: IntegrationsStepProps) {
       </div>
 
       <form onSubmit={handleSubmit}>
+        {/* ── Integration grid ──────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-6">
           {INTEGRATION_TYPE_OPTIONS.slice(0, 9).map(
             (intg: { value: string; label: string; tier?: string }) => {
@@ -93,10 +131,198 @@ export function IntegrationsStep({ onSubmit, onSkip }: IntegrationsStepProps) {
           )}
         </div>
 
+        {/* ── Workspace provisioning panel ──────────────────────────────── */}
+        {showWorkspacePanel && (
+          <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-900/10 p-5">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-300">
+                  Workspace Auto-Provisioning
+                </p>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Automatically create corporate email addresses and cloud
+                  storage folders for your invited team members.
+                </p>
+              </div>
+              {/* Toggle */}
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={wpConfig.enabled}
+                  onChange={(e) =>
+                    setWpConfig((p) => ({ ...p, enabled: e.target.checked }))
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-zinc-700 rounded-full peer peer-checked:bg-amber-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4" />
+              </label>
+            </div>
+
+            {wpConfig.enabled && (
+              <div className="space-y-4">
+                {/* Provider */}
+                <div>
+                  <p className="text-xs font-medium text-zinc-300 mb-2">
+                    Workspace Provider
+                  </p>
+                  <div className="flex gap-3">
+                    {(
+                      [
+                        {
+                          value: ProvisioningProvider.GOOGLE_WORKSPACE,
+                          label: "Google Workspace",
+                          icon: "🅶",
+                        },
+                        {
+                          value: ProvisioningProvider.MICROSOFT_365,
+                          label: "Microsoft 365",
+                          icon: "Ⓜ",
+                        },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() =>
+                          setWpConfig((p) => ({ ...p, provider: opt.value }))
+                        }
+                        className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition ${
+                          wpConfig.provider === opt.value
+                            ? "border-amber-500/60 bg-amber-900/30 text-amber-300"
+                            : "border-zinc-700 bg-zinc-800/40 text-zinc-400 hover:border-zinc-600"
+                        }`}
+                      >
+                        <span>{opt.icon}</span>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Email domain */}
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-1">
+                    Corporate Email Domain
+                  </label>
+                  <div className="flex items-center rounded-lg border border-zinc-700 bg-zinc-800/60 overflow-hidden">
+                    <span className="px-3 text-zinc-500 text-sm select-none">
+                      @
+                    </span>
+                    <input
+                      type="text"
+                      value={wpConfig.emailDomain}
+                      onChange={(e) =>
+                        setWpConfig((p) => ({
+                          ...p,
+                          emailDomain: e.target.value.toLowerCase(),
+                        }))
+                      }
+                      placeholder="yourcompany.com"
+                      className="flex-1 bg-transparent pr-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Email pattern */}
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-2">
+                    Email Pattern
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        {
+                          value: EmailPattern.FIRST_DOT_LAST,
+                          label: "john.doe",
+                        },
+                        { value: EmailPattern.FIRSTLAST, label: "johndoe" },
+                        { value: EmailPattern.F_DOT_LAST, label: "j.doe" },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() =>
+                          setWpConfig((p) => ({
+                            ...p,
+                            emailPattern: opt.value,
+                          }))
+                        }
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-mono transition ${
+                          wpConfig.emailPattern === opt.value
+                            ? "border-amber-500/60 bg-amber-900/30 text-amber-300"
+                            : "border-zinc-700 bg-zinc-800/40 text-zinc-400 hover:border-zinc-600"
+                        }`}
+                      >
+                        {opt.label}@…
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Folder structure */}
+                <div>
+                  <p className="text-xs font-medium text-zinc-300 mb-2">
+                    Folder Structure
+                  </p>
+                  <div className="flex gap-3">
+                    {(
+                      [
+                        {
+                          value: FolderStructure.BY_DEPARTMENT,
+                          label: "By Department",
+                          sub: "Sales / John Doe",
+                        },
+                        {
+                          value: FolderStructure.FLAT,
+                          label: "Flat",
+                          sub: "John Doe",
+                        },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() =>
+                          setWpConfig((p) => ({
+                            ...p,
+                            folderStructure: opt.value,
+                          }))
+                        }
+                        className={`flex-1 rounded-lg border p-3 text-left text-xs transition ${
+                          wpConfig.folderStructure === opt.value
+                            ? "border-amber-500/60 bg-amber-900/30"
+                            : "border-zinc-700 bg-zinc-800/40 hover:border-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={`font-medium ${wpConfig.folderStructure === opt.value ? "text-amber-300" : "text-zinc-300"}`}
+                        >
+                          {opt.label}
+                        </span>
+                        <p className="text-zinc-500 mt-0.5 font-mono">
+                          {opt.sub}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="text-xs text-zinc-500 pt-1">
+                  💡 You&apos;ll connect your admin account in{" "}
+                  <span className="text-zinc-400">Settings → Workspace</span>{" "}
+                  after completing the wizard.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Footer hint ───────────────────────────────────────────────── */}
         {selected.length > 0 && (
           <p className="text-xs text-zinc-500 mb-4">
             {selected.length} integration{selected.length > 1 ? "s" : ""}{" "}
-            selected. You'll configure credentials in{" "}
+            selected. Configure credentials in{" "}
             <span className="text-zinc-300">Settings → Integrations</span> after
             setup.
           </p>

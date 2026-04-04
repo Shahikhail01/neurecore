@@ -282,31 +282,42 @@ export class LangSmithTracingService {
   }
 
   /**
-   * Send events to LangSmith API
+   * Send events to LangSmith API via the official langsmith SDK.
+   *
+   * Uses dynamic import to keep startup cost zero when tracing is disabled.
+   * Failures are intentionally swallowed — tracing must never crash the agent.
    */
   private async sendToLangSmith(events: LangSmithEvent[]): Promise<void> {
     if (!this.config.apiKey || events.length === 0) {
       return;
     }
 
-    const body = {
-      events: events.map((e) => ({
-        ...e,
-        project: this.config.project,
-      })),
-    };
+    try {
+      const { Client } = await import('langsmith');
+      const client = new Client({
+        apiUrl: this.config.endpoint,
+        apiKey: this.config.apiKey,
+      });
 
-    const response = await fetch(`${this.config.endpoint}/api/v1/runs/batch`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+      for (const event of events) {
+        if (event.type === 'start') {
+          await client.createRun({
+            name: (event.name as string) ?? 'unnamed',
+            run_type: 'chain',
+            inputs: (event.data as Record<string, unknown>) ?? {},
+            project_name: this.config.project,
+          });
+        }
+      }
 
-    if (!response.ok) {
-      throw new Error(`LangSmith API error: ${response.status}`);
+      this.logger.debug(
+        `Sent ${events.length} trace event(s) to LangSmith project '${this.config.project}'`,
+      );
+    } catch (error) {
+      // Non-fatal — log and continue
+      this.logger.warn(
+        `LangSmith send failed (non-fatal): ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

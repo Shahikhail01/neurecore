@@ -11,7 +11,15 @@
  * - Node names must be typed as constants to avoid TypeScript errors with addEdge/addConditionalEdges
  */
 
-import { StateGraph, END, START, Annotation } from '@langchain/langgraph';
+import {
+  StateGraph,
+  END,
+  START,
+  Annotation,
+  interrupt,
+  MemorySaver,
+  Command,
+} from '@langchain/langgraph';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AgentState, StepResult, ToolCall } from './agent.state';
@@ -21,12 +29,16 @@ import { StreamingEventType } from '../streaming/agent-streaming.service';
 import { AgentCheckpointService } from './checkpoint.service';
 import { SecurityInterceptorService } from '../security/security-interceptor.service';
 import type { ISecurityContext } from '../security/interfaces/security.interfaces';
+import { AgentPlannerService } from '../services/agent-planner.service';
+import { AgentEvaluatorService } from '../services/agent-evaluator.service';
+import { ApprovalsService } from '../../governance/services/approvals.service';
 
-// Node name constants to satisfy TypeScript
-const PLANNER_NODE = 'planner';
-const EXECUTOR_NODE = 'executor';
-const TOOL_NODE = 'tool_node';
-const EVALUATOR_NODE = 'evaluator';
+// Node name constants — as const satisfies TypeScript literal-type constraints
+const PLANNER_NODE = 'planner' as const;
+const EXECUTOR_NODE = 'executor' as const;
+const TOOL_NODE = 'tool_node' as const;
+const EVALUATOR_NODE = 'evaluator' as const;
+const HUMAN_REVIEW_NODE = 'human_review' as const;
 
 /**
  * LangGraph State Schema - defines the state structure for the graph
@@ -139,6 +151,19 @@ const AgentStateAnnotation = Annotation.Root({
     reducer: (_left, right) => right,
     default: () => true,
   }),
+
+  // ─── HITL fields ──────────────────────────────────────────────────────────
+  // Set to true by governance pre-check to route through humanReviewNode
+  requiresApproval: Annotation<boolean>({
+    reducer: (_left, right) => right,
+    default: () => false,
+  }),
+
+  // Set by humanReviewNode after creating an ApprovalRequest in the DB
+  approvalId: Annotation<string | null>({
+    reducer: (left, right) => right ?? left,
+    default: () => null,
+  }),
 });
 
 type AgentGraphState = typeof AgentStateAnnotation.State;
@@ -166,6 +191,9 @@ export class OfficialAgentGraph {
     private readonly toolRegistry: StructuredToolRegistry,
     private readonly checkpointService: AgentCheckpointService,
     private readonly securityInterceptor: SecurityInterceptorService,
+    private readonly planner: AgentPlannerService,
+    private readonly evaluator: AgentEvaluatorService,
+    private readonly approvalsService: ApprovalsService,
   ) {
     this.initializeGraph();
   }
@@ -184,9 +212,30 @@ export class OfficialAgentGraph {
     workflow.addNode(TOOL_NODE, this.toolNode.bind(this));
     workflow.addNode(EVALUATOR_NODE, this.evaluatorNode.bind(this));
 
-    // Set entry point
-    // Note: TypeScript has issues with the complex generics here, using type assertions
-    workflow.addEdge(START, PLANNER_NODE as any);
+    // ─── HITL: human review node ──────────────────────────────────────────
+    workflow.addNode(HUMAN_REVIEW_NODE, this.humanReviewNode.bind(this));
+
+    // Entry: route through human review when governance requires approval
+    // Otherwise go directly to planner
+    workflow.addConditionalEdges(
+      START as any,
+      this.requiresApprovalCheck.bind(this),
+      {
+        planner: PLANNER_NODE,
+        human_review: HUMAN_REVIEW_NODE,
+      } as any,
+    );
+
+    // After human review: continue to planner (approved) or end (rejected)
+    workflow.addConditionalEdges(
+      HUMAN_REVIEW_NODE as any,
+      this.shouldContinueAfterReview.bind(this),
+      {
+        planner: PLANNER_NODE,
+        end: END,
+      } as any,
+    );
+
     workflow.addEdge(EXECUTOR_NODE as any, TOOL_NODE as any);
     workflow.addEdge(TOOL_NODE as any, EVALUATOR_NODE as any);
 
@@ -216,8 +265,11 @@ export class OfficialAgentGraph {
   private initializeGraph() {
     try {
       const workflow = this.buildGraph();
+      // MemorySaver checkpointer is required for interrupt()-based HITL —
+      // it persists graph state between the interrupt and resume calls.
       this.compiledGraph = workflow.compile({
         name: 'AgentWorkflow',
+        checkpointer: new MemorySaver(),
       }) as typeof this.compiledGraph;
       this.logger.log('Official LangGraph initialized successfully');
     } catch (error) {
@@ -225,32 +277,107 @@ export class OfficialAgentGraph {
     }
   }
 
+  // ─── HITL routing helpers ──────────────────────────────────────────────────
+
+  private requiresApprovalCheck(state: AgentGraphState): string {
+    return state.requiresApproval ? HUMAN_REVIEW_NODE : PLANNER_NODE;
+  }
+
+  private shouldContinueAfterReview(state: AgentGraphState): string {
+    return state.error || !state.shouldContinue
+      ? (END as string)
+      : PLANNER_NODE;
+  }
+
   /**
-   * Planner node - creates execution plan
+   * Human Review Node
+   *
+   * Creates an ApprovalRequest in the DB, then calls interrupt() to pause
+   * the graph and return control to the caller.
+   *
+   * When the graph is resumed (via resumeGraph()), interrupt() returns the
+   * reviewer's decision ('APPROVED' | 'REJECTED'). The node then either
+   * clears requiresApproval (approved) or sets error (rejected).
+   *
+   * IMPORTANT: interrupt() is a LangGraph-internal mechanism — it does NOT
+   * throw; it signals the runtime to pause and serialise state. The node
+   * function will be called AGAIN on resume with the same state, and
+   * interrupt() will return the value passed to Command({ resume: value }).
+   */
+  private humanReviewNode: AgentNodeFunction = async (state) => {
+    const approval = await this.approvalsService.create({
+      title: `Agent approval required: ${state.goal.slice(0, 100)}`,
+      resourceType: 'AGENT_TASK',
+      resourceId: state.agentId,
+      tenantId: state.tenantId,
+      payload: { goal: state.goal, agentId: state.agentId },
+      priority: 'HIGH' as const,
+    });
+
+    const decision: unknown = interrupt({
+      approvalId: approval.id,
+      reason: 'Governance requires human approval before continuing',
+    });
+
+    if (decision !== 'APPROVED') {
+      return {
+        error: 'Task rejected by human reviewer',
+        shouldContinue: false,
+        currentNode: HUMAN_REVIEW_NODE,
+      };
+    }
+
+    return {
+      requiresApproval: false,
+      approvalId: approval.id,
+      currentNode: HUMAN_REVIEW_NODE,
+    };
+  };
+
+  /**
+   * Resume a paused graph after a human review decision.
+   *
+   * @param threadId   - The session/task ID used as LangGraph thread_id
+   * @param decision   - 'APPROVED' or 'REJECTED'
+   */
+  async resumeGraph(params: {
+    threadId: string;
+    decision: 'APPROVED' | 'REJECTED';
+  }): Promise<void> {
+    if (!this.compiledGraph) {
+      throw new Error('Graph not initialized');
+    }
+    await this.compiledGraph.invoke(new Command({ resume: params.decision }), {
+      configurable: { thread_id: params.threadId },
+    });
+  }
+
+  /**
+   * Planner node - delegates to AgentPlannerService for LLM-based planning
    */
   private plannerNode: AgentNodeFunction = async (state) => {
     this.logger.debug(`[planner] Creating plan for goal: ${state.goal}`);
 
     try {
-      // Emit event for streaming
       this.emitNodeEvent(PLANNER_NODE, state.agentId, { status: 'started' });
 
-      // Simple plan creation (in real impl, would call LLM)
+      const agentPlan = await this.planner.plan({
+        agentId: state.agentId,
+        goal: state.goal,
+        availableTools: this.toolRegistry.listToolNames(),
+        constraints: [],
+      });
+
       const plan = {
-        steps: [
-          {
-            id: 'step-1',
-            description: 'Analyze goal and determine required tools',
-            toolId: null,
-            input: { goal: state.goal },
-            dependsOn: [],
-          },
-        ],
+        steps: agentPlan.steps.map((s) => ({
+          id: s.id,
+          description: s.description,
+          toolId: s.toolId ?? null,
+          input: s.input ?? {},
+          dependsOn: s.dependsOn ?? [],
+        })),
         currentStepIndex: 0,
       };
-
-      // Async for future LLM integration
-      await Promise.resolve();
 
       return {
         plan,
@@ -403,59 +530,31 @@ export class OfficialAgentGraph {
   };
 
   /**
-   * Evaluator node - evaluates execution results
+   * Evaluator node - delegates to AgentEvaluatorService for LLM-based evaluation
    */
   private evaluatorNode: AgentNodeFunction = async (state) => {
     this.logger.debug(`[evaluator] Evaluating results`);
 
     try {
-      const iteration = state.iteration;
-      const maxIterations = state.maxIterations;
-
-      // Check if we've exceeded max iterations
-      if (iteration >= maxIterations) {
-        this.logger.warn(
-          `[evaluator] Max iterations (${maxIterations}) reached`,
-        );
-        return {
-          shouldContinue: false,
-          evaluation: {
-            score: 0.5,
-            success: false,
-            reflection: 'Max iterations reached',
-            suggestions: [],
-            shouldRetry: false,
-          },
-          currentNode: EVALUATOR_NODE,
-        };
-      }
-
-      // Simple evaluation logic
-      const allStepsComplete = state.plan
-        ? state.plan.currentStepIndex >= state.plan.steps.length
-        : true;
-
-      const hasErrors = state.error !== null;
-      const hasToolErrors = state.toolResults.some((r) => r.error);
-
-      const success = allStepsComplete && !hasErrors && !hasToolErrors;
-
-      // Async for future LLM integration
-      await Promise.resolve();
+      const evalResult = await this.evaluator.evaluate({
+        taskId: state.agentId,
+        agentId: state.agentId,
+        goal: state.goal,
+        steps: state.steps.map((s) => ({
+          id: s.id,
+          description: s.description,
+          output: s.output,
+          success: s.success,
+        })),
+        finalOutput: state.toolResults.at(-1)?.output,
+      });
 
       return {
-        shouldContinue: !success,
-        evaluation: {
-          score: success ? 1.0 : 0.5,
-          success,
-          reflection: success
-            ? 'All steps completed successfully'
-            : 'Some steps failed or incomplete',
-          suggestions: success ? [] : ['Retry failed steps'],
-          shouldRetry: !success && iteration < maxIterations,
-        },
+        evaluation: evalResult,
+        shouldContinue:
+          evalResult.shouldRetry && state.iteration < state.maxIterations,
         currentNode: EVALUATOR_NODE,
-        iteration: 1, // Increment for next iteration
+        iteration: 1,
       };
     } catch (error) {
       this.logger.error('[evaluator] Error evaluating results', error);
@@ -594,6 +693,8 @@ export class OfficialAgentGraph {
         maxIterations: 10,
         error: null,
         shouldContinue: true,
+        requiresApproval: false,
+        approvalId: null,
       };
     }
 
@@ -640,6 +741,8 @@ export class OfficialAgentGraph {
       maxIterations: state.maxIterations ?? 10,
       error: state.error ?? null,
       shouldContinue: state.shouldContinue ?? true,
+      requiresApproval: false,
+      approvalId: null,
     };
   }
 
@@ -695,6 +798,8 @@ export class OfficialAgentGraph {
       maxIterations: 10,
       error: null,
       shouldContinue: true,
+      requiresApproval: false,
+      approvalId: null,
     };
 
     this.logger.log(`[stream] Starting streaming agent execution`);

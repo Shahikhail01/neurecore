@@ -2,17 +2,175 @@
 
 ## Last Updated
 
-2026-04-01T22:15:00Z
+2026-04-04T12:00:00Z (update 24 — LangChain Phase 2: OpenClaw adapter, new tools (12), HITL, pgvector, frontend wiring)
+
+---
+
+## Update 24 — LangChain Phase 2 Complete (April 4, 2026)
+
+**Build result**: 289 files compiled with SWC (326.78ms), 0 TypeScript errors, `prisma generate` success.
+
+### Phase A — OpenClaw Channel Adapter
+
+New files:
+
+- `backend/src/modules/ai-gateway/openclaw.controller.ts` — `@Public()` inbound webhook at `POST /api/v1/openclaw/message`; HMAC-SHA256 via `timingSafeEqual`; fail-closed (rejects all if `OPENCLAW_WEBHOOK_SECRET` not set); verifies tenant/agent ownership; creates Task; fire-and-forget `executorService.executeTask()`
+- `backend/src/modules/ai-gateway/openclaw-adapter.module.ts` — `@Module({ imports: [AgentsModule], controllers: [OpenClawWebhookController] })`
+
+Modified files:
+
+- `backend/src/main.ts` — `rawBody: true` for HMAC validation
+- `backend/src/modules/ai-gateway/ai-gateway.module.ts` — `rateLimitRps: number` added to `OpenClawConfig`; factory reads `OPENCLAW_RATE_LIMIT_RPS ?? 10`
+- `backend/src/modules/ai-gateway/openclaw-gateway.service.ts` — `TokenBucket` rate limiter, audit logging, sanitized error responses
+- `backend/src/app.module.ts` — added `OpenClawAdapterModule`
+- `backend/src/modules/agents/services/agent-executor.service.ts` — injected `OpenClawGatewayService` + `ApprovalsService`; interrupt detection in stream loop (`__interrupt__` chunk → task PENDING + WS `task:approval:required`); outbound relay after completion (if `channelSource === 'openclaw'` → `openClawGateway.sendMessage()`); added `resumeGraph()` method
+
+### Phase B — New Tools + Registry Fix
+
+Critical bug fixed: `StructuredToolRegistry.toLangChainTools()` returned empty array because no tools were ever registered. Fixed via `ToolsInitializerService implements OnModuleInit`.
+
+New files:
+
+- `backend/src/modules/tools/built-in/web-search.tool.ts` — Serper API; SSRF guard (only `google.serper.dev`); 10s timeout; `maxResults` bounded 1-10
+- `backend/src/modules/tools/built-in/database-query.tool.ts` — SELECT-only regex gate; parameterized `$queryRawUnsafe`; max 100 rows
+- `backend/src/modules/tools/built-in/email-send.tool.ts` — Nodemailer SMTP; 10/hour/tenant sliding window; plain text only; `import('nodemailer/lib/smtp-transport').Options` for TS overload
+- `backend/src/modules/tools/built-in/agent-messaging.tool.ts` — EventsGateway; tenant isolation via DB check; message capped 1000 chars
+- `backend/src/modules/tools/built-in/document-summary.tool.ts` — LLMFactory `'execution'` tier; content capped 50,000 chars
+- `backend/src/modules/tools/tools-initializer.service.ts` — `OnModuleInit` registers all 7 tools into registry
+
+Modified:
+
+- `backend/src/modules/tools/tools.module.ts` — added `forwardRef(() => EventsModule)` + `ModelsModule` imports; all new tools as providers; `ToolsInitializerService`
+
+Dependency added: `nodemailer@8.0.4` + `@types/nodemailer@7.0.11`
+
+### Phase B.2 — 12 New Agent Tools (April 4, 2026)
+
+All 12 high-priority tools implemented and registered in StructuredToolRegistry:
+
+| #   | Tool                | File                      | Actions                                           |
+| --- | ------------------- | ------------------------- | ------------------------------------------------- |
+| 1   | Calendar Management | `calendar.tool.ts`        | list, create, update, delete events; availability |
+| 2   | Task Management     | `task-management.tool.ts` | CRUD tasks, assign, status updates                |
+| 3   | CRM Integration     | `crm.tool.ts`             | HubSpot, Pipedrive - contacts, deals              |
+| 4   | Spreadsheet         | `spreadsheet.tool.ts`     | Google Sheets CRUD                                |
+| 5   | Document Creation   | `document.tool.ts`        | Templates, format conversion                      |
+| 6   | Social Media        | `social-media.tool.ts`    | Twitter, LinkedIn posting                         |
+| 7   | Knowledge Base      | `knowledge-base.tool.ts`  | Articles, categories, search                      |
+| 8   | Vector Search       | `vector-search.tool.ts`   | pgvector semantic search                          |
+| 9   | Code Deployment     | `code-deployment.tool.ts` | Vercel, Netlify deploy                            |
+| 10  | Alerting            | `alerting.tool.ts`        | Email, SMS, Slack notifications                   |
+| 11  | Banking             | `banking.tool.ts`         | Balance, transactions, transfers                  |
+| 12  | Maps                | `maps.tool.ts`            | Geocoding, directions, places                     |
+
+Build result: 301 files compiled with SWC, 0 TypeScript errors.
+
+### Phase C — Frontend Wiring
+
+- `frontend-tenant/src/app/(app)/approvals/page.tsx` — fixed broken endpoint (`api.post('/approvals/${id}/approve')` → `api.patch('/approvals/${id}/review', { status: 'APPROVED'|'REJECTED' })`); added `hqEventBus.on('approval:requested')` real-time refresh; `useCallback` for `fetchApprovals`
+- `frontend-tenant/src/app/(app)/tasks/new/page.tsx` — complete rewrite: agent dropdown from `GET /agents`; dispatch via `POST /tasks` → `POST /agents/:id/dispatch`; live WebSocket streaming log (`task:step:start`, `task:tool:call`, `task:completed`, `task:failed`); `hqEventBus.on('task:update')`; auto-scroll ref
+
+### Phase D — LangGraph Human-in-the-Loop
+
+- `backend/src/modules/agents/langgraph/langgraph-official.ts` — added `interrupt`, `MemorySaver`, `Command` from `@langchain/langgraph`; `requiresApproval: Annotation<boolean>` + `approvalId: Annotation<string | null>` in state; `HUMAN_REVIEW_NODE`; `humanReviewNode` calls `approvalsService.create()` then `interrupt()`; `MemorySaver` checkpointer in `initializeGraph()`; `resumeGraph({ threadId, decision })` via `Command`; all 3 initialState objects include `requiresApproval: false, approvalId: null`
+- `backend/src/modules/agents/agents.controller.ts` — `GraphResumeDto` class; `POST :id/graph-resume` endpoint
+
+### Phase E — pgvector
+
+- `backend/prisma/schema.prisma` — `embeddingVector Unsupported("vector(1536)")?` on `MemoryEntry`
+- `backend/prisma/migrations/20260404_enable_pgvector/migration.sql` — `CREATE EXTENSION IF NOT EXISTS vector`; `ALTER TABLE memory_entries ADD COLUMN IF NOT EXISTS embedding_vector vector(1536)`; `CREATE INDEX USING ivfflat ... vector_cosine_ops WITH (lists = 100)` — **must be applied via Neon SQL console, not `prisma migrate dev`**
+- `backend/src/modules/memory/memory.service.ts` — `ENABLE_VECTOR_SEARCH` env flag; when on: `$executeRaw` for vector upsert in `store()`; `$queryRaw` with `<=>` cosine order in `search()`
+- `backend/scripts/backfill-embeddings.ts` — batch backfill from existing JSON `embedding` column (100 rows/batch); usage: `npx ts-node -r tsconfig-paths/register scripts/backfill-embeddings.ts`
+
+### Architecture Law (LOCKED)
+
+```
+Inbound:  User → OpenClaw → POST /api/v1/openclaw/message (HMAC validated)
+                                    ↓
+                          AgentExecutorService → OfficialAgentGraph
+                          (LangChain/LangGraph owns ALL reasoning)
+
+Outbound: AgentGraph result → OpenClawGatewayService.sendMessage() → OpenClaw → User
+```
+
+### HITL Production Flow
+
+Reviewers call `POST /agents/:id/graph-resume` with `{ threadId: UUID, approvalId: UUID, decision: 'APPROVED'|'REJECTED', reason?: string }`
+
+### Environment Variables Added (Phase 2)
+
+| Variable                                           | Purpose                                                        |
+| -------------------------------------------------- | -------------------------------------------------------------- |
+| `OPENCLAW_WEBHOOK_SECRET`                          | HMAC-SHA256 inbound webhook validation (fail-closed if absent) |
+| `OPENCLAW_RATE_LIMIT_RPS`                          | Token bucket RPS per tenant (default: 10)                      |
+| `SERPER_API_KEY`                                   | Web search tool                                                |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | Email send tool                                                |
+| `ENABLE_VECTOR_SEARCH`                             | `true` to activate pgvector path in memory service             |
+
+---
+
+## Update 23 — Chat Module, Analytics Summary, Tenants/Me (April 4, 2026)
+
+---
+
+## Update 23 — Chat Module, Analytics Summary, Tenants/Me (April 4, 2026)
+
+### New Endpoints
+
+| Endpoint                 | Controller              | Notes                                                |
+| ------------------------ | ----------------------- | ---------------------------------------------------- |
+| `POST /chat/messages`    | chat.controller.ts      | Send message, returns AI reply (data-driven, no LLM) |
+| `GET /chat/history`      | chat.controller.ts      | Last 50 messages for tenant                          |
+| `DELETE /chat/history`   | chat.controller.ts      | Clear all messages for tenant                        |
+| `POST /chat/suggestions` | chat.controller.ts      | Returns 4 contextual suggestion strings              |
+| `GET /analytics/summary` | analytics.controller.ts | Returns agents/tasks/workflows counts                |
+| `GET /tenants/me`        | tenants.controller.ts   | Current tenant from JWT (no role restriction)        |
+
+### New Files Created
+
+- `backend/src/modules/chat/chat.service.ts` — pure Prisma, no LLM; stores/retrieves ChatMessage records
+- `backend/src/modules/chat/chat.controller.ts` — 4 routes for send/history/clear/suggestions
+- `backend/src/modules/chat/chat.module.ts` — no extra imports needed (DatabaseModule + CacheModule are @Global)
+- Registered `ChatModule` in `app.module.ts`
+
+### TypeScript Fixes Applied
+
+- `chat.controller.ts`: removed invalid import of `CurrentUser` (use `@Req() req`)
+- `chat.module.ts`: corrected `PrismaModule` path → `DatabaseModule`
+- `chat.service.ts`: `agent.role` → `agent.type`; `TaskStatus.IN_PROGRESS` → `TaskStatus.RUNNING`
+
+### Critical: `nest start --watch` SWC Output Behaviour
+
+SWC watch mode writes compiled output to `dist/` (no `src/` prefix). `start:prod` uses `dist/src/main.js`.
+These are **different paths** — watch mode does NOT update the `start:prod` path.
+
+**Reliable dev start**: `cd backend && node dist/main.js >> /tmp/nodetest.log 2>&1 &`
+
+After code changes: run `pnpm run build` to update `dist/src/`, then restart with `node dist/src/main.js`.
+
+### E2E Test Status (April 4, 2026)
+
+- File: `backend/e2e-dashboard-comprehensive.mjs` (15 phases)
+- Test user: `jane@gmail.com` / `Jane1234`, tenantId: `2c5dfced-7289-48bc-8605-052c3849d742`
+- **Result: 29 PASSED, 0 FAILED, 15 WARNINGS** (unimplemented endpoints are expected warnings)
+
+### Prisma Enum Facts (use these, never guess)
+
+| Enum           | Valid values                                                              |
+| -------------- | ------------------------------------------------------------------------- |
+| `TaskStatus`   | `PENDING, QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED` (no IN_PROGRESS) |
+| `TaskPriority` | `LOW, MEDIUM, HIGH, CRITICAL` (uppercase)                                 |
+| `Agent.type`   | string field (not `role`)                                                 |
+
+---
 
 ## Architecture Overview
 
 - **Production Backend**: NestJS on Contabo (PM2 id 24), port 3003, proxied via LiteSpeed → `brain.neurecore.com`
-- **Production DB**: **Contabo PostgreSQL 16** — `127.0.0.1:5432/neurecore_prod` (MIGRATED from Neon, April 1 2026)
-- **Production Redis**: **Contabo Redis 7** — `127.0.0.1:6379` ioredis direct (REPLACED Upstash REST, April 1 2026)
-- **Local Dev DB**: Contabo PostgreSQL 16 via SSH tunnel on `localhost:15433` → `neurecore_prod`
-- **Local Dev Redis**: Contabo Redis 7 via SSH tunnel on `localhost:16380`
-- **Docker**: Not used — replaced by Contabo tunnel
-- **Neon / Upstash**: No longer used anywhere ✅
+- **Production/Dev DB**: **Neon PostgreSQL** — `ep-summer-pond-adpkqy1m-pooler.c-2.us-east-1.aws.neon.tech/neondb` (confirmed April 3, 2026)
+- **Production/Dev Cache**: **Upstash Redis REST** — `lasting-gobbler-72608.upstash.io`
+- **Contabo VPS**: Legacy — SSH tunnel details obsolete. Both env files point to Neon + Upstash.
+- **Docker**: Not in active use
 
 ### Contabo Server
 
@@ -73,14 +231,59 @@ register (2-step: account + plan) → /auth/register → startAuthenticatedWizar
 - **Legacy dashboard** (`dashboard/page.tsx`): any path hitting `/dashboard` now immediately does `router.replace("/dashboard-v2")`. Added `useRouter` import. Prevents stale sessions from looping to `/login` via the dead legacy page.
 - 0 TypeScript errors ✅, dev server hot-reloaded ✅
 
+### 13. Dashboard TypeError + Stale Cache Fix (April 3, 2026)
+
+- **Error**: `TypeError: (intermediate value)(intermediate value)(intermediate value).slice is not a function` at `page.tsx:82`
+- **Root cause**: Browser running a stale `.next` compiled bundle from before the `Array.isArray` guard was added. Source-map line numbers were off by ~100 lines.
+- **Secondary cause**: `try...finally` (no `catch`) in dashboard `useEffect` → unhandled promise rejection on any load error.
+- **Fixes**:
+  - Cleared entire `.next` build cache (`find .next -mindepth 1 -delete`)
+  - Added `catch {}` block to `load()` in `frontend-tenant/src/app/(app)/dashboard/page.tsx` — dashboard degrades silently to empty state on API errors
+- **Note**: `Array.isArray` guards before every `.slice()` are correct in source AND compiled code.
+
 ## Production Fixes Applied (March 31, 2026) ✅
 
 ### LiteSpeed 404 Root Cause — FIXED
 
-- **Root cause**: Missing closing `}` brace in `virtualHost endtime.gec5.com {}` block
-  in `/usr/local/lsws/conf/httpd_config.conf` (line ~388). All subsequent VHosts
-  (including `brain.neurecore.com`) were parsed as nested inside endtime — invisible
-  as top-level VHosts.
+### 12. Workspace Auto-Provisioning Feature — COMPLETE (April 3, 2026)
+
+Full 8-phase implementation on branch `tenant-base`. Zero TypeScript errors after completion.
+
+**DB**: 2 new tables (`provisioning_configs`, `provisioning_jobs`), 5 new enums — created via raw SQL (Neon drift prevents `migrate dev`), then `prisma generate` run.
+
+**Backend module**: `backend/src/modules/workspace-provisioning/` — 8 files, SOLID:
+
+- PROVISIONING_PROVIDERS Symbol token (OCP), IProvisioningProvider interface (DIP), ProvisioningJobService (SRP), ProvisioningOrchestratorService (OCP+DIP)
+- 8 REST endpoints under `/api/v1/workspace-provisioning`
+- OAuth: Google (`admin.directory.v1` — stub TODO) + Microsoft (`Graph API` — stub TODO)
+- OAuth tokens stored plaintext with TODO to encrypt (AES-256-GCM)
+- Hooked into `completeWizard`: creates ProvisioningConfig + ProvisioningJob[] when `wp.enabled`
+
+**Frontend**:
+
+- `types/onboarding.types.ts` — 3 new enums + 3 new interfaces + WizardData extended
+- `stores/onboardingStore.ts` — `setWorkspaceProvisioningData` action
+- `services/workspace-provisioning.service.ts` — 6 methods, triple-fallback extract
+- `IntegrationsStep.tsx` — workspace provisioning panel renders when storage integration selected
+- `dashboard/WorkspaceProvisioningBanner.tsx` — amber banner with sessionStorage dismiss, CTA → `/settings?tab=workspace`
+- `dashboard/page.tsx` — banner rendered above KPI bar, status fetched in parallel
+- `settings/page.tsx` — full rewrite; 5th "Workspace" tab: config summary, Connect OAuth button, jobs table, "Provision all pending" button
+
+**Key patterns**:
+
+- `?tab=workspace` URL param auto-selects workspace tab (Suspense + useSearchParams)
+- `sessionStorage` key `wp_banner_dismissed` for banner dismiss
+- `window.location.href` redirect for OAuth (not `router.push`)
+- Jobs table: Name / Invited Email / Corporate Email (or "Pending") / Status chip
+
+---
+
+### Previous Fixes (March–April 2026)
+
+in `/usr/local/lsws/conf/httpd_config.conf` (line ~388). All subsequent VHosts
+(including `brain.neurecore.com`) were parsed as nested inside endtime — invisible
+as top-level VHosts.
+
 - **Fix**: `sed` inserted missing `}` after the `restrained 1` line.
 - **VHost config** (`/usr/local/lsws/conf/vhosts/brain.neurecore.com/vhost.conf`):
   restored to CyberPanel format — `extprocessor nodeapi { type proxy; address 127.0.0.1:3003 }`
@@ -458,15 +661,18 @@ export const viewport: Viewport = {
 ## April 3, 2026 — Full 9-Step Wizard Rebuild + E2E Verified
 
 ### Wizard Steps (9 active, WELCOME skipped)
+
 ORGANIZATION → ADMIN → PLAN → DEPARTMENTS → TEAM → INTEGRATIONS → AGENTS → SECURITY → REVIEW
 
 ### Components Rebuilt
+
 - **AgentsStep.tsx**: Fetches real templates from `/onboarding/agent-templates`, calls `POST /onboarding/agents`
 - **TeamStep.tsx**: firstName/lastName/email/role form, calls `POST /onboarding/invitations`
 - **IntegrationsStep.tsx**: Toggle UI for 9 types, stores locally — `completeWizard` creates DB records
 - **onboarding/page.tsx `ACTIVE_STEPS`**: Expanded from 5 → 9 steps
 
 ### Backend Changes
+
 - `InvitationInputDto.departmentId`: `@IsOptional()` (service doesn't use it)
 - `AgentConfigInputDto.departmentId`: `@IsOptional()`
 - `WizardData` interface: both `departmentId` fields optional
@@ -474,37 +680,42 @@ ORGANIZATION → ADMIN → PLAN → DEPARTMENTS → TEAM → INTEGRATIONS → AG
 - `completeWizard`: Idempotent — deploys agents/invitations/integrations from wizard state
 
 ### Frontend Fixes
+
 - AgentsStep: removed duplicate old code (was 330 lines → 191 clean)
 - IntegrationsStep: removed duplicate interface (was 121 lines → 115 clean)
 - `frontend-tenant/src/types/onboarding.types.ts`: `InvitationInputDto.departmentId` optional
 
 ### E2E Test
+
 **File**: `backend/e2e-wizard-full.mjs`
 All 11 steps pass: register → start-authenticated → 9 wizard steps → completeWizard → tenantId confirmed
 
 ### Correct Onboarding Endpoint Reference
-| Endpoint | Method | Success Status |
-|---|---|---|
-| `/onboarding/start-authenticated` | POST | 201 (requires JWT) |
-| `/onboarding/organization` | PUT | 200 |
-| `/onboarding/admin` | PUT | 200 |
-| `/onboarding/plans` | GET | 200 |
-| `/onboarding/plan` | PUT | 200 |
-| `/onboarding/departments` | POST | 201 |
-| `/onboarding/invitations` | POST | 201 |
-| `/onboarding/integrations` | POST | 201 (one call per integration) |
-| `/onboarding/agent-templates` | GET | 200 |
-| `/onboarding/agents` | POST | 201 |
-| `/onboarding/security` | PUT | 200 |
-| `/onboarding/complete` | POST | 200 |
+
+| Endpoint                          | Method | Success Status                 |
+| --------------------------------- | ------ | ------------------------------ |
+| `/onboarding/start-authenticated` | POST   | 201 (requires JWT)             |
+| `/onboarding/organization`        | PUT    | 200                            |
+| `/onboarding/admin`               | PUT    | 200                            |
+| `/onboarding/plans`               | GET    | 200                            |
+| `/onboarding/plan`                | PUT    | 200                            |
+| `/onboarding/departments`         | POST   | 201                            |
+| `/onboarding/invitations`         | POST   | 201                            |
+| `/onboarding/integrations`        | POST   | 201 (one call per integration) |
+| `/onboarding/agent-templates`     | GET    | 200                            |
+| `/onboarding/agents`              | POST   | 201                            |
+| `/onboarding/security`            | PUT    | 200                            |
+| `/onboarding/complete`            | POST   | 200                            |
 
 ### Enum Values
+
 - `Industry`: `TECHNOLOGY`, `FINANCE`, `HEALTHCARE`, `RETAIL`, `MANUFACTURING`, `EDUCATION`, `LEGAL`, `CONSULTING`, `MEDIA`, `REAL_ESTATE`, `HOSPITALITY`, `TRANSPORTATION`, `ENERGY`, `GOVERNMENT`, `NON_PROFIT`, `OTHER`
 - `CompanySize`: `STARTUP`, `SMALL`, `MEDIUM`, `LARGE`, `ENTERPRISE`
 - `UserRole`: `SUPER_ADMIN`, `ADMIN`, `MANAGER`, `AGENT`, `VIEWER`
 - `BillingCycle`: `MONTHLY`, `YEARLY`
 
 ### Build Status
+
 - Backend: ✅ Clean
 - Frontend-tenant: ✅ Clean (29 pages, `/onboarding` = 9.73 kB)
 
@@ -513,14 +724,17 @@ All 11 steps pass: register → start-authenticated → 9 wizard steps → compl
 ## April 3, 2026 — Admin ↔ Tenant Architecture Mapped
 
 ### Connection Model
+
 Both frontends hit the **same** NestJS backend (brain.neurecore.com/api/v1). No direct frontend-to-frontend communication.
 
 ### Auth Separation
+
 - Admin frontend: `localStorage.admin_accessToken`, SUPER_ADMIN JWT role
 - Tenant frontend: `tokenManager` / key `hq_accessToken`, TENANT roles
 - Backend enforces role separation per endpoint
 
 ### Admin Controls That Affect Tenants
+
 1. **Tier/Plan CRUD** (`/tiers`) — sets `maxAgents`, `maxUsers`, features for every tenant subscribing to that plan
 2. **Platform Agent Templates** (`/agent-templates/platform`) — the templates tenants see in wizard step
 3. **Dept Template Deployment** (`POST /deploy/tenants/{id}/dept-template`) — creates Department records inside a tenant
@@ -535,8 +749,10 @@ Both frontends hit the **same** NestJS backend (brain.neurecore.com/api/v1). No 
 ## April 3, 2026 — Recurring Bug Patterns Fixed (Session 2)
 
 ### 1. Register 400 — lastName empty string
+
 **Root cause**: Single "Full name" field split on space → `lastName = ''` → fails `@MinLength(1)`.
 **Files changed**:
+
 - `backend/src/modules/auth/dto/register.dto.ts`: `lastName` → `@IsOptional()`, removed `@MinLength(1)`
 - `backend/src/modules/auth/interfaces/auth.interface.ts`: `RegisterInput.lastName` → `lastName?: string`
 - `backend/src/modules/auth/services/auth.service.ts`: `data.lastName ?? ''` (DB requires non-null String)
@@ -544,21 +760,26 @@ Both frontends hit the **same** NestJS backend (brain.neurecore.com/api/v1). No 
 - `frontend-tenant/src/app/register/page.tsx`: single-name → `lastName = undefined`, spread-omits from payload
 
 ### 2. Dashboard `.slice() is not a function` crash
+
 **Root cause**: `TransformResponseInterceptor` wraps all responses in `{ status, data, meta }`. Paginated list endpoints (agents, tasks) return `{ data: [], total, page, ... }` themselves. Array is at `axiosResponse.data.data.data` (3 levels). Pages only did `res.data?.data` → got pagination object → `.slice()` crash.
 **Fix pattern**: `res.data?.data?.data ?? res.data?.data ?? res.data ?? []` + `Array.isArray()` guard.
 **Files changed**:
+
 - `frontend-tenant/src/app/(app)/dashboard/page.tsx`: both `rawAgents` and `rawTasks` extraction fixed
 - `frontend-tenant/src/app/(app)/agents/page.tsx`: `setAgents` extraction fixed
 - `frontend-tenant/src/app/(app)/workflows/page.tsx`: `setWorkflows` extraction fixed
 
 ### 3. WebSocket repeated connection failures
+
 **Root cause**: `auth: { token: tokenManager.getAccessToken() }` captures token at socket-object-creation time. Socket is created before user logs in → `null` token → gateway rejects → retry loop.
 **Fix**: Changed to callback form `auth: (cb) => cb({ token: tokenManager.getAccessToken() })` — token is read fresh on every connection/reconnection attempt.
 **Files changed**:
+
 - `frontend-tenant/src/services/socket.ts`
 - `frontend-tenant/src/core/infrastructure/socket/SocketManager.ts`
 
 ### Lint / type errors fixed
+
 - `backend/src/modules/onboarding/onboarding.service.ts`: remove unused `UserRole` import
 - `backend/src/modules/onboarding/onboarding.controller.ts`: remove unused `Version` import
 - `backend/src/modules/onboarding/dto/onboarding.dto.ts`: remove unused `IsPhoneNumber` import
@@ -573,6 +794,7 @@ Both frontends hit the **same** NestJS backend (brain.neurecore.com/api/v1). No 
 **Previous entries saying "Contabo is production, Neon/Upstash obsolete" are WRONG as of this session.**
 
 Both `backend/.env` (local dev) and `backend/.env.production` currently point to:
+
 - **Database**: Neon PostgreSQL (`ep-summer-pond-adpkqy1m-pooler.c-2.us-east-1.aws.neon.tech/neondb`)
 - **Cache**: Upstash Redis (`lasting-gobbler-72608.upstash.io`) via REST client
 
@@ -580,32 +802,37 @@ Both `backend/.env` (local dev) and `backend/.env.production` currently point to
 The `backend/scripts/ssh-tunnel.sh` and `contabo/` folder can be disregarded.
 
 ### Current Active Infrastructure (April 3, 2026)
-| Layer | Service |
-|---|---|
-| Database | Neon PostgreSQL (pooled, AWS us-east-1) |
-| Cache / Sessions | Upstash Redis (REST client via `@upstash/redis`) |
-| Backend (dev) | Local NestJS port 3000 |
-| Backend (prod) | Vercel — `brain.neurecore.com` |
-| Frontend-tenant (dev) | Local Next.js port 3001 |
-| Frontend-admin (dev) | Local Next.js port 3002 |
-| Frontend (prod) | Vercel — `hq.neurecore.com` / `cc.neurecore.com` |
+
+| Layer                 | Service                                          |
+| --------------------- | ------------------------------------------------ |
+| Database              | Neon PostgreSQL (pooled, AWS us-east-1)          |
+| Cache / Sessions      | Upstash Redis (REST client via `@upstash/redis`) |
+| Backend (dev)         | Local NestJS port 3000                           |
+| Backend (prod)        | Vercel — `brain.neurecore.com`                   |
+| Frontend-tenant (dev) | Local Next.js port 3001                          |
+| Frontend-admin (dev)  | Local Next.js port 3002                          |
+| Frontend (prod)       | Vercel — `hq.neurecore.com` / `cc.neurecore.com` |
 
 ---
 
 ## April 3, 2026 — Connector Duplicate Bug Fix + Dashboard E2E Verification
 
 ### Bug: Duplicate connectors created after wizard completion
+
 **Root cause**: `onboarding.service.ts` `addIntegration` was pushing `integration.id` (a UUID) into `wizardData.integrations[]`. `completeWizard` iterated those values as type strings (e.g. `CRM_SALESFORCE`) — the idempotency check `findFirst({ provider: <uuid> })` never matched → created a second connector per integration with the UUID as its provider. Result: 4 connectors instead of 2.
 
 **Fix** (one line in `addIntegration`):
+
 ```ts
 // Before: integrations.push(integration.id);
 // After:
-integrations.push(dto.type);  // store the type string, not the record UUID
+integrations.push(dto.type); // store the type string, not the record UUID
 ```
 
 ### New E2E test: `backend/e2e-dashboard-flow.mjs`
+
 Full 6-phase test covering the complete user journey:
+
 1. `POST /auth/register` (201)
 2. `POST /onboarding/start-authenticated` (201)
 3. All wizard steps — organization, admin, plan, departments, invitations, integrations, agents, security
@@ -620,5 +847,6 @@ Full 6-phase test covering the complete user journey:
 **All 6 phases pass ✅**. Run with: `node e2e-dashboard-flow.mjs` from `/backend`.
 
 ### Key behaviour confirmed
+
 - Re-login after `completeWizard` is required: initial registration token has `role: USER, tenantId: null`. `completeWizard` updates the user to `role: ADMIN, tenantId: <id>`. Fresh JWT (via re-login) is needed to access tenant-scoped endpoints.
 - `GET /onboarding/progress` after complete correctly returns 401 (wizard session cleared from Redis).

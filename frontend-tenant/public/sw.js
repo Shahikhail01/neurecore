@@ -11,35 +11,49 @@
  * Push Notifications: receives and shows push payloads from server.
  */
 
-'use strict';
+"use strict";
 
-const CACHE_VERSION  = 'hq-v1';
-const STATIC_CACHE   = `${CACHE_VERSION}-static`;
-const PAGES_CACHE    = `${CACHE_VERSION}-pages`;
-const IMAGES_CACHE   = `${CACHE_VERSION}-images`;
-const SYNC_QUEUE_KEY = 'hq-sync-queue';
+const CACHE_VERSION = "hq-v1";
+const STATIC_CACHE = `${CACHE_VERSION}-static`;
+const PAGES_CACHE = `${CACHE_VERSION}-pages`;
+const IMAGES_CACHE = `${CACHE_VERSION}-images`;
+const SYNC_QUEUE_KEY = "hq-sync-queue";
 
-const STATIC_PRECACHE = [
-  '/offline.html',
-];
+const STATIC_PRECACHE = ["/offline.html"];
 
 // ─── Install ──────────────────────────────────────────────────────────────────
-self.addEventListener('install', (event) => {
+self.addEventListener("install", (event) => {
+  // Do NOT call skipWaiting() here automatically.
+  // On first install it would trigger `controllerchange` immediately, causing
+  // the JS client to reload the page mid-interaction (e.g. registration form).
+  // skipWaiting is triggered explicitly by the app via a SKIP_WAITING message.
   event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then((cache) => cache.addAll(STATIC_PRECACHE))
-      .then(() => self.skipWaiting()),
+    caches.open(STATIC_CACHE).then((cache) => cache.addAll(STATIC_PRECACHE)),
   );
 });
 
+// ─── Message ──────────────────────────────────────────────────────────────────
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 // ─── Activate ─────────────────────────────────────────────────────────────────
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys()
+    caches
+      .keys()
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k.startsWith('hq-') && k !== STATIC_CACHE && k !== PAGES_CACHE && k !== IMAGES_CACHE)
+            .filter(
+              (k) =>
+                k.startsWith("hq-") &&
+                k !== STATIC_CACHE &&
+                k !== PAGES_CACHE &&
+                k !== IMAGES_CACHE,
+            )
             .map((k) => caches.delete(k)),
         ),
       )
@@ -48,21 +62,24 @@ self.addEventListener('activate', (event) => {
 });
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
-self.addEventListener('fetch', (event) => {
+self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
   // Skip chrome-extension and non-http(s) requests
-  if (!url.protocol.startsWith('http')) return;
+  if (!url.protocol.startsWith("http")) return;
 
   // API calls — NetworkFirst, no cache
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith("/api/")) {
     event.respondWith(networkFirst(request, null));
     return;
   }
 
   // Next.js static assets — CacheFirst (immutable)
-  if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/')) {
+  if (
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/")
+  ) {
     event.respondWith(cacheFirst(request, STATIC_CACHE, 30 * 24 * 60 * 60));
     return;
   }
@@ -74,22 +91,22 @@ self.addEventListener('fetch', (event) => {
   }
 
   // HTML pages — NetworkFirst with offline fallback
-  if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request, PAGES_CACHE, '/offline.html'));
+  if (request.mode === "navigate") {
+    event.respondWith(networkFirst(request, PAGES_CACHE, "/offline.html"));
     return;
   }
 });
 
 // ─── Background Sync ──────────────────────────────────────────────────────────
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'hq-mutation-sync') {
+self.addEventListener("sync", (event) => {
+  if (event.tag === "hq-mutation-sync") {
     event.waitUntil(replayQueuedMutations());
   }
 });
 
 // ─── Push Notifications ───────────────────────────────────────────────────────
-self.addEventListener('push', (event) => {
-  let payload = { title: 'HeadQuarter', body: 'You have a new update.' };
+self.addEventListener("push", (event) => {
+  let payload = { title: "HeadQuarter", body: "You have a new update." };
 
   try {
     if (event.data) payload = event.data.json();
@@ -98,30 +115,29 @@ self.addEventListener('push', (event) => {
   }
 
   const options = {
-    body:    payload.body || '',
-    icon:    '/icons/icon-192.png',
-    badge:   '/icons/icon-72.png',
-    tag:     payload.tag || 'hq-notification',
+    body: payload.body || "",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-72.png",
+    tag: payload.tag || "hq-notification",
     renotify: true,
-    data:    payload.data || {},
+    data: payload.data || {},
     actions: payload.actions || [],
   };
 
-  event.waitUntil(
-    self.registration.showNotification(payload.title, options),
-  );
+  event.waitUntil(self.registration.showNotification(payload.title, options));
 });
 
 // ─── Notification click ───────────────────────────────────────────────────────
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/dashboard';
+  const url = event.notification.data?.url || "/dashboard";
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
       .then((clientList) => {
         for (const client of clientList) {
-          if (client.url.includes(self.location.origin) && 'focus' in client) {
+          if (client.url.includes(self.location.origin) && "focus" in client) {
             client.navigate(url);
             return client.focus();
           }
@@ -135,12 +151,16 @@ self.addEventListener('notificationclick', (event) => {
 
 /** Cache-First strategy */
 async function cacheFirst(request, cacheName, maxAgeSeconds) {
-  const cache    = await caches.open(cacheName);
-  const cached   = await cache.match(request);
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
 
   if (cached) {
-    const date = cached.headers.get('date');
-    if (!maxAgeSeconds || !date || (Date.now() - new Date(date).getTime()) < maxAgeSeconds * 1000) {
+    const date = cached.headers.get("date");
+    if (
+      !maxAgeSeconds ||
+      !date ||
+      Date.now() - new Date(date).getTime() < maxAgeSeconds * 1000
+    ) {
       return cached;
     }
   }
@@ -152,7 +172,7 @@ async function cacheFirst(request, cacheName, maxAgeSeconds) {
     }
     return response;
   } catch {
-    return cached ?? new Response('Offline', { status: 503 });
+    return cached ?? new Response("Offline", { status: 503 });
   }
 }
 
@@ -167,7 +187,7 @@ async function networkFirst(request, cacheName, fallbackUrl) {
     return response;
   } catch {
     if (cacheName) {
-      const cache  = await caches.open(cacheName);
+      const cache = await caches.open(cacheName);
       const cached = await cache.match(request);
       if (cached) return cached;
     }
@@ -175,21 +195,24 @@ async function networkFirst(request, cacheName, fallbackUrl) {
       const fallback = await caches.match(fallbackUrl);
       if (fallback) return fallback;
     }
-    return new Response('Service Unavailable', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+    return new Response("Service Unavailable", {
+      status: 503,
+      headers: { "Content-Type": "text/plain" },
+    });
   }
 }
 
 /** Replay stored PATCH/POST/PUT/DELETE requests */
 async function replayQueuedMutations() {
-  const db   = await openSyncDB();
+  const db = await openSyncDB();
   const queue = await getQueue(db);
 
   for (const entry of queue) {
     try {
       await fetch(entry.url, {
-        method:  entry.method,
+        method: entry.method,
         headers: entry.headers,
-        body:    entry.body,
+        body: entry.body,
       });
       await removeFromQueue(db, entry.id);
     } catch {
@@ -201,29 +224,32 @@ async function replayQueuedMutations() {
 // ─── Minimal IndexedDB for sync queue ─────────────────────────────────────────
 function openSyncDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('hq-sync', 1);
+    const req = indexedDB.open("hq-sync", 1);
     req.onupgradeneeded = () => {
-      req.result.createObjectStore('queue', { keyPath: 'id', autoIncrement: true });
+      req.result.createObjectStore("queue", {
+        keyPath: "id",
+        autoIncrement: true,
+      });
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror   = () => reject(req.error);
+    req.onerror = () => reject(req.error);
   });
 }
 
 function getQueue(db) {
   return new Promise((resolve, reject) => {
-    const tx  = db.transaction('queue', 'readonly');
-    const req = tx.objectStore('queue').getAll();
+    const tx = db.transaction("queue", "readonly");
+    const req = tx.objectStore("queue").getAll();
     req.onsuccess = () => resolve(req.result);
-    req.onerror   = () => reject(req.error);
+    req.onerror = () => reject(req.error);
   });
 }
 
 function removeFromQueue(db, id) {
   return new Promise((resolve, reject) => {
-    const tx  = db.transaction('queue', 'readwrite');
-    const req = tx.objectStore('queue').delete(id);
+    const tx = db.transaction("queue", "readwrite");
+    const req = tx.objectStore("queue").delete(id);
     req.onsuccess = () => resolve();
-    req.onerror   = () => reject(req.error);
+    req.onerror = () => reject(req.error);
   });
 }

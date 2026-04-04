@@ -17,6 +17,9 @@ import {
 import { useAuthStore } from "@/stores/authStore";
 import api from "@/services/api";
 import { cn } from "@/lib/utils";
+import { WorkspaceProvisioningBanner } from "@/components/dashboard/WorkspaceProvisioningBanner";
+import { workspaceProvisioningService } from "@/services/workspace-provisioning.service";
+import type { ProvisioningStatusDto } from "@/types/onboarding.types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AgentItem {
@@ -70,6 +73,9 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [kpis, setKpis] = useState<KpiItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [provStatus, setProvStatus] = useState<ProvisioningStatusDto | null>(
+    null,
+  );
 
   useEffect(() => {
     async function load() {
@@ -78,6 +84,12 @@ export default function DashboardPage() {
           api.get("/agents").catch(() => ({ data: { data: [] } })),
           api.get("/tasks").catch(() => ({ data: { data: [] } })),
         ]);
+
+        // Fetch provisioning status in parallel — never crashes dashboard on error
+        workspaceProvisioningService
+          .getStatus()
+          .then(setProvStatus)
+          .catch(() => null);
 
         // Unwrap TransformResponseInterceptor envelope: { status, data: <service return>, meta }
         // Agents findAll returns paginated: { data: [], total, page, ... }
@@ -191,6 +203,8 @@ export default function DashboardPage() {
             color: "text-blue-400",
           },
         ]);
+      } catch {
+        // Non-critical: dashboard still renders with empty state
       } finally {
         setLoading(false);
       }
@@ -325,6 +339,10 @@ export default function DashboardPage() {
 
         {/* CENTER: Activity Timeline */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* Workspace provisioning banner */}
+          <div className="flex-shrink-0 px-4 pt-3">
+            <WorkspaceProvisioningBanner status={provStatus} />
+          </div>
           {/* KPI bar */}
           <div className="flex-shrink-0 grid grid-cols-4 gap-0 border-b border-[var(--surface-border)]">
             {(loading

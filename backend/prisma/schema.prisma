@@ -175,6 +175,40 @@ enum BillingEventType {
   TAX_APPLIED
 }
 
+// ─── Workspace Provisioning Enums ─────────────────────────────────────────
+
+enum ProvisioningProvider {
+  GOOGLE_WORKSPACE
+  MICROSOFT_365
+}
+
+enum ProvisioningConfigStatus {
+  PENDING_CONNECT
+  CONNECTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum ProvisioningJobStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum EmailPattern {
+  FIRST_DOT_LAST
+  FIRSTLAST
+  F_DOT_LAST
+}
+
+enum FolderStructure {
+  BY_DEPARTMENT
+  FLAT
+}
+
 // ─── Tier (Phase 6: Unified Tier-Agent Architecture) ───────────────────────
 
 model Tier {
@@ -305,6 +339,9 @@ model Tenant {
   // Phase 5 back-relations - Goals & Projects
   goals    Goal[]
   projects Project[]
+
+  // Workspace provisioning (optional — created when admin selects storage integration in wizard)
+  provisioningConfig ProvisioningConfig?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -595,7 +632,9 @@ model MemoryEntry {
   type       MemoryType @default(SHORT_TERM)
   content    String     @db.Text
   summary    String?    @db.Text
-  embedding  String?    @db.Text // JSON-serialised float[] (pgvector on separate DB)
+  embedding  String?    @db.Text // JSON-serialised float[] (legacy / fallback)
+  // pgvector native column — populated when ENABLE_VECTOR_SEARCH=true
+  embeddingVector Unsupported("vector(1536)")?
   importance Float      @default(0.5)
   expiresAt  DateTime?
   metadata   Json       @default("{}")
@@ -1401,4 +1440,61 @@ model BudgetIncident {
   @@index([budgetPolicyId])
   @@index([status])
   @@map("budget_incidents")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Workspace Provisioning
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── ProvisioningConfig ───────────────────────────────────────────────────
+// One config per tenant — stores intent captured during wizard + OAuth tokens
+// after admin connects their Google Workspace / Microsoft 365 account.
+
+model ProvisioningConfig {
+  id                 String                   @id @default(uuid())
+  tenantId           String                   @unique
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider           ProvisioningProvider
+  emailDomain        String
+  emailPattern       EmailPattern             @default(FIRST_DOT_LAST)
+  folderStructure    FolderStructure          @default(BY_DEPARTMENT)
+  status             ProvisioningConfigStatus @default(PENDING_CONNECT)
+
+  // TODO(security): encrypt with AES-256-GCM using ENCRYPTION_KEY env var before going to production
+  oauthAccessToken   String?
+  oauthRefreshToken  String?
+  oauthExpiresAt     DateTime?
+  externalIdentifier String?
+
+  jobs      ProvisioningJob[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("provisioning_configs")
+}
+
+// ─── ProvisioningJob ──────────────────────────────────────────────────────
+// One job per invited user — tracks the provisioning of their corporate
+// email address and cloud storage folder.
+
+model ProvisioningJob {
+  id                  String                @id @default(uuid())
+  configId            String
+  config              ProvisioningConfig    @relation(fields: [configId], references: [id], onDelete: Cascade)
+  inviteeEmail        String
+  inviteeFirstName    String
+  inviteeLastName     String
+  departmentName      String?
+  provisionedEmail    String?
+  provisionedFolderId String?
+  status              ProvisioningJobStatus @default(PENDING)
+  errorMessage        String?
+  provisionedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([configId])
+  @@map("provisioning_jobs")
 }

@@ -23,7 +23,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
 import { AgentStatus, AgentType } from '@prisma/client';
 import { UserRole } from '@prisma/client';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 
 class UpdatePermissionsDto {
   @IsArray()
@@ -33,6 +33,21 @@ class UpdatePermissionsDto {
   @IsOptional()
   @IsString()
   budgetPerDay?: string;
+}
+
+class GraphResumeDto {
+  @IsUUID()
+  threadId!: string;
+
+  @IsUUID()
+  approvalId!: string;
+
+  @IsEnum(['APPROVED', 'REJECTED'])
+  decision!: 'APPROVED' | 'REJECTED';
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 @Controller({ path: 'agents', version: '1' })
@@ -249,5 +264,31 @@ export class AgentsController {
   @HttpCode(HttpStatus.OK)
   cancel(@Param('taskId', ParseUUIDPipe) taskId: string) {
     return this.executorService.cancelTask(taskId);
+  }
+
+  // ─── Resume LangGraph after human-in-the-loop approval ───
+
+  /**
+   * POST /agents/:id/graph-resume
+   *
+   * Called by a human reviewer to resume a graph that was paused by an
+   * interrupt() HITL node. Do NOT confuse with POST /agents/:id/resume
+   * which resumes a PAUSED agent status.
+   */
+  @Post(':id/graph-resume')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async graphResume(
+    @Param('id', ParseUUIDPipe) _agentId: string,
+    @Body() dto: GraphResumeDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    await this.executorService.resumeGraph(
+      dto.threadId,
+      dto.decision,
+      dto.approvalId,
+      this.resolveTenantId(user),
+      user.sub,
+    );
+    return { message: 'Graph resumed', threadId: dto.threadId };
   }
 }

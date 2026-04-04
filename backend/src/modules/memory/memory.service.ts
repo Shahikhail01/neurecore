@@ -29,6 +29,7 @@ export class MemoryService implements IMemoryService {
 
   async store(input: CreateMemoryInput): Promise<unknown> {
     const embedding = await this.generateEmbedding(input.content);
+    const vectorEnabled = this.isVectorSearchEnabled();
 
     const entry = await this.prisma.memoryEntry.create({
       data: {
@@ -44,6 +45,16 @@ export class MemoryService implements IMemoryService {
       },
     });
 
+    // Persist native pgvector column when feature flag is enabled
+    if (vectorEnabled && embedding && entry.id) {
+      const vecLiteral = `[${embedding.join(',')}]`;
+      await this.prisma.$executeRaw`
+        UPDATE memory_entries
+        SET embedding_vector = ${vecLiteral}::vector
+        WHERE id = ${entry.id}
+      `;
+    }
+
     // Emit real-time event if agent is linked
     if (input.agentId) {
       this.events.emitMemoryUpdated(input.tenantId, input.agentId, entry.id);
@@ -54,8 +65,35 @@ export class MemoryService implements IMemoryService {
 
   async search(input: MemorySearchInput): Promise<unknown[]> {
     const { tenantId, agentId, query, type, limit = 10 } = input;
+    const vectorEnabled = this.isVectorSearchEnabled();
 
-    // Try vector similarity search first
+    // When pgvector is enabled, use native cosine similarity via <=> operator
+    if (vectorEnabled) {
+      const queryEmbedding = await this.generateEmbedding(query);
+      if (queryEmbedding) {
+        const vecLiteral = `[${queryEmbedding.join(',')}]`;
+        type VectorRow = {
+          id: string;
+          content: string;
+          summary: string | null;
+          importance: number;
+        };
+        const rows = await this.prisma.$queryRaw<VectorRow[]>`
+          SELECT id, content, summary, importance
+          FROM memory_entries
+          WHERE tenant_id = ${tenantId}
+            ${agentId ? this.prisma.$queryRaw`AND agent_id = ${agentId}` : this.prisma.$queryRaw``}
+            ${type ? this.prisma.$queryRaw`AND type = ${type}` : this.prisma.$queryRaw``}
+            AND embedding_vector IS NOT NULL
+            AND (expires_at IS NULL OR expires_at > NOW())
+          ORDER BY embedding_vector <=> ${vecLiteral}::vector
+          LIMIT ${limit}
+        `;
+        return rows;
+      }
+    }
+
+    // Try in-memory cosine similarity using the JSON embedding column
     const queryEmbedding = await this.generateEmbedding(query);
 
     // Fetch candidate entries (broader for re-ranking)
@@ -152,6 +190,15 @@ export class MemoryService implements IMemoryService {
   // ───────────────────────────────────────────────────────────
   // Private helpers
   // ───────────────────────────────────────────────────────────
+
+  /**
+   * Feature flag: set ENABLE_VECTOR_SEARCH=true to use pgvector native
+   * cosine similarity instead of in-memory cosine similarity over JSON
+   * embeddings. Requires the migration.sql to have been applied on the DB.
+   */
+  private isVectorSearchEnabled(): boolean {
+    return this.config.get<string>('ENABLE_VECTOR_SEARCH') === 'true';
+  }
 
   private async generateEmbedding(text: string): Promise<number[] | null> {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');

@@ -14,24 +14,90 @@ import type {
 } from './ai-gateway.module';
 import { LangSmithTracingService } from './langsmith-tracing.service';
 
+/**
+ * Simple per-tenant token bucket for outbound rate limiting.
+ * SRP: rate-limit logic is encapsulated here, not in sendMessage().
+ */
+interface TokenBucket {
+  tokens: number;
+  lastRefillMs: number;
+}
+
 @Injectable()
 export class OpenClawGatewayService {
   private readonly logger = new Logger(OpenClawGatewayService.name);
+
+  /**
+   * Per-tenant rate-limit state. Process-scoped (acceptable for single-instance).
+   * OCP: this Map is the only change needed to swap in a distributed store later.
+   */
+  private readonly rateBuckets = new Map<string, TokenBucket>();
 
   constructor(
     @Inject('OPENCLAW_CONFIG') private readonly config: OpenClawConfig,
     private readonly tracingService: LangSmithTracingService,
   ) {}
 
+  // ─── Rate limiting ────────────────────────────────────────────────────────
+
   /**
-   * Send a message to an AI agent via OpenClaw protocol
+   * Consume one token for the given tenant.
+   * Returns false if the tenant is over the rate limit.
+   */
+  private consumeRateToken(tenantId: string): boolean {
+    const limitRps = this.config.rateLimitRps ?? 10;
+    const nowMs = Date.now();
+    let bucket = this.rateBuckets.get(tenantId);
+
+    if (!bucket) {
+      bucket = { tokens: limitRps, lastRefillMs: nowMs };
+      this.rateBuckets.set(tenantId, bucket);
+    }
+
+    // Token refill based on elapsed time
+    const elapsedSec = (nowMs - bucket.lastRefillMs) / 1000;
+    bucket.tokens = Math.min(limitRps, bucket.tokens + elapsedSec * limitRps);
+    bucket.lastRefillMs = nowMs;
+
+    if (bucket.tokens < 1) return false;
+    bucket.tokens -= 1;
+    return true;
+  }
+
+  /**
+   * Send a message to a user via OpenClaw (outbound channel adapter).
+   *
+   * Security:
+   *  - isConfigured() guard prevents calls when key is absent.
+   *  - Per-tenant rate limiting rejects if over OPENCLAW_RATE_LIMIT_RPS.
+   *  - Error messages do NOT include the raw response body (no data leakage).
+   *  - Audit log line written for every attempt (success or failure).
+   *
+   * SRP: this method only handles the transport; all AI logic is upstream.
    */
   async sendMessage(
     agentId: string,
     action: string,
     payload: Record<string, unknown>,
     metadata?: Record<string, unknown>,
+    tenantId?: string,
   ): Promise<AgentResponse> {
+    if (!this.isConfigured()) {
+      this.logger.warn(
+        'OpenClaw gateway not configured — OPENCLAW_API_KEY is not set',
+      );
+      return { success: false, error: 'OpenClaw gateway not configured' };
+    }
+
+    // Rate limit check (per-tenant when tenantId is provided)
+    const rateKey = tenantId ?? 'global';
+    if (!this.consumeRateToken(rateKey)) {
+      this.logger.warn(
+        `OpenClaw outbound rate limit exceeded for tenant=${rateKey}`,
+      );
+      return { success: false, error: 'Rate limit exceeded' };
+    }
+
     const traceId = uuidv4();
     const message: AgentMessage = {
       id: uuidv4(),
@@ -55,6 +121,7 @@ export class OpenClawGatewayService {
       },
     });
 
+    const auditStart = Date.now();
     try {
       const response = await this.executeWithRetry(message, span?.id);
 
@@ -63,11 +130,14 @@ export class OpenClawGatewayService {
         metadata: { responseSize: JSON.stringify(response).length },
       });
 
-      return {
-        success: true,
-        data: response,
-        traceId,
-      };
+      // AUDIT: structured log — never log apiKey or response body
+      this.logger.log(
+        `[AUDIT] openclaw.sendMessage action=${action} agentId=${agentId} ` +
+          `tenantId=${tenantId ?? 'n/a'} traceId=${traceId} ` +
+          `status=SUCCESS durationMs=${Date.now() - auditStart}`,
+      );
+
+      return { success: true, data: response, traceId };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -77,8 +147,11 @@ export class OpenClawGatewayService {
         error: errorMessage,
       });
 
+      // AUDIT: log failure details server-side; never surface raw body to callers
       this.logger.error(
-        `OpenClaw message failed: ${errorMessage}`,
+        `[AUDIT] openclaw.sendMessage action=${action} agentId=${agentId} ` +
+          `tenantId=${tenantId ?? 'n/a'} traceId=${traceId} ` +
+          `status=FAILED durationMs=${Date.now() - auditStart} error=${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
 
@@ -220,10 +293,12 @@ export class OpenClawGatewayService {
         );
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(
-            `OpenClaw API error: ${response.status} ${errorText}`,
+          // Read body for server-side logging only — NEVER include raw body in thrown errors
+          const errorBody = await response.text().catch(() => '');
+          this.logger.warn(
+            `OpenClaw HTTP ${response.status} (attempt ${attempt + 1}): ${errorBody.slice(0, 200)}`,
           );
+          throw new Error(`OpenClaw request failed (HTTP ${response.status})`);
         }
 
         const data = await response.json();

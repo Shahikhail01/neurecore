@@ -1,6 +1,58 @@
 # Agent Implementation - Structured Output, Tool Calling & Streaming
 
-## Implementation Date
+## Last Updated: April 4, 2026 (Phase 2 LangChain — HITL, new tools, OpenClaw adapter)
+
+---
+
+## Phase 2 LangChain Implementation (April 4, 2026)
+
+### LangGraph Human-in-the-Loop (`langgraph-official.ts`)
+
+- **New imports**: `interrupt`, `MemorySaver`, `Command` from `@langchain/langgraph`
+- **New state fields**: `requiresApproval: Annotation<boolean>`, `approvalId: Annotation<string | null>`
+  — All 3 initialState objects include `requiresApproval: false, approvalId: null`
+- **`humanReviewNode`**: creates `ApprovalRequest` via `approvalsService.create()`, calls `interrupt()`, handles decision
+- **Checkpointer**: `MemorySaver` passed to `compile()` in `initializeGraph()`
+- **`resumeGraph(threadId, decision)`**: `compiledGraph.invoke(new Command({ resume: decision }), { configurable: { thread_id: threadId } })`
+- **Conditional START routing**: `requiresApprovalCheck()` routes to `planner` or `human_review`
+
+### `AgentExecutorService` Changes
+
+- Injected: `OpenClawGatewayService`, `ApprovalsService`
+- Stream loop: detects `'__interrupt__' in chunk` → sets task to PENDING, emits `task:approval:required` WS event, returns early
+- Post-stream: if `task.input.channelSource === 'openclaw'` → calls `openClawGateway.sendMessage()`
+- New method: `resumeGraph(threadId, decision, approvalId, tenantId, reviewerId)` — calls `approvals.review()` then `officialGraph.resumeGraph()`
+
+### `AgentsController` Changes
+
+- `GraphResumeDto`: `threadId: UUID`, `approvalId: UUID`, `decision: 'APPROVED'|'REJECTED' (@IsEnum)`, `reason?: string`
+- `POST :id/graph-resume` endpoint
+
+### Tools Registry (Critical Bug Fix)
+
+Problem: `StructuredToolRegistry.toLangChainTools()` returned empty array — tools were NestJS providers but `registry.register()` was never called.
+Fix: `ToolsInitializerService implements OnModuleInit` — calls `registry.register()` for all tools in `onModuleInit()`.
+
+### New Built-in Tools (all in `backend/src/modules/tools/built-in/`)
+
+| Tool                       | Security Notes                                                           |
+| -------------------------- | ------------------------------------------------------------------------ |
+| `web-search.tool.ts`       | SSRF guard — only `google.serper.dev`; Serper API key from ConfigService |
+| `database-query.tool.ts`   | SELECT-only regex; parameterized; max 100 rows                           |
+| `email-send.tool.ts`       | 10/hour/tenant rate limit; Nodemailer SMTP; plain text only              |
+| `agent-messaging.tool.ts`  | `targetAgent.tenantId === context.tenantId` enforced; 1000 char cap      |
+| `document-summary.tool.ts` | LLMFactory `'execution'` tier; 50,000 char cap                           |
+
+### OpenClaw Channel Adapter
+
+- **Architecture Law**: OpenClaw is a channel adapter ONLY — never owns reasoning
+- `POST /api/v1/openclaw/message` (`@Public()`) — HMAC-SHA256 via `timingSafeEqual`
+- Fail-closed: if `OPENCLAW_WEBHOOK_SECRET` not set, all requests rejected (401)
+- `AIGatewayModule` is `@Global()` — `OpenClawGatewayService` available everywhere
+
+---
+
+## Initial Implementation Date
 
 March 22, 2026
 

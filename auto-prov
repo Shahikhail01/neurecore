@@ -1,0 +1,216 @@
+Plan: Workspace Auto-Provisioning (Option C)
+TL;DR: When an employee is invited in the onboarding wizard, NeureCore captures their workspace provisioning intent (email pattern, folder structure, provider) inline in the Integrations step — no OAuth redirect during wizard. After the wizard, a dashboard banner prompts the admin to connect their Google Workspace or Microsoft 365 admin account in Settings → Workspace. Once connected, the backend provisions corporate email addresses and cloud folders for all pending invited users.
+
+Phase 1 — Prisma Schema
+Step 1 — Add 5 new enums + 2 new models to schema.prisma:
+
+Enums to add (at bottom of enum section):
+
+
+ProvisioningProvider  { GOOGLE_WORKSPACE, MICROSOFT_365 }ProvisioningConfigStatus  { PENDING_CONNECT, CONNECTED, IN_PROGRESS, COMPLETED, FAILED }ProvisioningJobStatus  { PENDING, IN_PROGRESS, COMPLETED, FAILED, SKIPPED }EmailPattern  { FIRST_DOT_LAST, FIRSTLAST, F_DOT_LAST }FolderStructure  { BY_DEPARTMENT, FLAT }
+New model ProvisioningConfig (one per tenant, created when wizard completes):
+
+id, tenantId @unique, FK to Tenant
+provider ProvisioningProvider
+emailDomain String (e.g. acme.com)
+emailPattern EmailPattern @default(FIRST_DOT_LAST)
+folderStructure FolderStructure @default(BY_DEPARTMENT)
+status ProvisioningConfigStatus @default(PENDING_CONNECT)
+oauthAccessToken String?, oauthRefreshToken String?, oauthExpiresAt DateTime?
+externalIdentifier String? (Google: admin email; M365: Azure tenant ID)
+Relation: jobs ProvisioningJob[]
+@@map("provisioning_configs")
+New model ProvisioningJob (one per invited user):
+
+id, configId FK to ProvisioningConfig
+inviteeEmail String, inviteeFirstName String, inviteeLastName String
+departmentName String?
+provisionedEmail String? (corp email created), provisionedFolderId String?
+status ProvisioningJobStatus @default(PENDING)
+errorMessage String?, provisionedAt DateTime?
+@@index([configId]), @@map("provisioning_jobs")
+Also add in the Tenant model relations block: provisioningConfig ProvisioningConfig?
+
+Step 2 — Run npx prisma migrate dev --name add_workspace_provisioning from backend
+
+Phase 2 — Backend: workspace-provisioning Module (SOLID)
+New directory: backend/src/modules/workspace-provisioning/
+
+Step 3 — Create interfaces/provisioning-provider.interface.ts:
+
+
+export interface OAuthTokens { accessToken: string; refreshToken: string; expiresAt: Date; externalIdentifier: string; }export interface ProvisionedResources { email: string; temporaryPassword: string; folderId: string; folderUrl: string; }export interface IProvisioningProvider {  readonly providerType: ProvisioningProvider;  generateAuthUrl(tenantId: string, redirectUri: string): string;  exchangeCodeForTokens(code: string, redirectUri: string): Promise<OAuthTokens>;  provisionUser(tokens: OAuthTokens, config: ProvisioningConfig, job: ProvisioningJob): Promise<Partial<ProvisionedResources>>;}
+Step 4 — Create providers/google-workspace.provider.ts:
+
+Implements IProvisioningProvider, providerType = ProvisioningProvider.GOOGLE_WORKSPACE
+generateAuthUrl: builds https://accounts.google.com/o/oauth2/v2/auth?scope=admin.directory.user+drive URL
+exchangeCodeForTokens: TODO — POST to https://oauth2.googleapis.com/token (returns stub for now)
+provisionUser: TODO — POST https://admin.googleapis.com/admin/directory/v1/users + POST https://www.googleapis.com/drive/v3/files (returns stub for now)
+Takes ConfigService injection for GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+Step 5 — Create providers/microsoft-365.provider.ts:
+
+Same shape, providerType = ProvisioningProvider.MICROSOFT_365
+generateAuthUrl: builds https://login.microsoftonline.com/common/oauth2/v2.0/authorize?scope=User.ReadWrite.All Files.ReadWrite.All
+exchangeCodeForTokens: TODO — POST to https://login.microsoftonline.com/common/oauth2/v2.0/token
+provisionUser: TODO — POST https://graph.microsoft.com/v1.0/users + POST /users/{id}/drive/root/children
+Step 6 — Create PROVISIONING_PROVIDERS injection token: backend/src/modules/workspace-provisioning/provisioning.tokens.ts:
+
+
+export const PROVISIONING_PROVIDERS = Symbol('PROVISIONING_PROVIDERS');
+Step 7 — Create services/provisioning-job.service.ts (Single Responsibility — DB CRUD only):
+
+getPendingStatus(tenantId) → returns { hasPendingSetup, provider, status, pendingCount } (for banner)
+getConfig(tenantId) → ProvisioningConfig | null
+listJobs(tenantId) → ProvisioningJob[]
+updateConfigOAuth(configId, tokens: OAuthTokens) → saves encrypted tokens, sets status to CONNECTED
+markJobComplete(jobId, result) / markJobFailed(jobId, error)
+Step 8 — Create services/provisioning-orchestrator.service.ts (orchestrates the flow):
+
+Injects @Inject(PROVISIONING_PROVIDERS) providers: IProvisioningProvider[] + ProvisioningJobService + PrismaService
+getProvider(type) → finds correct provider from injected array (O/C principle — adding a provider = add to factory, no change here)
+handleOAuthCallback(tenantId, code, provider, redirectUri) → provider.exchangeCode → jobService.updateConfigOAuth → return success
+triggerProvisioning(tenantId) → loads all PENDING jobs for tenant → calls provider.provisionUser for each → marks complete/failed
+Step 9 — Create controllers/workspace-provisioning.controller.ts:
+All endpoints are @UseGuards(JwtAuthGuard), resolvedTenantId = user.tenantId:
+
+
+GET  /workspace-provisioning/status           → jobService.getPendingStatus(tenantId)GET  /workspace-provisioning/config           → jobService.getConfig(tenantId)GET  /workspace-provisioning/oauth/google/authorize     → orchestrator → redirect to GoogleGET  /workspace-provisioning/oauth/google/callback      → orchestrator.handleOAuthCallback(tenantId, code, GOOGLE)GET  /workspace-provisioning/oauth/microsoft/authorize  → orchestrator → redirect to MicrosoftGET  /workspace-provisioning/oauth/microsoft/callback   → orchestrator.handleOAuthCallback(tenantId, code, MICROSOFT)POST /workspace-provisioning/trigger          → orchestrator.triggerProvisioning(tenantId) → { queued: N }GET  /workspace-provisioning/jobs             → jobService.listJobs(tenantId)
+Step 10 — Create workspace-provisioning.module.ts:
+
+Imports PrismaModule, ConfigModule
+Provides GoogleWorkspaceProvider, MicrosoftGraphProvider
+Provides PROVISIONING_PROVIDERS token using factory: useFactory: (g, m) => [g, m]
+Provides ProvisioningJobService, ProvisioningOrchestratorService
+Exports ProvisioningJobService
+Phase 3 — Backend: Onboarding Integration
+Step 11 — Update onboarding-state.interface.ts:
+Add to WizardData:
+
+
+workspaceProvisioning?: {  enabled: boolean;  provider: 'GOOGLE_WORKSPACE' | 'MICROSOFT_365';  emailDomain: string;  emailPattern: 'FIRST_DOT_LAST' | 'FIRSTLAST' | 'F_DOT_LAST';  folderStructure: 'BY_DEPARTMENT' | 'FLAT';};
+Step 12 — Update onboarding.service.ts completeWizard method:
+After the existing // ── Create placeholder connectors block, add a new block:
+
+
+// ── Create workspace provisioning config + jobs ───────────────────if (wizardData.workspaceProvisioning?.enabled) {  const config = upsert ProvisioningConfig (PENDING_CONNECT status)  for each invitation in wizardData.invitations:    create ProvisioningJob with status PENDING}
+Inject PrismaService (already injected). No need to import WorkspaceProvisioningModule here — just use this.prisma directly to avoid circular imports.
+
+Step 13 — Update app.module.ts: Add WorkspaceProvisioningModule to imports array.
+
+Phase 4 — Frontend: Types + Store
+Step 14 — Update onboarding.types.ts:
+
+Add new enums:
+
+
+export enum ProvisioningProvider { GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE', MICROSOFT_365 = 'MICROSOFT_365' }export enum EmailPattern { FIRST_DOT_LAST = 'FIRST_DOT_LAST', FIRSTLAST = 'FIRSTLAST', F_DOT_LAST = 'F_DOT_LAST' }export enum FolderStructure { BY_DEPARTMENT = 'BY_DEPARTMENT', FLAT = 'FLAT' }
+Add WorkspaceProvisioningConfig interface:
+
+
+export interface WorkspaceProvisioningConfig {  enabled: boolean;  provider: ProvisioningProvider;  emailDomain: string;  emailPattern: EmailPattern;  folderStructure: FolderStructure;}
+Add workspaceProvisioning?: WorkspaceProvisioningConfig to WizardData.
+
+Also add response types for workspace provisioning API:
+
+
+export interface ProvisioningStatusDto { hasPendingSetup: boolean; provider: ProvisioningProvider | null; status: string | null; pendingCount: number; }export interface ProvisioningJobDto { id: string; inviteeEmail: string; inviteeFirstName: string; inviteeLastName: string; departmentName?: string; provisionedEmail?: string; status: string; errorMessage?: string; provisionedAt?: string; }
+Step 15 — Update onboardingStore.ts:
+
+Add setWorkspaceProvisioningData: (data: WorkspaceProvisioningConfig) => void to interface
+Implement: set(state => ({ wizardData: { ...state.wizardData, workspaceProvisioning: data } }))
+Phase 5 — Frontend: Services
+Step 16 — Create frontend-tenant/src/services/workspace-provisioning.service.ts:
+
+
+class WorkspaceProvisioningService {  getStatus(): Promise<ProvisioningStatusDto>          // GET /workspace-provisioning/status  getConfig()                                          // GET /workspace-provisioning/config  getGoogleAuthUrl(): Promise<{ authUrl: string }>     // GET /workspace-provisioning/oauth/google/authorize  getMicrosoftAuthUrl(): Promise<{ authUrl: string }>  // GET /workspace-provisioning/oauth/microsoft/authorize  triggerProvisioning(): Promise<{ queued: number }>   // POST /workspace-provisioning/trigger  listJobs(): Promise<ProvisioningJobDto[]>            // GET /workspace-provisioning/jobs}export const workspaceProvisioningService = new WorkspaceProvisioningService();
+Phase 6 — Frontend: IntegrationsStep Enhancement
+Step 17 — Update IntegrationsStep.tsx:
+
+Import WorkspaceProvisioningConfig, ProvisioningProvider, EmailPattern, FolderStructure from types
+Import setWorkspaceProvisioningData from onboarding store
+Add wpConfig local state: WorkspaceProvisioningConfig | null
+Compute showWorkspacePanel = selected.includes('STORAGE_GOOGLE_DRIVE') || selected.includes('STORAGE_ONEDRIVE')
+When showWorkspacePanel becomes true and wpConfig is null, auto-initialize default wpConfig
+Show panel below integration grid (only when showWorkspacePanel):
+Toggle: "Automatically provision corporate email + cloud storage for your team"
+When enabled: provider radio (Google Workspace / Microsoft 365), email domain input, email pattern select (john.doe, johndoe, j.doe), folder structure radio (By Department / Flat)
+Helpful hint: "We'll set this up in Settings → Workspace after completing the wizard"
+In handleSubmit, additionally call setWorkspaceProvisioningData(wpConfig) if wpConfig?.enabled
+Phase 7 — Frontend: Dashboard Banner
+Step 18 — Create frontend-tenant/src/components/dashboard/WorkspaceProvisioningBanner.tsx:
+
+Accepts status: ProvisioningStatusDto prop
+Only renders if status.hasPendingSetup && status.status === 'PENDING_CONNECT'
+Shows amber banner: "Workspace setup pending — connect your {Google Workspace / Microsoft 365} admin account to provision emails for {N} team member(s)"
+CTA button: "Set up now →" → router.push('/settings?tab=workspace')
+Dismiss button (local state, persists to sessionStorage so it doesn't flash on refresh)
+Step 19 — Update frontend-tenant/src/app/(app)/dashboard/page.tsx/dashboard/page.tsx):
+
+Add useEffect that calls workspaceProvisioningService.getStatus() (parallel with the existing agents/tasks fetch using Promise.allSettled)
+Use ?.catch(() => null) so any provisioning error never crashes dashboard
+Pass result to <WorkspaceProvisioningBanner status={provStatus} /> at top of center column, above KPI bar
+Phase 8 — Frontend: Settings Workspace Tab
+Step 20 — Update frontend-tenant/src/app/(app)/settings/page.tsx/settings/page.tsx):
+
+Add "workspace" to Tab union type
+Add Workspace tab to sidebar tabs array (icon: Building2 from lucide-react, only show if provisioningStatus.hasPendingSetup || provisioningStatus.status)
+On mount, fetch provisioning status + config
+Read ?tab=workspace from URL query to auto-focus tab (use useSearchParams)
+Workspace tab content sections:
+Config summary — shows provider, email domain, pattern, folder structure (read-only from DB)
+Connection status chip (PENDING_CONNECT amber / CONNECTED green / FAILED red)
+Connect button — if PENDING_CONNECT: "Connect {provider}" → calls getGoogleAuthUrl() / getMicrosoftAuthUrl() → window redirect
+Jobs table — columns: Name, Invited Email, Corporate Email (or "Pending"), Status chip — only shown if CONNECTED or beyond
+Trigger button — "Provision all pending" → calls triggerProvisioning() — only shown if CONNECTED
+Verification Steps
+Run npx prisma migrate dev --name add_workspace_provisioning from backend — confirm migration succeeds
+Run node e2e-dashboard-flow.mjs — confirm existing wizard tests still pass
+Manually test wizard → Integrations step → toggle STORAGE_GOOGLE_DRIVE → workspace panel appears → fill config → complete wizard → DB has ProvisioningConfig(PENDING_CONNECT) + ProvisioningJob records per invitee
+Log in → dashboard banner visible → click "Set up now" → lands on Settings → Workspace tab
+Run npx tsc --noEmit in both backend and frontend-tenant — zero errors
+Confirm GET /workspace-provisioning/status returns { hasPendingSetup: true, pendingCount: 2 } for demo tenant
+Decisions
+No mid-wizard OAuth redirect — intent only captured in wizard; auth happens post-login in Settings
+Actual Google/M365 API calls are stubs with // TODO comments — wired up once OAuth credentials are configured in env; the module structure is ready to fill in
+Token storage: OAuth tokens stored in DB as plaintext for now (oauthAccessToken, oauthRefreshToken columns). Production hardening = encrypt with AES-256-GCM using a ENCRYPTION_KEY env var — excluded from this scope
+Email provisioning only triggered for invited users (from wizardData.invitations) — future employees added via the team management page will be handled separately
+Workspace panel only shown in IntegrationsStep when STORAGE_GOOGLE_DRIVE or STORAGE_ONEDRIVE is toggled — the two storage options are the natural trigger for corporate workspace setup
+Excluded: actual sending of welcome emails with credentials (stub returns credentials, email sending is a TODO inside the provider)
+Relevant files
+
+schema.prisma — add enums + 2 models
+onboarding-state.interface.ts — add workspaceProvisioning to WizardData
+onboarding.service.ts — completeWizard block to create config + jobs
+app.module.ts — register WorkspaceProvisioningModule
+onboarding.types.ts — new enums + WorkspaceProvisioningConfig + types
+onboardingStore.ts — add action
+IntegrationsStep.tsx — workspace panel
+frontend-tenant/src/app/(app)/dashboard/page.tsx/dashboard/page.tsx) — banner
+frontend-tenant/src/app/(app)/settings/page.tsx/settings/page.tsx) — Workspace tab
+New files (backend)
+
+backend/src/modules/workspace-provisioning/ (9 files — see Phases 2–3)
+New files (frontend)
+
+frontend-tenant/src/services/workspace-provisioning.service.ts
+frontend-tenant/src/components/dashboard/WorkspaceProvisioningBanner.tsx
+Created memory file plan.md
+
+Plan is saved. Here's the full plan presented above — ready for your review before we proceed to implementation.
+
+A few things I want your confirmation on before building:
+
+Analyzing your answers...
+
+Q: Should the workspace provisioning panel appear only when Google Drive OR OneDrive is toggled, or always (regardless of storage selection)?
+A: Only when Google Drive or OneDrive is selected (recommended)
+Q: Does the company already have Google Workspace (paid, admin.google.com domain), or should we also support plain Google Drive (personal/free tier)?
+A: Google Workspace only (admin API — creates corporate emails)
+Q: Should we implement AES-256 encryption for stored OAuth refresh tokens now, or stub it as plaintext with a TODO for later hardening?
+A: Stub plaintext now, encrypt later (faster to ship)
+All three confirmed. The plan is locked:
+
+Workspace panel only appears when STORAGE_GOOGLE_DRIVE or STORAGE_ONEDRIVE is toggled
+Google path uses Google Workspace Admin SDK (admin.directory.user scope) — requires company's domain on Google Workspace, not personal Drive
+OAuth tokens stored plaintext for now with a // TODO(security): encrypt with AES-256-GCM comment
+The plan above is the full implementation blueprint. When you're ready to implement, you or the code agent can follow the 8 phases in order — each phase is independently verifiable before starting the next. The most critical path is Phase 1 (Prisma migration) → Phase 3 (onboarding.service.ts) → Phase 6 (IntegrationsStep) since those form the data pipeline. Phases 2 and 7–8 can be built in parallel once Phase 1 is done.

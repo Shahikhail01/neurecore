@@ -1,0 +1,394 @@
+# LangChain Implementation Plan — NeureCore
+
+**Document:** `langchain-impl-2026-04-04`
+**Date:** April 4, 2026
+**Branch:** `tenant-base`
+**Based on:** `langchain-audit-2026-04-04.md`
+
+---
+
+## Executive Summary
+
+The audit identified 8 problems. This plan resolves all of them across 7 phases. Each phase is independently deployable and leaves the system in a fully working state. All changes strictly follow SOLID principles — services continue to implement their existing interfaces; new behaviour is introduced via injection and adapters, never by modifying stable call sites.
+
+**Critical discovery not in the audit report:** `OfficialAgentGraph.plannerNode` and `evaluatorNode` are **hardcoded stubs** that return fixed results without calling `AgentPlannerService` or `AgentEvaluatorService`. The real LLM planning chain in `AgentPlannerService.buildLlmPlan()` is **never reached** at runtime. This is the highest-severity issue and is addressed in Phase 2.
+
+**Package status correction:** `@langchain/core` is already at `^1.1.16` in `package.json`. The `as any` casts in `langgraph-official.ts` are TypeScript inference gaps (missing `as const` on node name strings), not a version problem.
+
+---
+
+## Phase 1 — Cleanup & DI Safety
+
+**Goal:** Remove dead code, eliminate runtime DI failures, zero functional changes.
+
+### Step 1.1 — Delete `AgentStateMachine` (dead code)
+
+`AgentStateMachine` duplicates all LangChain logic from `AgentPlannerService` and `AgentEvaluatorService`. `AgentExecutorService` uses `OfficialAgentGraph` exclusively. It is registered in `agents.module.ts` providers/exports but never injected by any consumer.
+
+**Files:**
+
+- `backend/src/modules/agents/agents.module.ts` — Remove `AgentStateMachine` from `providers`, `exports`, and its import line
+- `backend/src/modules/agents/langgraph/agent-state-machine.ts` — **DELETE**
+- `backend/src/modules/agents/langgraph/index.ts` — Remove `AgentStateMachine` export
+
+**SOLID:** SRP — eliminates split responsibility. OCP — does not change `OfficialAgentGraph`'s contract.
+
+---
+
+### Step 1.2 — Fix `OpenClawGatewayService` DI Safety
+
+`ai-gateway.module.ts` resolves `OPENCLAW_CONFIG` via `secrets.getOpenClawApiKey()`. If `OPENCLAW_API_KEY` is absent from env, this throws at module initialisation — crashing the entire NestJS bootstrap even though OpenClaw is unused in any active flow.
+
+**Files:**
+
+- `backend/src/modules/ai-gateway/ai-gateway.module.ts` — Change `OPENCLAW_CONFIG` factory: `apiKey: secrets.getOpenClawApiKey() ?? ''`
+- `backend/src/modules/ai-gateway/openclaw-gateway.service.ts` — Guard `sendMessage()` — call `isConfigured()` at the start; if not configured, return error `AgentResponse`
+
+**SOLID:** DIP — callers depend on interface, not config availability. ISP — service handles unconfigured state without throwing.
+
+---
+
+### Step 1.3 — Remove `clawhub` from `package.json`
+
+`clawhub@0.9.0` is a runtime dependency imported nowhere in `src/`. Unused packages increase attack surface.
+
+```bash
+cd backend && pnpm remove clawhub
+```
+
+---
+
+## Phase 2 — Wire LLMFactory into Planner & Evaluator
+
+**Goal:** `AgentPlannerService` and `AgentEvaluatorService` must route through `LLMFactory` instead of hard-coding `ChatOpenAI`.
+
+### Step 2.1 — Add `createLangChainLLM()` to `LLMFactory`
+
+**File:** `backend/src/modules/models/services/llm-factory.service.ts`
+
+Add method:
+
+```typescript
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+
+async createLangChainLLM(
+  taskType: 'planning' | 'execution' | 'evaluation' | 'conversation' | 'coding' | 'reasoning',
+  options?: { temperature?: number; maxTokens?: number },
+): Promise<BaseChatModel | null>
+```
+
+Logic:
+
+1. Call `this.selectModel(taskType)` → get `{ provider, model }`
+2. Get provider API key + base URL from `ConfigService`
+3. Construct `ChatOpenAI` configured for each provider (all providers use OpenAI-compatible APIs; custom `baseURL` for MiniMax/DeepSeek/MiMo)
+4. If no API key available → try next provider
+5. Return `null` if no provider has a key (callers fall back to stub)
+
+**SOLID:** OCP — new method; existing methods unchanged. DIP — callers get `BaseChatModel` interface not `ChatOpenAI` concrete.
+
+---
+
+### Step 2.2 — Inject `LLMFactory` into `AgentPlannerService`
+
+**File:** `backend/src/modules/agents/services/agent-planner.service.ts`
+
+- Add `private readonly llmFactory: LLMFactory` to constructor
+- `buildLlmPlan()`: replace `new ChatOpenAI({ apiKey, ... })` with `await this.llmFactory.createLangChainLLM('planning')`
+- If `null` → call `buildStubPlan()`
+- `LLMFactory` already exported from `ModelsModule` which `AgentsModule` already imports — no module changes needed
+
+### Step 2.3 — Inject `LLMFactory` into `AgentEvaluatorService`
+
+**File:** `backend/src/modules/agents/services/agent-evaluator.service.ts`
+
+Same pattern. Task type: `'evaluation'`.
+
+---
+
+## Phase 3 — Wire Planning & Evaluation into `OfficialAgentGraph`
+
+**Goal:** Activate the real LLM planning chain for the first time at runtime.
+
+### Step 3.1 — Inject `AgentPlannerService` + rewrite `plannerNode`
+
+**File:** `backend/src/modules/agents/langgraph/langgraph-official.ts`
+
+Add to constructor:
+
+```typescript
+private readonly planner: AgentPlannerService,
+private readonly evaluator: AgentEvaluatorService,
+```
+
+Rewrite `plannerNode`:
+
+```typescript
+private plannerNode: AgentNodeFunction = async (state) => {
+  const agentPlan = await this.planner.plan({
+    agentId: state.agentId,
+    goal: state.goal,
+    availableTools: this.toolRegistry.listToolNames(),
+    constraints: [],
+  });
+  return { plan: { steps: agentPlan.steps, currentStepIndex: 0 }, currentNode: PLANNER_NODE, iteration: 1 };
+};
+```
+
+### Step 3.2 — Rewrite `evaluatorNode`
+
+```typescript
+private evaluatorNode: AgentNodeFunction = async (state) => {
+  const evalResult = await this.evaluator.evaluate({
+    taskId: state.agentId, agentId: state.agentId, goal: state.goal,
+    steps: state.steps.map((s) => ({ description: s.description, success: s.success, output: s.output })),
+    finalOutput: state.toolResults.at(-1)?.output,
+  });
+  return { evaluation: evalResult, shouldContinue: evalResult.shouldRetry && state.iteration < state.maxIterations, currentNode: EVALUATOR_NODE, iteration: 1 };
+};
+```
+
+**SOLID:** SRP — graph orchestrates only; planner plans only; evaluator evaluates only. DIP — depends on interfaces.
+
+**Verification:** `POST /api/v1/agents/:id/tasks` → execution log shows LLM-generated steps, not `"Analyze goal and determine required tools"`.
+
+---
+
+## Phase 4 — Replace LangSmith Stub with Real SDK Tracing
+
+### Step 4.1 — Update `LangSmithTracingService.sendToLangSmith()`
+
+**File:** `backend/src/modules/ai-gateway/langsmith-tracing.service.ts`
+
+```typescript
+private async sendToLangSmith(events: LangSmithEvent[]): Promise<void> {
+  if (!this.config.enabled || !this.config.apiKey) return;
+  try {
+    const { Client } = await import('langsmith');
+    const client = new Client({ apiUrl: this.config.endpoint, apiKey: this.config.apiKey });
+    for (const event of events) {
+      if (event.type === 'start') {
+        await client.createRun({ name: event.name ?? 'unnamed', run_type: 'chain',
+          inputs: event.data as Record<string, unknown>, project_name: this.config.project });
+      }
+    }
+  } catch (error) {
+    this.logger.warn(`LangSmith flush failed (non-fatal): ${error}`);
+    // NEVER propagate — tracing failures must not block agent execution
+  }
+}
+```
+
+Dynamic import keeps startup cost zero when disabled.
+
+### Step 4.2 — Wrap `AgentPlannerService.buildLlmPlan()` with tracing
+
+Add `LangSmithTracingService` to constructor (available globally via `@Global() AIGatewayModule`). Wrap `chain.invoke()` with `startSpan`/`endSpan`. Catch any tracing error — never let it propagate.
+
+### Step 4.3 — Same for `AgentEvaluatorService.llmEvaluate()`
+
+Span name: `'agent.evaluate'`.
+
+---
+
+## Phase 5 — Migrate to LangGraph `ToolNode`
+
+### Step 5.1 — Add `toLangChainTools()` to `StructuredToolRegistry`
+
+**File:** `backend/src/modules/tools/structured-tool.registry.ts`
+
+```typescript
+import { DynamicStructuredTool } from '@langchain/core/tools';
+
+toLangChainTools(
+  securityContext?: { tenantId: string; agentId: string; userId: string },
+  securityInterceptor?: SecurityInterceptorService,
+): DynamicStructuredTool[] {
+  return Array.from(this.tools.values()).map(
+    (tool) =>
+      new DynamicStructuredTool({
+        name: tool.name, description: tool.description, schema: tool.inputSchema,
+        func: async (input) => {
+          if (securityInterceptor && securityContext) {
+            const check = await securityInterceptor.validate(tool, input, securityContext);
+            if (!check.allowed) throw new Error(`Security blocked: ${check.reason}`);
+            input = check.sanitizedInput ?? input;
+          }
+          const result = await tool.execute(input, { tenantId: securityContext?.tenantId ?? '' });
+          if (!result.success) throw new Error(result.error ?? 'Tool failed');
+          return JSON.stringify(result.data ?? null);
+        },
+      }),
+  );
+}
+```
+
+**SOLID:** OCP — new method; existing `register/get/execute` unchanged.
+
+### Step 5.2 — Replace manual `toolNode` with `ToolNode` in `OfficialAgentGraph`
+
+```typescript
+import { ToolNode } from "@langchain/langgraph/prebuilt";
+
+// In buildGraph():
+const langChainTools = this.toolRegistry.toLangChainTools(
+  undefined,
+  this.securityInterceptor,
+);
+workflow.addNode(TOOL_NODE, new ToolNode(langChainTools));
+```
+
+For per-call security context: store `currentTenantId`/`currentAgentId` as mutable instance props on `OfficialAgentGraph`, updated at the start of each `run()` call, read inside `toLangChainTools()` closure. Remove the hand-written `toolNode` method.
+
+---
+
+## Phase 6 — Fix `as any` Casts
+
+**File:** `backend/src/modules/agents/langgraph/langgraph-official.ts`
+
+Add `as const` to all node name constants:
+
+```typescript
+const PLANNER_NODE = "planner" as const;
+const EXECUTOR_NODE = "executor" as const;
+const TOOL_NODE = "tool_node" as const;
+const EVALUATOR_NODE = "evaluator" as const;
+```
+
+If needed, define `type NodeName = typeof PLANNER_NODE | typeof EXECUTOR_NODE | ...`. Remove all `as any` casts from `addEdge`, `addConditionalEdges`, `compile()`.
+
+**Verification:** `npx tsc --noEmit --skipLibCheck` → 0 errors. `grep "as any" langgraph-official.ts` → 0 matches.
+
+---
+
+## Phase 7 — MemoryService pgvector Prep _(Lower Priority / Partially Deferred)_
+
+### Step 7.1 — Feature flag (implement now)
+
+**File:** `backend/src/modules/memory/memory.service.ts`
+
+Add `ENABLE_VECTOR_SEARCH` env flag (default `false`). When false, skip embedding generation.
+
+### Step 7.2 — pgvector migration (blocked on Neon)
+
+Blocked until `CREATE EXTENSION IF NOT EXISTS vector` confirmed on Neon. Steps:
+
+1. Add `embedding Unsupported("vector(1536)")?` to `memory` model in `prisma/schema.prisma`
+2. Create migration `20260404000000_add_pgvector_memory`
+3. Update `store()`: `prisma.$executeRaw` for vector insert
+4. Update `search()`: `ORDER BY embedding <-> $queryVector LIMIT $limit`
+
+---
+
+## Phase Execution Order
+
+```
+Phase 1 (Steps 1.1 + 1.2 + 1.3 — all parallel)
+         ↓
+Phase 2 → Step 2.1 → then Steps 2.2 + 2.3 (parallel)
+         ↓
+Phase 3 (Steps 3.1 + 3.2 parallel)   ║   Phase 4 (Steps 4.1 → 4.2+4.3)
+         ↓
+Phase 5 (Step 5.1 → Step 5.2)
+         ↓
+Phase 6
+
+Phase 7 — independent, lower priority
+```
+
+---
+
+## Complete File Change Matrix
+
+| File                                         | Phase(s)         | Change Type                   |
+| -------------------------------------------- | ---------------- | ----------------------------- |
+| `agents/agents.module.ts`                    | 1.1              | Remove `AgentStateMachine`    |
+| `agents/langgraph/agent-state-machine.ts`    | 1.1              | **DELETE**                    |
+| `agents/langgraph/index.ts`                  | 1.1              | Remove export                 |
+| `ai-gateway/ai-gateway.module.ts`            | 1.2              | Safe OPENCLAW_CONFIG default  |
+| `ai-gateway/openclaw-gateway.service.ts`     | 1.2              | Guard sendMessage()           |
+| `backend/package.json`                       | 1.3              | Remove `clawhub`              |
+| `models/services/llm-factory.service.ts`     | 2.1              | Add `createLangChainLLM()`    |
+| `agents/services/agent-planner.service.ts`   | 2.2, 4.2         | Inject LLMFactory + tracing   |
+| `agents/services/agent-evaluator.service.ts` | 2.3, 4.3         | Inject LLMFactory + tracing   |
+| `ai-gateway/langsmith-tracing.service.ts`    | 4.1              | Real SDK calls                |
+| `agents/langgraph/langgraph-official.ts`     | 3.1, 3.2, 5.2, 6 | All major wiring + as any fix |
+| `tools/structured-tool.registry.ts`          | 5.1              | Add `toLangChainTools()`      |
+| `memory/memory.service.ts`                   | 7.1              | Feature flag                  |
+
+---
+
+## SOLID Adherence Summary
+
+| Principle | Application                                                                                                                                         |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SRP**   | Graph orchestrates; planner plans; evaluator evaluates; factory selects providers; tracing service traces                                           |
+| **OCP**   | `LLMFactory.createLangChainLLM()` and `StructuredToolRegistry.toLangChainTools()` are new methods — no existing methods modified                    |
+| **LSP**   | All services still implement existing interfaces; `DynamicStructuredTool` wraps `IStructuredTool` without subclassing                               |
+| **ISP**   | Callers use only the surface they need; all new parameters optional                                                                                 |
+| **DIP**   | `AgentPlannerService` depends on `LLMFactory` abstraction, not `ChatOpenAI` concrete; graph depends on `IAgentPlanner`/`IAgentEvaluator` interfaces |
+
+---
+
+## Environment Variables Required
+
+| Variable                    | Phase | Purpose                                    |
+| --------------------------- | ----- | ------------------------------------------ |
+| `LLM_PROVIDER`              | 2+    | `minimax` / `deepseek` / `mimo` / `openai` |
+| `OPENAI_API_KEY`            | 2+    | Fallback provider                          |
+| `MINIMAX_API_KEY`           | 2+    | MiniMax routing                            |
+| `DEEPSEEK_API_KEY`          | 2+    | DeepSeek routing                           |
+| `MIMO_API_KEY`              | 2+    | MiMo routing                               |
+| `LANGSMITH_API_KEY`         | 4     | Real SDK tracing                           |
+| `LANGSMITH_TRACING_ENABLED` | 4     | `true` to enable                           |
+| `LANGSMITH_PROJECT`         | 4     | Project name (default: `neurecore`)        |
+| `ENABLE_VECTOR_SEARCH`      | 7     | `true` once pgvector confirmed on Neon     |
+
+---
+
+## Verification Checklist
+
+### Phase 1
+
+- [ ] `pnpm run build` → 0 errors
+- [ ] Backend boots without `OPENCLAW_API_KEY` → no crash
+- [ ] `GET /api/v1/health` → 200
+
+### Phase 2
+
+- [ ] `LLM_PROVIDER=deepseek` + key → `createLangChainLLM('planning')` returns ChatOpenAI with DeepSeek baseURL
+- [ ] No keys set → returns `null`; services fall back to stubs
+
+### Phase 3
+
+- [ ] `POST /api/v1/agents/:id/tasks` → log shows LLM-generated plan steps (not `"Analyze goal..."`)
+
+### Phase 4
+
+- [ ] `LANGSMITH_TRACING_ENABLED=false` → no HTTP to LangSmith
+- [ ] `LANGSMITH_TRACING_ENABLED=true` + valid key → runs visible in dashboard
+- [ ] Bad key → agent executes normally, warning logged
+
+### Phase 5
+
+- [ ] Tool step → `ToolNode` dispatches; `SecurityInterceptorService.validate()` still called (**SECURITY CRITICAL**)
+- [ ] `pnpm run build` → 0 errors
+
+### Phase 6
+
+- [ ] `npx tsc --noEmit --skipLibCheck` in `backend/` → 0 errors
+- [ ] `grep "as any" langgraph-official.ts` → 0 matches
+
+---
+
+## Not In Scope
+
+- OpenClaw real API integration
+- New tools in `StructuredToolRegistry`
+- Frontend changes
+- LangGraph human-in-the-loop interrupts
+- pgvector column migration (Phase 7.2 deferred until Neon pgvector confirmed)
+
+---
+
+_Plan v1.0 — April 4, 2026 — ready for implementation on branch `tenant-base`_

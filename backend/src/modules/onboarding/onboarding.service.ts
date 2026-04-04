@@ -44,6 +44,7 @@ import {
   TierDto,
   AgentTemplateDto,
 } from './dto/onboarding.dto';
+import { ProvisioningJobService } from '../workspace-provisioning/services/provisioning-job.service';
 
 interface WizardState {
   email?: string;
@@ -64,6 +65,7 @@ export class OnboardingService {
     private readonly redis: RedisService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly provisioningJobService: ProvisioningJobService,
   ) {}
 
   // ============================================================================
@@ -809,6 +811,33 @@ export class OnboardingService {
       this.logger.log(
         `Created ${wizardIntegrations.length} integration placeholders for tenant ${tenant.id}`,
       );
+    }
+
+    // ── Create workspace provisioning config + jobs (if admin opted in) ──────
+    const wp = wizard.wizardData.workspaceProvisioning;
+    if (wp?.enabled) {
+      const config = await this.provisioningJobService.upsertConfig({
+        tenantId: tenant.id,
+        provider: wp.provider,
+        emailDomain: wp.emailDomain,
+        emailPattern: wp.emailPattern,
+        folderStructure: wp.folderStructure,
+      });
+
+      // Create one job per invitee so provisioning can track each person individually
+      if (wizardInvitations?.length) {
+        const jobInputs = wizardInvitations.map((inv) => ({
+          configId: config.id,
+          inviteeEmail: inv.email,
+          inviteeFirstName: inv.firstName,
+          inviteeLastName: inv.lastName,
+          departmentName: inv.departmentId ?? undefined,
+        }));
+        await this.provisioningJobService.createManyJobs(jobInputs);
+        this.logger.log(
+          `Created ${jobInputs.length} provisioning jobs for tenant ${tenant.id}`,
+        );
+      }
     }
 
     // Clear wizard state

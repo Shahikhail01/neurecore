@@ -12,6 +12,7 @@ import type {
   TierDto,
   DepartmentOutputDto,
   AgentTemplateDto,
+  WorkspaceProvisioningConfig,
 } from "@/types/onboarding.types";
 
 interface OnboardingState {
@@ -47,6 +48,7 @@ interface OnboardingState {
   setDepartmentsData: (data: DepartmentOutputDto[]) => void;
   setInvitationsData: (data: WizardData["invitations"]) => void;
   setIntegrationsData: (data: string[]) => void;
+  setWorkspaceProvisioningData: (data: WorkspaceProvisioningConfig) => void;
   setAgentsData: (data: WizardData["agents"]) => void;
   setSecurityData: (data: WizardData["security"]) => void;
   setTiers: (tiers: TierDto[]) => void;
@@ -158,6 +160,11 @@ export const useOnboardingStore = create<OnboardingState>()(
       setIntegrationsData: (data) =>
         set((state) => ({
           wizardData: { ...state.wizardData, integrations: data },
+        })),
+
+      setWorkspaceProvisioningData: (data) =>
+        set((state) => ({
+          wizardData: { ...state.wizardData, workspaceProvisioning: data },
         })),
 
       setAgentsData: (data) =>

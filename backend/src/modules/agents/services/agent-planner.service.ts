@@ -1,10 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { z } from 'zod';
 import type {
   IAgentPlanner,
   AgentPlan,
   PlanningContext,
 } from '../interfaces/agent-planner.interface';
+import { LLMFactory } from '../../models/services/llm-factory.service';
+import { LangSmithTracingService } from '../../ai-gateway/langsmith-tracing.service';
 
 /**
  * AgentPlannerService
@@ -17,23 +20,25 @@ import type {
 export class AgentPlannerService implements IAgentPlanner {
   private readonly logger = new Logger(AgentPlannerService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly llmFactory: LLMFactory,
+    private readonly tracing: LangSmithTracingService,
+  ) {}
 
   async plan(context: PlanningContext): Promise<AgentPlan> {
     this.logger.debug(
       `Planning for agent ${context.agentId}: "${context.goal}"`,
     );
 
-    // Build a minimal plan without LLM when no API key is configured
-    // (keeps unit-tests fast; replace with real LangChain chain in prod)
-    const apiKey = this.config.get<string>('OPENAI_API_KEY');
+    const llm = await this.llmFactory.createLangChainLLM('planning');
 
-    if (!apiKey) {
-      this.logger.warn('OPENAI_API_KEY not set — returning stub plan');
+    if (!llm) {
+      this.logger.warn('No LLM available — returning stub plan');
       return this.buildStubPlan(context);
     }
 
-    return this.buildLlmPlan(context, apiKey);
+    return this.buildLlmPlan(context, llm);
   }
 
   async replan(
@@ -75,19 +80,16 @@ export class AgentPlannerService implements IAgentPlanner {
 
   private async buildLlmPlan(
     context: PlanningContext,
-    apiKey: string,
+    llm: import('@langchain/core/language_models/chat_models').BaseChatModel,
   ): Promise<AgentPlan> {
+    const span = this.tracing.startSpan({
+      name: 'agent.plan',
+      metadata: { agentId: context.agentId, goal: context.goal },
+    });
+
     try {
-      const { ChatOpenAI } = await import('@langchain/openai');
       const { ChatPromptTemplate } = await import('@langchain/core/prompts');
       const { z } = await import('zod');
-
-      const llm = new ChatOpenAI({
-        apiKey,
-        model: 'gpt-4o-mini',
-        temperature: 0.2,
-        maxTokens: 1024,
-      });
 
       // Define the planning schema for structured output
       const planStepSchema = z.object({
@@ -137,15 +139,15 @@ Rules:
       ]);
 
       // Use withStructuredOutput for type-safe JSON parsing
-      const structuredLlm = llm.withStructuredOutput(agentPlanSchema);
+      const structuredLlm = llm.withStructuredOutput(agentPlanSchema) as any;
 
       const chain = prompt.pipe(structuredLlm);
 
-      const plan = await chain.invoke({
+      const plan = (await chain.invoke({
         goal: context.goal,
         tools: toolList,
         constraints: constraintList,
-      });
+      })) as z.infer<typeof agentPlanSchema>;
 
       // Convert to AgentPlan format
       const agentPlan: AgentPlan = {
@@ -163,8 +165,14 @@ Rules:
       this.logger.debug(
         `LLM produced ${agentPlan.steps.length} steps for goal: ${context.goal}`,
       );
+
+      this.tracing.endSpan(span?.id, { success: true });
       return agentPlan;
     } catch (err) {
+      this.tracing.endSpan(span?.id, {
+        success: false,
+        error: String(err),
+      });
       this.logger.warn(
         `LLM planning failed, falling back to stub: ${String(err)}`,
       );
