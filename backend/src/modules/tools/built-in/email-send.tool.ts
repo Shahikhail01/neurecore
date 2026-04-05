@@ -78,6 +78,8 @@ export class EmailSendTool extends BaseStructuredTool {
     const host = this.config.get<string>('SMTP_HOST');
     const user = this.config.get<string>('SMTP_USER');
     const pass = this.config.get<string>('SMTP_PASS');
+    const portStr = this.config.get<string>('SMTP_PORT') ?? '465';
+    const smtpPort = parseInt(portStr, 10);
     const from = this.config.get<string>('SMTP_FROM') ?? user;
 
     if (!host || !user || !pass) {
@@ -94,7 +96,8 @@ export class EmailSendTool extends BaseStructuredTool {
       // Explicitly use SMTPTransport options to guide TypeScript overload resolution
       const smtpOptions: import('nodemailer/lib/smtp-transport').Options = {
         host,
-        secure: true,
+        port: smtpPort,
+        secure: smtpPort === 465,
         auth: { user, pass },
       };
       const transporter = nodemailer.createTransport(smtpOptions);

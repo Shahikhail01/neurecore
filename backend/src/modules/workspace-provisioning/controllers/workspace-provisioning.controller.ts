@@ -1,23 +1,27 @@
 /**
  * WorkspaceProvisioningController
- * Exposes 8 endpoints under /workspace-provisioning (versioned v1).
+ * Exposes 10 endpoints under /workspace-provisioning (versioned v1).
  * All endpoints require a valid JWT (tenant admin).
  */
 import {
+  Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
+  Put,
   Query,
   Req,
   Res,
-  HttpCode,
-  HttpStatus,
   ForbiddenException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import type { Response } from 'express';
 import { ProvisioningJobService } from '../services/provisioning-job.service';
 import { ProvisioningOrchestratorService } from '../services/provisioning-orchestrator.service';
+import { UpdateProvisioningConfigDto } from '../dto/update-provisioning-config.dto';
 import { ConfigService } from '@nestjs/config';
 
 interface RequestWithUser extends Request {
@@ -135,6 +139,49 @@ export class WorkspaceProvisioningController {
   async listJobs(@Req() req: RequestWithUser) {
     const tenantId = this.resolveTenantId(req);
     return this.jobService.listJobs(tenantId);
+  }
+
+  // ─── PUT /workspace-provisioning/configure ───────────────────────────────
+  /**
+   * Creates or updates the provisioning config for the tenant.
+   * This endpoint is available at any time — not only via the onboarding wizard.
+   * If a config already exists it is updated; otherwise a new one is created.
+   * On save the OAuth status is set to PENDING_CONNECT so the admin must
+   * (re-)connect their cloud account.
+   */
+  @Put('configure')
+  @HttpCode(HttpStatus.OK)
+  async configure(
+    @Body() dto: UpdateProvisioningConfigDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    const config = await this.jobService.upsertConfig({
+      tenantId,
+      provider: dto.provider,
+      emailDomain: dto.emailDomain,
+      emailPattern: dto.emailPattern,
+      folderStructure: dto.folderStructure,
+    });
+    // Strip raw OAuth tokens from the response (same guard as GET /config)
+    const { oauthAccessToken: _a, oauthRefreshToken: _r, ...safe } = config;
+    void _a;
+    void _r;
+    return safe;
+  }
+
+  // ─── DELETE /workspace-provisioning/disconnect ───────────────────────────
+  /**
+   * Clears stored OAuth tokens and resets provisioning status to PENDING_CONNECT.
+   * The config (provider, domain, patterns) is preserved so the admin can
+   * re-connect without re-entering the setup form.
+   */
+  @Delete('disconnect')
+  @HttpCode(HttpStatus.OK)
+  async disconnect(@Req() req: RequestWithUser) {
+    const tenantId = this.resolveTenantId(req);
+    await this.jobService.disconnectOAuth(tenantId);
+    return { success: true };
   }
 
   // ─── Private helpers ─────────────────────────────────────────────────────

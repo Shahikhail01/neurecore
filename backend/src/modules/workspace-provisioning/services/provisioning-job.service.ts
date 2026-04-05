@@ -165,4 +165,24 @@ export class ProvisioningJobService {
       data: { status: 'FAILED', errorMessage },
     });
   }
+
+  // ─── OAuth disconnect ──────────────────────────────────────────────────────
+
+  /**
+   * Clears stored OAuth tokens and resets status to PENDING_CONNECT.
+   * The provisioning config itself is preserved so it can be re-connected.
+   */
+  async disconnectOAuth(tenantId: string): Promise<void> {
+    const config = await this.getConfigByTenantId(tenantId);
+    if (!config) return;
+    await this.prisma.provisioningConfig.update({
+      where: { id: config.id },
+      data: {
+        oauthAccessToken: null,
+        oauthRefreshToken: null,
+        oauthExpiresAt: null,
+        status: 'PENDING_CONNECT',
+      },
+    });
+  }
 }

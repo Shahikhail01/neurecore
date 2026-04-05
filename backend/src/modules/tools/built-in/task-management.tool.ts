@@ -7,17 +7,9 @@
  * - Update task status/assignment
  * - Delete tasks
  * - Assign tasks to users
- *
- * SOLID Principles:
- * - SRP: Only handles task management operations
- * - OCP: Add new task providers without modifying existing code
- * - DIP: Depends on ITaskService interface, not concrete implementation
- * - LSP: Any task service can substitute for another
- * - ISP: Small, focused interfaces
  */
 
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 import { BaseStructuredTool } from '../structured-tool.base';
 import {
@@ -45,21 +37,22 @@ export const TaskActionEnum = z.enum([
 export type TaskActionType = z.infer<typeof TaskActionEnum>;
 
 /**
- * Task priority enum
+ * Task priority enum — matches TaskPriority in Prisma schema
  */
-export const TaskPriorityEnum = z.enum(['low', 'medium', 'high', 'urgent']);
+export const TaskPriorityEnum = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 
 export type TaskPriorityType = z.infer<typeof TaskPriorityEnum>;
 
 /**
- * Task status enum
+ * Task status enum — matches TaskStatus in Prisma schema
  */
 export const TaskStatusEnum = z.enum([
-  'todo',
-  'in_progress',
-  'review',
-  'done',
-  'cancelled',
+  'PENDING',
+  'QUEUED',
+  'RUNNING',
+  'COMPLETED',
+  'FAILED',
+  'CANCELLED',
 ]);
 
 export type TaskStatusType = z.infer<typeof TaskStatusEnum>;
@@ -71,17 +64,20 @@ export const TaskManagementInputSchema = z.object({
   action: TaskActionEnum.describe('Task operation'),
   title: z.string().optional().describe('Task title'),
   description: z.string().optional().describe('Task description'),
-  priority: TaskPriorityEnum.optional().describe('Task priority'),
-  status: TaskStatusEnum.optional().describe('Task status'),
-  dueDate: z
+  priority: TaskPriorityEnum.optional().describe(
+    'Task priority: LOW, MEDIUM, HIGH, CRITICAL',
+  ),
+  status: TaskStatusEnum.optional().describe(
+    'Task status: PENDING, QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED',
+  ),
+  scheduledAt: z
     .string()
     .datetime({ message: 'Invalid ISO 8601 datetime format' })
     .optional()
-    .describe('Due date'),
-  assigneeId: z.string().optional().describe('User ID to assign'),
+    .describe('Scheduled date/time'),
+  agentId: z.string().optional().describe('Agent ID to assign the task to'),
   taskId: z.string().optional().describe('Task ID for update/delete'),
-  projectId: z.string().optional().describe('Project ID'),
-  tags: z.array(z.string()).optional().describe('Task tags'),
+  workflowId: z.string().optional().describe('Workflow ID to associate'),
   limit: z.number().int().min(1).max(100).default(50).optional(),
   offset: z.number().int().min(0).default(0).optional(),
 });
@@ -93,7 +89,7 @@ export type TaskManagementInputType = z.infer<typeof TaskManagementInputSchema>;
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Task output schema
+ * Task output schema — matches fields in the Task model
  */
 const TaskOutputItemSchema = z.object({
   id: z.string(),
@@ -101,10 +97,9 @@ const TaskOutputItemSchema = z.object({
   description: z.string().nullable(),
   status: z.string(),
   priority: z.string(),
-  dueDate: z.string().nullable(),
-  assigneeId: z.string().nullable(),
-  projectId: z.string().nullable(),
-  tags: z.array(z.string()),
+  scheduledAt: z.string().nullable(),
+  agentId: z.string().nullable(),
+  workflowId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -142,16 +137,13 @@ export type TaskManagementOutputType = z.infer<
 export class TaskManagementTool extends BaseStructuredTool {
   readonly name = 'task_management';
   readonly description =
-    'Manage tasks, create, update, delete, assign tasks, and track task status. Supports actions: create, list, update, delete, assign.';
+    'Manage tasks: create, list, update, delete, assign. Priority values: LOW, MEDIUM, HIGH, CRITICAL. Status values: PENDING, QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED.';
   readonly category = ToolCategory.PRODUCTIVITY;
   readonly inputSchema = TaskManagementInputSchema;
   readonly outputSchema = TaskManagementOutputSchema;
   readonly version = '1.0.0';
 
-  constructor(
-    private readonly config: ConfigService,
-    private readonly prisma: PrismaService,
-  ) {
+  constructor(private readonly prisma: PrismaService) {
     super();
   }
 
@@ -202,82 +194,43 @@ export class TaskManagementTool extends BaseStructuredTool {
   }
 
   /**
-   * Parse metrics from Goal JSON field
-   */
-  private parseMetrics(metrics: unknown): Record<string, unknown> {
-    if (typeof metrics === 'string') {
-      try {
-        return JSON.parse(metrics);
-      } catch {
-        return {};
-      }
-    }
-    if (typeof metrics === 'object' && metrics !== null) {
-      return metrics as Record<string, unknown>;
-    }
-    return {};
-  }
-
-  /**
-   * Convert task output for response
+   * Convert a Prisma Task record to the tool output shape
    */
   private toTaskOutput(task: {
     id: string;
     title: string;
     description: string | null;
     status: string;
-    targetDate: Date | null;
-    ownerUserId: string | null;
+    priority: string;
+    scheduledAt: Date | null;
+    agentId: string | null;
+    workflowId: string | null;
     createdAt: Date;
     updatedAt: Date;
-    metrics: unknown;
-    departmentId: string | null;
   }): {
     id: string;
     title: string;
     description: string | null;
     status: string;
     priority: string;
-    dueDate: string | null;
-    assigneeId: string | null;
-    projectId: string | null;
-    tags: string[];
+    scheduledAt: string | null;
+    agentId: string | null;
+    workflowId: string | null;
     createdAt: string;
     updatedAt: string;
   } {
-    const metrics = this.parseMetrics(task.metrics);
     return {
       id: task.id,
       title: task.title,
       description: task.description,
       status: task.status,
-      priority: (metrics.priority as string) ?? 'medium',
-      dueDate: task.targetDate?.toISOString() ?? null,
-      assigneeId: task.ownerUserId,
-      projectId: task.departmentId,
-      tags: (metrics.tags as string[]) ?? [],
+      priority: task.priority,
+      scheduledAt: task.scheduledAt?.toISOString() ?? null,
+      agentId: task.agentId,
+      workflowId: task.workflowId,
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
     };
-  }
-
-  /**
-   * Map task status string to GoalStatus enum
-   */
-  private mapStatusToGoal(
-    status: string,
-  ): 'ACTIVE' | 'COMPLETED' | 'PAUSED' | 'ARCHIVED' {
-    const statusMap: Record<
-      string,
-      'ACTIVE' | 'COMPLETED' | 'PAUSED' | 'ARCHIVED'
-    > = {
-      todo: 'ACTIVE',
-      in_progress: 'ACTIVE',
-      review: 'ACTIVE',
-      done: 'COMPLETED',
-      cancelled: 'ARCHIVED',
-    };
-    return statusMap[status] ?? 'ACTIVE';
   }
 
   /**
@@ -296,20 +249,17 @@ export class TaskManagementTool extends BaseStructuredTool {
       };
     }
 
-    // Create task using Prisma - using Goal as proxy for tasks
-    const task = await this.prisma.goal.create({
+    const task = await this.prisma.task.create({
       data: {
         tenantId,
         title: input.title,
         description: input.description,
-        status: input.status ? this.mapStatusToGoal(input.status) : 'ACTIVE',
-        targetDate: input.dueDate ? new Date(input.dueDate) : null,
-        ownerUserId: input.assigneeId,
-        departmentId: input.projectId,
-        metrics: JSON.stringify({
-          priority: input.priority ?? 'medium',
-          tags: input.tags ?? [],
-        }),
+        status: (input.status as any) ?? 'PENDING',
+        priority: (input.priority as any) ?? 'MEDIUM',
+        scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
+        agentId: input.agentId ?? null,
+        workflowId: input.workflowId ?? null,
+        input: {},
       },
     });
 
@@ -339,27 +289,26 @@ export class TaskManagementTool extends BaseStructuredTool {
     const limit = input.limit ?? 50;
     const offset = input.offset ?? 0;
 
-    // Build where clause with tenant isolation
     const where: Record<string, unknown> = { tenantId };
 
     if (input.status) {
-      where.status = this.mapStatusToGoal(input.status);
+      where.status = input.status;
     }
-    if (input.assigneeId) {
-      where.ownerUserId = input.assigneeId;
+    if (input.agentId) {
+      where.agentId = input.agentId;
     }
-    if (input.projectId) {
-      where.departmentId = input.projectId;
+    if (input.workflowId) {
+      where.workflowId = input.workflowId;
     }
 
     const [tasks, totalCount] = await Promise.all([
-      this.prisma.goal.findMany({
+      this.prisma.task.findMany({
         where,
         take: limit,
         skip: offset,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.goal.count({ where }),
+      this.prisma.task.count({ where }),
     ]);
 
     return {
@@ -392,36 +341,22 @@ export class TaskManagementTool extends BaseStructuredTool {
       };
     }
 
-    // Build update data
     const updateData: Record<string, unknown> = {};
 
     if (input.title !== undefined) updateData.title = input.title;
     if (input.description !== undefined)
       updateData.description = input.description;
-    if (input.status !== undefined)
-      updateData.status = this.mapStatusToGoal(input.status);
-    if (input.dueDate !== undefined) {
-      updateData.targetDate = input.dueDate ? new Date(input.dueDate) : null;
+    if (input.status !== undefined) updateData.status = input.status;
+    if (input.priority !== undefined) updateData.priority = input.priority;
+    if (input.scheduledAt !== undefined) {
+      updateData.scheduledAt = input.scheduledAt
+        ? new Date(input.scheduledAt)
+        : null;
     }
-    if (input.projectId !== undefined)
-      updateData.departmentId = input.projectId;
+    if (input.workflowId !== undefined)
+      updateData.workflowId = input.workflowId;
 
-    // Update metrics for priority and tags
-    if (input.priority !== undefined || input.tags !== undefined) {
-      const existingTask = await this.prisma.goal.findUnique({
-        where: { id: input.taskId },
-      });
-      if (existingTask) {
-        const existingMetrics = this.parseMetrics(existingTask.metrics);
-        updateData.metrics = JSON.stringify({
-          ...existingMetrics,
-          priority: input.priority ?? existingMetrics.priority,
-          tags: input.tags ?? existingMetrics.tags,
-        });
-      }
-    }
-
-    const task = await this.prisma.goal.update({
+    const task = await this.prisma.task.update({
       where: { id: input.taskId, tenantId },
       data: updateData,
     });
@@ -457,7 +392,7 @@ export class TaskManagementTool extends BaseStructuredTool {
       };
     }
 
-    await this.prisma.goal.delete({
+    await this.prisma.task.delete({
       where: { id: input.taskId, tenantId },
     });
 
@@ -476,7 +411,7 @@ export class TaskManagementTool extends BaseStructuredTool {
   }
 
   /**
-   * Handle assign task action
+   * Handle assign task action — sets agentId on the task
    */
   private async handleAssign(
     input: TaskManagementInputType,
@@ -491,17 +426,17 @@ export class TaskManagementTool extends BaseStructuredTool {
       };
     }
 
-    if (!input.assigneeId) {
+    if (!input.agentId) {
       return {
         success: false,
-        error: 'assigneeId is required for assign action',
+        error: 'agentId is required for assign action',
         metadata: { durationMs: Date.now() - startTime },
       };
     }
 
-    const task = await this.prisma.goal.update({
+    const task = await this.prisma.task.update({
       where: { id: input.taskId, tenantId },
-      data: { ownerUserId: input.assigneeId },
+      data: { agentId: input.agentId },
     });
 
     return {
@@ -510,7 +445,7 @@ export class TaskManagementTool extends BaseStructuredTool {
         taskId: task.id,
         task: this.toTaskOutput(task),
         success: true,
-        message: `Task ${task.id} assigned to user ${input.assigneeId}`,
+        message: `Task ${task.id} assigned to agent ${input.agentId}`,
       },
       metadata: {
         durationMs: Date.now() - startTime,

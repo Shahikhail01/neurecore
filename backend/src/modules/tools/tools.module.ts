@@ -60,12 +60,14 @@ import { ToolsInitializerService } from './tools-initializer.service';
 import { EventsModule } from '../events/events.module';
 import { ModelsModule } from '../models/models.module';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { ConnectorsModule } from '../connectors/connectors.module';
 
 @Module({
   imports: [
     forwardRef(() => EventsModule), // EventsGateway for AgentMessagingTool
     ModelsModule, // LLMFactory for DocumentSummaryTool
     DatabaseModule, // PrismaService for TaskManagementTool
+    ConnectorsModule, // OAuthService for GoogleWorkspaceTool
   ],
   controllers: [ToolsController],
   providers: [

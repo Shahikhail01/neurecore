@@ -1,4 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { ConnectorRegistry } from './connector.registry';
 import { ConnectorService } from './services/connector.service';
 import { PrismaOAuthTokenStore } from './services/oauth-token.service';
@@ -19,6 +20,7 @@ import { PipedriveConnector } from './adapters/pipedrive.adapter';
  *       SyncSchedulerService handles background scheduling only.
  */
 @Module({
+  imports: [ConfigModule],
   controllers: [ConnectorsController],
   providers: [
     ConnectorRegistry,

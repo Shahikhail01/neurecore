@@ -85,9 +85,13 @@ export class DocumentSummaryTool extends BaseStructuredTool {
       const tokensUsed = Math.ceil((prompt.length + summary.length) / 4);
 
       return { success: true, data: { summary, tokensUsed } };
-    } catch {
-      this.logger.error('[DocumentSummaryTool] LLM call failed');
-      return { success: false, error: 'Summarisation failed' };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error('[DocumentSummaryTool] LLM call failed: ' + msg);
+      return {
+        success: false,
+        error: 'Summarisation failed — check LLM API key config: ' + msg,
+      };
     }
   }
 }

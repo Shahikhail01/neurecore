@@ -44,17 +44,11 @@ interface SearchResult {
   snippet: string;
 }
 
-/** DuckDuckGo Instant Answer API (free, no key required) */
-const DUCKDUCKGO_URL = 'https://api.duckduckgo.com/';
-
-/** SSRF guard — only these hosts are allowed for web search */
-const ALLOWED_HOSTS = ['api.duckduckgo.com', 'google.serper.dev'];
-
 @Injectable()
 export class WebSearchTool extends BaseStructuredTool {
   readonly name = 'web_search';
   readonly description =
-    'Search the web using DuckDuckGo (free, no API key) and return a list of relevant results with title, URL, and snippet.';
+    'Search the web using Serper (Google Search API) and return a list of relevant results with title, URL, and snippet.';
   readonly category = ToolCategory.SEARCH;
   readonly inputSchema = WebSearchInputSchema;
 

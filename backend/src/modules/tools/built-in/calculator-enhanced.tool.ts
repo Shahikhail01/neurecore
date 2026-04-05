@@ -54,7 +54,7 @@ export type CalculatorOutput = z.infer<typeof CalculatorOutputSchema>;
  */
 @Injectable()
 export class CalculatorEnhancedTool extends BaseStructuredTool {
-  readonly name = 'calculator';
+  readonly name = 'calculator_enhanced';
   readonly description =
     'Evaluate mathematical expressions with high precision. Supports basic arithmetic (+, -, *, /), powers (^), square root (sqrt), trigonometric functions (sin, cos, tan), and constants (pi, e).';
   readonly category = ToolCategory.CALCULATION;

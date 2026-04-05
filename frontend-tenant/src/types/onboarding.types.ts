@@ -113,6 +113,8 @@ export interface WorkspaceProvisioningConfig {
   emailDomain: string;
   emailPattern: EmailPattern;
   folderStructure: FolderStructure;
+  /** Returned by the API — matches ProvisioningConfigStatus enum values */
+  status?: string;
 }
 
 export interface ProvisioningStatusDto {

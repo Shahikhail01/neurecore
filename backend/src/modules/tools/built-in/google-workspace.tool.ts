@@ -8,6 +8,7 @@
  * - DIP: Depends on abstractions for Google API integration
  */
 
+import * as https from 'https';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
@@ -17,6 +18,92 @@ import {
   StructuredToolResult,
   ToolExecutionContext,
 } from '../interfaces/structured-tool.interface';
+import { OAuthService } from '../../connectors/services/oauth.service';
+
+// ─────────────────────────────────────────────────────────────
+// IPv4-forced HTTPS helpers (same pattern as oauth.service.ts)
+// ─────────────────────────────────────────────────────────────
+
+function httpsRequest(
+  method: string,
+  url: string,
+  accessToken: string,
+  body?: unknown,
+): Promise<{ ok: boolean; status: number; data: unknown }> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const bodyStr = body ? JSON.stringify(body) : undefined;
+    const options: https.RequestOptions = {
+      hostname: u.hostname,
+      path: u.pathname + u.search,
+      method,
+      family: 4,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+        ...(bodyStr
+          ? {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(bodyStr),
+            }
+          : {}),
+      },
+    };
+    const req = https.request(options, (res) => {
+      let raw = '';
+      res.on('data', (c) => (raw += c));
+      res.on('end', () => {
+        let data: unknown = raw;
+        try {
+          data = JSON.parse(raw);
+        } catch {}
+        resolve({
+          ok: (res.statusCode ?? 0) < 300,
+          status: res.statusCode ?? 0,
+          data,
+        });
+      });
+    });
+    req.on('error', reject);
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
+
+async function gGet(url: string, token: string): Promise<unknown> {
+  const r = await httpsRequest('GET', url, token);
+  if (!r.ok)
+    throw new Error(`Google API error ${r.status}: ${JSON.stringify(r.data)}`);
+  return r.data;
+}
+
+async function gPost(
+  url: string,
+  token: string,
+  body: unknown,
+): Promise<unknown> {
+  const r = await httpsRequest('POST', url, token, body);
+  if (!r.ok)
+    throw new Error(`Google API error ${r.status}: ${JSON.stringify(r.data)}`);
+  return r.data;
+}
+
+async function gPatch(
+  url: string,
+  token: string,
+  body: unknown,
+): Promise<unknown> {
+  const r = await httpsRequest('PATCH', url, token, body);
+  if (!r.ok)
+    throw new Error(`Google API error ${r.status}: ${JSON.stringify(r.data)}`);
+  return r.data;
+}
+
+async function gDelete(url: string, token: string): Promise<void> {
+  const r = await httpsRequest('DELETE', url, token);
+  if (!r.ok)
+    throw new Error(`Google API error ${r.status}: ${JSON.stringify(r.data)}`);
+}
 
 // ─────────────────────────────────────────────────────────────
 // Input Schema
@@ -485,6 +572,297 @@ class MockGoogleWorkspaceProvider
 }
 
 // ─────────────────────────────────────────────────────────────
+// Real Google Workspace Provider (uses stored OAuth tokens)
+// ─────────────────────────────────────────────────────────────
+
+class RealGoogleWorkspaceProvider
+  implements
+    IGoogleCalendarProvider,
+    IGoogleGmailProvider,
+    IGoogleDocsProvider,
+    IGoogleSheetsProvider
+{
+  private readonly logger = new Logger('RealGoogleWorkspaceProvider');
+
+  constructor(private readonly accessToken: string) {}
+
+  // ── Calendar ──────────────────────────────────────────────
+
+  async listEvents(options: {
+    calendarId?: string;
+    maxResults?: number;
+  }): Promise<z.infer<typeof CalendarEventSchema>[]> {
+    const calId = encodeURIComponent(options.calendarId ?? 'primary');
+    const max = options.maxResults ?? 10;
+    const now = new Date().toISOString();
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${calId}/events?maxResults=${max}&timeMin=${encodeURIComponent(now)}&singleEvents=true&orderBy=startTime`;
+    const res = (await gGet(url, this.accessToken)) as any;
+    return (res.items ?? []).map((e: any) => ({
+      id: e.id,
+      summary: e.summary,
+      description: e.description,
+      start: e.start?.dateTime ?? e.start?.date ?? '',
+      end: e.end?.dateTime ?? e.end?.date ?? '',
+      location: e.location,
+      attendees: e.attendees?.map((a: any) => a.email),
+    }));
+  }
+
+  async createEvent(options: {
+    calendarId?: string;
+    summary: string;
+    description?: string;
+    start: string;
+    end: string;
+    location?: string;
+    attendees?: string[];
+  }): Promise<z.infer<typeof CalendarEventSchema>> {
+    const calId = encodeURIComponent(options.calendarId ?? 'primary');
+    const body: any = {
+      summary: options.summary,
+      description: options.description,
+      start: { dateTime: options.start, timeZone: 'UTC' },
+      end: { dateTime: options.end, timeZone: 'UTC' },
+      location: options.location,
+      attendees: options.attendees?.map((e) => ({ email: e })),
+    };
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${calId}/events`;
+    const e = (await gPost(url, this.accessToken, body)) as any;
+    return {
+      id: e.id,
+      summary: e.summary,
+      description: e.description,
+      start: e.start?.dateTime ?? e.start?.date ?? '',
+      end: e.end?.dateTime ?? e.end?.date ?? '',
+      location: e.location,
+      attendees: e.attendees?.map((a: any) => a.email),
+    };
+  }
+
+  async updateEvent(
+    eventId: string,
+    options: {
+      calendarId?: string;
+      summary?: string;
+      description?: string;
+      start?: string;
+      end?: string;
+      location?: string;
+    },
+  ): Promise<z.infer<typeof CalendarEventSchema>> {
+    const calId = encodeURIComponent(options.calendarId ?? 'primary');
+    const body: any = {};
+    if (options.summary) body.summary = options.summary;
+    if (options.description) body.description = options.description;
+    if (options.start)
+      body.start = { dateTime: options.start, timeZone: 'UTC' };
+    if (options.end) body.end = { dateTime: options.end, timeZone: 'UTC' };
+    if (options.location) body.location = options.location;
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${calId}/events/${encodeURIComponent(eventId)}`;
+    const e = (await gPatch(url, this.accessToken, body)) as any;
+    return {
+      id: e.id,
+      summary: e.summary,
+      description: e.description,
+      start: e.start?.dateTime ?? e.start?.date ?? '',
+      end: e.end?.dateTime ?? e.end?.date ?? '',
+      location: e.location,
+      attendees: e.attendees?.map((a: any) => a.email),
+    };
+  }
+
+  async deleteEvent(eventId: string, calendarId?: string): Promise<void> {
+    const calId = encodeURIComponent(calendarId ?? 'primary');
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${calId}/events/${encodeURIComponent(eventId)}`;
+    await gDelete(url, this.accessToken);
+  }
+
+  // ── Gmail ─────────────────────────────────────────────────
+
+  async sendEmail(options: {
+    to: string;
+    subject: string;
+    body: string;
+  }): Promise<{ messageId: string }> {
+    const raw = Buffer.from(
+      `To: ${options.to}\r\nSubject: ${options.subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${options.body}`,
+    )
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    const res = (await gPost(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+      this.accessToken,
+      { raw },
+    )) as any;
+    return { messageId: res.id };
+  }
+
+  async readEmail(emailId: string): Promise<z.infer<typeof EmailSchema>> {
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(emailId)}?format=full`;
+    const msg = (await gGet(url, this.accessToken)) as any;
+    const headers: Record<string, string> = {};
+    for (const h of msg.payload?.headers ?? []) {
+      headers[h.name?.toLowerCase()] = h.value;
+    }
+    const body =
+      msg.snippet ??
+      Buffer.from(msg.payload?.body?.data ?? '', 'base64').toString();
+    return {
+      id: msg.id,
+      subject: headers['subject'] ?? '',
+      from: headers['from'] ?? '',
+      to: headers['to'] ?? '',
+      body,
+      date: headers['date'] ?? new Date().toISOString(),
+    };
+  }
+
+  // ── Google Docs ───────────────────────────────────────────
+
+  async createDocument(options: {
+    title: string;
+    content?: string;
+  }): Promise<z.infer<typeof GoogleDocumentSchema>> {
+    const doc = (await gPost(
+      'https://docs.googleapis.com/v1/documents',
+      this.accessToken,
+      { title: options.title },
+    )) as any;
+    const docId: string = doc.documentId;
+    const now = new Date().toISOString();
+    if (options.content) {
+      await gPost(
+        `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}:batchUpdate`,
+        this.accessToken,
+        {
+          requests: [
+            {
+              insertText: {
+                location: { index: 1 },
+                text: options.content,
+              },
+            },
+          ],
+        },
+      );
+    }
+    return {
+      id: docId,
+      title: options.title,
+      content: options.content,
+      createdTime: now,
+      modifiedTime: now,
+    };
+  }
+
+  async readDocument(
+    documentId: string,
+  ): Promise<z.infer<typeof GoogleDocumentSchema>> {
+    const url = `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`;
+    const doc = (await gGet(url, this.accessToken)) as any;
+    const text =
+      doc.body?.content
+        ?.flatMap((b: any) => b.paragraph?.elements ?? [])
+        .map((e: any) => e.textRun?.content ?? '')
+        .join('') ?? '';
+    return {
+      id: doc.documentId,
+      title: doc.title,
+      content: text,
+      createdTime: new Date().toISOString(),
+      modifiedTime: new Date().toISOString(),
+    };
+  }
+
+  async updateDocument(
+    documentId: string,
+    options: { content?: string; title?: string },
+  ): Promise<z.infer<typeof GoogleDocumentSchema>> {
+    const requests: any[] = [];
+    if (options.content) {
+      requests.push({
+        insertText: { location: { index: 1 }, text: options.content },
+      });
+    }
+    if (requests.length) {
+      await gPost(
+        `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
+        this.accessToken,
+        { requests },
+      );
+    }
+    const updatedDoc = await this.readDocument(documentId);
+    return { ...updatedDoc, modifiedTime: new Date().toISOString() };
+  }
+
+  // ── Google Sheets ─────────────────────────────────────────
+
+  async createSpreadsheet(options: {
+    title: string;
+    sheetName?: string;
+    data?: string[][];
+  }): Promise<z.infer<typeof GoogleSpreadsheetSchema>> {
+    const body: any = { properties: { title: options.title } };
+    if (options.sheetName) {
+      body.sheets = [{ properties: { title: options.sheetName } }];
+    }
+    const sheet = (await gPost(
+      'https://sheets.googleapis.com/v4/spreadsheets',
+      this.accessToken,
+      body,
+    )) as any;
+    const sheetId = sheet.spreadsheetId;
+    const sheetName = sheet.sheets?.[0]?.properties?.title ?? 'Sheet1';
+    if (options.data?.length) {
+      await gPost(
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(sheetName)}:append?valueInputOption=USER_ENTERED`,
+        this.accessToken,
+        { values: options.data },
+      );
+    }
+    return { id: sheetId, title: options.title, sheetName, data: options.data };
+  }
+
+  async readSpreadsheet(
+    spreadsheetId: string,
+    sheetName?: string,
+  ): Promise<z.infer<typeof GoogleSpreadsheetSchema>> {
+    const meta = (await gGet(
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}`,
+      this.accessToken,
+    )) as any;
+    const sName = sheetName ?? meta.sheets?.[0]?.properties?.title ?? 'Sheet1';
+    const range = (await gGet(
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(sName)}`,
+      this.accessToken,
+    )) as any;
+    return {
+      id: spreadsheetId,
+      title: meta.properties?.title ?? '',
+      sheetName: sName,
+      data: range.values ?? [],
+    };
+  }
+
+  async updateSpreadsheet(
+    spreadsheetId: string,
+    options: { sheetName?: string; data?: string[][] },
+  ): Promise<z.infer<typeof GoogleSpreadsheetSchema>> {
+    const sName = options.sheetName ?? 'Sheet1';
+    if (options.data?.length) {
+      await gPost(
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(sName)}:append?valueInputOption=USER_ENTERED`,
+        this.accessToken,
+        { values: options.data },
+      );
+    }
+    return await this.readSpreadsheet(spreadsheetId, sName);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // Tool Implementation
 // ─────────────────────────────────────────────────────────────
 
@@ -497,11 +875,36 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
   readonly inputSchema = GoogleWorkspaceInputSchema;
 
   private readonly log = new Logger(GoogleWorkspaceTool.name);
-  private readonly provider: MockGoogleWorkspaceProvider;
+  private readonly mockProvider = new MockGoogleWorkspaceProvider();
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly oauthService: OAuthService,
+  ) {
     super();
-    this.provider = new MockGoogleWorkspaceProvider();
+  }
+
+  private async getProvider(
+    tenantId: string,
+  ): Promise<
+    IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider
+  > {
+    try {
+      const connected = await this.oauthService.isGoogleConnected(tenantId);
+      if (connected) {
+        const accessToken =
+          await this.oauthService.getValidGoogleToken(tenantId);
+        if (accessToken) {
+          return new RealGoogleWorkspaceProvider(accessToken);
+        }
+      }
+    } catch {
+      // fall through to mock
+    }
+    return this.mockProvider;
   }
 
   protected async executeImpl(
@@ -509,33 +912,34 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
     context: ToolExecutionContext,
   ): Promise<StructuredToolResult<unknown>> {
     this.logger.log(`Executing Google Workspace action: ${input.action}`);
+    const provider = await this.getProvider(context.tenantId);
 
     try {
       switch (input.action) {
         case 'calendar_events':
-          return await this.handleCalendarEvents(input);
+          return await this.handleCalendarEvents(input, provider);
         case 'calendar_create_event':
-          return await this.handleCalendarCreateEvent(input);
+          return await this.handleCalendarCreateEvent(input, provider);
         case 'calendar_update_event':
-          return await this.handleCalendarUpdateEvent(input);
+          return await this.handleCalendarUpdateEvent(input, provider);
         case 'calendar_delete_event':
-          return await this.handleCalendarDeleteEvent(input);
+          return await this.handleCalendarDeleteEvent(input, provider);
         case 'send_email':
-          return await this.handleSendEmail(input);
+          return await this.handleSendEmail(input, provider);
         case 'read_email':
-          return await this.handleReadEmail(input);
+          return await this.handleReadEmail(input, provider);
         case 'create_document':
-          return await this.handleCreateDocument(input);
+          return await this.handleCreateDocument(input, provider);
         case 'read_document':
-          return await this.handleReadDocument(input);
+          return await this.handleReadDocument(input, provider);
         case 'update_document':
-          return await this.handleUpdateDocument(input);
+          return await this.handleUpdateDocument(input, provider);
         case 'create_spreadsheet':
-          return await this.handleCreateSpreadsheet(input);
+          return await this.handleCreateSpreadsheet(input, provider);
         case 'read_spreadsheet':
-          return await this.handleReadSpreadsheet(input);
+          return await this.handleReadSpreadsheet(input, provider);
         case 'update_spreadsheet':
-          return await this.handleUpdateSpreadsheet(input);
+          return await this.handleUpdateSpreadsheet(input, provider);
         default:
           throw new Error(`Unknown action: ${input.action}`);
       }
@@ -554,8 +958,12 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleCalendarEvents(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
-    const events = await this.provider.listEvents({
+    const events = await provider.listEvents({
       calendarId: input.calendarId,
       maxResults: 10,
     });
@@ -568,6 +976,10 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleCalendarCreateEvent(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.title || !input.startTime || !input.endTime) {
       throw new Error(
@@ -575,7 +987,7 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
       );
     }
 
-    const event = await this.provider.createEvent({
+    const event = await provider.createEvent({
       calendarId: input.calendarId,
       summary: input.title,
       description: input.description,
@@ -593,12 +1005,16 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleCalendarUpdateEvent(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.eventId) {
       throw new Error('eventId is required for calendar_update_event');
     }
 
-    const event = await this.provider.updateEvent(input.eventId, {
+    const event = await provider.updateEvent(input.eventId, {
       calendarId: input.calendarId,
       summary: input.title,
       description: input.description,
@@ -615,12 +1031,16 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleCalendarDeleteEvent(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.eventId) {
       throw new Error('eventId is required for calendar_delete_event');
     }
 
-    await this.provider.deleteEvent(input.eventId, input.calendarId);
+    await provider.deleteEvent(input.eventId, input.calendarId);
 
     return {
       success: true,
@@ -630,12 +1050,16 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleSendEmail(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.to || !input.subject || !input.body) {
       throw new Error('to, subject, and body are required for send_email');
     }
 
-    const result = await this.provider.sendEmail({
+    const result = await provider.sendEmail({
       to: input.to,
       subject: input.subject,
       body: input.body,
@@ -649,12 +1073,16 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleReadEmail(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.emailId) {
       throw new Error('emailId is required for read_email');
     }
 
-    const email = await this.provider.readEmail(input.emailId);
+    const email = await provider.readEmail(input.emailId);
 
     return {
       success: true,
@@ -664,12 +1092,16 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleCreateDocument(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.title) {
       throw new Error('title is required for create_document');
     }
 
-    const document = await this.provider.createDocument({
+    const document = await provider.createDocument({
       title: input.title,
       content: input.documentContent,
     });
@@ -682,12 +1114,16 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleReadDocument(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.documentId) {
       throw new Error('documentId is required for read_document');
     }
 
-    const document = await this.provider.readDocument(input.documentId);
+    const document = await provider.readDocument(input.documentId);
 
     return {
       success: true,
@@ -697,12 +1133,16 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleUpdateDocument(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.documentId) {
       throw new Error('documentId is required for update_document');
     }
 
-    const document = await this.provider.updateDocument(input.documentId, {
+    const document = await provider.updateDocument(input.documentId, {
       content: input.documentContent,
       title: input.title,
     });
@@ -715,12 +1155,16 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleCreateSpreadsheet(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.title) {
       throw new Error('title is required for create_spreadsheet');
     }
 
-    const spreadsheet = await this.provider.createSpreadsheet({
+    const spreadsheet = await provider.createSpreadsheet({
       title: input.title,
       sheetName: input.sheetName,
       data:
@@ -735,12 +1179,16 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleReadSpreadsheet(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.spreadsheetId) {
       throw new Error('spreadsheetId is required for read_spreadsheet');
     }
 
-    const spreadsheet = await this.provider.readSpreadsheet(
+    const spreadsheet = await provider.readSpreadsheet(
       input.spreadsheetId,
       input.sheetName,
     );
@@ -753,20 +1201,20 @@ export class GoogleWorkspaceTool extends BaseStructuredTool {
 
   private async handleUpdateSpreadsheet(
     input: GoogleWorkspaceInput,
+    provider: IGoogleCalendarProvider &
+      IGoogleGmailProvider &
+      IGoogleDocsProvider &
+      IGoogleSheetsProvider,
   ): Promise<StructuredToolResult<unknown>> {
     if (!input.spreadsheetId) {
       throw new Error('spreadsheetId is required for update_spreadsheet');
     }
 
-    const spreadsheet = await this.provider.updateSpreadsheet(
-      input.spreadsheetId,
-      {
-        sheetName: input.sheetName,
-        data:
-          input.data?.map((row) => row.map((cell) => String(cell))) ??
-          undefined,
-      },
-    );
+    const spreadsheet = await provider.updateSpreadsheet(input.spreadsheetId, {
+      sheetName: input.sheetName,
+      data:
+        input.data?.map((row) => row.map((cell) => String(cell))) ?? undefined,
+    });
 
     return {
       success: true,

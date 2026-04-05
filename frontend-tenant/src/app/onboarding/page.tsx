@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
@@ -47,14 +47,22 @@ export default function OnboardingPage() {
   } = useOnboardingStore();
   const [completing, setCompleting] = useState(false);
 
-  // Guard: must be logged in
+  // Detect ?rerun=1 from the URL (client-only, read once on mount)
+  const isRerunRef = useRef(false);
+  useEffect(() => {
+    isRerunRef.current =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("rerun") === "1";
+  }, []);
+
+  // Guard: must be logged in; re-run skips the tenantId redirect
   useEffect(() => {
     if (!_hasHydrated) return;
     if (!isAuthenticated) {
       router.replace("/login");
       return;
     }
-    if (user?.tenantId) {
+    if (user?.tenantId && !isRerunRef.current) {
       router.replace("/dashboard");
       return;
     }

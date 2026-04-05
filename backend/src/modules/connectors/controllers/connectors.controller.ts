@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Public } from '../../../common/decorators/roles.decorator';
 import { ConnectorService } from '../services/connector.service';
 import {
   RegisterConnectorDto,
@@ -97,6 +98,7 @@ export class ConnectorsController {
    * Exchanges code for tokens and persists them encrypted.
    */
   @Get('oauth/hubspot/callback')
+  @Public()
   async oauthHubSpotCallback(
     @Query('code') code?: string,
     @Query('state') state?: string,
@@ -112,6 +114,85 @@ export class ConnectorsController {
       state,
       redirectUri: redirect,
     });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Google OAuth - Per-Tenant Authorization
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * GET /v1/connectors/oauth/google/authorize
+   * Returns an authorization URL for Google OAuth.
+   * Each tenant gets their own OAuth flow for complete data isolation.
+   */
+  @Get('oauth/google/authorize')
+  oauthGoogleAuthorize(
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+    @Query('redirectUri') redirectUri?: string,
+  ) {
+    const tid = this.resolveTenantIdRequired(user, tenantId);
+    const redirect =
+      redirectUri ??
+      process.env.GOOGLE_REDIRECT_URI ??
+      'http://localhost:3000/api/v1/connectors/oauth/google/callback';
+
+    return this.oauthService.authorizeGoogle({
+      tenantId: tid,
+      redirectUri: redirect,
+    });
+  }
+
+  /**
+   * GET /v1/connectors/oauth/google/callback
+   * Exchanges code for tokens and persists them per-tenant.
+   */
+  @Get('oauth/google/callback')
+  @Public()
+  async oauthGoogleCallback(
+    @Query('code') code?: string,
+    @Query('state') state?: string,
+    @Query('redirectUri') redirectUri?: string,
+  ) {
+    if (!code || !state) throw new BadRequestException('Missing code/state');
+    const redirect =
+      redirectUri ??
+      process.env.GOOGLE_REDIRECT_URI ??
+      'http://localhost:3000/api/v1/connectors/oauth/google/callback';
+
+    return this.oauthService.callbackGoogle({
+      code,
+      state,
+      redirectUri: redirect,
+    });
+  }
+
+  /**
+   * GET /v1/connectors/oauth/google/status
+   * Check if Google is connected for a tenant
+   */
+  @Get('oauth/google/status')
+  async oauthGoogleStatus(
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    const tid = this.resolveTenantIdRequired(user, tenantId);
+    const isConnected = await this.oauthService.isGoogleConnected(tid);
+    return { connected: isConnected, tenantId: tid };
+  }
+
+  /**
+   * POST /v1/connectors/oauth/google/refresh
+   * Refresh Google OAuth token
+   */
+  @Post('oauth/google/refresh')
+  async oauthGoogleRefresh(
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    const tid = this.resolveTenantIdRequired(user, tenantId);
+    const refreshed = await this.oauthService.refreshGoogleToken(tid);
+    return { success: refreshed, tenantId: tid };
   }
 
   /** GET /v1/connectors */

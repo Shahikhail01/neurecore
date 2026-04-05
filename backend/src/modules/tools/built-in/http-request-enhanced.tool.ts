@@ -7,12 +7,66 @@
 
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
+import { URL } from 'url';
 import { BaseStructuredTool } from '../structured-tool.base';
 import {
   ToolCategory,
   StructuredToolResult,
   ToolExecutionContext,
 } from '../interfaces/structured-tool.interface';
+
+/**
+ * SSRF guard — rejects requests targeting private/loopback addresses.
+ * Blocks: loopback, link-local, private RFC-1918, any non-http(s) scheme.
+ */
+function assertSsrfSafe(rawUrl: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('Invalid URL');
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Disallowed URL scheme: ${parsed.protocol}`);
+  }
+
+  const host = parsed.hostname.toLowerCase();
+
+  // Reject localhost / loopback names
+  if (host === 'localhost' || host === '0.0.0.0') {
+    throw new Error('Requests to localhost are not allowed');
+  }
+
+  // Reject IPv6 loopback / link-local / unique-local
+  if (host.startsWith('[')) {
+    const ipv6 = host.slice(1, -1).toLowerCase();
+    if (
+      ipv6 === '::1' ||
+      ipv6.startsWith('fc') ||
+      ipv6.startsWith('fd') ||
+      ipv6.startsWith('fe80')
+    ) {
+      throw new Error('Requests to private IPv6 addresses are not allowed');
+    }
+  }
+
+  // Reject private IPv4 RFC-1918 and special ranges
+  const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const [, a, b] = ipv4Match.map(Number);
+    if (
+      a === 127 || // loopback
+      a === 10 || // RFC-1918 10/8
+      (a === 172 && b >= 16 && b <= 31) || // RFC-1918 172.16-31/12
+      (a === 192 && b === 168) || // RFC-1918 192.168/16
+      (a === 169 && b === 254) || // link-local
+      a === 0 // this network
+    ) {
+      throw new Error('Requests to private IP addresses are not allowed');
+    }
+  }
+}
 
 // Input schema for the HTTP request tool
 export const HttpRequestInputSchema = z.object({
@@ -76,6 +130,9 @@ export class HttpRequestEnhancedTool extends BaseStructuredTool {
     const startTime = Date.now();
 
     try {
+      // SSRF guard — must run before any network I/O
+      assertSsrfSafe(input.url);
+
       const controller = new AbortController();
       const timeoutId = setTimeout(
         () => controller.abort(),

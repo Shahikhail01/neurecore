@@ -7,6 +7,7 @@ import api from "./api";
 import type {
   ProvisioningStatusDto,
   ProvisioningJobDto,
+  WorkspaceProvisioningConfig,
 } from "@/types/onboarding.types";
 
 function unwrap<T>(res: { data: unknown }): T {
@@ -25,9 +26,28 @@ class WorkspaceProvisioningService {
   }
 
   /** GET /workspace-provisioning/config */
-  async getConfig(): Promise<Record<string, unknown> | null> {
+  async getConfig(): Promise<WorkspaceProvisioningConfig | null> {
     const res = await api.get("/workspace-provisioning/config");
-    return unwrap<Record<string, unknown> | null>(res);
+    return unwrap<WorkspaceProvisioningConfig | null>(res);
+  }
+
+  /**
+   * PUT /workspace-provisioning/configure
+   * Creates or updates provisioning config without going through the wizard.
+   */
+  async configure(
+    data: Omit<WorkspaceProvisioningConfig, "enabled">,
+  ): Promise<WorkspaceProvisioningConfig> {
+    const res = await api.put("/workspace-provisioning/configure", data);
+    return unwrap<WorkspaceProvisioningConfig>(res);
+  }
+
+  /**
+   * DELETE /workspace-provisioning/disconnect
+   * Clears OAuth tokens and resets status to PENDING_CONNECT.
+   */
+  async disconnect(): Promise<void> {
+    await api.delete("/workspace-provisioning/disconnect");
   }
 
   /** GET /workspace-provisioning/oauth/google/authorize */
