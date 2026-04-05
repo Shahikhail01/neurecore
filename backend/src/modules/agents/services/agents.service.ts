@@ -13,6 +13,7 @@ import type {
   CreateAgentInput,
   UpdateAgentInput,
 } from '../interfaces/agent.interface';
+import { AgentVersionService } from './agent-version.service';
 
 /**
  * AgentsService
@@ -26,6 +27,7 @@ export class AgentsService implements IAgentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
+    private readonly agentVersionService: AgentVersionService,
   ) {}
 
   async findAll(filter: AgentFilter): Promise<{
@@ -116,7 +118,7 @@ export class AgentsService implements IAgentService {
     tenantId: string,
   ): Promise<unknown> {
     await this.assertOwnership(id, tenantId);
-    return this.prisma.agent.update({
+    const updated = await this.prisma.agent.update({
       where: { id },
       data: {
         ...(input.name && { name: input.name }),
@@ -140,6 +142,26 @@ export class AgentsService implements IAgentService {
         ...(input.isActive !== undefined && { isActive: input.isActive }),
       },
     });
+
+    // Auto-snapshot: fire-and-forget so version failures never block caller.
+    this.agentVersionService
+      .snapshotAgent({
+        agentId: id,
+        tenantId,
+        label: 'Auto-save',
+        changeNote: 'Automatic snapshot on agent update',
+        changedBy: 'system',
+        configSnapshot: this.agentVersionService.buildSnapshot(
+          updated as Record<string, unknown>,
+        ),
+      })
+      .catch((err: unknown) =>
+        this.logger.warn(
+          `Auto-snapshot failed for agent ${id}: ${String(err)}`,
+        ),
+      );
+
+    return updated;
   }
 
   async remove(id: string, tenantId: string): Promise<void> {

@@ -4,9 +4,12 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { AuthController } from './controllers/auth.controller';
+import { SsoController } from './controllers/sso.controller';
+import { ScimController } from './controllers/scim.controller';
 import { AuthService } from './services/auth.service';
 import { TokenService } from './services/token.service';
 import { PasswordService } from './services/password.service';
+import { SsoConfigService } from './services/sso-config.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -30,12 +33,13 @@ import { SecretProviderService } from '../security/providers/secret.provider';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, SsoController, ScimController],
   providers: [
     AuthService,
     TokenService,
     SecretProviderService,
     PasswordService,
+    SsoConfigService,
     JwtStrategy,
     LocalStrategy,
     JwtAuthGuard,

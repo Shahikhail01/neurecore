@@ -1,10 +1,3 @@
-/**
- * Costs Module
- *
- * Cost tracking and budget management for Paperclip integration
- * Following SOLID principles with proper dependency injection
- */
-
 import { Module } from '@nestjs/common';
 import { CostsController } from './costs.controller';
 import { CostsService } from './services/costs.service';
@@ -15,22 +8,19 @@ import {
   PrismaBudgetIncidentRepository,
 } from './repositories/prisma-budget.repository';
 import { AgentsModule } from '../agents/agents.module';
+import { CsvExportService } from '../../shared/services/csv-export.service';
 
 @Module({
   imports: [AgentsModule],
   controllers: [CostsController],
   providers: [
-    // Main service
     CostsService,
-
-    // Cost provider (uses existing LangSmith/LLMFactory)
     LangSmithCostProvider,
-
-    // Repositories
     PrismaCostRecordRepository,
     PrismaBudgetPolicyRepository,
     PrismaBudgetIncidentRepository,
+    CsvExportService,
   ],
-  exports: [CostsService],
+  exports: [CostsService, CsvExportService],
 })
 export class CostsModule {}

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { KpiTile } from '@/components/kpi/KpiTile';
+import HomeHero from '@/components/home/HomeHero';
 import { AreaChart } from '@/components/charts/AreaChart';
 import { BarChart } from '@/components/charts/BarChart';
 import { usePlatformKpis } from '@/hooks/usePlatformKpis';
@@ -76,6 +77,7 @@ export default function OverviewPage() {
   return (
     <AdminShell user={user}>
       <div className="max-w-7xl mx-auto space-y-6">
+        <HomeHero userName={user.firstName ?? user.email ?? 'User'} />
         {/* ── Header ── */}
         <div>
           <h1 className="text-xl font-semibold text-zinc-100">Platform Overview</h1>

@@ -2,7 +2,180 @@
 
 ## Last Updated
 
-2026-04-04T12:00:00Z (update 24 — LangChain Phase 2: OpenClaw adapter, new tools (12), HITL, pgvector, frontend wiring)
+2026-04-05T00:00:00Z (update 25 — Implementation Plan Phases 2–4 complete: Evaluation framework, Workflow canvas, Multi-agent orchestration, Knowledge Spaces, Maturity indicator, CSV/PDF exports, Routines, Agent Packs, SCIM/SSO, NL→Report, ArtifactViewer, Dashboard maturity card, Agent detail page)
+
+---
+
+## Update 25 — Implementation Plan Phases 2–4 Complete (April 5, 2026)
+
+**Build result**: 355 files compiled with SWC (829.81ms), 0 TypeScript errors ✅
+
+---
+
+### Phase 2 — Execution Excellence & UX Flagship ✅ COMPLETE
+
+#### 2.1 — Agent Staging Environment + Evaluation Runs
+
+**Backend** (`backend/src/modules/agents/`):
+
+- `services/evaluation.service.ts` — `startEvaluation(agentId, dto)`, `getRunsForAgent(agentId)`, `getRunById(runId)`, `promoteToProduction(agentId, runId)`. Heuristic scoring (exact match on expectedOutput, else partial length-ratio). Sets `deploymentMode: PRODUCTION` on promote.
+- `interfaces/evaluation.interface.ts` — `IEvaluationRepository`, `CreateEvaluationInput`, `EvaluationRunRecord`, `TestResult`
+- `repositories/prisma-evaluation.repository.ts` — Prisma implementation of `IEvaluationRepository`. Import path: `../../../infrastructure/database/prisma.service`
+- `dto/evaluation.dto.ts` — `StartEvaluationDto`, `TestCaseDto`
+- `agents.controller.ts` — added `POST /agents/:id/evaluation-runs`, `GET /agents/:id/evaluation-runs`, `GET /agents/evaluation-runs/:runId`, `POST /agents/:id/promote`, `POST /agents/:id/clone-to-staging`
+
+**Frontend** (`frontend-tenant/src/app/(app)/agents/[id]/page.tsx`) — **NEW FILE**:
+
+- 4 tabs: Config, Versions, Staging & Eval, Team
+- Config tab: `GET /agents/:id`, `PATCH /agents/:id`, auto-snapshot on save
+- Versions tab: links to `/agents/:id/versions`
+- Staging & Eval tab: clone-to-staging, multi-line test case input (`Input >> Expected`), eval run list with pass-rate badge, promote button (enabled when passRate ≥ 0.8)
+- Team tab: `GET /workflows/supervisors/:id/workers`, worker roster
+
+#### 2.2 — Visual Workflow Canvas
+
+- `frontend-tenant/src/app/(app)/workflows/new/page.tsx` — ReactFlow v11 (`reactflow@^11.11.4`) drag-and-drop canvas. `NodeTypes`: `Start`, `Agent`, `Condition`, `Done`. Inspector panel for node config. Saves via `POST /workflows`. SSR-safe dynamic import.
+- Workflow serialization: `{ nodes: ReactFlowNode[], edges: ReactFlowEdge[] }` stored as JSON in `Workflow.definition`.
+
+#### 2.3 — Supervisor-Worker Agent Orchestration
+
+- `backend/src/modules/orchestration/services/multi-agent-orchestrator.service.ts` — `dispatchSupervisedWorkflow(supervisorId, goal, tenantId)`: finds workers via `supervisorId` FK, fans out sub-tasks, aggregates results. Import fix: `../../../infrastructure/database/prisma.service`.
+- `backend/src/modules/orchestration/orchestration.module.ts` — MultiAgentOrchestratorService registered.
+
+#### 2.4 — Department-Scoped Knowledge Spaces
+
+- `backend/src/modules/knowledge/services/knowledge.service.ts` — `createSpace`, `findAllForTenant`, `addDocument`, `searchDocuments` (pgvector cosine similarity), `grantAccess`, `revokeAccess`, `deleteSpace`. Import fix: `../../../infrastructure/database/prisma.service`.
+- `backend/src/modules/knowledge/dto/knowledge.dto.ts` — `CreateKnowledgeSpaceDto`, `AddDocumentDto`, `GrantAccessDto`, `SearchDocumentsDto`
+- `backend/src/modules/knowledge/knowledge.controller.ts` — CRUD + search endpoints under `GET|POST /knowledge`
+- `backend/src/modules/knowledge/knowledge.module.ts` — module wiring
+
+---
+
+### Phase 3 — Enterprise Experience ✅ COMPLETE
+
+#### 3.1 — Tenant Maturity Indicator
+
+**Backend**:
+
+- `backend/src/modules/analytics/services/maturity.service.ts` — 5 dimensions: Agent Coverage, Task Completion, Goal Achievement, Automation Depth, Multi-Agent Orchestration. Returns `{ overallScore, tier: string, dimensions, computedAt }`. Import fix: `../../../infrastructure/database/prisma.service`.
+- Analytics controller: `GET /analytics/maturity` endpoint
+
+**Frontend** (`frontend-tenant/src/app/(app)/dashboard/page.tsx`):
+
+- Fetches `GET /analytics/maturity` in parallel with agents + tasks
+- Added `MaturityDimension` + `MaturityReport` interfaces
+- Right-panel Maturity Card: tier label, overall progress bar (gradient violet), top-3 dimension mini-bars, "Full report →" link
+
+#### 3.2 — Rich Artifact Outputs
+
+**Backend**:
+
+- `backend/src/shared/services/csv-export.service.ts` — stateless `.toCsv(rows)` method
+- `GET /tasks/export/csv` in `orchestration.controller.ts` — placed BEFORE `GET /` to avoid route collision. Streams `text/csv` response.
+- `GET /costs/export/csv`, `GET /analytics/export/csv` — existing endpoints
+
+**Frontend** (`frontend-tenant/src/components/artifacts/ArtifactViewer.tsx`) — **NEW FILE**:
+
+- MIME-type + heuristic content detection: JSON, CSV, Markdown, PDF (base64 embed), Image, plain text
+- `JsonViewer` — pretty-printed with `JSON.parse`
+- `CsvViewer` — table preview (max 50 rows, sticky headers)
+- `MarkdownViewer` — heading/bold/italic/code/list regex transform, `dangerouslySetInnerHTML`
+- `PdfViewer` — `atob` → `Blob` → `URL.createObjectURL` → `<embed>`
+- `ImageViewer` — base64 or data-URI `<img>`
+- Expand/collapse (fixed overlay) via `Maximize2/Minimize2`
+- Props: `{ content, mimeType?, filename?, className? }`
+
+#### 3.3 — Routines Frontend
+
+- `frontend-tenant/src/app/(app)/routines/page.tsx` — full CRUD page for scheduled agent runs. Create (agent selector, cron expression, name), list, enable/disable toggle, delete. Calls `POST|GET|PATCH|DELETE /routines`.
+
+#### 3.4 — Industry-Specific Agent Packs
+
+**Backend**:
+
+- `backend/src/modules/agents/agent-packs.service.ts` — 3 built-in packs: GTM Pack (5 agents), Customer Support Pack (5 agents), Finance Pack (5 agents). `POST /agent-packs/:id/deploy` creates agent records for the tenant.
+
+**Frontend**:
+
+- `frontend-tenant/src/app/(app)/agents/packs/page.tsx` — Marketplace grid of packs (icon, description, agent count). "Deploy" button locks during request, shows success/error feedback.
+
+---
+
+### Phase 4 — Enterprise Sales Unlock ✅ COMPLETE
+
+#### 4.1 — SCIM Provisioning + Enterprise SSO
+
+**Backend**:
+
+- `backend/src/modules/auth/services/sso-config.service.ts` — `getConfig`, `upsertConfig`, `toggleEnabled`, `getSamlMetadataXml`
+- `backend/src/modules/auth/controllers/sso.controller.ts` — `GET|POST /auth/sso/config`, `POST /auth/sso/config/enable|disable`, `GET /auth/sso/metadata`. All `user.tenantId` calls use `!` non-null assertion (tenantId is guaranteed by JwtAuthGuard for tenant routes).
+- `backend/src/modules/auth/dto/sso.dto.ts` — `CreateSsoConfigDto` with definite assignment (`!`) on `provider`, `entryPoint`, `issuer`.
+- `backend/src/modules/auth/controllers/scim.controller.ts` — Full SCIM 2.0 compliance:
+  - `GET|POST /scim/v2/Users` — list + create
+  - `GET|PUT|PATCH|DELETE /scim/v2/Users/:id` — full user lifecycle
+  - `GET|POST /scim/v2/Groups` — list + create departments
+  - `PATCH|DELETE /scim/v2/Groups/:id` — rename or archive departments
+  - SCIM token guard via `x-scim-token` header
+  - All `user.tenantId` uses `!` assertion
+
+#### 4.2 — Natural Language → Admin UI Generator
+
+**Backend**:
+
+- `backend/src/modules/analytics/services/nl-report.service.ts` — keyword matcher produces `ReportDefinition` from NL input. Runs queries via Prisma (`costRecord.groupBy` on `costCents`, `task.groupBy` on status). Returns `{ definition, data, generatedAt }`.
+- `backend/src/modules/analytics/dto/nl-report.dto.ts` — `NlReportDto` (query field with `!` definite assignment), `ReportDefinition`, `ReportColumn` interfaces.
+- Analytics controller: `POST /analytics/nl-report`
+
+---
+
+### Bug Fixes Applied (April 5, 2026)
+
+| File                                                         | Fix                                                                                |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `knowledge/services/knowledge.service.ts`                    | PrismaService path: `../../shared` → `../../../infrastructure/database`            |
+| `agents/repositories/prisma-evaluation.repository.ts`        | Same PrismaService path fix                                                        |
+| `orchestration/services/multi-agent-orchestrator.service.ts` | Same PrismaService path fix                                                        |
+| `analytics/services/maturity.service.ts`                     | Same PrismaService path fix                                                        |
+| `auth/dto/sso.dto.ts`                                        | Added `!` definite assignment to `provider`, `entryPoint`, `issuer`                |
+| `auth/controllers/sso.controller.ts`                         | Non-null asserted all 5 `user.tenantId` usages                                     |
+| `auth/controllers/scim.controller.ts`                        | Non-null asserted all 4 `user.tenantId` usages in Group handlers                   |
+| `analytics/dto/nl-report.dto.ts`                             | Added `!` to `query` property                                                      |
+| `analytics/services/nl-report.service.ts`                    | `_sum.amount` → `_sum?.costCents` (matches actual Prisma schema field `costCents`) |
+
+### Canonical PrismaService Import Path
+
+```typescript
+// CORRECT — always use this:
+import { PrismaService } from "../../../infrastructure/database/prisma.service";
+// (adjust relative depth as needed)
+
+// WRONG — this path does not exist:
+import { PrismaService } from "../../../shared/services/prisma.service"; // ❌
+import { PrismaService } from "../../shared/services/prisma.service"; // ❌
+```
+
+### New Files Created (Phase 2–4)
+
+| File                                                                      | Purpose                                          |
+| ------------------------------------------------------------------------- | ------------------------------------------------ |
+| `frontend-tenant/src/app/(app)/agents/[id]/page.tsx`                      | Agent detail — Config/Versions/Staging/Team tabs |
+| `frontend-tenant/src/components/artifacts/ArtifactViewer.tsx`             | MIME-aware artifact renderer                     |
+| `backend/src/modules/agents/services/evaluation.service.ts`               | Evaluation runs + scoring                        |
+| `backend/src/modules/agents/repositories/prisma-evaluation.repository.ts` | Eval repo                                        |
+| `backend/src/modules/knowledge/services/knowledge.service.ts`             | Knowledge spaces service                         |
+| `backend/src/modules/knowledge/knowledge.controller.ts`                   | Knowledge REST controller                        |
+| `backend/src/modules/knowledge/knowledge.module.ts`                       | Knowledge DI wiring                              |
+| `backend/src/modules/analytics/services/maturity.service.ts`              | 5-dimension maturity scoring                     |
+| `backend/src/modules/analytics/services/nl-report.service.ts`             | NL → report definition                           |
+| `backend/src/modules/auth/services/sso-config.service.ts`                 | SSO config upsert/toggle                         |
+| `backend/src/modules/auth/controllers/sso.controller.ts`                  | SSO REST endpoints                               |
+| `backend/src/modules/agents/agent-packs.service.ts`                       | 3 built-in agent packs                           |
+| `frontend-tenant/src/app/(app)/agents/packs/page.tsx`                     | Agent packs marketplace                          |
+| `frontend-tenant/src/app/(app)/routines/page.tsx`                         | Routines management                              |
+
+---
+
+## Update 24 — LangChain Phase 2: OpenClaw adapter, new tools (12), HITL, pgvector, frontend wiring
 
 ---
 

@@ -20,10 +20,13 @@ import { ResourceAccessValidator } from './validators/resource-access.validator'
 
 // Providers
 import { SecurityPolicyProvider } from './providers/security-policy.provider';
+import { RegexPiiDetector } from './providers/regex-pii-detector.service';
+import { PiiMaskerService } from './providers/pii-masker.service';
 
 // Services
 import { SecurityInterceptorService } from './security-interceptor.service';
 import { SecurityAuditLoggerService } from './security-audit-logger.service';
+import { PiiMiddlewareService } from './pii-middleware.service';
 
 @Global()
 @Module({
@@ -36,6 +39,11 @@ import { SecurityAuditLoggerService } from './security-audit-logger.service';
 
     // Policy Provider
     SecurityPolicyProvider,
+
+    // PII Detection & Masking
+    RegexPiiDetector,
+    PiiMaskerService,
+    PiiMiddlewareService,
 
     // Core Services
     SecurityInterceptorService,
@@ -51,6 +59,9 @@ import { SecurityAuditLoggerService } from './security-audit-logger.service';
     { provide: 'ISecurityPolicyProvider', useClass: SecurityPolicyProvider },
     { provide: 'ISecurityInterceptor', useClass: SecurityInterceptorService },
     { provide: 'ISecurityAuditLogger', useClass: SecurityAuditLoggerService },
+    { provide: 'IPiiDetector', useClass: RegexPiiDetector },
+    { provide: 'IPiiMasker', useClass: PiiMaskerService },
+    { provide: 'IPiiMiddleware', useClass: PiiMiddlewareService },
   ],
   exports: [
     // Export validators for direct use if needed
@@ -58,6 +69,11 @@ import { SecurityAuditLoggerService } from './security-audit-logger.service';
     CommandPatternValidator,
     ResourceAccessValidator,
     SecurityPolicyProvider,
+
+    // Export PII services
+    RegexPiiDetector,
+    PiiMaskerService,
+    PiiMiddlewareService,
 
     // Export main security service
     SecurityInterceptorService,
@@ -70,6 +86,9 @@ import { SecurityAuditLoggerService } from './security-audit-logger.service';
     'ISecurityPolicyProvider',
     'ISecurityInterceptor',
     'ISecurityAuditLogger',
+    'IPiiDetector',
+    'IPiiMasker',
+    'IPiiMiddleware',
   ],
 })
 export class SecurityModule {}

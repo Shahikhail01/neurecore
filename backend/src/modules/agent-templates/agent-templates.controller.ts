@@ -12,8 +12,10 @@ import {
   ForbiddenException,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { AgentTemplatesService } from './agent-templates.service';
+import { AgentPacksService } from './agent-packs.service';
 import {
   CreateAgentTemplateDto,
   UpdateAgentTemplateDto,
@@ -33,7 +35,10 @@ import { UserRole } from '@prisma/client';
  */
 @Controller({ path: 'agent-templates', version: '1' })
 export class AgentTemplatesController {
-  constructor(private readonly templatesService: AgentTemplatesService) {}
+  constructor(
+    private readonly templatesService: AgentTemplatesService,
+    private readonly packsService: AgentPacksService,
+  ) {}
 
   // ─── Platform (SUPER_ADMIN) ──────────────────────────────────────────────
 
@@ -174,5 +179,26 @@ export class AgentTemplatesController {
   ) {
     if (!user.tenantId) throw new ForbiddenException('Tenant context required');
     return this.templatesService.remove(id, user.tenantId);
+  }
+
+  // ─── Agent Packs (Phase 3.4) ──────────────────────────────────────────────
+
+  /** GET /agent-templates/packs — list all curated agent packs */
+  @Get('packs')
+  listPacks() {
+    return this.packsService.listPacks();
+  }
+
+  /** POST /agent-templates/packs/:packId/install — install a pack to tenant */
+  @Post('packs/:packId/install')
+  @HttpCode(HttpStatus.CREATED)
+  async installPack(
+    @Param('packId') packId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    const pack = this.packsService.getPack(packId);
+    if (!pack) throw new NotFoundException(`Agent pack '${packId}' not found`);
+    return this.packsService.installPack(packId, user.tenantId, user.sub);
   }
 }

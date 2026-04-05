@@ -45,6 +45,7 @@ import { HealthModule } from './modules/health/health.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { WorkspaceProvisioningModule } from './modules/workspace-provisioning/workspace-provisioning.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -127,6 +128,9 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     // Workspace Provisioning — corporate email + cloud folder auto-provisioning
     WorkspaceProvisioningModule,
     ChatModule,
+
+    // Phase 2.4 — Knowledge Spaces
+    KnowledgeModule,
   ],
   providers: [
     // Global rate-limit guard

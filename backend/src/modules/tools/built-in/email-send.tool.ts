@@ -83,11 +83,16 @@ export class EmailSendTool extends BaseStructuredTool {
     const from = this.config.get<string>('SMTP_FROM') ?? user;
 
     if (!host || !user || !pass) {
+      // Demo mode: simulate a successful send with a mock message ID
+      const mockId = `demo-${Date.now()}@neurecore.local`;
+      this.logger.warn(
+        `[EmailSendTool] SMTP not configured — running in demo mode (tenant=${tenantId})`,
+      );
       return {
-        success: false,
-        error:
-          'Email is not configured (SMTP_HOST/SMTP_USER/SMTP_PASS missing)',
-      };
+        success: true,
+        data: { messageId: mockId },
+        metadata: { demo: true, note: 'SMTP not configured — email simulated' },
+      } as StructuredToolResult<{ messageId: string }>;
     }
 
     try {

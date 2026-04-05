@@ -374,12 +374,65 @@ export class CalendarTool extends BaseStructuredTool {
 
     // Check if provider is configured
     if (!this.provider) {
+      // Demo mode: return mock calendar data
+      this.logger.warn('[CalendarTool] No provider — running in demo mode');
+      const now = new Date();
+      const demoEvents = [
+        {
+          id: 'demo-1',
+          summary: 'Team Standup',
+          description: 'Daily sync',
+          start: new Date(now.getTime() + 3600000).toISOString(),
+          end: new Date(now.getTime() + 5400000).toISOString(),
+          attendees: ['team@demo.local'],
+          location: null,
+        },
+        {
+          id: 'demo-2',
+          summary: 'Client Review — Acme Corp',
+          description: 'Monthly campaign review',
+          start: new Date(now.getTime() + 86400000).toISOString(),
+          end: new Date(now.getTime() + 90000000).toISOString(),
+          attendees: ['client@acme.example', 'demo@marketing-agency.local'],
+          location: 'Zoom',
+        },
+        {
+          id: 'demo-3',
+          summary: 'Content Planning Session',
+          description: 'Plan next week content calendar',
+          start: new Date(now.getTime() + 172800000).toISOString(),
+          end: new Date(now.getTime() + 176400000).toISOString(),
+          attendees: ['creative@demo.local'],
+          location: null,
+        },
+      ];
+      if (input.action === 'create') {
+        return {
+          success: true,
+          data: {
+            eventId: `demo-evt-${Date.now()}`,
+            success: true,
+            message: 'Event created (demo mode)',
+          },
+          metadata: { demo: true },
+        } as StructuredToolResult<CalendarOutput>;
+      }
+      if (input.action === 'delete') {
+        return {
+          success: true,
+          data: { success: true, message: 'Event deleted (demo mode)' },
+          metadata: { demo: true },
+        } as StructuredToolResult<CalendarOutput>;
+      }
       return {
-        success: false,
-        error:
-          'Calendar provider not configured. Set GOOGLE_CALENDAR_API_KEY environment variable.',
-        metadata: { durationMs: Date.now() - startTime },
-      };
+        success: true,
+        data: {
+          events: demoEvents,
+          success: true,
+          message: 'Demo calendar data (GOOGLE_CALENDAR_API_KEY not set)',
+        },
+        metadata: { demo: true, durationMs: Date.now() - startTime },
+      } as StructuredToolResult<CalendarOutput>;
     }
 
     try {

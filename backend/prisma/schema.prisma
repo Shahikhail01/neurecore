@@ -175,6 +175,34 @@ enum BillingEventType {
   TAX_APPLIED
 }
 
+// ─── Phase Implementation (2/3/4) Enums ─────────────────────────────────────
+
+enum DeploymentMode {
+  PRODUCTION
+  STAGING
+}
+
+enum EvaluationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum KnowledgeSourceType {
+  MANUAL
+  GOOGLE_DRIVE
+  NOTION
+  CONFLUENCE
+  GITHUB
+  SLACK
+}
+
+enum SsoProvider {
+  SAML
+  OIDC
+}
+
 // ─── Workspace Provisioning Enums ─────────────────────────────────────────
 
 enum ProvisioningProvider {
@@ -342,6 +370,18 @@ model Tenant {
 
   // Workspace provisioning (optional — created when admin selects storage integration in wizard)
   provisioningConfig ProvisioningConfig?
+
+  // Phase 7 back-relations - Agent versions
+  agentVersions AgentVersion[]
+
+  // Phase 2.1 back-relations - Evaluation runs
+  evaluationRuns EvaluationRun[]
+
+  // Phase 2.4 back-relations - Knowledge spaces
+  knowledgeSpaces KnowledgeSpace[]
+
+  // Phase 4.1 back-relations - SSO
+  ssoConfig SsoConfig?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -529,6 +569,17 @@ model Agent {
   // Tenant can toggle selected agents within their tier allocation
   isSelected      Boolean @default(true)
 
+  // Phase 2.1 — staging / deployment mode
+  deploymentMode  DeploymentMode @default(PRODUCTION)
+  stagingParentId String?
+  stagingParent   Agent?  @relation("StagingCopies", fields: [stagingParentId], references: [id])
+  stagingCopies   Agent[] @relation("StagingCopies")
+
+  // Phase 2.3 — supervisor / worker hierarchy
+  supervisorId String?
+  supervisor   Agent?  @relation("WorkerAgents", fields: [supervisorId], references: [id])
+  workers      Agent[] @relation("WorkerAgents")
+
   departmentId String?
   department   Department? @relation("DepartmentAgents", fields: [departmentId], references: [id])
 
@@ -548,6 +599,15 @@ model Agent {
   // Phase 5 back-relations - Goals
   goals Goal[]
 
+  // Phase 7 back-relations - Version history
+  versions AgentVersion[]
+
+  // Phase 2.1 back-relations - Evaluation runs
+  evaluationRuns EvaluationRun[]
+
+  // Phase 2.4 back-relations - Knowledge access
+  knowledgeAccess AgentKnowledgeAccess[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -556,7 +616,32 @@ model Agent {
   @@index([type])
   @@index([departmentId])
   @@index([tierAgentPoolId])
+  @@index([stagingParentId])
+  @@index([supervisorId])
   @@map("agents")
+}
+
+// ─── Agent Version (Phase 7: Version Control + Rollback) ──────────────────
+
+model AgentVersion {
+  id            String  @id @default(uuid())
+  agentId       String
+  agent         Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tenantId      String
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  label         String?
+  configSnapshot Json   // full config snapshot: name, model, systemPrompt, instructions, permissions, config
+  changedBy     String  // userId or "system"
+  changeNote    String? @db.Text
+  isActive      Boolean @default(false) // true = currently deployed version
+
+  createdAt DateTime @default(now())
+
+  @@unique([agentId, versionNumber])
+  @@index([agentId])
+  @@index([tenantId])
+  @@map("agent_versions")
 }
 
 // ─── Task ─────────────────────────────────────────────────────────────────
@@ -738,6 +823,9 @@ model Department {
   // Phase 5 back-relations - Goals & Projects
   goals    Goal[]
   projects Project[]
+
+  // Phase 2.4 back-relations - Knowledge spaces
+  knowledgeSpaces KnowledgeSpace[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1497,4 +1585,119 @@ model ProvisioningJob {
 
   @@index([configId])
   @@map("provisioning_jobs")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 2.1 — Agent Staging + Evaluation Runs
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A test run executed against a staging agent copy before promoting to production.
+model EvaluationRun {
+  id           String           @id @default(uuid())
+  agentId      String
+  agent        Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tenantId     String
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  status       EvaluationStatus @default(PENDING)
+  /// Array of { input, expectedOutput, … } test case objects
+  testCases    Json             @default("[]")
+  /// Array of { testCaseIndex, passed, actualOutput, latencyMs } results
+  results      Json?
+  /// Overall pass-rate 0–100
+  scoreOverall Decimal?         @db.Decimal(5, 2)
+  runBy        String
+  notes        String?          @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([tenantId])
+  @@map("evaluation_runs")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 2.4 — Knowledge Spaces
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A named collection of documents accessible to one or more agents.
+model KnowledgeSpace {
+  id           String      @id @default(uuid())
+  name         String
+  description  String?     @db.Text
+  tenantId     String
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  documents KnowledgeDocument[]
+  agents    AgentKnowledgeAccess[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([departmentId])
+  @@map("knowledge_spaces")
+}
+
+/// A single document (text chunk) stored in a knowledge space.
+/// The embedding column requires the pgvector extension (enabled on Neon).
+model KnowledgeDocument {
+  id         String              @id @default(uuid())
+  spaceId    String
+  space      KnowledgeSpace      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  title      String
+  content    String              @db.Text
+  sourceType KnowledgeSourceType @default(MANUAL)
+  sourceUrl  String?
+  /// pgvector embedding — use @db.VectorType after installing prisma-pg-vector or raw SQL for now
+  metadata   Json                @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId])
+  @@map("knowledge_documents")
+}
+
+/// Many-to-many: which agents can read which knowledge spaces.
+model AgentKnowledgeAccess {
+  id      String         @id @default(uuid())
+  agentId String
+  agent   Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  spaceId String
+  space   KnowledgeSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, spaceId])
+  @@index([agentId])
+  @@index([spaceId])
+  @@map("agent_knowledge_access")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 4.1 — SSO Config scaffold
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Per-tenant SSO configuration. Supports SAML 2.0 and OIDC.
+model SsoConfig {
+  id         String      @id @default(uuid())
+  tenantId   String      @unique
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider   SsoProvider
+  /// SAML: IdP single sign-on URL
+  entryPoint String?
+  /// SAML: IdP entity ID
+  issuer     String?
+  /// SAML: X.509 certificate (PEM)
+  cert       String?     @db.Text
+  /// OIDC: client_id
+  clientId   String?
+  isEnabled  Boolean     @default(false)
+  metadata   Json        @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sso_configs")
 }

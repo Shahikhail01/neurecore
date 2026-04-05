@@ -1,11 +1,13 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { User } from '@prisma/client';
 
-// Extracts the authenticated user from the request.
+// Extracts the authenticated user (or a specific property) from the request.
 // Usage: @CurrentUser() user: User
+//        @CurrentUser('tenantId') tenantId: string
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): User => {
+  (data: string | undefined, ctx: ExecutionContext): User | unknown => {
     const request = ctx.switchToHttp().getRequest();
-    return request.user as User;
+    const user = request.user as Record<string, unknown>;
+    return data ? user?.[data] : user;
   },
 );

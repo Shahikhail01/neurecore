@@ -16,15 +16,21 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CostsService } from './services/costs.service';
+import { CsvExportService } from '../../shared/services/csv-export.service';
 import { CreateBudgetPolicyDto, UpdateBudgetPolicyDto } from './dto/cost.dto';
 
 @Controller('costs')
 @UseGuards(JwtAuthGuard)
 export class CostsController {
-  constructor(private readonly costsService: CostsService) {}
+  constructor(
+    private readonly costsService: CostsService,
+    private readonly csvExportService: CsvExportService,
+  ) {}
 
   /**
    * Get cost summary for tenant
@@ -248,5 +254,43 @@ export class CostsController {
     const end = endDate ? new Date(endDate) : new Date();
 
     return this.costsService.getCostByModelBreakdown(tenantId, start, end);
+  }
+
+  /**
+   * GET /api/v1/costs/export/csv — download cost records as CSV (Phase 3.2)
+   */
+  @Get('export/csv')
+  async exportCsv(
+    @Req() req: { user: { tenantId: string } },
+    @Res() res: Response,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const tenantId = req.user.tenantId;
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+
+    const summary = await this.costsService.getTenantCostSummary(
+      tenantId,
+      start,
+      end,
+    );
+    const rows = [
+      {
+        metric: 'totalCost',
+        value: String((summary as Record<string, unknown>)['totalCost'] ?? ''),
+        start: start.toISOString(),
+        end: end.toISOString(),
+      },
+    ];
+    const csv = this.csvExportService.toCsv(rows);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="costs-${start.toISOString().slice(0, 10)}-${end.toISOString().slice(0, 10)}.csv"`,
+    );
+    res.send(csv);
   }
 }

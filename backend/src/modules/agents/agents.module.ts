@@ -15,6 +15,10 @@ import { AgentStreamingController } from './streaming/agent-streaming.controller
 import { OfficialAgentGraph } from './langgraph/langgraph-official';
 import { AgentCheckpointService } from './langgraph/checkpoint.service';
 import { SecurityModule } from './security/security.module';
+import { AgentVersionService } from './services/agent-version.service';
+import { PrismaAgentVersionRepository } from './repositories/prisma-agent-version.repository';
+import { EvaluationService } from './services/evaluation.service';
+import { PrismaEvaluationRepository } from './repositories/prisma-evaluation.repository';
 
 /**
  * AgentsModule
@@ -28,7 +32,7 @@ import { SecurityModule } from './security/security.module';
     ToolsModule,
     GovernanceModule,
     ModelsModule,
-    SecurityModule, // Security interceptors for tool validation
+    SecurityModule,
   ],
   controllers: [
     AgentsController,
@@ -44,6 +48,12 @@ import { SecurityModule } from './security/security.module';
     AgentStreamingService,
     OfficialAgentGraph,
     AgentCheckpointService,
+    PrismaAgentVersionRepository,
+    AgentVersionService,
+    // Phase 2.1 — Evaluation
+    PrismaEvaluationRepository,
+    { provide: 'IEvaluationRepository', useClass: PrismaEvaluationRepository },
+    EvaluationService,
   ],
   exports: [
     AgentsService,
@@ -54,6 +64,8 @@ import { SecurityModule } from './security/security.module';
     AgentStreamingService,
     OfficialAgentGraph,
     AgentCheckpointService,
+    AgentVersionService,
+    EvaluationService,
   ],
 })
 export class AgentsModule {}

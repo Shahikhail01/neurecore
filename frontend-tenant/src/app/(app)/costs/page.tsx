@@ -1,115 +1,524 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { DollarSign, TrendingDown, Calendar, Filter } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import {
+  DollarSign,
+  Zap,
+  BarChart2,
+  ShieldAlert,
+  RefreshCw,
+  TrendingUp,
+} from "lucide-react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import api from "@/services/api";
+import { cn } from "@/lib/utils";
 
-interface CostEntry {
-  id: string;
-  description: string;
-  amount: number;
-  category: string;
-  date: string;
-  agent?: string;
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface TimelinePoint {
+  timestamp: string;
+  costCents: number;
+  inputTokens: number;
+  outputTokens: number;
 }
 
+interface CostSummary {
+  totalCostCents: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  recordCount: number;
+  byModel?: Record<string, number>;
+  byProvider?: Record<string, number>;
+  timeline?: TimelinePoint[];
+}
+
+interface AgentCostRow {
+  agentId: string;
+  agentName?: string;
+  totalCostCents: number;
+  recordCount: number;
+}
+
+interface BudgetPolicy {
+  id: string;
+  scope: string;
+  scopeId?: string;
+  limitCents: number;
+  windowDays: number;
+  isActive: boolean;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const fmtUsd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+const fmtK = (n: number) =>
+  n >= 1_000_000
+    ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000
+      ? `${(n / 1_000).toFixed(1)}K`
+      : String(n);
+
+function dateRange(daysBack: number): { startDate: string; endDate: string } {
+  const end = new Date();
+  const start = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+  return {
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+  };
+}
+
+// ─── Cards component ──────────────────────────────────────────────────────────
+
+interface StatCardProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+}
+
+function StatCard({ icon, label, value, sub, accent }: StatCardProps) {
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-[var(--text-secondary)]">{label}</span>
+        <span
+          className={cn(
+            "w-7 h-7 rounded-lg flex items-center justify-center",
+            accent ?? "bg-zinc-800",
+          )}
+        >
+          {icon}
+        </span>
+      </div>
+      <p
+        className={cn(
+          "text-2xl font-bold tracking-tight",
+          accent ? "text-green-400" : "text-[var(--text-primary)]",
+        )}
+      >
+        {value}
+      </p>
+      {sub && <p className="text-[11px] text-[var(--text-secondary)]">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function CostsPage() {
-  const [costs, setCosts] = useState<CostEntry[]>([]);
+  const [summary, setSummary] = useState<CostSummary | null>(null);
+  const [agentRows, setAgentRows] = useState<AgentCostRow[]>([]);
+  const [budgets, setBudgets] = useState<BudgetPolicy[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [rangeDays, setRangeDays] = useState(30);
+
+  const load = useCallback(
+    async (showSpinner = true) => {
+      if (showSpinner) setLoading(true);
+      else setRefreshing(true);
+
+      const { startDate, endDate } = dateRange(rangeDays);
+
+      const [summaryRes, agentRes, budgetRes] = await Promise.allSettled([
+        api.get("/costs/summary", { params: { startDate, endDate } }),
+        api.get("/costs/records", {
+          params: { startDate, endDate, limit: 200 },
+        }),
+        api.get("/costs/budgets"),
+      ]);
+
+      if (summaryRes.status === "fulfilled") {
+        const d = summaryRes.value.data;
+        setSummary(d?.data?.data ?? d?.data ?? d ?? null);
+      }
+
+      if (agentRes.status === "fulfilled") {
+        const list: unknown[] = (() => {
+          const d = agentRes.value.data;
+          const raw = d?.data?.data ?? d?.data ?? d ?? [];
+          return Array.isArray(raw) ? raw : [];
+        })();
+
+        // Aggregate by agentId client-side
+        const map = new Map<string, AgentCostRow>();
+        for (const r of list) {
+          const rec = r as Record<string, unknown>;
+          const id = String(rec.agentId ?? "unknown");
+          const prev = map.get(id) ?? {
+            agentId: id,
+            agentName: rec.agentName as string | undefined,
+            totalCostCents: 0,
+            recordCount: 0,
+          };
+          map.set(id, {
+            ...prev,
+            totalCostCents: prev.totalCostCents + (Number(rec.costCents) || 0),
+            recordCount: prev.recordCount + 1,
+          });
+        }
+        setAgentRows(
+          [...map.values()].sort((a, b) => b.totalCostCents - a.totalCostCents),
+        );
+      }
+
+      if (budgetRes.status === "fulfilled") {
+        const d = budgetRes.value.data;
+        const raw = d?.data?.data ?? d?.data ?? d ?? [];
+        setBudgets(Array.isArray(raw) ? (raw as BudgetPolicy[]) : []);
+      }
+
+      setLoading(false);
+      setRefreshing(false);
+    },
+    [rangeDays],
+  );
 
   useEffect(() => {
-    api
-      .get("/costs")
-      .catch(() => ({ data: { data: [] } }))
-      .then((res) => {
-        setCosts(res.data?.data ?? res.data ?? []);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    load();
+  }, [load]);
 
-  const total = costs.reduce((sum, c) => sum + (c.amount ?? 0), 0);
+  // Build chart data from timeline
+  const chartData = (summary?.timeline ?? []).map((p) => ({
+    date: new Date(p.timestamp).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
+    cost: +(p.costCents / 100).toFixed(4),
+    tokens: p.inputTokens + p.outputTokens,
+  }));
+
+  const totalTokens =
+    (summary?.totalInputTokens ?? 0) + (summary?.totalOutputTokens ?? 0);
+
+  const topModel = summary?.byModel
+    ? (Object.entries(summary.byModel).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+      "—")
+    : "—";
 
   return (
     <div className="h-full flex flex-col">
+      {/* Header */}
       <div className="flex-shrink-0 px-5 py-4 border-b border-[var(--surface-border)] flex items-center justify-between">
         <div>
           <h1 className="text-base font-semibold text-[var(--text-primary)] flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-green-400" /> Cost Tracker
+            <DollarSign className="w-4 h-4 text-green-400" />
+            Cost Dashboard
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            AI token usage, subscriptions, and operational costs
+            AI token usage &amp; budget tracking
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-[var(--text-secondary)]">
-            Total this month
-          </p>
-          <p className="text-lg font-bold text-green-400">
-            ${total.toFixed(2)}
-          </p>
+
+        <div className="flex items-center gap-2">
+          {/* Range selector */}
+          <div className="flex rounded-md overflow-hidden border border-[var(--surface-border)] text-xs">
+            {[7, 30, 90].map((d) => (
+              <button
+                key={d}
+                onClick={() => setRangeDays(d)}
+                className={cn(
+                  "px-2.5 py-1 transition-colors",
+                  rangeDays === d
+                    ? "bg-violet-600 text-white"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                )}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+          {/* Refresh */}
+          <button
+            onClick={() => load(false)}
+            disabled={refreshing}
+            className="p-1.5 rounded-md border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            <RefreshCw
+              className={cn("w-3.5 h-3.5", refreshing && "animate-spin")}
+            />
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto hide-scrollbar">
+      <div className="flex-1 overflow-y-auto hide-scrollbar p-5 space-y-5">
         {loading ? (
-          Array.from({ length: 5 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-14 mx-4 my-2 rounded-md bg-[var(--surface-overlay)] animate-pulse"
-            />
-          ))
-        ) : costs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <TrendingDown className="w-10 h-10 text-green-500/20 mb-3" />
-            <p className="text-sm font-medium text-[var(--text-secondary)]">
-              No costs tracked yet
-            </p>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
-              Costs accrue as your agents work
-            </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-28 rounded-xl bg-[var(--surface-overlay)] animate-pulse"
+              />
+            ))}
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="sticky top-0 bg-[var(--surface)] border-b border-[var(--surface-border)]">
-              <tr>
-                {["Description", "Category", "Agent", "Date", "Amount"].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-widest text-[var(--text-secondary)]"
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {costs.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-b border-[var(--surface-border)] hover:bg-[var(--surface-raised)] transition-colors"
-                >
-                  <td className="px-4 py-3 text-sm text-[var(--text-primary)]">
-                    {c.description}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-[var(--text-secondary)] capitalize">
-                    {c.category}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-violet-400">
-                    {c.agent ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-[var(--text-secondary)] flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    {c.date ? new Date(c.date).toLocaleDateString() : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium text-green-400">
-                    ${(c.amount ?? 0).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            {/* ── Stat cards ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard
+                icon={<DollarSign className="w-3.5 h-3.5 text-green-400" />}
+                label={`Total spend (${rangeDays}d)`}
+                value={fmtUsd(summary?.totalCostCents ?? 0)}
+                sub={`${summary?.recordCount ?? 0} runs`}
+                accent="bg-green-900/40"
+              />
+              <StatCard
+                icon={<Zap className="w-3.5 h-3.5 text-yellow-400" />}
+                label="Total tokens"
+                value={fmtK(totalTokens)}
+                sub={`In: ${fmtK(summary?.totalInputTokens ?? 0)} · Out: ${fmtK(summary?.totalOutputTokens ?? 0)}`}
+              />
+              <StatCard
+                icon={<BarChart2 className="w-3.5 h-3.5 text-blue-400" />}
+                label="Top model"
+                value={topModel}
+                sub={
+                  summary?.byModel?.[topModel]
+                    ? fmtUsd(summary.byModel[topModel])
+                    : undefined
+                }
+              />
+              <StatCard
+                icon={<ShieldAlert className="w-3.5 h-3.5 text-purple-400" />}
+                label="Budget policies"
+                value={String(budgets.length)}
+                sub={`${budgets.filter((b) => b.isActive).length} active`}
+              />
+            </div>
+
+            {/* ── Spend trend chart ── */}
+            {chartData.length > 0 && (
+              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp className="w-3.5 h-3.5 text-green-400" />
+                  <span className="text-xs font-medium text-[var(--text-primary)]">
+                    Spend Trend
+                  </span>
+                </div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart
+                    data={chartData}
+                    margin={{ top: 4, right: 0, bottom: 0, left: 0 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="costGradient"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#22c55e"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#22c55e"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(255,255,255,0.04)"
+                    />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v: number) => `$${v.toFixed(2)}`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--surface-overlay)",
+                        border: "1px solid var(--surface-border)",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                      formatter={(v: unknown) => [
+                        `$${Number(v).toFixed(4)}`,
+                        "Cost",
+                      ]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="cost"
+                      stroke="#22c55e"
+                      strokeWidth={2}
+                      fill="url(#costGradient)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* ── Per-agent cost table ── */}
+            {agentRows.length > 0 && (
+              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[var(--surface-border)]">
+                  <span className="text-xs font-medium text-[var(--text-primary)]">
+                    Cost by Agent
+                  </span>
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--surface-border)] text-[var(--text-secondary)]">
+                      <th className="text-left px-4 py-2 font-medium">Agent</th>
+                      <th className="text-right px-4 py-2 font-medium">Runs</th>
+                      <th className="text-right px-4 py-2 font-medium">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agentRows.map((row) => (
+                      <tr
+                        key={row.agentId}
+                        className="border-b border-[var(--surface-border)]/50 hover:bg-[var(--surface-border)]/20 transition-colors"
+                      >
+                        <td className="px-4 py-2.5 text-[var(--text-primary)] font-mono">
+                          {row.agentName ?? row.agentId.slice(0, 12) + "…"}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-[var(--text-secondary)]">
+                          {row.recordCount}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-green-400">
+                          {fmtUsd(row.totalCostCents)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* ── Budget policies ── */}
+            {budgets.length > 0 && (
+              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[var(--surface-border)]">
+                  <span className="text-xs font-medium text-[var(--text-primary)]">
+                    Budget Policies
+                  </span>
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--surface-border)] text-[var(--text-secondary)]">
+                      <th className="text-left px-4 py-2 font-medium">Scope</th>
+                      <th className="text-right px-4 py-2 font-medium">
+                        Limit
+                      </th>
+                      <th className="text-right px-4 py-2 font-medium">
+                        Window
+                      </th>
+                      <th className="text-right px-4 py-2 font-medium">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {budgets.map((b) => (
+                      <tr
+                        key={b.id}
+                        className="border-b border-[var(--surface-border)]/50"
+                      >
+                        <td className="px-4 py-2.5 text-[var(--text-primary)]">
+                          <span className="capitalize">
+                            {b.scope.toLowerCase()}
+                          </span>
+                          {b.scopeId && (
+                            <span className="ml-1 text-[var(--text-secondary)] font-mono">
+                              {b.scopeId.slice(0, 8)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-[var(--text-primary)]">
+                          {fmtUsd(b.limitCents)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-[var(--text-secondary)]">
+                          {b.windowDays}d
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <span
+                            className={cn(
+                              "px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                              b.isActive
+                                ? "bg-green-900/40 text-green-300"
+                                : "bg-zinc-800 text-zinc-400",
+                            )}
+                          >
+                            {b.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* ── Model breakdown ── */}
+            {summary?.byModel && Object.keys(summary.byModel).length > 0 && (
+              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] p-4">
+                <p className="text-xs font-medium text-[var(--text-primary)] mb-3">
+                  Cost by Model
+                </p>
+                <div className="flex flex-col gap-2">
+                  {Object.entries(summary.byModel)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([model, cents]) => {
+                      const pct = summary.totalCostCents
+                        ? Math.round((cents / summary.totalCostCents) * 100)
+                        : 0;
+                      return (
+                        <div key={model}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-[var(--text-secondary)]">
+                              {model}
+                            </span>
+                            <span className="text-[var(--text-primary)] font-medium">
+                              {fmtUsd(cents)}{" "}
+                              <span className="text-[var(--text-secondary)] font-normal">
+                                ({pct}%)
+                              </span>
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-[var(--surface-border)]">
+                            <div
+                              className="h-full rounded-full bg-violet-500 transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {!summary && !loading && (
+              <div className="flex flex-col items-center justify-center h-40 text-center gap-2">
+                <DollarSign className="w-8 h-8 text-[var(--text-secondary)]" />
+                <p className="text-sm text-[var(--text-secondary)]">
+                  No cost data yet
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

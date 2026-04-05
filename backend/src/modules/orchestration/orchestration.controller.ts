@@ -12,11 +12,16 @@ import {
   HttpStatus,
   ForbiddenException,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { TasksService } from './services/tasks.service';
+import { CsvExportService } from '../../shared/services/csv-export.service';
 import { WorkflowsService } from './services/workflows.service';
+import { MultiAgentOrchestratorService } from './services/multi-agent-orchestrator.service';
 import { CreateTaskDto, UpdateTaskDto } from './dto/task.dto';
 import { CreateWorkflowDto, UpdateWorkflowDto } from './dto/workflow.dto';
+import { SupervisedWorkflowDto } from './dto/supervised-workflow.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
 import { UserRole } from '@prisma/client';
@@ -28,7 +33,42 @@ import type { TaskStatus, WorkflowStatus } from '@prisma/client';
 
 @Controller({ path: 'tasks', version: '1' })
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(
+    private readonly tasksService: TasksService,
+    private readonly csvExportService: CsvExportService,
+  ) {}
+
+  /** GET /v1/tasks/export/csv — download all tasks as CSV (Phase 3.2) */
+  @Get('export/csv')
+  async exportCsv(
+    @CurrentUser() user: JwtPayload,
+    @Res() res: Response,
+    @Query('status') status?: TaskStatus,
+  ) {
+    if (!user.tenantId && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Tenant context required');
+    }
+    const { data } = await this.tasksService.findAll(user.tenantId, {
+      status,
+      page: 1,
+      limit: 5000,
+    });
+    const rows = (data as Record<string, unknown>[]).map((t) => ({
+      id: t['id'],
+      title: t['title'],
+      status: t['status'],
+      priority: t['priority'],
+      agentId: t['agentId'],
+      createdAt: t['createdAt'],
+    }));
+    const csv = this.csvExportService.toCsv(rows);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="tasks-${new Date().toISOString().slice(0, 10)}.csv"`,
+    );
+    return res.send(csv);
+  }
 
   @Get()
   findAll(
@@ -91,7 +131,10 @@ export class TasksController {
 
 @Controller({ path: 'workflows', version: '1' })
 export class WorkflowsController {
-  constructor(private readonly workflowsService: WorkflowsService) {}
+  constructor(
+    private readonly workflowsService: WorkflowsService,
+    private readonly multiAgentOrchestrator: MultiAgentOrchestratorService,
+  ) {}
 
   private resolveTenantId(user: JwtPayload, tenantId?: string): string {
     if (user.role === UserRole.SUPER_ADMIN) {
@@ -194,5 +237,41 @@ export class WorkflowsController {
   ) {
     const resolvedTenantId = this.resolveTenantId(user, tenantId);
     return this.workflowsService.remove(id, resolvedTenantId);
+  }
+
+  // ─── Supervisor-Worker orchestration (Phase 2.3) ──────────────────────
+
+  /**
+   * POST /workflows/supervised
+   * Start a supervised multi-agent workflow: assign workers under a supervisor.
+   */
+  @Post('supervised')
+  @HttpCode(HttpStatus.ACCEPTED)
+  startSupervisedWorkflow(
+    @Body() dto: SupervisedWorkflowDto,
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    const tid = this.resolveTenantId(user, tenantId ?? dto.tenantId);
+    return this.multiAgentOrchestrator.startSupervisedWorkflow(
+      dto.supervisorId,
+      dto.workerIds,
+      dto.goalDescription,
+      tid,
+    );
+  }
+
+  /**
+   * GET /workflows/supervisors/:supervisorId/workers
+   * List worker agents currently assigned to a supervisor.
+   */
+  @Get('supervisors/:supervisorId/workers')
+  getWorkers(
+    @Param('supervisorId', ParseUUIDPipe) supervisorId: string,
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    const tid = this.resolveTenantId(user, tenantId);
+    return this.multiAgentOrchestrator.getWorkers(supervisorId, tid);
   }
 }

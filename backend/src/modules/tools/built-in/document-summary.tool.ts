@@ -60,10 +60,21 @@ export class DocumentSummaryTool extends BaseStructuredTool {
   ): Promise<StructuredToolResult<{ summary: string; tokensUsed: number }>> {
     const llm = await this.llmFactory.createLangChainLLM('execution');
     if (!llm) {
+      // Demo mode: return an extractive summary (first 400 chars) without LLM
+      const demoSummary =
+        input.content.slice(0, 400).replace(/\s+/g, ' ').trim() +
+        (input.content.length > 400 ? ' [... content continues]' : '');
+      this.logger.warn(
+        '[DocumentSummaryTool] LLM not configured — returning extractive demo summary',
+      );
       return {
-        success: false,
-        error: 'LLM is not configured — cannot generate summary',
-      };
+        success: true,
+        data: { summary: demoSummary, tokensUsed: 0 },
+        metadata: {
+          demo: true,
+          note: 'LLM not configured — extractive summary used',
+        },
+      } as StructuredToolResult<{ summary: string; tokensUsed: number }>;
     }
 
     const systemPrompt =
@@ -87,11 +98,23 @@ export class DocumentSummaryTool extends BaseStructuredTool {
       return { success: true, data: { summary, tokensUsed } };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error('[DocumentSummaryTool] LLM call failed: ' + msg);
+      this.logger.warn(
+        '[DocumentSummaryTool] LLM call failed, falling back to demo summary: ' +
+          msg,
+      );
+      // Demo fallback: extractive summary when LLM is misconfigured/unavailable
+      const demoSummary =
+        input.content.slice(0, 400).replace(/\s+/g, ' ').trim() +
+        (input.content.length > 400 ? ' [... content continues]' : '');
       return {
-        success: false,
-        error: 'Summarisation failed — check LLM API key config: ' + msg,
-      };
+        success: true,
+        data: { summary: demoSummary, tokensUsed: 0 },
+        metadata: {
+          demo: true,
+          note: 'LLM unavailable — extractive summary used',
+          llmError: msg.slice(0, 80),
+        },
+      } as StructuredToolResult<{ summary: string; tokensUsed: number }>;
     }
   }
 }

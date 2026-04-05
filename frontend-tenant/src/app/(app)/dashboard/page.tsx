@@ -13,6 +13,9 @@ import {
   Plus,
   ChevronRight,
   Activity,
+  Bot,
+  Star,
+  Link2,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import api from "@/services/api";
@@ -47,6 +50,16 @@ interface KpiItem {
   trend?: "up" | "down" | "flat";
   color?: string;
 }
+interface MaturityDimension {
+  name: string;
+  score: number;
+  label: string;
+}
+interface MaturityReport {
+  overallScore: number;
+  tier: string;
+  dimensions: MaturityDimension[];
+}
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusDot({ status }: { status: AgentItem["status"] }) {
@@ -72,6 +85,7 @@ export default function DashboardPage() {
   const [agents, setAgents] = useState<AgentItem[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [kpis, setKpis] = useState<KpiItem[]>([]);
+  const [maturity, setMaturity] = useState<MaturityReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [provStatus, setProvStatus] = useState<ProvisioningStatusDto | null>(
     null,
@@ -80,9 +94,10 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [agentsRes, tasksRes] = await Promise.all([
+        const [agentsRes, tasksRes, maturityRes] = await Promise.all([
           api.get("/agents").catch(() => ({ data: { data: [] } })),
           api.get("/tasks").catch(() => ({ data: { data: [] } })),
+          api.get("/analytics/maturity").catch(() => ({ data: null })),
         ]);
 
         // Fetch provisioning status in parallel — never crashes dashboard on error
@@ -203,6 +218,14 @@ export default function DashboardPage() {
             color: "text-blue-400",
           },
         ]);
+
+        const maturityPayload =
+          maturityRes.data?.data?.data ??
+          maturityRes.data?.data ??
+          maturityRes.data;
+        if (maturityPayload?.overallScore !== undefined) {
+          setMaturity(maturityPayload as MaturityReport);
+        }
       } catch {
         // Non-critical: dashboard still renders with empty state
       } finally {
@@ -554,6 +577,62 @@ export default function DashboardPage() {
                 ))
             )}
           </div>
+
+          {/* ── Maturity Card ─────────────────────────────────── */}
+          {maturity && (
+            <div className="px-3 py-2.5 border-b border-[var(--surface-border)] flex-shrink-0">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-secondary)] mb-2 flex items-center gap-1">
+                {maturity.overallScore >= 70 ? (
+                  <Star className="w-3 h-3 text-amber-400" />
+                ) : maturity.overallScore >= 40 ? (
+                  <Link2 className="w-3 h-3 text-violet-400" />
+                ) : (
+                  <Bot className="w-3 h-3 text-zinc-400" />
+                )}
+                AI Maturity
+              </p>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-[var(--text-primary)]">
+                  {maturity.tier}
+                </span>
+                <span className="text-[10px] text-[var(--text-secondary)]">
+                  {maturity.overallScore}/100
+                </span>
+              </div>
+              {/* Overall progress bar */}
+              <div className="h-1.5 rounded-full bg-zinc-800 mb-2 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-600 to-violet-400 transition-all"
+                  style={{ width: `${maturity.overallScore}%` }}
+                />
+              </div>
+              {/* Mini dimension bars */}
+              <div className="space-y-1">
+                {maturity.dimensions.slice(0, 3).map((d) => (
+                  <div key={d.name} className="flex items-center gap-2">
+                    <span className="text-[9px] text-[var(--text-secondary)] w-20 truncate">
+                      {d.name}
+                    </span>
+                    <div className="flex-1 h-1 rounded-full bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-violet-500/60"
+                        style={{ width: `${d.score}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] text-[var(--text-secondary)] w-5 text-right">
+                      {d.score}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <a
+                href="/analytics"
+                className="mt-1.5 block text-[10px] text-violet-400 hover:underline"
+              >
+                Full report →
+              </a>
+            </div>
+          )}
 
           {/* Navigation shortcuts */}
           <div className="flex-1 overflow-y-auto hide-scrollbar px-3 py-2.5">

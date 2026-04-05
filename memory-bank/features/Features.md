@@ -544,5 +544,126 @@ The platform includes a 9-step onboarding wizard for new tenant setup:
 
 ---
 
-_Last Updated: April 4, 2026_
-_Document Version: 1.1 (12 new agent tools added)_
+## Agent Staging & Evaluation (Phase 2.1)
+
+| Feature                   | Description                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Clone to Staging**      | `POST /agents/:id/clone-to-staging` creates an isolated staging copy (`deploymentMode: STAGING`)  |
+| **Evaluation Runs**       | `POST /agents/:id/evaluation-runs` accepts test cases (`input >> expectedOutput`) and scores them |
+| **Heuristic Scoring**     | Exact-match + partial length-ratio scorer; averageScore + passRate stored on run                  |
+| **Promote to Production** | `POST /agents/:id/promote` — enabled when `passRate >= 0.8`; sets `deploymentMode: PRODUCTION`    |
+| **Run History**           | `GET /agents/:id/evaluation-runs` — paginated list with status, passRate, results                 |
+| **Agent Detail Page**     | `/agents/[id]` — 4-tab UI: Config (edit + save), Versions (link), Staging & Eval, Team            |
+
+---
+
+## Visual Workflow Canvas (Phase 2.2)
+
+| Feature                  | Description                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| **Drag-and-drop Canvas** | ReactFlow v11 canvas at `/workflows/new` with Start, Agent, Condition, Done node types |
+| **Inspector Panel**      | Node config panel with label/description editing                                       |
+| **Save Workflow**        | Serialises `nodes + edges` to JSON, sends `POST /workflows`                            |
+| **SSR-safe**             | Dynamic import (`ssr: false`) prevents Next.js hydration issues                        |
+
+---
+
+## Multi-Agent Orchestration (Phase 2.3)
+
+| Feature                       | Description                                                                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Supervisor-Worker Pattern** | `MultiAgentOrchestratorService.dispatchSupervisedWorkflow()` — finds workers via `supervisorId` FK, fans out sub-tasks |
+| **Result Aggregation**        | Collects all worker results and returns aggregated `SupervisedWorkflowResult`                                          |
+| **Team Tab**                  | Agent detail page Team tab calls `GET /workflows/supervisors/:id/workers`                                              |
+
+---
+
+## Department-Scoped Knowledge Spaces (Phase 2.4)
+
+| Feature             | Description                                                             |
+| ------------------- | ----------------------------------------------------------------------- |
+| **Create Space**    | `POST /knowledge` — creates a `KnowledgeSpace` scoped to a department   |
+| **Add Documents**   | `POST /knowledge/:id/documents` — adds text/URL documents with metadata |
+| **Semantic Search** | `GET /knowledge/:id/search?q=...` — pgvector cosine similarity search   |
+| **Access Control**  | Grant/revoke user access per space; `OWNER` vs `VIEWER` roles           |
+| **Delete Space**    | `DELETE /knowledge/:id` (owner only)                                    |
+
+---
+
+## Tenant Maturity Indicator (Phase 3.1)
+
+| Feature            | Description                                                                                          |
+| ------------------ | ---------------------------------------------------------------------------------------------------- |
+| **5 Dimensions**   | Agent Coverage, Task Completion, Goal Achievement, Automation Depth, Multi-Agent Orchestration       |
+| **Tier Labels**    | Beginner / Developing / Proficient / Advanced / Expert (based on overallScore 0–100)                 |
+| **API Endpoint**   | `GET /analytics/maturity` — returns `{ overallScore, tier, dimensions[], computedAt }`               |
+| **Dashboard Card** | Right-panel maturity card on dashboard: tier label, gradient progress bar, top-3 dimension mini-bars |
+
+---
+
+## Rich Artifact Outputs (Phase 3.2)
+
+| Feature               | Description                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| **ArtifactViewer**    | `frontend-tenant/src/components/artifacts/ArtifactViewer.tsx` — renders by MIME type |
+| **JSON Viewer**       | Pretty-printed, syntax-highlighted JSON                                              |
+| **CSV Table**         | Table preview (max 50 rows, sticky headers, alternating rows)                        |
+| **Markdown Renderer** | Headings, bold, italic, code, lists via regex transform                              |
+| **PDF Embed**         | `atob` → Blob → `URL.createObjectURL` → `<embed>`                                    |
+| **Image Viewer**      | Base64 or data-URI `<img>` with `object-fit: contain`                                |
+| **Expand/Collapse**   | Fixed-position overlay mode via `Maximize2` icon                                     |
+| **CSV Export**        | `GET /tasks/export/csv`, `GET /costs/export/csv`, `GET /analytics/export/csv`        |
+
+---
+
+## Routines / Scheduled Runs (Phase 3.3)
+
+| Feature              | Description                                               |
+| -------------------- | --------------------------------------------------------- |
+| **Create Routine**   | `POST /routines` — agent selection, name, cron expression |
+| **List Routines**    | `GET /routines` — table with status, next run             |
+| **Enable / Disable** | `PATCH /routines/:id` toggle                              |
+| **Delete**           | `DELETE /routines/:id`                                    |
+| **Frontend Page**    | `/routines` — full management UI with create form         |
+
+---
+
+## Agent Packs Marketplace (Phase 3.4)
+
+| Feature                   | Description                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------- |
+| **GTM Pack**              | 5 pre-configured agents: SDR, Content Marketer, SEO, Social Media, Campaign Manager           |
+| **Customer Support Pack** | 5 agents: Tier 1 Support, Knowledge Base, Ticket Router, Escalation Manager, Customer Success |
+| **Finance Pack**          | 5 agents: Bookkeeper, Invoice Manager, Expense Analyst, Payroll Assistant, Financial Reporter |
+| **Deploy Pack**           | `POST /agent-packs/:id/deploy` — creates agent records for visiting tenant                    |
+| **Marketplace UI**        | `/agents/packs` — grid with icon, description, agent count, deploy button                     |
+
+---
+
+## SCIM Provisioning + Enterprise SSO (Phase 4.1)
+
+| Feature                   | Description                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------- | ----- | -------------------------- |
+| **SCIM 2.0 Users**        | Full CRUD: `GET                                                                                         | POST /scim/v2/Users`, `GET                       | PUT                         | PATCH | DELETE /scim/v2/Users/:id` |
+| **SCIM 2.0 Groups**       | `GET                                                                                                    | POST /scim/v2/Groups`, `PATCH                    | DELETE /scim/v2/Groups/:id` |
+| **SCIM PATCH Operations** | RFC 7644-compliant Operations array handler for `active`, `displayName` paths                           |
+| **SCIM Soft Delete**      | `DELETE /Users/:id` deactivates (`isActive: false`); `DELETE /Groups/:id` archives (`status: INACTIVE`) |
+| **SSO Config**            | `GET                                                                                                    | POST /auth/sso/config` — upsert SAML/OIDC config |
+| **SSO Toggle**            | `POST /auth/sso/config/enable` / `disable`                                                              |
+| **SAML Metadata**         | `GET /auth/sso/metadata` — returns SP XML metadata                                                      |
+
+---
+
+## Natural Language → Report Generator (Phase 4.2)
+
+| Feature                | Description                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- | ------ | ----- | ------------------------------- |
+| **NL Keyword Matcher** | `POST /analytics/nl-report` — maps keywords (cost, task, agent, workflow) to report definitions                |
+| **Report Definition**  | Returns `{ title, description, metric, groupBy, columns[], chartType }`                                        |
+| **Auto-Query**         | Prisma `groupBy` runs automatically for `costRecords` (by `agentId`, sums `costCents`) and `tasks` (by status) |
+| **Chart Type Hint**    | Returns `chartType: 'bar'                                                                                      | 'line' | 'pie' | 'table'` for frontend rendering |
+
+---
+
+_Last Updated: April 5, 2026_
+_Document Version: 1.2 (Phases 2–4 complete — 10 new feature sections added)_

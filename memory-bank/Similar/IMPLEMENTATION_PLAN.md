@@ -32,23 +32,23 @@
 | Chat module (conversational AI)                         | `modules/chat/`                                 |
 | OpenClaw webhook adapter                                | `modules/ai-gateway/openclaw-adapter.module.ts` |
 
-### Missing / Priority Gaps ❌ (from similar-concept.md)
+### Missing / Priority Gaps (from similar-concept.md)
 
-| #   | Feature                                             | Priority             | Effort |
-| --- | --------------------------------------------------- | -------------------- | ------ |
-| 1   | Agent Version Control + Rollback                    | **P0 — critical**    | M      |
-| 2   | PII Detection + Masking Middleware                  | **P0 — compliance**  | M      |
-| 3   | Per-agent Cost Dashboard (UI)                       | **P0 — trust**       | S      |
-| 4   | Agent Staging Environment + Eval Runs               | **P1**               | L      |
-| 5   | Visual Workflow Canvas (drag-and-drop)              | **P1 — UX flagship** | L      |
-| 6   | Supervisor-Worker Agent Orchestration               | **P1**               | M      |
-| 7   | Department-Scoped Knowledge Spaces                  | **P1**               | M      |
-| 8   | Tenant Maturity Indicator (L1→L4 roadmap)           | **P2**               | S      |
-| 9   | Rich Artifact Outputs (PDF / CSV / Chart)           | **P2**               | M      |
-| 10  | Proactive/Scheduled Runs — Frontend Wiring          | **P2**               | S      |
-| 11  | Industry-Specific Agent Packs (GTM/Support/Finance) | **P2**               | M      |
-| 12  | SCIM Provisioning + Enterprise SSO                  | **P3**               | L      |
-| 13  | Natural Language → Admin UI Generator               | **P3**               | XL     |
+| #   | Feature                                             | Priority             | Effort | Status |
+| --- | --------------------------------------------------- | -------------------- | ------ | ------ |
+| 1   | Agent Version Control + Rollback                    | **P0 — critical**    | M      | ✅     |
+| 2   | PII Detection + Masking Middleware                  | **P0 — compliance**  | M      | ✅     |
+| 3   | Per-agent Cost Dashboard (UI)                       | **P0 — trust**       | S      | ✅     |
+| 4   | Agent Staging Environment + Eval Runs               | **P1**               | L      | ✅     |
+| 5   | Visual Workflow Canvas (drag-and-drop)              | **P1 — UX flagship** | L      | ✅     |
+| 6   | Supervisor-Worker Agent Orchestration               | **P1**               | M      | ✅     |
+| 7   | Department-Scoped Knowledge Spaces                  | **P1**               | M      | ✅     |
+| 8   | Tenant Maturity Indicator (L1→L4 roadmap)           | **P2**               | S      | ✅     |
+| 9   | Rich Artifact Outputs (PDF / CSV / Chart)           | **P2**               | M      | ✅     |
+| 10  | Proactive/Scheduled Runs — Frontend Wiring          | **P2**               | S      | ✅     |
+| 11  | Industry-Specific Agent Packs (GTM/Support/Finance) | **P2**               | M      | ✅     |
+| 12  | SCIM Provisioning + Enterprise SSO                  | **P3**               | L      | ✅     |
+| 13  | Natural Language → Admin UI Generator               | **P3**               | XL     | ✅     |
 
 ---
 
@@ -71,9 +71,9 @@ Each phase is independently deployable. All implementation follows:
 
 ---
 
-## PHASE 1 — Foundation & Trust
+## PHASE 1 — Foundation & Trust ✅ COMPLETE
 
-### Feature 1.1 — Agent Version Control + Rollback
+### Feature 1.1 — Agent Version Control + Rollback ✅
 
 **Why now**: Immediate trust signal. Enterprise buyers demand audit trails and safe rollback.
 
@@ -439,7 +439,7 @@ Key component structure:
 
 ---
 
-### Feature 1.2 — PII Detection + Masking Middleware
+### Feature 1.2 — PII Detection + Masking Middleware ✅
 
 **Why now**: Compliance requirement. Prevents sensitive data from leaking into LLM via tool inputs/outputs.
 
@@ -614,7 +614,7 @@ In `security.module.ts`, add `RegexPiiDetector`, `PiiMaskerService`, `PiiMiddlew
 
 ---
 
-### Feature 1.3 — Per-Agent Cost Dashboard UI
+### Feature 1.3 — Per-Agent Cost Dashboard UI ✅
 
 **Why now**: Infrastructure already exists (`CostRecord`, `BudgetPolicy`). Just needs wiring to frontend.
 
@@ -670,7 +670,7 @@ listBudgetPolicies(): Promise<BudgetPolicy[]>
 
 ---
 
-## PHASE 2 — Execution Excellence & UX Flagship
+## PHASE 2 — Execution Excellence & UX Flagship ✅ COMPLETE
 
 ### Feature 2.1 — Agent Staging Environment + Evaluation Runs
 
@@ -1094,7 +1094,7 @@ In `knowledge-base.tool.ts`, replace any placeholder logic with a call to `Knowl
 
 ---
 
-## PHASE 3 — Enterprise Experience
+## PHASE 3 — Enterprise Experience ✅ COMPLETE
 
 ### Feature 3.1 — Tenant Maturity Indicator (L1→L4 Adoption Roadmap)
 
@@ -1357,7 +1357,7 @@ File: `frontend-tenant/src/app/(app)/agents/packs/page.tsx`
 
 ---
 
-## PHASE 4 — Enterprise Sales Unlock
+## PHASE 4 — Enterprise Sales Unlock ✅ COMPLETE
 
 ### Feature 4.1 — SCIM Provisioning
 
@@ -1563,47 +1563,47 @@ No inline styles. All styling via Tailwind classes. CSS variables for theme toke
 
 ### Phase 1 Sprint Targets (2 weeks)
 
-| Task                                            | Owner    | Done When                                           |
-| ----------------------------------------------- | -------- | --------------------------------------------------- |
-| 1.1 — Agent Versions schema + migration         | Backend  | Migration applied, `pnpm prisma generate` passes    |
-| 1.1 — AgentVersionRepository + Service          | Backend  | `tsc --noEmit` passes, unit tests pass              |
-| 1.1 — Controller endpoints + auto-snapshot hook | Backend  | `GET /agents/:id/versions` returns 200              |
-| 1.1 — Frontend versions page                    | Frontend | Versions tab shows history, rollback modal works    |
-| 1.2 — PII interfaces + RegexPiiDetector         | Backend  | `detect()` unit tests pass for email/phone/SSN      |
-| 1.2 — PiiMiddlewareService integration          | Backend  | Tool inputs with PII are sanitized before LLM call  |
-| 1.3 — Cost dashboard page                       | Frontend | `/costs` page shows spend summary + per-agent table |
+| Task                                            | Owner    | Done When                                           | Status                        |
+| ----------------------------------------------- | -------- | --------------------------------------------------- | ----------------------------- |
+| 1.1 — Agent Versions schema + migration         | Backend  | Migration applied, `pnpm prisma generate` passes    | ✅ Applied to Neon 2026-04-05 |
+| 1.1 — AgentVersionRepository + Service          | Backend  | `tsc --noEmit` passes, unit tests pass              | ✅                            |
+| 1.1 — Controller endpoints + auto-snapshot hook | Backend  | `GET /agents/:id/versions` returns 200              | ✅                            |
+| 1.1 — Frontend versions page                    | Frontend | Versions tab shows history, rollback modal works    | ✅                            |
+| 1.2 — PII interfaces + RegexPiiDetector         | Backend  | `detect()` unit tests pass for email/phone/SSN      | ✅                            |
+| 1.2 — PiiMiddlewareService integration          | Backend  | Tool inputs with PII are sanitized before LLM call  | ✅                            |
+| 1.3 — Cost dashboard page                       | Frontend | `/costs` page shows spend summary + per-agent table | ✅                            |
 
 ### Phase 2 Sprint Targets (3 weeks)
 
-| Task                                  | Done When                                                   |
-| ------------------------------------- | ----------------------------------------------------------- |
-| 2.1 — EvaluationRun schema + service  | `POST /agents/:id/evaluation-runs` returns runs with scores |
-| 2.1 — Frontend staging + eval tab     | Pass rate ≥ 80% flow works end-to-end                       |
-| 2.2 — React Flow canvas setup         | Canvas renders with drag + node config panel                |
-| 2.2 — Serialization + save            | Created workflow appears in `/workflows` list               |
-| 2.3 — Supervisor-worker schema        | `supervisorId` relationship persists                        |
-| 2.3 — MultiAgentOrchestratorService   | Supervisor dispatches sub-tasks to workers                  |
-| 2.4 — KnowledgeSpace schema + service | `searchDocuments()` returns pgvector results                |
+| Task                                  | Done When                                                   | Status |
+| ------------------------------------- | ----------------------------------------------------------- | ------ |
+| 2.1 — EvaluationRun schema + service  | `POST /agents/:id/evaluation-runs` returns runs with scores | ✅     |
+| 2.1 — Frontend staging + eval tab     | Pass rate ≥ 80% flow works end-to-end                       | ✅     |
+| 2.2 — React Flow canvas setup         | Canvas renders with drag + node config panel                | ✅     |
+| 2.2 — Serialization + save            | Created workflow appears in `/workflows` list               | ✅     |
+| 2.3 — Supervisor-worker schema        | `supervisorId` relationship persists                        | ✅     |
+| 2.3 — MultiAgentOrchestratorService   | Supervisor dispatches sub-tasks to workers                  | ✅     |
+| 2.4 — KnowledgeSpace schema + service | `searchDocuments()` returns pgvector results                | ✅     |
 
 ### Phase 3 Sprint Targets (2 weeks)
 
-| Task                                   | Done When                                     |
-| -------------------------------------- | --------------------------------------------- |
-| 3.1 — MaturityService                  | `GET /analytics/maturity` returns level 1–4   |
-| 3.1 — Frontend maturity card           | Dashboard shows L1–L4 indicator               |
-| 3.2 — PDF tool enhancement             | Tool returns base64 PDF for structured data   |
-| 3.2 — CSV export endpoints             | `/tasks/export` returns downloadable CSV      |
-| 3.3 — Routines frontend page           | User can create/manage scheduled runs         |
-| 3.4 — Agent pack seed data             | 3 packs seeded (GTM, Support, Finance)        |
-| 3.4 — Pack deployment + marketplace UI | `POST /agent-packs/:id/deploy` creates agents |
+| Task                                   | Done When                                     | Status |
+| -------------------------------------- | --------------------------------------------- | ------ |
+| 3.1 — MaturityService                  | `GET /analytics/maturity` returns level 1–4   | ✅     |
+| 3.1 — Frontend maturity card           | Dashboard shows L1–L4 indicator               | ✅     |
+| 3.2 — PDF tool enhancement             | Tool returns base64 PDF for structured data   | ✅     |
+| 3.2 — CSV export endpoints             | `/tasks/export` returns downloadable CSV      | ✅     |
+| 3.3 — Routines frontend page           | User can create/manage scheduled runs         | ✅     |
+| 3.4 — Agent pack seed data             | 3 packs seeded (GTM, Support, Finance)        | ✅     |
+| 3.4 — Pack deployment + marketplace UI | `POST /agent-packs/:id/deploy` creates agents | ✅     |
 
 ### Phase 4 Sprint Targets (4 weeks)
 
-| Task                             | Done When                                         |
-| -------------------------------- | ------------------------------------------------- |
-| 4.1 — SCIM endpoints scaffold    | SCIM User CRUD returns SCIM 2.0 compliant JSON    |
-| 4.1 — SSO config + SAML callback | SAML login flow works with test IdP (Okta, Auth0) |
-| 4.2 Sub-A — NL → Report          | Report definition JSON generates, chart renders   |
+| Task                             | Done When                                         | Status |
+| -------------------------------- | ------------------------------------------------- | ------ |
+| 4.1 — SCIM endpoints scaffold    | SCIM User CRUD returns SCIM 2.0 compliant JSON    | ✅     |
+| 4.1 — SSO config + SAML callback | SAML login flow works with test IdP (Okta, Auth0) | ✅     |
+| 4.2 Sub-A — NL → Report          | Report definition JSON generates, chart renders   | ✅     |
 
 ---
 

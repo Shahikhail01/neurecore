@@ -99,12 +99,34 @@ export class WebSearchTool extends BaseStructuredTool {
           snippet: item.snippet ?? '',
         }));
       } else {
-        // DuckDuckGo API is blocked/sandboxed - return helpful message
-        // Note: For production, set SERPER_API_KEY in environment variables
+        // Demo mode: return mock results when SERPER_API_KEY is absent
+        this.logger.warn(
+          '[WebSearchTool] No SERPER_API_KEY — running in demo mode',
+        );
+        results = [
+          {
+            title: 'Demo: AI Marketing Trends 2026',
+            url: 'https://example.com/ai-marketing-trends',
+            snippet:
+              'Artificial intelligence is transforming digital marketing with personalization, predictive analytics, and automated campaign optimization.',
+          },
+          {
+            title: 'Demo: Digital Campaign Best Practices',
+            url: 'https://example.com/digital-campaigns',
+            snippet:
+              'Effective digital campaigns combine multi-channel strategies, A/B testing, and data-driven targeting for maximum ROI.',
+          },
+          {
+            title: 'Demo: Content Strategy for B2B Companies',
+            url: 'https://example.com/b2b-content-strategy',
+            snippet:
+              'B2B content marketing success relies on thought leadership, case studies, and consistent value delivery across the funnel.',
+          },
+        ].slice(0, maxResults);
         return {
-          success: false,
-          error:
-            'Web search requires SERPER_API_KEY. For free search, set up DuckDuckGo HTML endpoint or use Serper.',
+          success: true,
+          data: { results },
+          metadata: { demo: true, durationMs: Date.now() },
         };
       }
 

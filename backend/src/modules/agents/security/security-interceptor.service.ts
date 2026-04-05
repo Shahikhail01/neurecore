@@ -26,6 +26,7 @@ import type {
   ISecurityAuditLogger,
   ISecurityAuditEvent,
 } from './interfaces/security.interfaces';
+import type { IPiiMiddleware } from './interfaces/pii.interfaces';
 
 @Injectable()
 export class SecurityInterceptorService implements ISecurityInterceptor {
@@ -48,6 +49,9 @@ export class SecurityInterceptorService implements ISecurityInterceptor {
     @Optional()
     @Inject('ISecurityAuditLogger')
     private readonly auditLogger?: ISecurityAuditLogger,
+    @Optional()
+    @Inject('IPiiMiddleware')
+    private readonly piiMiddleware?: IPiiMiddleware,
   ) {}
 
   /**
@@ -231,13 +235,39 @@ export class SecurityInterceptorService implements ISecurityInterceptor {
       durationMs: duration,
     });
 
+    // Step 7: PII sanitisation — mask sensitive data in string fields.
+    const baseInput = promptValidator ? promptValidator.sanitize(input) : input;
+    const sanitizedInput = this.piiMiddleware
+      ? this.sanitizeInputFields(baseInput)
+      : baseInput;
+
     return {
       allowed: true,
       reason: 'All security checks passed',
-      sanitizedInput: promptValidator ? promptValidator.sanitize(input) : input,
+      sanitizedInput,
       toolName: tool.name,
       input,
     };
+  }
+
+  /**
+   * Recursively sanitise all string-valued fields in a tool input record.
+   * Non-string values are passed through untouched.
+   */
+  private sanitizeInputFields(
+    input: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!this.piiMiddleware) return input;
+
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (typeof value === 'string') {
+        result[key] = this.piiMiddleware.sanitise(value).masked;
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
   }
 
   /**

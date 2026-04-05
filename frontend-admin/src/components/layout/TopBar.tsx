@@ -6,6 +6,7 @@ import { useCommandStore } from '@/stores/commandStore';
 import { useActivityStore } from '@/stores/activityStore';
 import api from '@/services/api';
 import { unwrapList } from '@/services/unwrap';
+import { useTheme } from '@/hooks/useTheme';
 
 interface TopBarProps {
   title?: string;
@@ -15,6 +16,7 @@ export function TopBar({ title }: TopBarProps) {
   const { openPalette } = useCommandStore();
   const { events } = useActivityStore();
   const [pendingApprovals, setPendingApprovals] = useState(0);
+  const { theme, setTheme } = useTheme();
 
   const errorCount = events.filter((e) => e.severity === 'error').length;
 
@@ -38,6 +40,15 @@ export function TopBar({ title }: TopBarProps) {
       >
         <span>Search or command…</span>
         <kbd className="text-[10px] bg-surface-muted px-1.5 py-0.5 rounded text-zinc-600">⌘K</kbd>
+      </button>
+
+      {/* Theme toggle */}
+      <button
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        title="Toggle theme"
+        className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg hover:bg-surface-overlay text-zinc-400"
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
       </button>
 
       {/* Alerts badge */}
