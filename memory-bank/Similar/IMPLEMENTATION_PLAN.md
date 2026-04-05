@@ -10,43 +10,45 @@
 ## Codebase Audit Summary
 
 ### Already Implemented ✅
-| Feature | Location |
-|---|---|
-| LangGraph HITL execution with MemorySaver | `backend/src/modules/agents/langgraph/` |
-| Agent evaluator (LLM + heuristic scoring) | `agents/services/agent-evaluator.service.ts` |
-| Cost tracking infrastructure (CostRecord, BudgetPolicy) | `modules/costs/` |
-| Security interceptor (prompt injection, SSRF guards) | `agents/security/` |
-| Memory module (SHORT/LONG/EPISODIC + pgvector) | `modules/memory/` |
-| Governance rules + Approvals HITL | `modules/governance/` |
-| Multi-tenant tier system (Starter/Pro/Enterprise) | `modules/tiers/` |
-| OAuth connectors (Google, HubSpot) | `modules/connectors/` |
-| 50 built-in tools in registry | `modules/tools/built-in/` |
-| Analytics + Observability modules | `modules/analytics/`, `modules/observability/` |
-| Workspace provisioning (Google/M365) | `modules/workspace-provisioning/` |
-| Routines/Scheduler module (backend) | `modules/routines/` |
-| Projects + Goals module | `modules/projects/`, `modules/goals/` |
-| Finance / Invoices / Expenses | `modules/finance/` |
-| Full 9-step onboarding wizard | `modules/onboarding/` + `frontend-tenant` |
-| OpenTelemetry + LangSmith tracing | `modules/ai-gateway/` |
-| Chat module (conversational AI) | `modules/chat/` |
-| OpenClaw webhook adapter | `modules/ai-gateway/openclaw-adapter.module.ts` |
+
+| Feature                                                 | Location                                        |
+| ------------------------------------------------------- | ----------------------------------------------- |
+| LangGraph HITL execution with MemorySaver               | `backend/src/modules/agents/langgraph/`         |
+| Agent evaluator (LLM + heuristic scoring)               | `agents/services/agent-evaluator.service.ts`    |
+| Cost tracking infrastructure (CostRecord, BudgetPolicy) | `modules/costs/`                                |
+| Security interceptor (prompt injection, SSRF guards)    | `agents/security/`                              |
+| Memory module (SHORT/LONG/EPISODIC + pgvector)          | `modules/memory/`                               |
+| Governance rules + Approvals HITL                       | `modules/governance/`                           |
+| Multi-tenant tier system (Starter/Pro/Enterprise)       | `modules/tiers/`                                |
+| OAuth connectors (Google, HubSpot)                      | `modules/connectors/`                           |
+| 50 built-in tools in registry                           | `modules/tools/built-in/`                       |
+| Analytics + Observability modules                       | `modules/analytics/`, `modules/observability/`  |
+| Workspace provisioning (Google/M365)                    | `modules/workspace-provisioning/`               |
+| Routines/Scheduler module (backend)                     | `modules/routines/`                             |
+| Projects + Goals module                                 | `modules/projects/`, `modules/goals/`           |
+| Finance / Invoices / Expenses                           | `modules/finance/`                              |
+| Full 9-step onboarding wizard                           | `modules/onboarding/` + `frontend-tenant`       |
+| OpenTelemetry + LangSmith tracing                       | `modules/ai-gateway/`                           |
+| Chat module (conversational AI)                         | `modules/chat/`                                 |
+| OpenClaw webhook adapter                                | `modules/ai-gateway/openclaw-adapter.module.ts` |
 
 ### Missing / Priority Gaps ❌ (from similar-concept.md)
-| # | Feature | Priority | Effort |
-|---|---|---|---|
-| 1 | Agent Version Control + Rollback | **P0 — critical** | M |
-| 2 | PII Detection + Masking Middleware | **P0 — compliance** | M |
-| 3 | Per-agent Cost Dashboard (UI) | **P0 — trust** | S |
-| 4 | Agent Staging Environment + Eval Runs | **P1** | L |
-| 5 | Visual Workflow Canvas (drag-and-drop) | **P1 — UX flagship** | L |
-| 6 | Supervisor-Worker Agent Orchestration | **P1** | M |
-| 7 | Department-Scoped Knowledge Spaces | **P1** | M |
-| 8 | Tenant Maturity Indicator (L1→L4 roadmap) | **P2** | S |
-| 9 | Rich Artifact Outputs (PDF / CSV / Chart) | **P2** | M |
-| 10 | Proactive/Scheduled Runs — Frontend Wiring | **P2** | S |
-| 11 | Industry-Specific Agent Packs (GTM/Support/Finance) | **P2** | M |
-| 12 | SCIM Provisioning + Enterprise SSO | **P3** | L |
-| 13 | Natural Language → Admin UI Generator | **P3** | XL |
+
+| #   | Feature                                             | Priority             | Effort |
+| --- | --------------------------------------------------- | -------------------- | ------ |
+| 1   | Agent Version Control + Rollback                    | **P0 — critical**    | M      |
+| 2   | PII Detection + Masking Middleware                  | **P0 — compliance**  | M      |
+| 3   | Per-agent Cost Dashboard (UI)                       | **P0 — trust**       | S      |
+| 4   | Agent Staging Environment + Eval Runs               | **P1**               | L      |
+| 5   | Visual Workflow Canvas (drag-and-drop)              | **P1 — UX flagship** | L      |
+| 6   | Supervisor-Worker Agent Orchestration               | **P1**               | M      |
+| 7   | Department-Scoped Knowledge Spaces                  | **P1**               | M      |
+| 8   | Tenant Maturity Indicator (L1→L4 roadmap)           | **P2**               | S      |
+| 9   | Rich Artifact Outputs (PDF / CSV / Chart)           | **P2**               | M      |
+| 10  | Proactive/Scheduled Runs — Frontend Wiring          | **P2**               | S      |
+| 11  | Industry-Specific Agent Packs (GTM/Support/Finance) | **P2**               | M      |
+| 12  | SCIM Provisioning + Enterprise SSO                  | **P3**               | L      |
+| 13  | Natural Language → Admin UI Generator               | **P3**               | XL     |
 
 ---
 
@@ -60,6 +62,7 @@ Phase 4 (P3 — Enterprise Sales Unlock) → Items 12, 13
 ```
 
 Each phase is independently deployable. All implementation follows:
+
 - **S**RP — each class/service has one reason to change
 - **O**CP — new behaviour via extension (interfaces + DI tokens), not mutation
 - **L**SP — all concrete classes fully satisfy their interface contracts
@@ -104,16 +107,19 @@ model AgentVersion {
 ```
 
 Also add back-relation on `Agent`:
+
 ```prisma
 versions      AgentVersion[]
 ```
 
 And back-relation on `Tenant`:
+
 ```prisma
 agentVersions AgentVersion[]
 ```
 
 **Migration SQL** (`backend/prisma/migrations/20260405_agent_versions/migration.sql`):
+
 ```sql
 CREATE TABLE IF NOT EXISTS "agent_versions" (
   "id"             TEXT          NOT NULL PRIMARY KEY,
@@ -142,8 +148,15 @@ File: `backend/src/modules/agents/interfaces/agent-version.interface.ts`
 export interface IAgentVersionRepository {
   create(input: CreateAgentVersionInput): Promise<AgentVersionDto>;
   findByAgentId(agentId: string, tenantId: string): Promise<AgentVersionDto[]>;
-  findActive(agentId: string, tenantId: string): Promise<AgentVersionDto | null>;
-  rollback(agentId: string, tenantId: string, versionNumber: number): Promise<AgentVersionDto>;
+  findActive(
+    agentId: string,
+    tenantId: string,
+  ): Promise<AgentVersionDto | null>;
+  rollback(
+    agentId: string,
+    tenantId: string,
+    versionNumber: number,
+  ): Promise<AgentVersionDto>;
 }
 
 export interface CreateAgentVersionInput {
@@ -173,13 +186,13 @@ export interface AgentVersionDto {
 File: `backend/src/modules/agents/repositories/prisma-agent-version.repository.ts`
 
 ```typescript
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import type {
   IAgentVersionRepository,
   CreateAgentVersionInput,
   AgentVersionDto,
-} from '../interfaces/agent-version.interface';
+} from "../interfaces/agent-version.interface";
 
 @Injectable()
 export class PrismaAgentVersionRepository implements IAgentVersionRepository {
@@ -192,7 +205,7 @@ export class PrismaAgentVersionRepository implements IAgentVersionRepository {
     return this.prisma.$transaction(async (tx) => {
       const last = await tx.agentVersion.findFirst({
         where: { agentId: input.agentId },
-        orderBy: { versionNumber: 'desc' },
+        orderBy: { versionNumber: "desc" },
         select: { versionNumber: true },
       });
       const versionNumber = (last?.versionNumber ?? 0) + 1;
@@ -212,21 +225,31 @@ export class PrismaAgentVersionRepository implements IAgentVersionRepository {
     });
   }
 
-  async findByAgentId(agentId: string, tenantId: string): Promise<AgentVersionDto[]> {
+  async findByAgentId(
+    agentId: string,
+    tenantId: string,
+  ): Promise<AgentVersionDto[]> {
     return this.prisma.agentVersion.findMany({
       where: { agentId, tenantId },
-      orderBy: { versionNumber: 'desc' },
+      orderBy: { versionNumber: "desc" },
     }) as unknown as AgentVersionDto[];
   }
 
-  async findActive(agentId: string, tenantId: string): Promise<AgentVersionDto | null> {
+  async findActive(
+    agentId: string,
+    tenantId: string,
+  ): Promise<AgentVersionDto | null> {
     return this.prisma.agentVersion.findFirst({
       where: { agentId, tenantId, isActive: true },
-      orderBy: { versionNumber: 'desc' },
+      orderBy: { versionNumber: "desc" },
     }) as unknown as AgentVersionDto | null;
   }
 
-  async rollback(agentId: string, tenantId: string, versionNumber: number): Promise<AgentVersionDto> {
+  async rollback(
+    agentId: string,
+    tenantId: string,
+    versionNumber: number,
+  ): Promise<AgentVersionDto> {
     return this.prisma.$transaction(async (tx) => {
       const target = await tx.agentVersion.findFirstOrThrow({
         where: { agentId, tenantId, versionNumber },
@@ -243,12 +266,12 @@ export class PrismaAgentVersionRepository implements IAgentVersionRepository {
       await tx.agent.update({
         where: { id: agentId },
         data: {
-          name: snapshot['name'] as string | undefined,
-          model: snapshot['model'] as string | undefined,
-          systemPrompt: snapshot['systemPrompt'] as string | undefined,
-          instructions: snapshot['instructions'] as string | undefined,
-          permissions: snapshot['permissions'] as string | undefined,
-          config: snapshot['config'] as string | undefined,
+          name: snapshot["name"] as string | undefined,
+          model: snapshot["model"] as string | undefined,
+          systemPrompt: snapshot["systemPrompt"] as string | undefined,
+          instructions: snapshot["instructions"] as string | undefined,
+          permissions: snapshot["permissions"] as string | undefined,
+          config: snapshot["config"] as string | undefined,
         },
       });
 
@@ -267,9 +290,12 @@ export class PrismaAgentVersionRepository implements IAgentVersionRepository {
 File: `backend/src/modules/agents/services/agent-version.service.ts`
 
 ```typescript
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaAgentVersionRepository } from '../repositories/prisma-agent-version.repository';
-import type { AgentVersionDto, CreateAgentVersionInput } from '../interfaces/agent-version.interface';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { PrismaAgentVersionRepository } from "../repositories/prisma-agent-version.repository";
+import type {
+  AgentVersionDto,
+  CreateAgentVersionInput,
+} from "../interfaces/agent-version.interface";
 
 /**
  * AgentVersionService
@@ -280,25 +306,36 @@ import type { AgentVersionDto, CreateAgentVersionInput } from '../interfaces/age
 export class AgentVersionService {
   private readonly logger = new Logger(AgentVersionService.name);
 
-  constructor(
-    private readonly versionRepo: PrismaAgentVersionRepository,
-  ) {}
+  constructor(private readonly versionRepo: PrismaAgentVersionRepository) {}
 
-  async snapshotAgent(input: CreateAgentVersionInput): Promise<AgentVersionDto> {
-    this.logger.log(`Snapshotting agent ${input.agentId} v?+1 by ${input.changedBy}`);
+  async snapshotAgent(
+    input: CreateAgentVersionInput,
+  ): Promise<AgentVersionDto> {
+    this.logger.log(
+      `Snapshotting agent ${input.agentId} v?+1 by ${input.changedBy}`,
+    );
     return this.versionRepo.create(input);
   }
 
-  async listVersions(agentId: string, tenantId: string): Promise<AgentVersionDto[]> {
+  async listVersions(
+    agentId: string,
+    tenantId: string,
+  ): Promise<AgentVersionDto[]> {
     return this.versionRepo.findByAgentId(agentId, tenantId);
   }
 
-  async rollback(agentId: string, tenantId: string, versionNumber: number): Promise<AgentVersionDto> {
+  async rollback(
+    agentId: string,
+    tenantId: string,
+    versionNumber: number,
+  ): Promise<AgentVersionDto> {
     this.logger.log(`Rolling back agent ${agentId} to v${versionNumber}`);
     const versions = await this.versionRepo.findByAgentId(agentId, tenantId);
     const target = versions.find((v) => v.versionNumber === versionNumber);
     if (!target) {
-      throw new NotFoundException(`Version ${versionNumber} not found for agent ${agentId}`);
+      throw new NotFoundException(
+        `Version ${versionNumber} not found for agent ${agentId}`,
+      );
     }
     return this.versionRepo.rollback(agentId, tenantId, versionNumber);
   }
@@ -310,7 +347,7 @@ export class AgentVersionService {
 File: `backend/src/modules/agents/dto/agent-version.dto.ts`
 
 ```typescript
-import { IsString, IsOptional, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min } from "class-validator";
 
 export class CreateAgentVersionDto {
   @IsOptional()
@@ -393,6 +430,7 @@ File: `frontend-tenant/src/app/(app)/agents/[id]/versions/page.tsx`
 ```
 
 Key component structure:
+
 - `AgentVersionsPage` — fetches `GET /agents/:id/versions` → renders table
 - `RollbackConfirmModal` — controlled dialog, calls `POST /agents/:id/rollback`
 - Types: `AgentVersionItem { id, versionNumber, label, changedBy, isActive, createdAt, changeNote }`
@@ -428,15 +466,15 @@ export interface PiiEntity {
 }
 
 export type PiiEntityType =
-  | 'EMAIL'
-  | 'PHONE'
-  | 'SSN'
-  | 'CREDIT_CARD'
-  | 'IP_ADDRESS'
-  | 'DATE_OF_BIRTH'
-  | 'FULL_NAME'
-  | 'PASSPORT'
-  | 'BANK_ACCOUNT';
+  | "EMAIL"
+  | "PHONE"
+  | "SSN"
+  | "CREDIT_CARD"
+  | "IP_ADDRESS"
+  | "DATE_OF_BIRTH"
+  | "FULL_NAME"
+  | "PASSPORT"
+  | "BANK_ACCOUNT";
 ```
 
 #### 1.2.2 — RegEx-based PII Detector (OCP — replaceable with ML-based detector later)
@@ -444,8 +482,8 @@ export type PiiEntityType =
 File: `backend/src/modules/agents/security/providers/regex-pii-detector.service.ts`
 
 ```typescript
-import { Injectable } from '@nestjs/common';
-import type { IPiiDetector, PiiEntity } from '../interfaces/pii.interfaces';
+import { Injectable } from "@nestjs/common";
+import type { IPiiDetector, PiiEntity } from "../interfaces/pii.interfaces";
 
 /**
  * RegexPiiDetector
@@ -454,12 +492,18 @@ import type { IPiiDetector, PiiEntity } from '../interfaces/pii.interfaces';
  */
 @Injectable()
 export class RegexPiiDetector implements IPiiDetector {
-  private static readonly PATTERNS: Array<{ type: PiiEntity['type']; regex: RegExp }> = [
-    { type: 'EMAIL', regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
-    { type: 'PHONE', regex: /\b(\+?\d[\d\s\-().]{7,}\d)\b/g },
-    { type: 'SSN', regex: /\b\d{3}-\d{2}-\d{4}\b/g },
-    { type: 'CREDIT_CARD', regex: /\b(?:\d[ -]?){13,16}\b/g },
-    { type: 'IP_ADDRESS', regex: /\b\d{1,3}(?:\.\d{1,3}){3}\b/g },
+  private static readonly PATTERNS: Array<{
+    type: PiiEntity["type"];
+    regex: RegExp;
+  }> = [
+    {
+      type: "EMAIL",
+      regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+    },
+    { type: "PHONE", regex: /\b(\+?\d[\d\s\-().]{7,}\d)\b/g },
+    { type: "SSN", regex: /\b\d{3}-\d{2}-\d{4}\b/g },
+    { type: "CREDIT_CARD", regex: /\b(?:\d[ -]?){13,16}\b/g },
+    { type: "IP_ADDRESS", regex: /\b\d{1,3}(?:\.\d{1,3}){3}\b/g },
   ];
 
   detect(text: string): PiiEntity[] {
@@ -468,7 +512,12 @@ export class RegexPiiDetector implements IPiiDetector {
       const re = new RegExp(regex.source, regex.flags);
       let match: RegExpExecArray | null;
       while ((match = re.exec(text)) !== null) {
-        entities.push({ type, value: match[0], start: match.index, end: match.index + match[0].length });
+        entities.push({
+          type,
+          value: match[0],
+          start: match.index,
+          end: match.index + match[0].length,
+        });
       }
     }
     return entities;
@@ -481,8 +530,8 @@ export class RegexPiiDetector implements IPiiDetector {
 File: `backend/src/modules/agents/security/providers/pii-masker.service.ts`
 
 ```typescript
-import { Injectable } from '@nestjs/common';
-import type { IPiiMasker, PiiEntity } from '../interfaces/pii.interfaces';
+import { Injectable } from "@nestjs/common";
+import type { IPiiMasker, PiiEntity } from "../interfaces/pii.interfaces";
 
 @Injectable()
 export class PiiMaskerService implements IPiiMasker {
@@ -504,9 +553,9 @@ export class PiiMaskerService implements IPiiMasker {
 File: `backend/src/modules/agents/security/pii-middleware.service.ts`
 
 ```typescript
-import { Injectable, Logger } from '@nestjs/common';
-import { RegexPiiDetector } from './providers/regex-pii-detector.service';
-import { PiiMaskerService } from './providers/pii-masker.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { RegexPiiDetector } from "./providers/regex-pii-detector.service";
+import { PiiMaskerService } from "./providers/pii-masker.service";
 
 /**
  * PiiMiddlewareService
@@ -526,7 +575,9 @@ export class PiiMiddlewareService {
   sanitizeInput(input: string): { sanitized: string; piiFound: boolean } {
     const entities = this.detector.detect(input);
     if (entities.length === 0) return { sanitized: input, piiFound: false };
-    this.logger.warn(`PII detected in tool input: ${entities.map((e) => e.type).join(', ')}`);
+    this.logger.warn(
+      `PII detected in tool input: ${entities.map((e) => e.type).join(", ")}`,
+    );
     return { sanitized: this.masker.mask(input, entities), piiFound: true };
   }
 
@@ -548,7 +599,10 @@ const inputStr = JSON.stringify(toolCall.input);
 const { sanitized, piiFound } = this.piiMiddleware.sanitizeInput(inputStr);
 if (piiFound) {
   // Replace tool call input with sanitized version
-  toolCall = { ...toolCall, input: JSON.parse(sanitized) as Record<string, unknown> };
+  toolCall = {
+    ...toolCall,
+    input: JSON.parse(sanitized) as Record<string, unknown>,
+  };
 }
 ```
 
@@ -600,12 +654,14 @@ File: `frontend-tenant/src/app/(app)/costs/page.tsx`
 ```
 
 Component breakdown:
+
 - `CostSummaryCard` — total $, token count, model breakdowns
 - `AgentCostTable` — sortable by cost desc, badge for over-budget agents
 - `BudgetPolicyPanel` — lists active policies, CTA to create/edit
 - `SpendTrendChart` — `<ResponsiveContainer width="100%" height={200}>` with `<AreaChart>`
 
 Service additions in `frontend-tenant/src/services/costs.service.ts`:
+
 ```typescript
 getSummary(from: Date, to: Date): Promise<CostSummary>
 getByAgent(agentId: string, from: Date, to: Date): Promise<CostSummary>
@@ -623,6 +679,7 @@ listBudgetPolicies(): Promise<BudgetPolicy[]>
 #### 2.1.1 — Concept
 
 Agents exist in two modes:
+
 - **PRODUCTION** — live, serving real tasks
 - **STAGING** — isolated, test-only, uses `stagingTenantId` namespace for memory
 
@@ -638,19 +695,21 @@ enum DeploymentMode {
 ```
 
 On `Agent` model, add:
+
 ```prisma
 deploymentMode DeploymentMode @default(PRODUCTION)
 stagingParentId String?  // if STAGING, points to the PRODUCTION agent being tested
 ```
 
 Migration SQL:
+
 ```sql
 DO $$ BEGIN
   CREATE TYPE "DeploymentMode" AS ENUM ('PRODUCTION', 'STAGING');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
-ALTER TABLE "agents" 
+ALTER TABLE "agents"
   ADD COLUMN IF NOT EXISTS "deploymentMode" "DeploymentMode" NOT NULL DEFAULT 'PRODUCTION',
   ADD COLUMN IF NOT EXISTS "stagingParentId" TEXT REFERENCES "agents"("id") ON DELETE SET NULL;
 ```
@@ -706,14 +765,21 @@ export class EvaluationService {
     tenantId: string,
     testCases: Array<{ input: string; expectedOutput?: string }>,
     triggeredBy: string,
-  ): Promise<EvaluationRun>
+  ): Promise<EvaluationRun>;
 
-  async getEvaluationRuns(agentId: string, tenantId: string): Promise<EvaluationRun[]>
-  async promoteToProduction(stagingAgentId: string, tenantId: string): Promise<Agent>
+  async getEvaluationRuns(
+    agentId: string,
+    tenantId: string,
+  ): Promise<EvaluationRun[]>;
+  async promoteToProduction(
+    stagingAgentId: string,
+    tenantId: string,
+  ): Promise<Agent>;
 }
 ```
 
 `promoteToProduction()`:
+
 1. Check staging agent exists and `deploymentMode === 'STAGING'`
 2. Snapshot current production agent (calls `AgentVersionService.snapshotAgent`)
 3. Copy staging config onto production agent via `AgentsService.update()`
@@ -733,11 +799,13 @@ POST /agents/:id/promote               → promotes staging → production (with
 #### 2.1.6 — Frontend
 
 File: `frontend-tenant/src/app/(app)/agents/[id]/page.tsx` — add tabs:
+
 - **Config** (existing form)
 - **Versions** (Phase 1.1 feature)
 - **Staging** — Create/clone staging copy, run evaluations, promote
 
 `EvalRunForm` component:
+
 ```tsx
 // Textarea for test cases (one per line: "Input >> Expected Output")
 // Start Evaluation button → POST /agents/:id/evaluation-runs
@@ -765,7 +833,12 @@ No new backend dependencies needed — existing `POST /workflows` endpoint accep
 File: `frontend-tenant/src/components/workflow-canvas/node-types.ts`
 
 ```typescript
-export type WorkflowNodeType = 'trigger' | 'agent_task' | 'condition' | 'parallel' | 'done';
+export type WorkflowNodeType =
+  | "trigger"
+  | "agent_task"
+  | "condition"
+  | "parallel"
+  | "done";
 
 export interface WorkflowNodeData {
   label: string;
@@ -797,6 +870,7 @@ WorkflowCanvasPage                        ← route: /workflows/new (replaces ex
 ```
 
 **SOLID application**:
+
 - **SRP**: Each node component renders its own visual only. Config is in `NodeConfigPanel`.
 - **OCP**: New node types added by registering in `nodeTypes` map — no `WorkflowCanvas` changes.
 - **DIP**: `WorkflowCanvasPage` depends on `IWorkflowService` interface, not direct `api.post`.
@@ -804,22 +878,23 @@ WorkflowCanvasPage                        ← route: /workflows/new (replaces ex
 #### 2.2.4 — Serialization to backend
 
 On save, canvas state is serialized:
+
 ```typescript
 const workflowPayload = {
   name: meta.name,
   description: meta.description,
   steps: nodes
-    .filter((n) => n.data.nodeType === 'agent_task')
+    .filter((n) => n.data.nodeType === "agent_task")
     .map((n, idx) => ({
       name: n.data.label,
-      agentRole: n.data.agentName ?? '',
+      agentRole: n.data.agentName ?? "",
       agentId: n.data.agentId,
       taskDescription: n.data.taskDescription,
       order: idx,
     })),
-  canvasState: { nodes, edges },  // raw canvas state stored in workflow.config JSON
+  canvasState: { nodes, edges }, // raw canvas state stored in workflow.config JSON
 };
-await api.post('/workflows', workflowPayload);
+await api.post("/workflows", workflowPayload);
 ```
 
 The existing `POST /workflows` endpoint stores `canvasState` inside the `config: Json` field of the Workflow model — no schema change needed.
@@ -835,6 +910,7 @@ The existing `POST /workflows` endpoint stores `canvasState` inside the `config:
 #### 2.3.1 — Concept
 
 A **Supervisor** agent orchestrates a team of **Worker** agents:
+
 1. User assigns a high-level goal to the Supervisor
 2. Supervisor's LangGraph `planner_node` decomposes into sub-tasks
 3. Each sub-task is dispatched as a `Task` to a Worker agent
@@ -851,6 +927,7 @@ workers      Agent[] @relation("SupervisorWorkers")
 ```
 
 Migration SQL:
+
 ```sql
 ALTER TABLE "agents"
   ADD COLUMN IF NOT EXISTS "supervisorId" TEXT REFERENCES "agents"("id") ON DELETE SET NULL;
@@ -877,25 +954,26 @@ export class MultiAgentOrchestratorService {
     tenantId: string,
     goal: string,
     userId: string,
-  ): Promise<OrchestrationResult>
+  ): Promise<OrchestrationResult>;
 
   private async decomposeGoal(
     supervisorAgent: Agent,
     goal: string,
-  ): Promise<SubTask[]>
+  ): Promise<SubTask[]>;
 
   private async dispatchSubTask(
     workerAgentId: string,
     subTask: SubTask,
     tenantId: string,
     userId: string,
-  ): Promise<TaskResult>
+  ): Promise<TaskResult>;
 }
 ```
 
 #### 2.3.4 — Frontend: Agent Team Builder
 
 In agent detail page, add **"Team" tab**:
+
 - Shows current workers assigned to this agent
 - "Assign Worker" button → opens modal to select from tenant agents
 - "Run as Supervisor" button → opens goal input → dispatches via `POST /orchestration/supervised`
@@ -983,15 +1061,24 @@ File: `backend/src/modules/memory/knowledge.service.ts`
  */
 @Injectable()
 export class KnowledgeService {
-  createSpace(input: CreateKnowledgeSpaceInput): Promise<KnowledgeSpace>
-  addDocument(spaceId: string, doc: AddDocumentInput): Promise<KnowledgeDocument>
-  searchDocuments(query: string, agentId: string, tenantId: string, limit?: number): Promise<KnowledgeDocument[]>
-  grantAgentAccess(agentId: string, spaceId: string): Promise<void>
-  revokeAgentAccess(agentId: string, spaceId: string): Promise<void>
+  createSpace(input: CreateKnowledgeSpaceInput): Promise<KnowledgeSpace>;
+  addDocument(
+    spaceId: string,
+    doc: AddDocumentInput,
+  ): Promise<KnowledgeDocument>;
+  searchDocuments(
+    query: string,
+    agentId: string,
+    tenantId: string,
+    limit?: number,
+  ): Promise<KnowledgeDocument[]>;
+  grantAgentAccess(agentId: string, spaceId: string): Promise<void>;
+  revokeAgentAccess(agentId: string, spaceId: string): Promise<void>;
 }
 ```
 
 `searchDocuments()` — uses pgvector cosine search restricted to spaces the agent has access to:
+
 ```sql
 SELECT kd.*, kd.embedding <=> $1::vector AS distance
 FROM knowledge_documents kd
@@ -1035,15 +1122,21 @@ File: `backend/src/modules/analytics/services/maturity.service.ts`
 @Injectable()
 export class MaturityService {
   async computeMaturity(tenantId: string): Promise<MaturityResult> {
-    const [agentCount, taskCount, workflowCount, connectorCount, evalCount, budgetCount] =
-      await Promise.all([
-        this.prisma.agent.count({ where: { tenantId, status: 'IDLE' } }),
-        this.prisma.task.count({ where: { tenantId, status: 'COMPLETED' } }),
-        this.prisma.workflow.count({ where: { tenantId, status: 'ACTIVE' } }),
-        this.prisma.crmConnector.count({ where: { tenantId } }),
-        // evaluation_runs count
-        // budget_policies count
-      ]);
+    const [
+      agentCount,
+      taskCount,
+      workflowCount,
+      connectorCount,
+      evalCount,
+      budgetCount,
+    ] = await Promise.all([
+      this.prisma.agent.count({ where: { tenantId, status: "IDLE" } }),
+      this.prisma.task.count({ where: { tenantId, status: "COMPLETED" } }),
+      this.prisma.workflow.count({ where: { tenantId, status: "ACTIVE" } }),
+      this.prisma.crmConnector.count({ where: { tenantId } }),
+      // evaluation_runs count
+      // budget_policies count
+    ]);
     // Returns: { level: 1|2|3|4, nextLevelRequirements: string[], progressPct: number }
   }
 }
@@ -1054,9 +1147,10 @@ Endpoint: `GET /analytics/maturity` → consumed by dashboard.
 #### 3.1.3 — Frontend: Maturity Card on Dashboard
 
 Renders above the KPI bar on `dashboard/page.tsx`:
+
 ```tsx
 <MaturityCard
-  level={maturity.level}          // 1–4
+  level={maturity.level} // 1–4
   progressPct={maturity.progressPct}
   nextSteps={maturity.nextLevelRequirements}
 />
@@ -1073,16 +1167,19 @@ Visual: 4 connected dots (L1→L2→L3→L4) with current level highlighted, pro
 #### 3.2.1 — PDF Export Tool (enhancement of existing `pdf-generation.tool.ts`)
 
 The tool already exists. It needs to:
+
 1. Accept JSON data + a template string
 2. Use `puppeteer-core` (or `@sparticuz/chromium` for serverless) to render HTML → PDF
 3. Upload to a temp storage bucket or return as base64
 
 Alternatively use `pdfkit` (no Chromium dependency):
+
 ```bash
 pnpm add pdfkit @types/pdfkit
 ```
 
 Update `pdf-generation.tool.ts` to use `pdfkit` for structured reports:
+
 ```typescript
 // Input: { title, sections: [{heading, body}][], tableData?: {headers, rows}[] }
 // Output: { pdfBase64: string, filename: string }
@@ -1100,11 +1197,12 @@ File: `backend/src/shared/services/csv-export.service.ts`
  */
 @Injectable()
 export class CsvExportService {
-  toCsv(headers: string[], rows: Array<Record<string, unknown>>): string
+  toCsv(headers: string[], rows: Array<Record<string, unknown>>): string;
 }
 ```
 
 Controller endpoints to add to existing relevant controllers:
+
 ```
 GET /tasks/export?format=csv      → Content-Disposition: attachment; filename="tasks.csv"
 GET /costs/export?format=csv      → cost records as CSV
@@ -1135,12 +1233,14 @@ Used in task detail page to render `task.output` field.
 #### 3.3.1 — Audit existing Routines module
 
 Check `backend/src/modules/routines/` for existing endpoints:
+
 - `POST /routines` — create a routine
 - `GET /routines` — list routines
 - `PATCH /routines/:id` — update
 - `DELETE /routines/:id` — delete
 
 If cron scheduling is not wired in `RoutineExecutionService`, add `@nestjs/schedule`:
+
 ```bash
 pnpm add @nestjs/schedule
 ```
@@ -1161,6 +1261,7 @@ File: `frontend-tenant/src/app/(app)/routines/page.tsx`
 ```
 
 Component tree:
+
 ```
 RoutinesPage
 ├── RoutinesList     ← table with status badges + run/pause actions
@@ -1185,11 +1286,11 @@ File: `backend/src/modules/agent-templates/interfaces/agent-pack.interface.ts`
 export interface AgentPack {
   id: string;
   name: string;
-  industry: string;        // 'GTM' | 'SUPPORT' | 'FINANCE' | 'HR' | 'ENGINEERING'
+  industry: string; // 'GTM' | 'SUPPORT' | 'FINANCE' | 'HR' | 'ENGINEERING'
   description: string;
   agents: AgentPackEntry[];
   recommendedWorkflows: WorkflowTemplate[];
-  tools: string[];         // tool IDs required
+  tools: string[]; // tool IDs required
 }
 
 export interface AgentPackEntry {
@@ -1204,18 +1305,21 @@ export interface AgentPackEntry {
 #### 3.4.2 — Three starter packs (seeded via `seed-platform-templates.cjs`)
 
 **GTM Pack** (Go-to-Market):
+
 - SDR Agent (prospecting, CRM sync)
 - Content Agent (blog posts, social media)
 - Analytics Agent (campaign performance)
 - Forecasting Agent (pipeline analysis)
 
 **Support Pack**:
+
 - Triage Agent (classify and route tickets)
 - FAQ Agent (knowledge-base lookup)
 - Escalation Agent (sentiment + escalation detection)
 - SLA Monitor Agent (tracks open tickets)
 
 **Finance Pack**:
+
 - Invoice Agent (generate, issue, track)
 - Expense Agent (categorize, policy check)
 - Budget Agent (monitor, alert on overspend)
@@ -1230,6 +1334,7 @@ POST /agent-packs/:id/deploy  → creates all agents from pack for tenant
 ```
 
 `deployPack()` service method:
+
 ```typescript
 // For each AgentPackEntry:
 //   1. Check agentTemplate exists (by templateId)
@@ -1288,13 +1393,24 @@ SCIM uses its own auth token (`X-SCIM-Token` bearer) stored in `ApiKey` table wi
  */
 @Injectable()
 export class ScimService {
-  listUsers(tenantId: string, filter?: string): Promise<ScimListResponse<ScimUser>>
-  createUser(tenantId: string, data: ScimUser): Promise<ScimUser>
-  updateUser(tenantId: string, userId: string, data: Partial<ScimUser>): Promise<ScimUser>
-  deactivateUser(tenantId: string, userId: string): Promise<void>
-  listGroups(tenantId: string): Promise<ScimListResponse<ScimGroup>>
-  createGroup(tenantId: string, data: ScimGroup): Promise<ScimGroup>
-  updateGroupMembers(tenantId: string, groupId: string, operations: ScimPatchOp[]): Promise<ScimGroup>
+  listUsers(
+    tenantId: string,
+    filter?: string,
+  ): Promise<ScimListResponse<ScimUser>>;
+  createUser(tenantId: string, data: ScimUser): Promise<ScimUser>;
+  updateUser(
+    tenantId: string,
+    userId: string,
+    data: Partial<ScimUser>,
+  ): Promise<ScimUser>;
+  deactivateUser(tenantId: string, userId: string): Promise<void>;
+  listGroups(tenantId: string): Promise<ScimListResponse<ScimGroup>>;
+  createGroup(tenantId: string, data: ScimGroup): Promise<ScimGroup>;
+  updateGroupMembers(
+    tenantId: string,
+    groupId: string,
+    operations: ScimPatchOp[],
+  ): Promise<ScimGroup>;
 }
 ```
 
@@ -1303,6 +1419,7 @@ export class ScimService {
 Integration via `passport-saml` for SAML 2.0 and `passport-openidconnect` for OIDC.
 
 Backend endpoints:
+
 ```
 GET  /auth/sso/config           → get tenant SSO config
 POST /auth/sso/config           → save SSO config (entityId, cert, entryPoint)
@@ -1313,6 +1430,7 @@ GET  /auth/sso/oidc/callback    → OIDC callback
 ```
 
 SSOConfig stored in new model:
+
 ```prisma
 model SsoConfig {
   id          String  @id @default(uuid())
@@ -1344,15 +1462,18 @@ enum SsoProvider {
 This is the most complex feature. Implement in sub-phases:
 
 **Sub-phase A (MVP)**: NL → Report Definition
+
 - User describes a report in natural language: "Show me all failed tasks by agent for the last 30 days"
 - LLM generates a `ReportDefinition` JSON: `{ entity, filters, groupBy, sortBy, chartType }`
 - Report rendered as table + chart from existing analytics APIs
 
 **Sub-phase B**: NL → Filter Builder
+
 - User types "show agents that cost more than $100 this month"
 - LLM generates filter expression applied to `GET /agents` with query params
 
 **Sub-phase C**: Full Admin Panel Generator (LangGraph multi-step)
+
 - NL prompt → LLM generates React component TSX (restricted to safe primitives)
 - Sandboxed preview via iframe with `postMessage` bridge
 - If approved, saved as a "Custom View" in tenant settings
@@ -1364,6 +1485,7 @@ This is the most complex feature. Implement in sub-phases:
 ### TypeScript Quality Standards
 
 All new files must pass:
+
 ```bash
 cd backend && npx tsc --noEmit --skipLibCheck
 cd frontend-tenant && npx tsc --noEmit --skipLibCheck
@@ -1371,6 +1493,7 @@ cd frontend-admin && npx tsc --noEmit --skipLibCheck
 ```
 
 Rules:
+
 1. **No `any`** — use `unknown` with type guards or explicit union types
 2. **No non-null assertion (`!`)** — use optional chaining and `?? fallback`
 3. **DTOs must use class-validator decorators** — `@IsString()`, `@IsOptional()`, etc.
@@ -1382,6 +1505,7 @@ Rules:
 ### SOLID Compliance Checklist
 
 For every new module:
+
 - [ ] **SRP**: Service file only has one primary responsibility. No mixed concerns.
 - [ ] **OCP**: Strategy/behaviour variants injected via DI token, not conditionals in service core
 - [ ] **LSP**: If implementing an interface, ALL interface methods must be implemented fully (no `throw new Error('not implemented')` in production paths)
@@ -1391,6 +1515,7 @@ For every new module:
 ### NestJS Module Structure Template
 
 Every new module follows this layout:
+
 ```
 modules/{feature}/
 ├── dto/
@@ -1438,72 +1563,72 @@ No inline styles. All styling via Tailwind classes. CSS variables for theme toke
 
 ### Phase 1 Sprint Targets (2 weeks)
 
-| Task | Owner | Done When |
-|------|-------|-----------|
-| 1.1 — Agent Versions schema + migration | Backend | Migration applied, `pnpm prisma generate` passes |
-| 1.1 — AgentVersionRepository + Service | Backend | `tsc --noEmit` passes, unit tests pass |
-| 1.1 — Controller endpoints + auto-snapshot hook | Backend | `GET /agents/:id/versions` returns 200 |
-| 1.1 — Frontend versions page | Frontend | Versions tab shows history, rollback modal works |
-| 1.2 — PII interfaces + RegexPiiDetector | Backend | `detect()` unit tests pass for email/phone/SSN |
-| 1.2 — PiiMiddlewareService integration | Backend | Tool inputs with PII are sanitized before LLM call |
-| 1.3 — Cost dashboard page | Frontend | `/costs` page shows spend summary + per-agent table |
+| Task                                            | Owner    | Done When                                           |
+| ----------------------------------------------- | -------- | --------------------------------------------------- |
+| 1.1 — Agent Versions schema + migration         | Backend  | Migration applied, `pnpm prisma generate` passes    |
+| 1.1 — AgentVersionRepository + Service          | Backend  | `tsc --noEmit` passes, unit tests pass              |
+| 1.1 — Controller endpoints + auto-snapshot hook | Backend  | `GET /agents/:id/versions` returns 200              |
+| 1.1 — Frontend versions page                    | Frontend | Versions tab shows history, rollback modal works    |
+| 1.2 — PII interfaces + RegexPiiDetector         | Backend  | `detect()` unit tests pass for email/phone/SSN      |
+| 1.2 — PiiMiddlewareService integration          | Backend  | Tool inputs with PII are sanitized before LLM call  |
+| 1.3 — Cost dashboard page                       | Frontend | `/costs` page shows spend summary + per-agent table |
 
 ### Phase 2 Sprint Targets (3 weeks)
 
-| Task | Done When |
-|------|-----------|
-| 2.1 — EvaluationRun schema + service | `POST /agents/:id/evaluation-runs` returns runs with scores |
-| 2.1 — Frontend staging + eval tab | Pass rate ≥ 80% flow works end-to-end |
-| 2.2 — React Flow canvas setup | Canvas renders with drag + node config panel |
-| 2.2 — Serialization + save | Created workflow appears in `/workflows` list |
-| 2.3 — Supervisor-worker schema | `supervisorId` relationship persists |
-| 2.3 — MultiAgentOrchestratorService | Supervisor dispatches sub-tasks to workers |
-| 2.4 — KnowledgeSpace schema + service | `searchDocuments()` returns pgvector results |
+| Task                                  | Done When                                                   |
+| ------------------------------------- | ----------------------------------------------------------- |
+| 2.1 — EvaluationRun schema + service  | `POST /agents/:id/evaluation-runs` returns runs with scores |
+| 2.1 — Frontend staging + eval tab     | Pass rate ≥ 80% flow works end-to-end                       |
+| 2.2 — React Flow canvas setup         | Canvas renders with drag + node config panel                |
+| 2.2 — Serialization + save            | Created workflow appears in `/workflows` list               |
+| 2.3 — Supervisor-worker schema        | `supervisorId` relationship persists                        |
+| 2.3 — MultiAgentOrchestratorService   | Supervisor dispatches sub-tasks to workers                  |
+| 2.4 — KnowledgeSpace schema + service | `searchDocuments()` returns pgvector results                |
 
 ### Phase 3 Sprint Targets (2 weeks)
 
-| Task | Done When |
-|------|-----------|
-| 3.1 — MaturityService | `GET /analytics/maturity` returns level 1–4 |
-| 3.1 — Frontend maturity card | Dashboard shows L1–L4 indicator |
-| 3.2 — PDF tool enhancement | Tool returns base64 PDF for structured data |
-| 3.2 — CSV export endpoints | `/tasks/export` returns downloadable CSV |
-| 3.3 — Routines frontend page | User can create/manage scheduled runs |
-| 3.4 — Agent pack seed data | 3 packs seeded (GTM, Support, Finance) |
+| Task                                   | Done When                                     |
+| -------------------------------------- | --------------------------------------------- |
+| 3.1 — MaturityService                  | `GET /analytics/maturity` returns level 1–4   |
+| 3.1 — Frontend maturity card           | Dashboard shows L1–L4 indicator               |
+| 3.2 — PDF tool enhancement             | Tool returns base64 PDF for structured data   |
+| 3.2 — CSV export endpoints             | `/tasks/export` returns downloadable CSV      |
+| 3.3 — Routines frontend page           | User can create/manage scheduled runs         |
+| 3.4 — Agent pack seed data             | 3 packs seeded (GTM, Support, Finance)        |
 | 3.4 — Pack deployment + marketplace UI | `POST /agent-packs/:id/deploy` creates agents |
 
 ### Phase 4 Sprint Targets (4 weeks)
 
-| Task | Done When |
-|------|-----------|
-| 4.1 — SCIM endpoints scaffold | SCIM User CRUD returns SCIM 2.0 compliant JSON |
+| Task                             | Done When                                         |
+| -------------------------------- | ------------------------------------------------- |
+| 4.1 — SCIM endpoints scaffold    | SCIM User CRUD returns SCIM 2.0 compliant JSON    |
 | 4.1 — SSO config + SAML callback | SAML login flow works with test IdP (Okta, Auth0) |
-| 4.2 Sub-A — NL → Report | Report definition JSON generates, chart renders |
+| 4.2 Sub-A — NL → Report          | Report definition JSON generates, chart renders   |
 
 ---
 
 ## Known Risks & Mitigations
 
-| Risk | Mitigation |
-|------|-----------|
-| pgvector not enabled for KnowledgeDocument embeddings | Apply `CREATE EXTENSION vector;` migration — same as existing MemoryEntry vector |
-| ReactFlow bundle size (+~200KB gzip) | Code-split: `dynamic(() => import('./WorkflowCanvas'), { ssr: false })` |
-| PII regex false positives on legitimate data | Add per-tenant PII policy config (`piiEnabled: boolean` in `tenant.settings` JSON) |
-| EvaluationRun LLM costs for scoring | Score with heuristic by default; opt-in LLM scoring per evaluation run |
-| SCIM token security | Store SCIM token as bcrypt hash in ApiKey table; plaintext only shown once on creation |
-| Multi-agent task fan-out causing DB write storms | Use BullMQ job queue for sub-task dispatch (already a dep candidate) |
+| Risk                                                  | Mitigation                                                                             |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| pgvector not enabled for KnowledgeDocument embeddings | Apply `CREATE EXTENSION vector;` migration — same as existing MemoryEntry vector       |
+| ReactFlow bundle size (+~200KB gzip)                  | Code-split: `dynamic(() => import('./WorkflowCanvas'), { ssr: false })`                |
+| PII regex false positives on legitimate data          | Add per-tenant PII policy config (`piiEnabled: boolean` in `tenant.settings` JSON)     |
+| EvaluationRun LLM costs for scoring                   | Score with heuristic by default; opt-in LLM scoring per evaluation run                 |
+| SCIM token security                                   | Store SCIM token as bcrypt hash in ApiKey table; plaintext only shown once on creation |
+| Multi-agent task fan-out causing DB write storms      | Use BullMQ job queue for sub-task dispatch (already a dep candidate)                   |
 
 ---
 
 ## Environment Variables Required
 
-| Variable | Phase | Purpose |
-|----------|-------|---------|
-| `PII_MASKING_ENABLED` | 1.2 | Toggle PII masking globally (default: `true`) |
-| `EVAL_MAX_CONCURRENT_RUNS` | 2.1 | Max parallel eval runs per tenant (default: `2`) |
-| `AGENT_PACK_SEED_VERSION` | 3.4 | Re-seed trigger version (increment to re-seed) |
-| `SCIM_TOKEN_LENGTH` | 4.1 | SCIM API token byte length (default: `32`) |
-| `SSO_SAML_CALLBACK_URL` | 4.1 | Public URL for SAML ACS (e.g. `https://brain.neurecore.com/api/v1/auth/sso/saml/callback`) |
+| Variable                   | Phase | Purpose                                                                                    |
+| -------------------------- | ----- | ------------------------------------------------------------------------------------------ |
+| `PII_MASKING_ENABLED`      | 1.2   | Toggle PII masking globally (default: `true`)                                              |
+| `EVAL_MAX_CONCURRENT_RUNS` | 2.1   | Max parallel eval runs per tenant (default: `2`)                                           |
+| `AGENT_PACK_SEED_VERSION`  | 3.4   | Re-seed trigger version (increment to re-seed)                                             |
+| `SCIM_TOKEN_LENGTH`        | 4.1   | SCIM API token byte length (default: `32`)                                                 |
+| `SSO_SAML_CALLBACK_URL`    | 4.1   | Public URL for SAML ACS (e.g. `https://brain.neurecore.com/api/v1/auth/sso/saml/callback`) |
 
 ---
 
@@ -1514,10 +1639,11 @@ memory-bank/Similar/IMPLEMENTATION_PLAN.md  ← this file
 ```
 
 Related files:
+
 - `memory-bank/Similar/similar-concept.md` — source competitive analysis
 - `memory-bank/Similar/systemPatterns.md` — existing system patterns reference
 - `memories/repo/neurecore_fixes_and_todo.md` — running dev log
 
 ---
 
-*End of Implementation Plan — NeureCore Competitive Feature Roadmap*
+_End of Implementation Plan — NeureCore Competitive Feature Roadmap_
