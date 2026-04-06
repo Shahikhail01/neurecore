@@ -1,52 +1,109 @@
-import * as React from "react"
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
-
+/**
+ * Card Component
+ * 
+ * A container component for grouped content.
+ * Uses design tokens for surface colors and borders.
+ * Supports light/dark themes via CSS variables.
+ */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 border py-6 shadow-sm",
-        className
+        "rounded-lg bg-surface-raised border border-surface-border shadow-md p-lg text-text-primary",
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
+/**
+ * CardHeader Component
+ * 
+ * Header section of a card, typically containing title and actions.
+ */
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      data-slot="card-header"
-      className={cn(
-        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
-        className
-      )}
+      className={cn("flex items-start justify-between mb-lg border-b border-surface-border pb-lg", className)}
       {...props}
     />
-  )
+  );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * CardTitle Component
+ * 
+ * Typically used within CardHeader.
+ * Displays prominent text.
+ */
+function CardTitle({
+  className,
+  ...props
+}: React.ComponentProps<"h2">) {
   return (
-    <div
-      data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
+    <h2
+      className={cn("text-xl font-semibold text-text-primary", className)}
       {...props}
     />
-  )
+  );
 }
 
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * CardDescription Component
+ * 
+ * Secondary text, typically below CardTitle.
+ */
+function CardDescription({
+  className,
+  ...props
+}: React.ComponentProps<"p">) {
   return (
-    <div
-      data-slot="card-description"
-      className={cn("text-muted-foreground text-sm", className)}
+    <p
+      className={cn("text-sm text-text-secondary", className)}
       {...props}
     />
-  )
+  );
 }
+
+/**
+ * CardContent Component
+ * 
+ * Main content area of the card.
+ */
+function CardContent({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      className={cn("", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * CardFooter Component
+ * 
+ * Footer section, typically containing actions.
+ */
+function CardFooter({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      className={cn("flex items-center justify-between mt-lg pt-lg border-t border-surface-border", className)}
+      {...props}
+    />
+  );
+}
+
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };
 
 function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   return (

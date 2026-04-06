@@ -1,21 +1,52 @@
-import * as React from "react"
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
-
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+/**
+ * Input Component
+ * 
+ * A flexible text input component supporting various types.
+ * Uses design tokens for consistent theming across light/dark modes.
+ * Includes proper focus states and accessibility features.
+ */
+const Input = React.forwardRef<
+  HTMLInputElement,
+  React.ComponentProps<"input">
+>(({ className, type, ...props }, ref) => {
   return (
     <input
       type={type}
-      data-slot="input"
       className={cn(
-        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-        "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
-        className
+        // Base styles - using design tokens
+        "w-full rounded-md border bg-surface-base text-text-primary placeholder:text-text-muted",
+        "h-9 px-3 py-2 text-sm",
+        "border-surface-border transition-colors duration-base shadow-sm",
+        
+        // Focus states
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base",
+        
+        // Hover state
+        "hover:border-surface-border/80",
+        
+        // Disabled state
+        "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-surface-muted",
+        
+        // Read-only state
+        "read-only:bg-surface-muted read-only:cursor-pointer",
+        
+        // Invalid/error state
+        "aria-invalid:border-status-danger aria-invalid:focus-visible:ring-status-danger",
+        
+        // File input styling
+        "file:rounded-sm file:border-0 file:bg-surface-raised file:px-2 file:py-1.5 file:text-sm file:font-medium file:text-text-primary file:cursor-pointer hover:file:bg-surface-border",
+        
+        className,
       )}
+      ref={ref}
       {...props}
     />
-  )
-}
+  );
+});
 
-export { Input }
+Input.displayName = "Input";
+
+export { Input };
