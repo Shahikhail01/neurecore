@@ -144,7 +144,7 @@ function InputBox({ onSend, disabled }: { onSend: (q: string, ctx?: ChatRequest[
 }
 
 export function ConversationPanel() {
-  const { open, toggleOpen } = useChatStore();
+  const { open, toggleOpen, setChannel, currentChannel } = useChatStore();
   const { messages, sending, sendMessage, clearHistory } = useChat();
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -165,9 +165,19 @@ export function ConversationPanel() {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="fixed bottom-16 right-4 z-40 w-80 max-h-[520px] flex flex-col rounded-2xl border border-surface-border bg-surface-raised shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-zinc-200">Ask NeureCore</span>
-                <span className="text-[9px] bg-indigo-900 text-indigo-300 rounded-full px-1.5 py-0.5">Admin AI</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-zinc-200">Ask NeureCore</span>
+                  <span className="text-[9px] bg-indigo-900 text-indigo-300 rounded-full px-1.5 py-0.5">Admin AI</span>
+                </div>
+                <div>
+                  <select value={currentChannel} onChange={(e) => setChannel(e.target.value)} className="text-xs bg-surface-overlay border border-surface-border rounded px-2 py-1 text-zinc-300">
+                    <option value="all">All Agents</option>
+                    <option value="agents">Agents</option>
+                    <option value="team">Team</option>
+                    <option value="direct">Direct</option>
+                  </select>
+                </div>
               </div>
               <button onClick={() => void clearHistory()} title="Clear history"
                 className="text-zinc-600 hover:text-zinc-400 text-xs transition px-1">↺</button>

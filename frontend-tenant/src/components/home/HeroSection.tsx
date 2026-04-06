@@ -1,10 +1,10 @@
 /**
  * Hero Section Component
- * 
+ *
  * A prominent full-width banner for the home screen.
  * Displays greeting, time, and centered command input.
  * Inspired by Creatio's hero design with scenic background.
- * 
+ *
  * Features:
  * - Responsive background (gradient or image)
  * - Centered greeting and command input
@@ -53,7 +53,7 @@ interface HeroSectionProps {
 
 /**
  * HeroSection Component
- * 
+ *
  * @example
  * <HeroSection
  *   userName="John"
@@ -65,7 +65,7 @@ export function HeroSection({
   userName,
   placeholder = "Message NeureCore or ask a question...",
   onCommandSubmit,
- backgroundImage,
+  backgroundImage,
   className,
   children,
 }: HeroSectionProps) {
@@ -127,10 +127,7 @@ export function HeroSection({
         </div>
 
         {/* Command Input */}
-        <form
-          onSubmit={handleSubmit}
-          className="w-full max-w-xl px-4 mb-6"
-        >
+        <form onSubmit={handleSubmit} className="w-full max-w-xl px-4 mb-6">
           <div className="relative">
             <input
               type="text"

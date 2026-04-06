@@ -1,9 +1,9 @@
 /**
  * Agent Status Panel Component
- * 
+ *
  * Displays status and metrics for AI agents and autonomous workflows.
  * Shows agent availability, mode (Assist/Copilot/Autopilot), and active tasks.
- * 
+ *
  * Features:
  * - Agent availability indicators (online, offline, in-use)
  * - Mode/autonomy level display (Assist, Copilot, Autopilot)
@@ -92,7 +92,7 @@ interface AgentStatusPanelProps {
 
 /**
  * Agent Status Panel Component
- * 
+ *
  * @example
  * <AgentStatusPanel
  *   agents={[
@@ -165,7 +165,7 @@ export function AgentStatusPanel({
 
 /**
  * Individual Agent Card Component
- * 
+ *
  * Composable sub-component for Single Responsibility Principle
  */
 function AgentCard({
@@ -199,7 +199,7 @@ function AgentCard({
           "p-6 rounded-lg border",
           "bg-surface-raised border-surface-border",
           "hover:border-accent-primary transition-all duration-base",
-          onAgentClick && "cursor-pointer"
+          onAgentClick && "cursor-pointer",
         )}
         onClick={handleCardClick}
         role="region"
@@ -210,9 +210,7 @@ function AgentCard({
           <div className="flex items-center gap-3 flex-1">
             <div className={cn("w-3 h-3 rounded-full", statusColor)} />
             <div>
-              <h3 className="font-semibold text-text-primary">
-                {agent.name}
-              </h3>
+              <h3 className="font-semibold text-text-primary">{agent.name}</h3>
               {agent.description && (
                 <p className="text-xs text-text-muted mt-1">
                   {agent.description}
@@ -229,7 +227,8 @@ function AgentCard({
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-text-muted" />
               <span className="text-text-muted">
-                {agent.activeTasks} active task{agent.activeTasks !== 1 ? "s" : ""}
+                {agent.activeTasks} active task
+                {agent.activeTasks !== 1 ? "s" : ""}
               </span>
             </div>
           </div>
@@ -254,11 +253,15 @@ function AgentCard({
             aria-expanded={modeMenuOpen}
             aria-haspopup="listbox"
           >
-            <span>Mode: <span className="capitalize">{agent.mode}</span></span>
-            <Zap className={cn(
-              "w-4 h-4 transition-transform duration-base",
-              modeMenuOpen ? "rotate-180" : ""
-            )} />
+            <span>
+              Mode: <span className="capitalize">{agent.mode}</span>
+            </span>
+            <Zap
+              className={cn(
+                "w-4 h-4 transition-transform duration-base",
+                modeMenuOpen ? "rotate-180" : "",
+              )}
+            />
           </button>
 
           {/* Mode Menu */}
@@ -287,7 +290,9 @@ function AgentCard({
                   aria-selected={agent.mode === mode}
                 >
                   <div className="flex items-center gap-2">
-                    {React.createElement(getModeIcon(mode), { className: "w-4 h-4" })}
+                    {React.createElement(getModeIcon(mode), {
+                      className: "w-4 h-4",
+                    })}
                     <span className="capitalize">{mode}</span>
                   </div>
                   <p className="text-xs text-text-muted mt-1">
@@ -324,14 +329,17 @@ function AgentCard({
       aria-label={`${agent.name} agent, ${agent.status}, mode ${agent.mode}`}
     >
       <div className="flex items-center gap-3 flex-1">
-        <div className={cn("w-2 h-2 rounded-full flex-shrink-0", statusColor)} />
+        <div
+          className={cn("w-2 h-2 rounded-full flex-shrink-0", statusColor)}
+        />
         <div className="min-w-0 flex-1">
           <p className="font-medium text-sm text-text-primary truncate">
             {agent.name}
           </p>
           <p className="text-xs text-text-muted">
             <span className="capitalize">{agent.mode}</span>
-            {agent.activeTasks !== undefined && ` • ${agent.activeTasks} task${agent.activeTasks !== 1 ? "s" : ""}`}
+            {agent.activeTasks !== undefined &&
+              ` • ${agent.activeTasks} task${agent.activeTasks !== 1 ? "s" : ""}`}
           </p>
         </div>
       </div>
@@ -343,9 +351,10 @@ function AgentCard({
 /**
  * Get icon and color for status
  */
-function getStatusMeta(
-  status: AgentStatus,
-): { icon: React.ComponentType<any>; color: string } {
+function getStatusMeta(status: AgentStatus): {
+  icon: React.ComponentType<any>;
+  color: string;
+} {
   const statusMap = {
     online: { icon: Radio, color: "text-status-success" },
     offline: { icon: Radio, color: "text-text-muted" },

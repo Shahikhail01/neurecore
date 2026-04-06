@@ -1,9 +1,9 @@
 /**
  * Theme Toggle Component
- * 
+ *
  * Allows users to switch between light, dark, and high-contrast themes.
  * Persists preference to localStorage and respects system preference on first visit.
- * 
+ *
  * Uses design tokens for consistent styling.
  */
 
@@ -58,14 +58,14 @@ interface ThemeToggleProps {
 
 /**
  * ThemeToggle Component
- * 
+ *
  * @example
  * // Icon button variant (default)
  * <ThemeToggle />
- * 
+ *
  * // Dropdown variant
  * <ThemeToggle variant="dropdown" />
- * 
+ *
  * // Compact variant (icon only, no touch target)
  * <ThemeToggle variant="compact" />
  */
@@ -103,11 +103,11 @@ export function ThemeToggle({
   if (variant === "dropdown") {
     return (
       <div className={cn("relative", className)}>
-        <Select value={theme} onValueChange={(value) => handleThemeChange(value as ThemeOption)}>
-          <SelectTrigger
-            className="w-40"
-            aria-label="Select theme"
-          >
+        <Select
+          value={theme}
+          onValueChange={(value) => handleThemeChange(value as ThemeOption)}
+        >
+          <SelectTrigger className="w-40" aria-label="Select theme">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -127,7 +127,8 @@ export function ThemeToggle({
 
   if (variant === "compact") {
     const currentIcon = THEME_CONFIG[theme].icon;
-    const nextTheme = theme === "light" ? "dark" : theme === "dark" ? "high-contrast" : "light";
+    const nextTheme =
+      theme === "light" ? "dark" : theme === "dark" ? "high-contrast" : "light";
 
     return (
       <button
@@ -148,7 +149,8 @@ export function ThemeToggle({
 
   // Default: icon-button variant
   const currentIcon = THEME_CONFIG[theme].icon;
-  const nextTheme = theme === "light" ? "dark" : theme === "dark" ? "high-contrast" : "light";
+  const nextTheme =
+    theme === "light" ? "dark" : theme === "dark" ? "high-contrast" : "light";
 
   return (
     <div className={cn("relative inline-block", className)}>
@@ -188,11 +190,15 @@ export function ThemeToggle({
 
 /**
  * ThemeProviderClient Component
- * 
+ *
  * Wrap your app with this component to enable theme persistence and system preference detection.
  * Must be used in a client component.
  */
-export function ThemeProviderClient({ children }: { children: React.ReactNode }) {
+export function ThemeProviderClient({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [isMounted, setIsMounted] = React.useState(false);
   React.useEffect(() => setIsMounted(true), []);
 

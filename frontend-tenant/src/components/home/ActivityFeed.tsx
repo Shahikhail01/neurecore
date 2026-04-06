@@ -1,9 +1,9 @@
 /**
  * Activity Feed Component
- * 
+ *
  * Displays recent activities, notifications, and workflow updates.
  * Provides users with at-a-glance status of their tasks, approvals, and communications.
- * 
+ *
  * Features:
  * - Chronological activity list with timestamps
  * - Activity type indicators (task, approval, message, etc.)
@@ -112,7 +112,7 @@ interface ActivityFeedProps {
 
 /**
  * Activity Feed Component
- * 
+ *
  * @example
  * <ActivityFeed
  *   activities={[
@@ -134,7 +134,9 @@ export function ActivityFeed({
   className,
 }: ActivityFeedProps) {
   const [expanded, setExpanded] = React.useState(false);
-  const visibleActivities = expanded ? activities : activities.slice(0, maxVisible);
+  const visibleActivities = expanded
+    ? activities
+    : activities.slice(0, maxVisible);
 
   if (activities.length === 0) {
     return (
@@ -201,7 +203,7 @@ export function ActivityFeed({
 
 /**
  * Individual Activity Item
- * 
+ *
  * Composable sub-component for Single Responsibility Principle
  */
 function ActivityItem({
@@ -221,7 +223,8 @@ function ActivityItem({
         "flex gap-4 p-4 rounded-lg",
         "bg-surface-base border border-surface-border",
         "transition-all duration-base",
-        activity.onClick && "hover:bg-surface-raised hover:border-accent-primary cursor-pointer",
+        activity.onClick &&
+          "hover:bg-surface-raised hover:border-accent-primary cursor-pointer",
         "focus-within:ring-2 focus-within:ring-accent-primary focus-within:ring-offset-2",
       )}
       role={activity.onClick ? "button" : "article"}
@@ -239,7 +242,12 @@ function ActivityItem({
     >
       {/* Icon/Status Indicator */}
       <div className="flex-shrink-0 mt-1">
-        <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", color)}>
+        <div
+          className={cn(
+            "w-10 h-10 rounded-full flex items-center justify-center",
+            color,
+          )}
+        >
           <Icon className="w-5 h-5 text-white" />
         </div>
       </div>
@@ -252,7 +260,9 @@ function ActivityItem({
               {activity.title}
             </p>
             {activity.user && (
-              <p className="text-xs text-text-muted mt-1">by {activity.user.name}</p>
+              <p className="text-xs text-text-muted mt-1">
+                by {activity.user.name}
+              </p>
             )}
             {activity.description && (
               <p className="text-xs text-text-muted mt-1 line-clamp-2">

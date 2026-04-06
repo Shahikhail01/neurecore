@@ -11,7 +11,8 @@ function makeId() {
 }
 
 export function useChat() {
-  const { messages, conversationId, addMessage, updateStreamingMessage, clearHistory: storeClear, setConversationId } = useChatStore();
+  const { messages, currentChannel, conversationIdByChannel, addMessage, updateStreamingMessage, clearHistory: storeClear, setConversationId } = useChatStore();
+  const conversationId = conversationIdByChannel[currentChannel ?? 'all'] ?? null;
   const [sending, setSending] = useState(false);
 
   const sendMessage = useCallback(

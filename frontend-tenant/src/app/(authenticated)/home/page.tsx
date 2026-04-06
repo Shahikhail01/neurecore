@@ -1,10 +1,10 @@
 /**
  * Home Screen Component
- * 
+ *
  * Main landing page for authenticated users.
  * Combines hero section, quick actions, agent status, and activity feed.
  * Serves as the dashboard and navigation hub for NeureCore platform.
- * 
+ *
  * Features:
  * - Personalized greeting based on time and user data
  * - Prominent command/chat input for quick interactions
@@ -31,20 +31,27 @@ import {
   Settings,
 } from "lucide-react";
 import { HeroSection } from "@/components/home/HeroSection";
-import { QuickLinksGrid, type QuickLink } from "@/components/home/QuickLinksGrid";
+import {
+  QuickLinksGrid,
+  type QuickLink,
+} from "@/components/home/QuickLinksGrid";
 import { ActivityFeed, type Activity } from "@/components/home/ActivityFeed";
-import { AgentStatusPanel, type Agent } from "@/components/home/AgentStatusPanel";
+import {
+  AgentStatusPanel,
+  type Agent,
+} from "@/components/home/AgentStatusPanel";
 
 /**
  * HomeScreen Component
- * 
+ *
  * @example
  * <HomeScreen />
  */
 export function HomeScreen() {
   const user = useAuthStore((state) => state.user);
   const [commandInput, setCommandInput] = React.useState("");
-  const [selectedAgent, setSelectedAgent] = React.useState<string>("marketing-agent");
+  const [selectedAgent, setSelectedAgent] =
+    React.useState<string>("marketing-agent");
 
   // Mock data for quick links
   const quickLinks: QuickLink[] = [
@@ -273,15 +280,11 @@ export function HomeScreen() {
           <h2 className="text-lg font-semibold text-text-primary mb-4">
             Recent Activity
           </h2>
-          <ActivityFeed
-            activities={activities}
-            hasMore={true}
-            maxVisible={5}
-          />
+          <ActivityFeed activities={activities} hasMore={true} maxVisible={5} />
         </div>
       </div>
     </div>
   );
 }
 
-export type { };
+export type {};

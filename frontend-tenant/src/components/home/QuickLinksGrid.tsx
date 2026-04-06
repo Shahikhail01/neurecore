@@ -1,10 +1,10 @@
 /**
  * Quick Links Grid Component
- * 
+ *
  * A responsive grid of action links for common home screen tasks.
  * Provides quick access to primary workflows (create task, approve, etc.).
  * Follows SOLID principles with composable sub-components.
- * 
+ *
  * Features:
  * - Customizable action items with icons and labels
  * - Responsive grid (1 col mobile, 2-3 cols tablet, 3-4 cols desktop)
@@ -86,7 +86,7 @@ interface QuickLinksGridProps {
 
 /**
  * QuickLinksGrid Component
- * 
+ *
  * @example
  * <QuickLinksGrid
  *   links={[
@@ -123,7 +123,7 @@ export function QuickLinksGrid({
 
 /**
  * Individual Quick Link Item
- * 
+ *
  * Composable sub-component for Single Responsibility Principle
  */
 function QuickLinkItem({ link }: { link: QuickLink }) {
@@ -155,7 +155,8 @@ function QuickLinkItem({ link }: { link: QuickLink }) {
           "w-8 h-8 md:w-10 md:h-10 mb-3",
           "text-text-primary",
           "transition-transform duration-base",
-          !link.disabled && "group-hover:scale-110 group-hover:text-accent-primary",
+          !link.disabled &&
+            "group-hover:scale-110 group-hover:text-accent-primary",
         )}
       />
 
@@ -198,16 +199,16 @@ function QuickLinkItem({ link }: { link: QuickLink }) {
     "focus-within:ring-2 focus-within:ring-accent-primary focus-within:ring-offset-2",
   );
 
-  const interactiveClasses = !link.disabled && cn(
-    "hover:border-accent-primary hover:shadow-md",
-    "hover:bg-surface-base cursor-pointer",
-    "active:scale-95",
-  );
+  const interactiveClasses =
+    !link.disabled &&
+    cn(
+      "hover:border-accent-primary hover:shadow-md",
+      "hover:bg-surface-base cursor-pointer",
+      "active:scale-95",
+    );
 
-  const disabledClasses = link.disabled && cn(
-    "opacity-50 cursor-not-allowed",
-    "bg-surface-muted",
-  );
+  const disabledClasses =
+    link.disabled && cn("opacity-50 cursor-not-allowed", "bg-surface-muted");
 
   if (link.href) {
     return (
@@ -230,7 +231,12 @@ function QuickLinkItem({ link }: { link: QuickLink }) {
     <button
       onClick={handleClick}
       disabled={link.disabled}
-      className={cn(baseClasses, interactiveClasses, disabledClasses, "text-left")}
+      className={cn(
+        baseClasses,
+        interactiveClasses,
+        disabledClasses,
+        "text-left",
+      )}
       title={link.description}
       aria-label={`${link.label}${link.description ? `: ${link.description}` : ""}`}
     >

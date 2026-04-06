@@ -8,33 +8,65 @@ const MAX_MESSAGES = 100;
 
 interface ChatState {
   open: boolean;
+  // messages for the currently selected channel
   messages: ConversationMessage[];
-  conversationId: string | null;
+  // mapping channel -> messages
+  messagesByChannel: Record<string, ConversationMessage[]>;
+  // currently active channel
+  currentChannel: string;
+  // mapping channel -> conversation id
+  conversationIdByChannel: Record<string, string | null>;
 
   setOpen: (open: boolean) => void;
   toggleOpen: () => void;
+  setChannel: (channel: string) => void;
   addMessage: (msg: ConversationMessage) => void;
   updateStreamingMessage: (id: string, content: string, done?: boolean) => void;
   clearHistory: () => void;
-  setConversationId: (id: string) => void;
+  setConversationId: (id: string | null) => void;
 }
 
-export const useChatStore = create<ChatState>()((set) => ({
+export const useChatStore = create<ChatState>()((set, get) => ({
   open: false,
   messages: [],
-  conversationId: null,
+  messagesByChannel: {},
+  currentChannel: 'all',
+  conversationIdByChannel: {},
+
   setOpen: (open) => set({ open }),
   toggleOpen: () => set((s) => ({ open: !s.open })),
+
+  setChannel: (channel) =>
+    set((s) => ({ currentChannel: channel, messages: s.messagesByChannel[channel] ?? [] })),
+
   addMessage: (msg) =>
-    set((s) => ({ messages: [...s.messages.slice(-(MAX_MESSAGES - 1)), msg] })),
+    set((s) => {
+      const ch = (msg as any).channel ?? s.currentChannel ?? 'all';
+      const list = [...(s.messagesByChannel[ch] ?? []).slice(-(MAX_MESSAGES - 1)), msg];
+      const byChannel = { ...s.messagesByChannel, [ch]: list };
+      return { messagesByChannel: byChannel, messages: ch === s.currentChannel ? list : s.messages };
+    }),
+
   updateStreamingMessage: (id, content, done = false) =>
-    set((s) => ({
-      messages: s.messages.map((m) =>
-        m.id === id ? { ...m, content, streaming: !done } : m,
-      ),
-    })),
-  clearHistory: () => set({ messages: [], conversationId: null }),
-  setConversationId: (conversationId) => set({ conversationId }),
+    set((s) => {
+      const byChannel = Object.fromEntries(
+        Object.entries(s.messagesByChannel).map(([k, arr]) => [
+          k,
+          arr.map((m) => (m.id === id ? { ...m, content, streaming: !done } : m)),
+        ]),
+      );
+      return { messagesByChannel: byChannel, messages: byChannel[s.currentChannel] ?? [] };
+    }),
+
+  clearHistory: () =>
+    set((s) => {
+      const ch = s.currentChannel;
+      const byChannel = { ...s.messagesByChannel, [ch]: [] };
+      return { messagesByChannel: byChannel, messages: [], conversationIdByChannel: { ...s.conversationIdByChannel, [ch]: null } };
+    }),
+
+  setConversationId: (conversationId) =>
+    set((s) => ({ conversationIdByChannel: { ...s.conversationIdByChannel, [s.currentChannel]: conversationId } })),
 }));
 
 // ─── Strategy Store (Admin only) ──────────────────────────────────────────────

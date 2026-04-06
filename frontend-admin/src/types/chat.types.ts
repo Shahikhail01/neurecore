@@ -41,6 +41,7 @@ export interface ConversationMessage {
   id: string;
   role: ChatMessageRole;
   content: string;
+  channel?: string;
   type?: ChatResponseType;
   data?: ChatMessageData;
   suggestion?: ChatSuggestion;

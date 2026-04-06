@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Badge variant styles using design tokens
- * 
+ *
  * Primary: Accent colors for primary importance
  * Secondary: Surface colors for secondary badges
  * Success: Status green for positive badges
@@ -30,8 +30,7 @@ const badgeVariants = cva(
           "bg-status-warning-light text-status-warning border-status-warning/20 hover:bg-status-warning/10",
         danger:
           "bg-status-danger-light text-status-danger border-status-danger/20 hover:bg-status-danger/10",
-        info:
-          "bg-status-info-light text-status-info border-status-info/20 hover:bg-status-info/10",
+        info: "bg-status-info-light text-status-info border-status-info/20 hover:bg-status-info/10",
         ghost:
           "text-text-secondary border-surface-border hover:text-text-primary hover:bg-surface-overlay",
         outline:
@@ -45,17 +44,16 @@ const badgeVariants = cva(
 );
 
 interface BadgeProps
-  extends React.ComponentProps<"span">,
-    VariantProps<typeof badgeVariants> {
+  extends React.ComponentProps<"span">, VariantProps<typeof badgeVariants> {
   asChild?: boolean;
 }
 
 /**
  * Badge Component
- * 
+ *
  * A small, labeled display component for status, tags, or indicators.
  * Uses design tokens for consistent theming.
- * 
+ *
  * @example
  * <Badge>New</Badge>
  * <Badge variant="success">Approved</Badge>

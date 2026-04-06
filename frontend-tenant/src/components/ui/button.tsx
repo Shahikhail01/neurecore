@@ -46,17 +46,16 @@ const buttonVariants = cva(
 );
 
 interface ButtonProps
-  extends React.ComponentProps<"button">,
-    VariantProps<typeof buttonVariants> {
+  extends React.ComponentProps<"button">, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
 }
 
-/** 
+/**
  * Button Component
- * 
+ *
  * A flexible, accessible button component supporting multiple variants and sizes.
  * Uses design tokens for consistent theming across light/dark modes.
- * 
+ *
  * @example
  * <Button>Click me</Button>
  * <Button variant="secondary" size="lg">Secondary Large</Button>
@@ -65,7 +64,13 @@ interface ButtonProps
  */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
-    { className, variant = "primary", size = "default", asChild = false, ...props },
+    {
+      className,
+      variant = "primary",
+      size = "default",
+      asChild = false,
+      ...props
+    },
     ref,
   ) => {
     const Comp = asChild ? Slot : "button";

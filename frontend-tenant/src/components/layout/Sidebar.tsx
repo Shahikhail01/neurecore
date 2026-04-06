@@ -1,9 +1,9 @@
 /**
  * Sidebar Component
- * 
+ *
  * A collapsible navigation sidebar with grouped items and icons.
  * Follows SOLID principles with composable sub-components.
- * 
+ *
  * Features:
  * - Grouped navigation items
  * - Collapsible sections
@@ -11,7 +11,7 @@
  * - Badge support for notifications
  * - Responsive behavior (collapses on mobile)
  * - Keyboard navigation
- * 
+ *
  * Uses design tokens for consistent theming.
  */
 
@@ -49,12 +49,16 @@ interface SidebarContextType {
 
 // ─── Context ────────────────────────────────────────────────────────────────
 
-const SidebarContext = React.createContext<SidebarContextType | undefined>(undefined);
+const SidebarContext = React.createContext<SidebarContextType | undefined>(
+  undefined,
+);
 
 function useSidebarContext() {
   const context = React.useContext(SidebarContext);
   if (!context) {
-    throw new Error("Sidebar components must be used within a Sidebar component");
+    throw new Error(
+      "Sidebar components must be used within a Sidebar component",
+    );
   }
   return context;
 }
@@ -71,7 +75,7 @@ interface SidebarProps {
 
 /**
  * Sidebar Root Component
- * 
+ *
  * Provides context for all child sidebar components.
  */
 function Sidebar({
@@ -82,7 +86,9 @@ function Sidebar({
   onCollapseChange,
 }: SidebarProps) {
   const [internalCollapsed, setInternalCollapsed] = React.useState(isCollapsed);
-  const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(
+    new Set(),
+  );
 
   const collapsed = onCollapseChange ? isCollapsed : internalCollapsed;
 
@@ -143,7 +149,7 @@ interface SidebarHeaderProps {
 
 /**
  * Sidebar Header
- * 
+ *
  * Top section of the sidebar, typically for branding or logo.
  */
 function SidebarHeader({ children, className }: SidebarHeaderProps) {
@@ -173,16 +179,13 @@ interface SidebarNavProps {
 
 /**
  * Sidebar Nav
- * 
+ *
  * Container for navigation groups.
  */
 function SidebarNav({ children, className }: SidebarNavProps) {
   return (
     <nav
-      className={cn(
-        "flex-1 overflow-y-auto px-2 py-4 space-y-2",
-        className,
-      )}
+      className={cn("flex-1 overflow-y-auto px-2 py-4 space-y-2", className)}
     >
       {children}
     </nav>
@@ -199,7 +202,7 @@ interface SidebarNavGroupProps extends SidebarNavGroup {
 
 /**
  * Sidebar Nav Group
- * 
+ *
  * Groups related navigation items.
  * Can be collapsible for better space management.
  */
@@ -269,14 +272,19 @@ interface SidebarNavItemProps {
 
 /**
  * Sidebar Nav Item
- * 
+ *
  * Individual navigation link with icon and optional badge.
  */
-function SidebarNavItem({item, isActive = false, className }: SidebarNavItemProps) {
+function SidebarNavItem({
+  item,
+  isActive = false,
+  className,
+}: SidebarNavItemProps) {
   const { isCollapsed } = useSidebarContext();
   const Icon = item.icon;
 
-  const badgeContent = typeof item.badge === 'number' ? String(item.badge) : null;
+  const badgeContent =
+    typeof item.badge === "number" ? String(item.badge) : null;
 
   return (
     <Link
@@ -316,7 +324,7 @@ interface SidebarFooterProps {
 
 /**
  * Sidebar Footer
- * 
+ *
  * Bottom section of the sidebar, typically for user menu or additional actions.
  */
 function SidebarFooter({ children, className }: SidebarFooterProps) {
@@ -347,4 +355,11 @@ export {
   useSidebarContext,
 };
 
-export type { SidebarProps, SidebarHeaderProps, SidebarNavProps, SidebarNavGroupProps, SidebarNavItemProps, SidebarFooterProps };
+export type {
+  SidebarProps,
+  SidebarHeaderProps,
+  SidebarNavProps,
+  SidebarNavGroupProps,
+  SidebarNavItemProps,
+  SidebarFooterProps,
+};
