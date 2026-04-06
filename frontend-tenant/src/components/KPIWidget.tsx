@@ -2,6 +2,12 @@ import React from 'react';
 import GlassPanel from './GlassPanel';
 import { Grid, Search, Send } from 'lucide-react';
 
+type KPIData = {
+  taskCompletion?: number;
+  activeProjects?: number;
+  sparkline?: number[];
+};
+
 const Sparkline: React.FC<{ data?: number[]; width?: number; height?: number }> = ({ data = [45, 60, 72, 81, 88], width = 200, height = 48 }) => {
   const min = Math.min(...data);
   const max = Math.max(...data);
@@ -26,7 +32,15 @@ const Sparkline: React.FC<{ data?: number[]; width?: number; height?: number }> 
   );
 };
 
-export const KPIWidget: React.FC = () => {
+interface KPIWidgetProps {
+  data?: KPIData;
+}
+
+export const KPIWidget: React.FC<KPIWidgetProps> = ({ data }) => {
+  const taskCompletion = data?.taskCompletion ?? 88;
+  const activeProjects = data?.activeProjects ?? 14;
+  const sparklineData = data?.sparkline ?? [45, 60, 72, 81, 88];
+
   return (
     <GlassPanel
       header={
@@ -75,16 +89,16 @@ export const KPIWidget: React.FC = () => {
           <div className="flex items-center justify-between gap-6">
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 220 }}>
-                <Sparkline />
+                <Sparkline data={sparklineData} />
               </div>
               <div>
-                <div className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>88%</div>
+                <div className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{taskCompletion}%</div>
                 <div className="text-xs font-medium text-[rgba(255,255,255,0.7)]">Task Completion</div>
               </div>
             </div>
 
             <div style={{ textAlign: 'center' }}>
-              <div className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>14</div>
+              <div className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{activeProjects}</div>
               <div className="text-xs font-medium text-[rgba(255,255,255,0.7)]">Active Projects</div>
             </div>
           </div>
