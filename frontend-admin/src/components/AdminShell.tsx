@@ -84,12 +84,15 @@ export default function AdminShell({
     NAV.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"))
       ?.label ?? "Overview";
 
-  
-
   return (
     <div className="flex h-screen overflow-hidden bg-surface text-zinc-100">
       {/* ── Sidebar (extracted) ───────────────────────────────── */}
-      <Sidebar navItems={NAV} user={user} pathname={pathname} onLogout={handleLogout} />
+      <Sidebar
+        navItems={NAV}
+        user={user}
+        pathname={pathname}
+        onLogout={handleLogout}
+      />
 
       {/* ── Content column ───────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">

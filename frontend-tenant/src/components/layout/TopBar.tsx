@@ -1,7 +1,7 @@
 "use client";
 
 import type { AuthUser } from "@/types/auth.types";
-import { useTheme } from '@/hooks/useTheme';
+import { useTheme } from "@/hooks/useTheme";
 
 export type AutonomyLevel = "assist" | "copilot" | "autopilot";
 
@@ -57,11 +57,11 @@ export function TopBar({
 
         {/* Theme toggle */}
         <button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           title="Toggle theme"
           className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--surface-overlay)]"
         >
-          {theme === 'dark' ? '☀️' : '🌙'}
+          {theme === "dark" ? "☀️" : "🌙"}
         </button>
       </div>
     </header>

@@ -5,9 +5,9 @@
  * Following SOLID: Single Responsibility, Dependency Inversion
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaInboxRepository } from './repositories/prisma-inbox.repository';
-import { OpenClawInboxNotifier } from './notifiers/openclaw-inbox.notifier';
+import type { IInboxNotifier } from './interfaces/inbox.interface';
 import type {
   InboxItemInput,
   FindInboxOptions,
@@ -21,7 +21,7 @@ export class InboxService {
 
   constructor(
     private readonly repository: PrismaInboxRepository,
-    private readonly notifier: OpenClawInboxNotifier,
+    @Inject('INBOX_NOTIFIERS') private readonly notifiers: IInboxNotifier[],
   ) {}
 
   /**
@@ -75,8 +75,12 @@ export class InboxService {
     // Store in repository
     const item = await this.repository.create(tenantId, userId, input);
 
-    // Send via notifier (logs, future: email, slack)
-    await this.notifier.notify(userId, input);
+    // Send via all registered notifiers (best-effort)
+    try {
+      await Promise.allSettled(this.notifiers.map((n) => n.notify(userId, input)));
+    } catch (err) {
+      this.logger.error('One or more notifiers failed', err as any);
+    }
 
     return item;
   }

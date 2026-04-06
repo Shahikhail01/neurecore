@@ -40,7 +40,8 @@ export function Sidebar({
       );
       lastGroup = item.group;
     }
-    const active = pathname === item.href || pathname.startsWith(item.href + "/");
+    const active =
+      pathname === item.href || pathname.startsWith(item.href + "/");
     rendered.push(
       <Link
         key={item.href}
@@ -60,16 +61,24 @@ export function Sidebar({
   return (
     <aside className="w-56 shrink-0 border-r border-surface-border flex flex-col bg-surface-raised">
       <div className="px-5 py-4 border-b border-surface-border">
-        <span className="text-sm font-bold tracking-widest text-indigo-400 uppercase">NeureCore</span>
+        <span className="text-sm font-bold tracking-widest text-indigo-400 uppercase">
+          NeureCore
+        </span>
         <div className="text-xs text-zinc-500 mt-0.5">Admin Console</div>
       </div>
 
-      <nav className="flex-1 py-3 flex flex-col gap-0.5 px-2 overflow-y-auto">{rendered}</nav>
+      <nav className="flex-1 py-3 flex flex-col gap-0.5 px-2 overflow-y-auto">
+        {rendered}
+      </nav>
 
       <div className="px-4 py-4 border-t border-surface-border">
-        <div className="text-xs text-zinc-400 font-medium truncate mb-0.5">{user.firstName} {user.lastName}</div>
+        <div className="text-xs text-zinc-400 font-medium truncate mb-0.5">
+          {user.firstName} {user.lastName}
+        </div>
         <div className="text-xs text-zinc-500 truncate mb-2">{user.email}</div>
-        <span className="inline-block rounded-full bg-indigo-900 text-indigo-300 text-xs px-2 py-0.5 font-medium mb-3">{user.role}</span>
+        <span className="inline-block rounded-full bg-indigo-900 text-indigo-300 text-xs px-2 py-0.5 font-medium mb-3">
+          {user.role}
+        </span>
         <button
           onClick={onLogout}
           className="w-full rounded-lg border border-surface-border px-3 py-1.5 text-xs text-zinc-400 hover:bg-surface-overlay hover:text-white transition"
