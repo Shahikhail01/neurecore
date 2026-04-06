@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Zap,
   Search,
+  Home,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useUIPreferencesStore } from "@/shared/stores/uiPreferencesStore";
@@ -37,6 +38,7 @@ const NAV_GROUPS = [
   {
     label: "Workspace",
     items: [
+      { icon: Home, label: "Home", href: "/home" },
       { icon: LayoutDashboard, label: "AI Office", href: "/dashboard" },
       { icon: Bell, label: "Inbox", href: "/inbox", badge: true },
       { icon: Activity, label: "Activity", href: "/activity" },

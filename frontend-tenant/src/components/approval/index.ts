@@ -16,7 +16,6 @@ export { ApprovalDetailView } from "./ApprovalDetailView";
 export type { ApprovalDetailViewProps } from "./ApprovalDetailView";
 
 export { ApprovalQueue } from "./ApprovalQueue";
-export type { ApprovalQueueProps } from "./ApprovalQueue";
 
 export { WorkflowStageIndicator } from "./WorkflowStageIndicator";
 export type { WorkflowStageIndicatorProps } from "./WorkflowStageIndicator";

@@ -287,4 +287,4 @@ export function HomeScreen() {
   );
 }
 
-export type {};
+export default HomeScreen;

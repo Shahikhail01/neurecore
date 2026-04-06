@@ -10,6 +10,7 @@ module.exports = {
 
       // ─── Surface colors (background, cards, panels) ───
       surface: {
+        DEFAULT: "var(--surface-base)",
         base: "var(--surface-base)",
         raised: "var(--surface-raised)",
         overlay: "var(--surface-overlay)",

@@ -10,14 +10,14 @@ export type ISODateString = string;
 // ─── Auth / Users ─────────────────────────────────────────────────────────────
 
 export type UserRole =
-  | 'SUPER_ADMIN'
-  | 'PLATFORM_ADMIN'
-  | 'SECURITY_OFFICER'
-  | 'SUPPORT'
-  | 'OWNER'
-  | 'ADMIN'
-  | 'USER'
-  | 'AUDITOR';
+  | "SUPER_ADMIN"
+  | "PLATFORM_ADMIN"
+  | "SECURITY_OFFICER"
+  | "SUPPORT"
+  | "OWNER"
+  | "ADMIN"
+  | "USER"
+  | "AUDITOR";
 
 export interface User {
   id: EntityId;
@@ -34,8 +34,8 @@ export interface User {
 
 // ─── Tenant ───────────────────────────────────────────────────────────────────
 
-export type TenantPlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
-export type TenantStatus = 'ACTIVE' | 'SUSPENDED' | 'PENDING' | 'CANCELLED';
+export type TenantPlan = "FREE" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE";
+export type TenantStatus = "ACTIVE" | "SUSPENDED" | "PENDING" | "CANCELLED";
 
 export interface Tenant {
   id: EntityId;
@@ -52,17 +52,22 @@ export interface Tenant {
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
-export type AgentStatus = 'ACTIVE' | 'INACTIVE' | 'TRAINING' | 'ERROR' | 'PAUSED';
-export type AgentMood = 'busy' | 'idle' | 'optimistic' | 'stressed' | 'offline';
+export type AgentStatus =
+  | "ACTIVE"
+  | "INACTIVE"
+  | "TRAINING"
+  | "ERROR"
+  | "PAUSED";
+export type AgentMood = "busy" | "idle" | "optimistic" | "stressed" | "offline";
 
 export interface AgentPerformance {
-  successRate: number;        // 0–100
-  avgTaskDuration: number;    // seconds
+  successRate: number; // 0–100
+  avgTaskDuration: number; // seconds
   tasksCompleted: number;
   tasksInProgress: number;
   tasksFailed: number;
   lastEvaluationScore?: number;
-  streak: number;             // consecutive successes
+  streak: number; // consecutive successes
 }
 
 export interface Agent {
@@ -79,7 +84,7 @@ export interface Agent {
   departmentName?: string;
   performance: AgentPerformance;
   avatarUrl?: string;
-  workloadGauge: number;      // 0–100 (visual meter)
+  workloadGauge: number; // 0–100 (visual meter)
   tags: string[];
   createdAt: ISODateString;
   lastActiveAt?: ISODateString;
@@ -88,14 +93,14 @@ export interface Agent {
 // ─── Task ─────────────────────────────────────────────────────────────────────
 
 export type TaskStatus =
-  | 'PENDING'
-  | 'ASSIGNED'
-  | 'IN_PROGRESS'
-  | 'COMPLETED'
-  | 'FAILED'
-  | 'CANCELLED';
+  | "PENDING"
+  | "ASSIGNED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "FAILED"
+  | "CANCELLED";
 
-export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 export interface Task {
   id: EntityId;
@@ -110,7 +115,7 @@ export interface Task {
   dueAt?: ISODateString;
   completedAt?: ISODateString;
   estimatedDuration?: number; // minutes
-  actualDuration?: number;    // minutes
+  actualDuration?: number; // minutes
   metadata?: Record<string, unknown>;
   createdAt: ISODateString;
   updatedAt: ISODateString;
@@ -118,11 +123,16 @@ export interface Task {
 
 // ─── Workflow ─────────────────────────────────────────────────────────────────
 
-export type WorkflowStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED' | 'ERROR';
+export type WorkflowStatus =
+  | "DRAFT"
+  | "ACTIVE"
+  | "PAUSED"
+  | "ARCHIVED"
+  | "ERROR";
 
 export interface WorkflowNode {
   id: string;
-  type: 'trigger' | 'agent' | 'condition' | 'delay' | 'notification';
+  type: "trigger" | "agent" | "condition" | "delay" | "notification";
   label: string;
   agentId?: EntityId;
   config: Record<string, unknown>;
@@ -145,7 +155,7 @@ export interface Workflow {
   edges?: WorkflowEdge[];
   lastExecutedAt?: ISODateString;
   executionCount: number;
-  successRate: number;  // 0–100
+  successRate: number; // 0–100
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
@@ -157,6 +167,7 @@ export interface Department {
   name: string;
   description?: string;
   tenantId: EntityId;
+  parentDepartmentId?: EntityId | null;
   agentCount: number;
   activeAgentCount: number;
   completedTasksToday: number;
@@ -166,7 +177,7 @@ export interface Department {
 
 // ─── Execution Log ────────────────────────────────────────────────────────────
 
-export type ExecutionStatus = 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type ExecutionStatus = "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
 
 export interface ExecutionLog {
   id: EntityId;
@@ -187,17 +198,17 @@ export interface ExecutionLog {
 // ─── Activity Event (Newsfeed) ─────────────────────────────────────────────────
 
 export type ActivityEventType =
-  | 'task.completed'
-  | 'task.failed'
-  | 'agent.activated'
-  | 'agent.error'
-  | 'workflow.started'
-  | 'workflow.completed'
-  | 'approval.requested'
-  | 'approval.approved'
-  | 'approval.rejected'
-  | 'collaboration'
-  | 'alert';
+  | "task.completed"
+  | "task.failed"
+  | "agent.activated"
+  | "agent.error"
+  | "workflow.started"
+  | "workflow.completed"
+  | "approval.requested"
+  | "approval.approved"
+  | "approval.rejected"
+  | "collaboration"
+  | "alert";
 
 export interface ActivityEvent {
   id: EntityId;
@@ -208,7 +219,7 @@ export interface ActivityEvent {
   entityType?: string;
   agentId?: EntityId;
   agentName?: string;
-  impact?: 'positive' | 'negative' | 'neutral';
+  impact?: "positive" | "negative" | "neutral";
   metadata?: Record<string, unknown>;
   timestamp: ISODateString;
 }
@@ -218,12 +229,12 @@ export interface ActivityEvent {
 export interface CompanyMetrics {
   totalAgents: number;
   activeAgents: number;
-  teamHarmony: number;          // 0–100
+  teamHarmony: number; // 0–100
   tasksCompletedToday: number;
   tasksPending: number;
   activeWorkflows: number;
   pendingApprovals: number;
-  companyScore: number;         // 0–100
+  companyScore: number; // 0–100
   revenueImpact?: number;
   alertCount: number;
   criticalAlertCount: number;
@@ -231,7 +242,7 @@ export interface CompanyMetrics {
 
 // ─── Approval ─────────────────────────────────────────────────────────────────
 
-export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
 
 export interface Approval {
   id: EntityId;
@@ -252,8 +263,13 @@ export interface Approval {
 
 // ─── Notification ─────────────────────────────────────────────────────────────
 
-export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'collaboration';
-export type NotificationPriority = 'critical' | 'important' | 'info';
+export type NotificationType =
+  | "info"
+  | "success"
+  | "warning"
+  | "error"
+  | "collaboration";
+export type NotificationPriority = "critical" | "important" | "info";
 
 export interface Notification {
   id: EntityId;
@@ -269,12 +285,12 @@ export interface Notification {
 
 // ─── Time Range ───────────────────────────────────────────────────────────────
 
-export type TimeRange = '1h' | '24h' | '7d' | '30d' | '90d';
+export type TimeRange = "1h" | "24h" | "7d" | "30d" | "90d";
 
 // ─── Analytics Trend Data ─────────────────────────────────────────────────────
 
 export interface TrendPoint {
-  label: string;          // e.g. "Mon", "Jan 12", "14:00"
+  label: string; // e.g. "Mon", "Jan 12", "14:00"
   value: number;
   baseline?: number;
 }
@@ -282,7 +298,7 @@ export interface TrendPoint {
 export interface AgentPerformanceTrend {
   agentId: EntityId;
   agentName: string;
-  successRate: number;    // 0–100
+  successRate: number; // 0–100
   taskCount: number;
   avgDurationMs?: number;
 }

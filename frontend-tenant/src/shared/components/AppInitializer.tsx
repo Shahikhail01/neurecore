@@ -46,6 +46,7 @@ export function AppInitializer() {
               if (user) useAuthStore.getState().setUser(user);
             } catch {
               tokenManager.clearTokens();
+              useAuthStore.getState().clearUser();
             }
           }
         }

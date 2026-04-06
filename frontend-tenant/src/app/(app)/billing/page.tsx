@@ -52,7 +52,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     api
-      .get("/billing/invoices")
+      .get("/finance/invoices")
       .catch(() => ({ data: { data: [] } }))
       .then((res) => {
         setInvoices(res.data?.data ?? res.data ?? []);

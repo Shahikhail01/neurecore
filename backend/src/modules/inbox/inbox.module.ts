@@ -22,8 +22,15 @@ import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
     // Repository
     PrismaInboxRepository,
 
-    // Notifier
+    // Notifier (concrete)
     OpenClawInboxNotifier,
+
+    // Notifier array token expected by InboxService
+    {
+      provide: 'INBOX_NOTIFIERS',
+      useFactory: (openclaw: OpenClawInboxNotifier) => [openclaw],
+      inject: [OpenClawInboxNotifier],
+    },
   ],
   exports: [InboxService],
 })
