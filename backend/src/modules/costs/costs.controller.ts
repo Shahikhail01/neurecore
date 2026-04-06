@@ -24,7 +24,7 @@ import { CostsService } from './services/costs.service';
 import { CsvExportService } from '../../shared/services/csv-export.service';
 import { CreateBudgetPolicyDto, UpdateBudgetPolicyDto } from './dto/cost.dto';
 
-@Controller('costs')
+@Controller({ path: 'costs', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class CostsController {
   constructor(

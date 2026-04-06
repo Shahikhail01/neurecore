@@ -309,7 +309,7 @@ export class AgentsController {
    */
   @Get(':id/versions')
   listVersions(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
@@ -325,7 +325,7 @@ export class AgentsController {
    */
   @Post(':id/versions')
   async createVersion(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: CreateAgentVersionDto,
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
@@ -353,7 +353,7 @@ export class AgentsController {
   @Post(':id/rollback')
   @HttpCode(HttpStatus.OK)
   rollback(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: RollbackAgentVersionDto,
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,

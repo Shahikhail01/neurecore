@@ -1,16 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Plus, Users, Bot } from "lucide-react";
+import { Building2, Plus, Users, Bot, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import api from "@/services/api";
+
+interface DeptAgent {
+  id: string;
+  name: string;
+  status: string;
+  type: string;
+}
 
 interface Department {
   id: string;
   name: string;
   description?: string;
+  agents?: DeptAgent[];
+  _count?: { agents: number };
+  // legacy compat
   agentCount?: number;
   headCount?: number;
 }
+
+const STATUS_DOT: Record<string, string> = {
+  ACTIVE: "bg-emerald-400",
+  IDLE: "bg-zinc-500",
+  PAUSED: "bg-yellow-400",
+  ERROR: "bg-red-400",
+};
 
 export default function DepartmentsPage() {
   const [depts, setDepts] = useState<Department[]>([]);
@@ -48,7 +66,7 @@ export default function DepartmentsPage() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="h-28 rounded-xl bg-[var(--surface-overlay)] animate-pulse"
+                className="h-36 rounded-xl bg-[var(--surface-overlay)] animate-pulse"
               />
             ))}
           </div>
@@ -64,35 +82,68 @@ export default function DepartmentsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {depts.map((d) => (
-              <div
-                key={d.id}
-                className="bg-[var(--surface-raised)] border border-[var(--surface-border)] rounded-xl p-4 hover:border-emerald-500/30 transition-colors cursor-pointer"
-              >
-                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
-                  {d.name}
-                </h3>
-                {d.description && (
-                  <p className="text-xs text-[var(--text-secondary)] mb-3 line-clamp-2">
-                    {d.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-4 text-[11px] text-[var(--text-secondary)]">
-                  {d.agentCount !== undefined && (
-                    <span className="flex items-center gap-1">
-                      <Bot className="w-3 h-3 text-violet-400" />
-                      {d.agentCount} agents
+            {depts.map((d) => {
+              const agentCount =
+                d._count?.agents ?? d.agentCount ?? d.agents?.length ?? 0;
+              const previewAgents = (d.agents ?? []).slice(0, 4);
+              return (
+                <div
+                  key={d.id}
+                  className="bg-[var(--surface-raised)] border border-[var(--surface-border)] rounded-xl p-4 hover:border-emerald-500/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                      {d.name}
+                    </h3>
+                    <span className="flex items-center gap-1 text-[11px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full">
+                      <Bot className="w-3 h-3" />
+                      {agentCount}
                     </span>
+                  </div>
+                  {d.description && (
+                    <p className="text-xs text-[var(--text-secondary)] mb-3 line-clamp-2">
+                      {d.description}
+                    </p>
                   )}
-                  {d.headCount !== undefined && (
+
+                  {/* Agent preview list */}
+                  {previewAgents.length > 0 && (
+                    <div className="space-y-1 mb-3">
+                      {previewAgents.map((a) => (
+                        <div
+                          key={a.id}
+                          className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]"
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[a.status] ?? "bg-zinc-500"}`}
+                          />
+                          <span className="truncate">{a.name}</span>
+                        </div>
+                      ))}
+                      {agentCount > 4 && (
+                        <p className="text-[10px] text-[var(--text-secondary)] pl-3.5">
+                          +{agentCount - 4} more
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] pt-2 border-t border-[var(--surface-border)]">
                     <span className="flex items-center gap-1">
                       <Users className="w-3 h-3 text-blue-400" />
-                      {d.headCount} members
+                      {agentCount} agent{agentCount !== 1 ? "s" : ""}
                     </span>
-                  )}
+                    <Link
+                      href={`/agents?departmentId=${d.id}`}
+                      className="flex items-center gap-0.5 text-brand hover:underline"
+                    >
+                      View agents{" "}
+                      <ChevronRight className="w-3 h-3" aria-hidden="true" />
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -35,6 +35,9 @@ import {
 import { useAuthStore } from "@/stores/authStore";
 import { useUIPreferencesStore } from "@/shared/stores/uiPreferencesStore";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { PageContent } from "@/components/layout/PageContent";
+import { TabNav } from "@/components/layout/TabNav";
 import { workspaceProvisioningService } from "@/services/workspace-provisioning.service";
 import type {
   ProvisioningStatusDto,
@@ -51,16 +54,16 @@ import {
 
 type Tab =
   | "profile"
+  | "workspace"
+  | "preferences"
   | "notifications"
-  | "appearance"
-  | "security"
-  | "workspace";
+  | "security";
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
 function SectionCard({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] overflow-hidden">
+    <div className="rounded-card border border-surface-border bg-surface-overlay overflow-hidden">
       {children}
     </div>
   );
@@ -74,9 +77,9 @@ function SectionRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex justify-between items-center px-4 py-2.5 border-b border-[var(--surface-border)] last:border-0">
-      <span className="text-xs text-[var(--text-secondary)]">{label}</span>
-      <div className="text-xs text-[var(--text-primary)] font-medium">
+    <div className="flex justify-between items-center px-4 py-2.5 border-b border-surface-border last:border-0">
+      <span className="text-caption text-text-secondary">{label}</span>
+      <div className="text-caption text-text-primary font-medium">
         {children}
       </div>
     </div>
@@ -95,33 +98,33 @@ function StatusChip({ status }: StatusChipProps) {
     {
       PENDING_CONNECT: {
         label: "Pending Connection",
-        cls: "bg-amber-900/30 text-amber-400 border-amber-500/30",
+        cls: "bg-status-warn/20 text-status-warn border-status-warn/30",
         icon: <Clock className="h-3 w-3" />,
       },
       CONNECTED: {
         label: "Connected",
-        cls: "bg-green-900/30 text-green-400 border-green-500/30",
+        cls: "bg-status-profit/20 text-status-profit border-status-profit/30",
         icon: <CheckCircle2 className="h-3 w-3" />,
       },
       IN_PROGRESS: {
         label: "Provisioning…",
-        cls: "bg-blue-900/30 text-blue-400 border-blue-500/30",
+        cls: "bg-status-ops/20 text-status-ops border-status-ops/30",
         icon: <Loader2 className="h-3 w-3 animate-spin" />,
       },
       COMPLETED: {
         label: "Completed",
-        cls: "bg-green-900/30 text-green-400 border-green-500/30",
+        cls: "bg-status-profit/20 text-status-profit border-status-profit/30",
         icon: <CheckCircle2 className="h-3 w-3" />,
       },
       FAILED: {
         label: "Failed",
-        cls: "bg-red-900/30 text-red-400 border-red-500/30",
+        cls: "bg-status-risk/20 text-status-risk border-status-risk/30",
         icon: <AlertCircle className="h-3 w-3" />,
       },
     };
   const entry = map[status] ?? {
     label: status,
-    cls: "bg-zinc-800 text-zinc-400 border-zinc-700",
+    cls: "bg-surface-muted text-text-secondary border-surface-border",
   };
   return (
     <span
@@ -135,11 +138,11 @@ function StatusChip({ status }: StatusChipProps) {
 
 function JobStatusChip({ status }: { status: string }) {
   const cls: Record<string, string> = {
-    PENDING: "bg-zinc-800 text-zinc-400 border-zinc-700",
-    IN_PROGRESS: "bg-blue-900/30 text-blue-400 border-blue-500/30",
-    COMPLETED: "bg-green-900/30 text-green-400 border-green-500/30",
-    FAILED: "bg-red-900/30 text-red-400 border-red-500/30",
-    SKIPPED: "bg-zinc-800 text-zinc-500 border-zinc-700",
+    PENDING: "bg-surface-muted text-text-secondary border-surface-border",
+    IN_PROGRESS: "bg-status-ops/20 text-status-ops border-status-ops/30",
+    COMPLETED: "bg-status-profit/20 text-status-profit border-status-profit/30",
+    FAILED: "bg-status-risk/20 text-status-risk border-status-risk/30",
+    SKIPPED: "bg-surface-overlay text-text-muted border-surface-border",
   };
   return (
     <span
@@ -224,27 +227,23 @@ function ProviderSelector({ value, onChange }: ProviderSelectorProps) {
           type="button"
           onClick={() => onChange(opt.value)}
           className={cn(
-            "flex items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+            "flex items-center gap-3 rounded-input border p-3 text-left transition-colors",
             value === opt.value
-              ? "border-violet-500 bg-violet-500/10"
-              : "border-[var(--surface-border)] hover:border-violet-500/40",
+              ? "border-brand bg-brand/10"
+              : "border-surface-border hover:border-brand/40",
           )}
         >
           {opt.icon}
           <div>
             <p
               className={cn(
-                "text-xs font-semibold",
-                value === opt.value
-                  ? "text-violet-400"
-                  : "text-[var(--text-primary)]",
+                "text-caption font-semibold",
+                value === opt.value ? "text-brand" : "text-text-primary",
               )}
             >
               {opt.label}
             </p>
-            <p className="text-[11px] text-[var(--text-secondary)]">
-              {opt.description}
-            </p>
+            <p className="text-micro text-text-secondary">{opt.description}</p>
           </div>
         </button>
       ))}
@@ -285,10 +284,10 @@ function EmailPatternSelector({
           type="button"
           onClick={() => onChange(p)}
           className={cn(
-            "rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors",
+            "rounded-input border px-3 py-1.5 text-micro font-medium transition-colors",
             value === p
-              ? "border-violet-500 bg-violet-500/10 text-violet-400"
-              : "border-[var(--surface-border)] text-[var(--text-secondary)] hover:border-violet-500/40",
+              ? "border-brand bg-brand/10 text-brand"
+              : "border-surface-border text-text-secondary hover:border-brand/40",
           )}
         >
           {EMAIL_PATTERN_LABELS[p]}
@@ -328,27 +327,27 @@ function FolderStructureSelector({
           type="button"
           onClick={() => onChange(s)}
           className={cn(
-            "flex flex-1 flex-col items-start rounded-lg border p-3 text-left transition-colors",
+            "flex flex-1 flex-col items-start rounded-card border p-3 text-left transition-colors",
             value === s
-              ? "border-violet-500 bg-violet-500/10"
-              : "border-[var(--surface-border)] hover:border-violet-500/40",
+              ? "border-brand bg-brand/10"
+              : "border-surface-border hover:border-brand/40",
           )}
         >
           <FolderOpen
             className={cn(
               "mb-1 h-4 w-4",
-              value === s ? "text-violet-400" : "text-zinc-500",
+              value === s ? "text-brand" : "text-text-muted",
             )}
           />
           <p
             className={cn(
-              "text-xs font-semibold",
-              value === s ? "text-violet-400" : "text-[var(--text-primary)]",
+              "text-caption font-semibold",
+              value === s ? "text-brand" : "text-text-primary",
             )}
           >
             {FOLDER_STRUCTURE_LABELS[s]}
           </p>
-          <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+          <p className="mt-0.5 text-micro text-text-secondary">
             {FOLDER_STRUCTURE_DESCRIPTIONS[s]}
           </p>
         </button>
@@ -415,7 +414,7 @@ function WorkspaceConfigForm({
   };
 
   return (
-    <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] overflow-hidden">
+    <div className="rounded-card border border-surface-border bg-surface-overlay overflow-hidden">
       {/* Header / toggle */}
       <button
         type="button"
@@ -423,26 +422,26 @@ function WorkspaceConfigForm({
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
         <div className="flex items-center gap-2">
-          <Globe className="h-4 w-4 text-violet-400" />
-          <span className="text-sm font-semibold text-[var(--text-primary)]">
+          <Globe className="h-4 w-4 text-brand" />
+          <span className="text-sm font-semibold text-text-primary">
             Workspace Configuration
           </span>
         </div>
         {expanded ? (
-          <ChevronUp className="h-4 w-4 text-zinc-500" />
+          <ChevronUp className="h-4 w-4 text-text-muted" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-zinc-500" />
+          <ChevronDown className="h-4 w-4 text-text-muted" />
         )}
       </button>
 
       {expanded && (
         <form
           onSubmit={handleSubmit}
-          className="border-t border-[var(--surface-border)] p-4 space-y-5"
+          className="border-t border-surface-border p-4 space-y-5"
         >
           {/* Provider */}
           <div className="space-y-2">
-            <label className="block text-xs font-medium text-[var(--text-secondary)]">
+            <label className="block text-caption font-medium text-text-secondary">
               Cloud Provider
             </label>
             <ProviderSelector
@@ -453,12 +452,12 @@ function WorkspaceConfigForm({
 
           {/* Email Domain */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-[var(--text-secondary)]">
+            <label className="block text-caption font-medium text-text-secondary">
               <Mail className="inline h-3 w-3 mr-1" />
               Corporate Email Domain
             </label>
-            <div className="flex items-center rounded-md border border-[var(--surface-border)] bg-[var(--surface-overlay)] overflow-hidden focus-within:border-violet-500">
-              <span className="px-3 py-2 text-xs text-zinc-500 border-r border-[var(--surface-border)]">
+            <div className="flex items-center rounded-input border border-surface-border bg-surface-overlay overflow-hidden focus-within:border-brand">
+              <span className="px-3 py-2 text-caption text-text-muted border-r border-surface-border">
                 @
               </span>
               <input
@@ -467,14 +466,14 @@ function WorkspaceConfigForm({
                   setForm((f) => ({ ...f, emailDomain: e.target.value }))
                 }
                 placeholder="company.com"
-                className="flex-1 px-3 py-2 text-xs text-[var(--text-primary)] bg-transparent focus:outline-none"
+                className="flex-1 px-3 py-2 text-caption text-text-primary bg-transparent focus:outline-none"
               />
             </div>
           </div>
 
           {/* Email Pattern */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-[var(--text-secondary)]">
+            <label className="block text-caption font-medium text-text-secondary">
               <Mail className="inline h-3 w-3 mr-1" />
               Email Address Pattern
             </label>
@@ -487,7 +486,7 @@ function WorkspaceConfigForm({
 
           {/* Folder Structure */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-[var(--text-secondary)]">
+            <label className="block text-caption font-medium text-text-secondary">
               <FolderOpen className="inline h-3 w-3 mr-1" />
               Cloud Storage Folder Structure
             </label>
@@ -506,7 +505,7 @@ function WorkspaceConfigForm({
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-input bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90 disabled:opacity-50"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -591,8 +590,8 @@ function ConnectionPanel({
     <SectionCard>
       <div className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Plug className="h-4 w-4 text-violet-400" />
-          <span className="text-sm font-semibold text-[var(--text-primary)]">
+          <Plug className="h-4 w-4 text-brand" />
+          <span className="text-sm font-semibold text-text-primary">
             OAuth Connection
           </span>
         </div>
@@ -624,7 +623,7 @@ function ConnectionPanel({
           <button
             onClick={handleConnect}
             disabled={connectLoading}
-            className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-400 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-input bg-status-warn px-4 py-2 text-sm font-semibold text-black transition hover:bg-status-warn/80 disabled:opacity-50"
           >
             {connectLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -638,7 +637,7 @@ function ConnectionPanel({
           <button
             onClick={handleDisconnect}
             disabled={disconnectLoading}
-            className="flex items-center gap-2 rounded-lg border border-red-500/40 bg-red-900/20 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-900/40 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-input border border-status-risk/40 bg-status-risk/20 px-4 py-2 text-sm font-semibold text-status-risk transition hover:bg-status-risk/30 disabled:opacity-50"
           >
             {disconnectLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -699,7 +698,7 @@ function ProvisioningJobsTable({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-semibold text-[var(--text-primary)]">
+        <p className="text-caption font-semibold text-text-primary">
           Provisioning Jobs ({jobs.length})
         </p>
         <div className="flex items-center gap-2">
@@ -708,7 +707,7 @@ function ProvisioningJobsTable({
             <button
               onClick={handleTrigger}
               disabled={loading || !hasPending}
-              className="flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-500 disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-input bg-brand px-3 py-1.5 text-caption font-semibold text-white transition hover:bg-brand/90 disabled:opacity-40"
             >
               {loading ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -722,20 +721,20 @@ function ProvisioningJobsTable({
       </div>
 
       {jobs.length === 0 ? (
-        <p className="text-xs text-[var(--text-secondary)]">
+        <p className="text-caption text-text-secondary">
           No provisioning jobs found. Team members invited during onboarding
           will appear here.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[var(--surface-border)]">
+        <div className="overflow-x-auto rounded-card border border-surface-border">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-[var(--surface-border)] bg-[var(--surface-overlay)]">
+              <tr className="border-b border-surface-border bg-surface-overlay">
                 {["Name", "Invited Email", "Corporate Email", "Status"].map(
                   (h) => (
                     <th
                       key={h}
-                      className="px-3 py-2.5 text-left font-medium text-[var(--text-secondary)]"
+                      className="px-3 py-2.5 text-left font-medium text-text-secondary"
                     >
                       {h}
                     </th>
@@ -747,17 +746,17 @@ function ProvisioningJobsTable({
               {jobs.map((job) => (
                 <tr
                   key={job.id}
-                  className="border-b border-[var(--surface-border)] last:border-0"
+                  className="border-b border-surface-border last:border-0"
                 >
-                  <td className="px-3 py-2.5 text-[var(--text-primary)]">
+                  <td className="px-3 py-2.5 text-text-primary">
                     {job.inviteeFirstName} {job.inviteeLastName}
                   </td>
-                  <td className="px-3 py-2.5 text-[var(--text-secondary)]">
+                  <td className="px-3 py-2.5 text-text-secondary">
                     {job.inviteeEmail}
                   </td>
-                  <td className="px-3 py-2.5 text-[var(--text-secondary)]">
+                  <td className="px-3 py-2.5 text-text-secondary">
                     {job.provisionedEmail ?? (
-                      <span className="text-zinc-600">Pending</span>
+                      <span className="text-text-muted">Pending</span>
                     )}
                   </td>
                   <td className="px-3 py-2.5">
@@ -830,7 +829,7 @@ function WorkspaceTabContent() {
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="h-10 rounded-md bg-[var(--surface-overlay)] animate-pulse"
+            className="h-10 rounded-input bg-surface-overlay animate-pulse"
           />
         ))}
       </div>
@@ -854,10 +853,10 @@ function WorkspaceTabContent() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+        <h2 className="text-sm font-semibold text-text-primary">
           Workspace Integration
         </h2>
-        <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+        <p className="mt-0.5 text-caption text-text-secondary">
           Connect Google Workspace or Microsoft 365 to auto-provision corporate
           email accounts and cloud storage folders for your team.
         </p>
@@ -909,21 +908,21 @@ function OnboardingRerunSection() {
   };
 
   return (
-    <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] p-4">
+    <div className="rounded-card border border-surface-border bg-surface-overlay p-4">
       <div className="flex items-start gap-3">
-        <PlayCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-violet-400" />
+        <PlayCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand" />
         <div className="flex-1">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">
+          <p className="text-sm font-semibold text-text-primary">
             Re-run Onboarding Wizard
           </p>
-          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+          <p className="mt-0.5 text-caption text-text-secondary">
             Update your company details, plan, departments, team members, or
             integrations at any time by re-running the setup wizard.
           </p>
           <button
             onClick={handleRerun}
             disabled={loading}
-            className="mt-3 flex items-center gap-2 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/20 disabled:opacity-50"
+            className="mt-3 flex items-center gap-2 rounded-input border border-brand/40 bg-brand/10 px-3 py-1.5 text-caption font-semibold text-brand transition hover:bg-brand/20 disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -940,12 +939,47 @@ function OnboardingRerunSection() {
 
 // ─── Settings page inner ──────────────────────────────────────────────────────
 
+const SETTINGS_TABS: Array<{ id: string; label: string; icon?: ReactNode }> = [
+  { id: "profile", label: "Profile", icon: <User className="w-3.5 h-3.5" /> },
+  {
+    id: "workspace",
+    label: "Workspace",
+    icon: <Building2 className="w-3.5 h-3.5" />,
+  },
+  {
+    id: "preferences",
+    label: "Preferences",
+    icon: <Palette className="w-3.5 h-3.5" />,
+  },
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: <Bell className="w-3.5 h-3.5" />,
+  },
+  {
+    id: "security",
+    label: "Security",
+    icon: <Shield className="w-3.5 h-3.5" />,
+  },
+];
+
 function SettingsPageInner() {
   const { user } = useAuthStore();
-  const { theme, setTheme } = useUIPreferencesStore();
+  const {
+    theme,
+    setTheme,
+    textSize,
+    setTextSize,
+    autonomyLevel,
+    setAutonomyLevel,
+  } = useUIPreferencesStore();
   const searchParams = useSearchParams();
 
-  const initialTab = (searchParams.get("tab") ?? "profile") as Tab;
+  // Map legacy "appearance" URL param to new "preferences" tab id
+  const rawTab = searchParams.get("tab");
+  const initialTab = (
+    rawTab === "appearance" ? "preferences" : (rawTab ?? "profile")
+  ) as Tab;
   const [tab, setTab] = useState<Tab>(initialTab);
   const [name, setName] = useState(
     user ? `${user.firstName} ${user.lastName}`.trim() : "",
@@ -957,237 +991,287 @@ function SettingsPageInner() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const tabs: { key: Tab; label: string; icon: ReactNode }[] = [
-    {
-      key: "profile",
-      label: "Profile",
-      icon: <User className="w-3.5 h-3.5" />,
-    },
-    {
-      key: "appearance",
-      label: "Appearance",
-      icon: <Palette className="w-3.5 h-3.5" />,
-    },
-    {
-      key: "notifications",
-      label: "Notifications",
-      icon: <Bell className="w-3.5 h-3.5" />,
-    },
-    {
-      key: "security",
-      label: "Security",
-      icon: <Shield className="w-3.5 h-3.5" />,
-    },
-    {
-      key: "workspace",
-      label: "Workspace",
-      icon: <Building2 className="w-3.5 h-3.5" />,
-    },
-  ];
-
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 px-5 py-4 border-b border-[var(--surface-border)]">
-        <h1 className="text-base font-semibold text-[var(--text-primary)] flex items-center gap-2">
-          <Settings className="w-4 h-4 text-zinc-400" /> Settings
-        </h1>
-        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-          Manage your account and workspace preferences
-        </p>
-      </div>
+      <PageHeader
+        title="Settings"
+        subtitle="Manage your account and workspace preferences"
+        icon={<Settings className="w-4 h-4" />}
+      />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-44 flex-shrink-0 border-r border-[var(--surface-border)] py-3">
-          {tabs.map((t) => (
+      <TabNav
+        tabs={SETTINGS_TABS}
+        active={tab}
+        onChange={(id) => setTab(id as Tab)}
+      />
+
+      <PageContent className="max-w-2xl">
+        {tab === "profile" && (
+          <div className="space-y-4">
+            <h2 className="text-subheading font-semibold text-text-primary">
+              Profile Settings
+            </h2>
+            <div>
+              <label className="block text-caption font-medium text-text-secondary mb-1">
+                Full Name
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 rounded-input bg-surface-overlay border border-surface-border text-sm text-text-primary focus:outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="block text-caption font-medium text-text-secondary mb-1">
+                Email
+              </label>
+              <input
+                value={user?.email ?? ""}
+                readOnly
+                className="w-full px-3 py-2 rounded-input bg-surface-overlay border border-surface-border text-sm text-text-secondary cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-caption font-medium text-text-secondary mb-1">
+                Organization
+              </label>
+              <input
+                value={user?.tenant?.name ?? ""}
+                readOnly
+                className="w-full px-3 py-2 rounded-input bg-surface-overlay border border-surface-border text-sm text-text-secondary cursor-not-allowed"
+              />
+            </div>
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                "w-full flex items-center gap-2.5 px-4 py-2 text-sm text-left transition-colors",
-                tab === t.key
-                  ? "text-[var(--text-primary)] bg-[var(--surface-raised)]"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-              )}
+              onClick={handleSave}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-input bg-brand hover:bg-brand/90 text-caption text-white font-medium transition-colors"
             >
-              {t.icon}
-              {t.label}
+              <Save className="w-3.5 h-3.5" />
+              {saved ? "Saved!" : "Save Changes"}
             </button>
-          ))}
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto hide-scrollbar p-6 max-w-xl">
-          {tab === "profile" && (
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-                Profile Settings
-              </h2>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Full Name
-                </label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md bg-[var(--surface-overlay)] border border-[var(--surface-border)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Email
-                </label>
-                <input
-                  value={user?.email ?? ""}
-                  readOnly
-                  className="w-full px-3 py-2 rounded-md bg-[var(--surface-overlay)] border border-[var(--surface-border)] text-sm text-[var(--text-secondary)] cursor-not-allowed"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Organization
-                </label>
-                <input
-                  value={user?.tenant?.name ?? ""}
-                  readOnly
-                  className="w-full px-3 py-2 rounded-md bg-[var(--surface-overlay)] border border-[var(--surface-border)] text-sm text-[var(--text-secondary)] cursor-not-allowed"
-                />
-              </div>
-              <button
-                onClick={handleSave}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-violet-600 hover:bg-violet-500 text-xs text-white font-medium transition-colors"
-              >
-                <Save className="w-3.5 h-3.5" />
-                {saved ? "Saved!" : "Save Changes"}
-              </button>
+            <div className="pt-4 border-t border-surface-border">
+              <OnboardingRerunSection />
+            </div>
+          </div>
+        )}
 
-              <div className="pt-4 border-t border-[var(--surface-border)]">
-                <OnboardingRerunSection />
+        {tab === "workspace" && <WorkspaceTabContent />}
+
+        {tab === "preferences" && (
+          <div className="space-y-6">
+            <h2 className="text-subheading font-semibold text-text-primary">
+              Preferences
+            </h2>
+
+            {/* Theme */}
+            <div>
+              <label className="block text-caption font-medium text-text-secondary mb-2">
+                Theme
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                {(
+                  [
+                    { id: "dark", label: "🌙 Dark" },
+                    { id: "light", label: "☀️ Light" },
+                    { id: "high-contrast", label: "◑ High Contrast" },
+                  ] as {
+                    id: "dark" | "light" | "high-contrast";
+                    label: string;
+                  }[]
+                ).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTheme(t.id)}
+                    className={cn(
+                      "py-5 rounded-card border text-caption font-medium capitalize transition-colors",
+                      theme === t.id
+                        ? "border-brand bg-brand/10 text-brand"
+                        : "border-surface-border text-text-secondary hover:border-brand/40",
+                    )}
+                  >
+                    {t.label}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
 
-          {tab === "appearance" && (
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-                Appearance
-              </h2>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
-                  Theme
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {(["dark", "light"] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTheme(t)}
+            {/* Font Size */}
+            <div>
+              <label className="block text-caption font-medium text-text-secondary mb-2">
+                Interface Font Size
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {(
+                  [
+                    { id: "sm", label: "Small" },
+                    { id: "md", label: "Medium" },
+                    { id: "lg", label: "Large" },
+                    { id: "xl", label: "X-Large" },
+                  ] as { id: "sm" | "md" | "lg" | "xl"; label: string }[]
+                ).map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setTextSize(s.id)}
+                    className={cn(
+                      "py-2.5 rounded-input border text-caption font-medium transition-colors",
+                      textSize === s.id
+                        ? "border-brand bg-brand/10 text-brand"
+                        : "border-surface-border text-text-secondary hover:border-brand/40",
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Autonomy Default */}
+            <div>
+              <label className="block text-caption font-medium text-text-secondary mb-1">
+                Default Agent Autonomy
+              </label>
+              <p className="text-micro text-text-muted mb-2">
+                Controls how proactively agents act without your input.
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {(
+                  [
+                    {
+                      id: "assist",
+                      label: "Assist",
+                      desc: "Always asks before acting",
+                    },
+                    {
+                      id: "copilot",
+                      label: "Copilot",
+                      desc: "Acts with light supervision",
+                    },
+                    {
+                      id: "autopilot",
+                      label: "Autopilot",
+                      desc: "Fully autonomous",
+                    },
+                  ] as {
+                    id: "assist" | "copilot" | "autopilot";
+                    label: string;
+                    desc: string;
+                  }[]
+                ).map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => setAutonomyLevel(a.id)}
+                    className={cn(
+                      "flex flex-col items-start p-3 rounded-card border text-left transition-colors",
+                      autonomyLevel === a.id
+                        ? "border-brand bg-brand/10"
+                        : "border-surface-border hover:border-brand/40",
+                    )}
+                  >
+                    <span
                       className={cn(
-                        "py-6 rounded-xl border text-sm font-medium capitalize transition-colors",
-                        theme === t
-                          ? "border-violet-500 bg-violet-500/10 text-violet-400"
-                          : "border-[var(--surface-border)] text-[var(--text-secondary)] hover:border-violet-500/40",
+                        "text-caption font-semibold mb-0.5",
+                        autonomyLevel === a.id
+                          ? "text-brand"
+                          : "text-text-primary",
                       )}
                     >
-                      {t === "dark" ? "🌙 Dark" : "☀️ Light"}
-                    </button>
-                  ))}
+                      {a.label}
+                    </span>
+                    <span className="text-micro text-text-secondary">
+                      {a.desc}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "notifications" && (
+          <div className="space-y-4">
+            <h2 className="text-subheading font-semibold text-text-primary">
+              Notification Preferences
+            </h2>
+            {[
+              {
+                label: "Agent task completed",
+                sub: "Notify when an agent finishes a task",
+              },
+              {
+                label: "Approval required",
+                sub: "Notify when an agent needs your sign-off",
+              },
+              {
+                label: "Agent error",
+                sub: "Notify when an agent encounters an error",
+              },
+              {
+                label: "Weekly summary",
+                sub: "Receive a weekly performance digest",
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-between py-2 border-b border-surface-border"
+              >
+                <div>
+                  <p className="text-sm text-text-primary">{item.label}</p>
+                  <p className="text-caption text-text-secondary">{item.sub}</p>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {tab === "notifications" && (
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-                Notification Preferences
-              </h2>
-              {[
-                {
-                  label: "Agent task completed",
-                  sub: "Notify when an agent finishes a task",
-                },
-                {
-                  label: "Approval required",
-                  sub: "Notify when an agent needs your sign-off",
-                },
-                {
-                  label: "Agent error",
-                  sub: "Notify when an agent encounters an error",
-                },
-                {
-                  label: "Weekly summary",
-                  sub: "Receive a weekly performance digest",
-                },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center justify-between py-2 border-b border-[var(--surface-border)]"
-                >
-                  <div>
-                    <p className="text-sm text-[var(--text-primary)]">
-                      {item.label}
-                    </p>
-                    <p className="text-xs text-[var(--text-secondary)]">
-                      {item.sub}
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-zinc-700 rounded-full peer peer-checked:bg-violet-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4" />
-                  </label>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {tab === "security" && (
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-                Security
-              </h2>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Current Password
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-surface-muted rounded-full peer peer-checked:bg-brand after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4" />
                 </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 rounded-md bg-[var(--surface-overlay)] border border-[var(--surface-border)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
-                />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 rounded-md bg-[var(--surface-overlay)] border border-[var(--surface-border)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Confirm New Password
-                </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 rounded-md bg-[var(--surface-overlay)] border border-[var(--surface-border)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-violet-500"
-                />
-              </div>
-              <button className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-violet-600 hover:bg-violet-500 text-xs text-white font-medium transition-colors">
-                <Shield className="w-3.5 h-3.5" /> Update Password
-              </button>
-            </div>
-          )}
+            ))}
+          </div>
+        )}
 
-          {tab === "workspace" && <WorkspaceTabContent />}
-        </div>
-      </div>
+        {tab === "security" && (
+          <div className="space-y-4">
+            <h2 className="text-subheading font-semibold text-text-primary">
+              Security
+            </h2>
+            <div>
+              <label className="block text-caption font-medium text-text-secondary mb-1">
+                Current Password
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full px-3 py-2 rounded-input bg-surface-overlay border border-surface-border text-sm text-text-primary focus:outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="block text-caption font-medium text-text-secondary mb-1">
+                New Password
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full px-3 py-2 rounded-input bg-surface-overlay border border-surface-border text-sm text-text-primary focus:outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="block text-caption font-medium text-text-secondary mb-1">
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full px-3 py-2 rounded-input bg-surface-overlay border border-surface-border text-sm text-text-primary focus:outline-none focus:border-brand"
+              />
+            </div>
+            <button className="flex items-center gap-1.5 px-4 py-2 rounded-input bg-brand hover:bg-brand/90 text-caption text-white font-medium transition-colors">
+              <Shield className="w-3.5 h-3.5" /> Update Password
+            </button>
+          </div>
+        )}
+      </PageContent>
     </div>
   );
 }

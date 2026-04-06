@@ -20,6 +20,8 @@ import {
 } from "recharts";
 import api from "@/services/api";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { PageContent } from "@/components/layout/PageContent";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,13 +89,13 @@ interface StatCardProps {
 
 function StatCard({ icon, label, value, sub, accent }: StatCardProps) {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] p-4">
+    <div className="flex flex-col gap-2 rounded-card border border-surface-border bg-surface-overlay p-card">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-[var(--text-secondary)]">{label}</span>
+        <span className="text-caption text-text-secondary">{label}</span>
         <span
           className={cn(
-            "w-7 h-7 rounded-lg flex items-center justify-center",
-            accent ?? "bg-zinc-800",
+            "w-7 h-7 rounded-input flex items-center justify-center",
+            accent ?? "bg-surface-muted",
           )}
         >
           {icon}
@@ -102,12 +104,12 @@ function StatCard({ icon, label, value, sub, accent }: StatCardProps) {
       <p
         className={cn(
           "text-2xl font-bold tracking-tight",
-          accent ? "text-green-400" : "text-[var(--text-primary)]",
+          accent ? "text-status-profit" : "text-text-primary",
         )}
       >
         {value}
       </p>
-      {sub && <p className="text-[11px] text-[var(--text-secondary)]">{sub}</p>}
+      {sub && <p className="text-micro text-text-secondary">{sub}</p>}
     </div>
   );
 }
@@ -207,56 +209,50 @@ export default function CostsPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 px-5 py-4 border-b border-[var(--surface-border)] flex items-center justify-between">
-        <div>
-          <h1 className="text-base font-semibold text-[var(--text-primary)] flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-green-400" />
-            Cost Dashboard
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            AI token usage &amp; budget tracking
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Range selector */}
-          <div className="flex rounded-md overflow-hidden border border-[var(--surface-border)] text-xs">
-            {[7, 30, 90].map((d) => (
-              <button
-                key={d}
-                onClick={() => setRangeDays(d)}
-                className={cn(
-                  "px-2.5 py-1 transition-colors",
-                  rangeDays === d
-                    ? "bg-violet-600 text-white"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-                )}
-              >
-                {d}d
-              </button>
-            ))}
+      <PageHeader
+        title="Cost Dashboard"
+        icon={<DollarSign className="w-4 h-4" />}
+        subtitle="AI token usage & budget tracking"
+        actions={
+          <div className="flex items-center gap-2">
+            {/* Range selector */}
+            <div className="flex rounded-input overflow-hidden border border-surface-border text-caption">
+              {[7, 30, 90].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setRangeDays(d)}
+                  className={cn(
+                    "px-2.5 py-1 transition-colors duration-fast",
+                    rangeDays === d
+                      ? "bg-brand text-brand-foreground"
+                      : "text-text-secondary hover:text-text-primary",
+                  )}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+            {/* Refresh */}
+            <button
+              onClick={() => load(false)}
+              disabled={refreshing}
+              className="p-1.5 rounded-input border border-surface-border text-text-secondary hover:text-text-primary transition-colors duration-fast"
+            >
+              <RefreshCw
+                className={cn("w-3.5 h-3.5", refreshing && "animate-spin")}
+              />
+            </button>
           </div>
-          {/* Refresh */}
-          <button
-            onClick={() => load(false)}
-            disabled={refreshing}
-            className="p-1.5 rounded-md border border-[var(--surface-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <RefreshCw
-              className={cn("w-3.5 h-3.5", refreshing && "animate-spin")}
-            />
-          </button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="flex-1 overflow-y-auto hide-scrollbar p-5 space-y-5">
+      <PageContent className="space-y-5">
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="h-28 rounded-xl bg-[var(--surface-overlay)] animate-pulse"
+                className="h-28 rounded-card bg-surface-overlay animate-pulse"
               />
             ))}
           </div>
@@ -265,20 +261,20 @@ export default function CostsPage() {
             {/* ── Stat cards ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard
-                icon={<DollarSign className="w-3.5 h-3.5 text-green-400" />}
+                icon={<DollarSign className="w-3.5 h-3.5 text-status-profit" />}
                 label={`Total spend (${rangeDays}d)`}
                 value={fmtUsd(summary?.totalCostCents ?? 0)}
                 sub={`${summary?.recordCount ?? 0} runs`}
-                accent="bg-green-900/40"
+                accent="bg-status-profit/10"
               />
               <StatCard
-                icon={<Zap className="w-3.5 h-3.5 text-yellow-400" />}
+                icon={<Zap className="w-3.5 h-3.5 text-status-warn" />}
                 label="Total tokens"
                 value={fmtK(totalTokens)}
                 sub={`In: ${fmtK(summary?.totalInputTokens ?? 0)} · Out: ${fmtK(summary?.totalOutputTokens ?? 0)}`}
               />
               <StatCard
-                icon={<BarChart2 className="w-3.5 h-3.5 text-blue-400" />}
+                icon={<BarChart2 className="w-3.5 h-3.5 text-status-ops" />}
                 label="Top model"
                 value={topModel}
                 sub={
@@ -288,7 +284,7 @@ export default function CostsPage() {
                 }
               />
               <StatCard
-                icon={<ShieldAlert className="w-3.5 h-3.5 text-purple-400" />}
+                icon={<ShieldAlert className="w-3.5 h-3.5 text-brand" />}
                 label="Budget policies"
                 value={String(budgets.length)}
                 sub={`${budgets.filter((b) => b.isActive).length} active`}
@@ -297,10 +293,10 @@ export default function CostsPage() {
 
             {/* ── Spend trend chart ── */}
             {chartData.length > 0 && (
-              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] p-4">
+              <div className="rounded-card border border-surface-border bg-surface-overlay p-card">
                 <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="w-3.5 h-3.5 text-green-400" />
-                  <span className="text-xs font-medium text-[var(--text-primary)]">
+                  <TrendingUp className="w-3.5 h-3.5 text-status-profit" />
+                  <span className="text-caption font-medium text-text-primary">
                     Spend Trend
                   </span>
                 </div>
@@ -371,33 +367,39 @@ export default function CostsPage() {
 
             {/* ── Per-agent cost table ── */}
             {agentRows.length > 0 && (
-              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] overflow-hidden">
-                <div className="px-4 py-3 border-b border-[var(--surface-border)]">
-                  <span className="text-xs font-medium text-[var(--text-primary)]">
+              <div className="rounded-card border border-surface-border bg-surface-overlay overflow-hidden">
+                <div className="px-card py-3 border-b border-surface-border">
+                  <span className="text-caption font-medium text-text-primary">
                     Cost by Agent
                   </span>
                 </div>
-                <table className="w-full text-xs">
+                <table className="w-full text-caption">
                   <thead>
-                    <tr className="border-b border-[var(--surface-border)] text-[var(--text-secondary)]">
-                      <th className="text-left px-4 py-2 font-medium">Agent</th>
-                      <th className="text-right px-4 py-2 font-medium">Runs</th>
-                      <th className="text-right px-4 py-2 font-medium">Cost</th>
+                    <tr className="border-b border-surface-border text-text-secondary">
+                      <th className="text-left px-card py-2 font-medium">
+                        Agent
+                      </th>
+                      <th className="text-right px-card py-2 font-medium">
+                        Runs
+                      </th>
+                      <th className="text-right px-card py-2 font-medium">
+                        Cost
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {agentRows.map((row) => (
                       <tr
                         key={row.agentId}
-                        className="border-b border-[var(--surface-border)]/50 hover:bg-[var(--surface-border)]/20 transition-colors"
+                        className="border-b border-surface-border/50 hover:bg-surface-border/20 transition-colors duration-fast"
                       >
-                        <td className="px-4 py-2.5 text-[var(--text-primary)] font-mono">
+                        <td className="px-card py-2.5 text-text-primary font-mono">
                           {row.agentName ?? row.agentId.slice(0, 12) + "…"}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-[var(--text-secondary)]">
+                        <td className="px-card py-2.5 text-right text-text-secondary">
                           {row.recordCount}
                         </td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-green-400">
+                        <td className="px-card py-2.5 text-right font-semibold text-status-profit">
                           {fmtUsd(row.totalCostCents)}
                         </td>
                       </tr>
@@ -409,23 +411,25 @@ export default function CostsPage() {
 
             {/* ── Budget policies ── */}
             {budgets.length > 0 && (
-              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] overflow-hidden">
-                <div className="px-4 py-3 border-b border-[var(--surface-border)]">
-                  <span className="text-xs font-medium text-[var(--text-primary)]">
+              <div className="rounded-card border border-surface-border bg-surface-overlay overflow-hidden">
+                <div className="px-card py-3 border-b border-surface-border">
+                  <span className="text-caption font-medium text-text-primary">
                     Budget Policies
                   </span>
                 </div>
-                <table className="w-full text-xs">
+                <table className="w-full text-caption">
                   <thead>
-                    <tr className="border-b border-[var(--surface-border)] text-[var(--text-secondary)]">
-                      <th className="text-left px-4 py-2 font-medium">Scope</th>
-                      <th className="text-right px-4 py-2 font-medium">
+                    <tr className="border-b border-surface-border text-text-secondary">
+                      <th className="text-left px-card py-2 font-medium">
+                        Scope
+                      </th>
+                      <th className="text-right px-card py-2 font-medium">
                         Limit
                       </th>
-                      <th className="text-right px-4 py-2 font-medium">
+                      <th className="text-right px-card py-2 font-medium">
                         Window
                       </th>
-                      <th className="text-right px-4 py-2 font-medium">
+                      <th className="text-right px-card py-2 font-medium">
                         Status
                       </th>
                     </tr>
@@ -434,31 +438,31 @@ export default function CostsPage() {
                     {budgets.map((b) => (
                       <tr
                         key={b.id}
-                        className="border-b border-[var(--surface-border)]/50"
+                        className="border-b border-surface-border/50"
                       >
-                        <td className="px-4 py-2.5 text-[var(--text-primary)]">
+                        <td className="px-card py-2.5 text-text-primary">
                           <span className="capitalize">
                             {b.scope.toLowerCase()}
                           </span>
                           {b.scopeId && (
-                            <span className="ml-1 text-[var(--text-secondary)] font-mono">
+                            <span className="ml-1 text-text-secondary font-mono">
                               {b.scopeId.slice(0, 8)}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-[var(--text-primary)]">
+                        <td className="px-card py-2.5 text-right text-text-primary">
                           {fmtUsd(b.limitCents)}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-[var(--text-secondary)]">
+                        <td className="px-card py-2.5 text-right text-text-secondary">
                           {b.windowDays}d
                         </td>
-                        <td className="px-4 py-2.5 text-right">
+                        <td className="px-card py-2.5 text-right">
                           <span
                             className={cn(
-                              "px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                              "px-1.5 py-0.5 rounded-input text-micro font-semibold",
                               b.isActive
-                                ? "bg-green-900/40 text-green-300"
-                                : "bg-zinc-800 text-zinc-400",
+                                ? "bg-status-profit/10 text-status-profit"
+                                : "bg-surface-muted text-text-secondary",
                             )}
                           >
                             {b.isActive ? "Active" : "Inactive"}
@@ -473,8 +477,8 @@ export default function CostsPage() {
 
             {/* ── Model breakdown ── */}
             {summary?.byModel && Object.keys(summary.byModel).length > 0 && (
-              <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-overlay)] p-4">
-                <p className="text-xs font-medium text-[var(--text-primary)] mb-3">
+              <div className="rounded-card border border-surface-border bg-surface-overlay p-card">
+                <p className="text-caption font-medium text-text-primary mb-3">
                   Cost by Model
                 </p>
                 <div className="flex flex-col gap-2">
@@ -486,20 +490,18 @@ export default function CostsPage() {
                         : 0;
                       return (
                         <div key={model}>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-[var(--text-secondary)]">
-                              {model}
-                            </span>
-                            <span className="text-[var(--text-primary)] font-medium">
+                          <div className="flex justify-between text-caption mb-1">
+                            <span className="text-text-secondary">{model}</span>
+                            <span className="text-text-primary font-medium">
                               {fmtUsd(cents)}{" "}
-                              <span className="text-[var(--text-secondary)] font-normal">
+                              <span className="text-text-secondary font-normal">
                                 ({pct}%)
                               </span>
                             </span>
                           </div>
-                          <div className="h-1.5 rounded-full bg-[var(--surface-border)]">
+                          <div className="h-1.5 rounded-pill bg-surface-border">
                             <div
-                              className="h-full rounded-full bg-violet-500 transition-all"
+                              className="h-full rounded-pill bg-brand transition-all duration-normal"
                               style={{ width: `${pct}%` }}
                             />
                           </div>
@@ -512,15 +514,15 @@ export default function CostsPage() {
 
             {!summary && !loading && (
               <div className="flex flex-col items-center justify-center h-40 text-center gap-2">
-                <DollarSign className="w-8 h-8 text-[var(--text-secondary)]" />
-                <p className="text-sm text-[var(--text-secondary)]">
+                <DollarSign className="w-8 h-8 text-text-secondary" />
+                <p className="text-body text-text-secondary">
                   No cost data yet
                 </p>
               </div>
             )}
           </>
         )}
-      </div>
+      </PageContent>
     </div>
   );
 }

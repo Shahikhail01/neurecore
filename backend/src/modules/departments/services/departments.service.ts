@@ -21,6 +21,8 @@ export class DepartmentsService {
       include: {
         children: true,
         parent: { select: { id: true, name: true } },
+        agents: { select: { id: true, name: true, status: true, type: true } },
+        _count: { select: { agents: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -29,7 +31,12 @@ export class DepartmentsService {
   async findOne(id: string, tenantId: string) {
     const dept = await this.prisma.department.findFirst({
       where: { id, tenantId },
-      include: { children: true, parent: { select: { id: true, name: true } } },
+      include: {
+        children: true,
+        parent: { select: { id: true, name: true } },
+        agents: { select: { id: true, name: true, status: true, type: true } },
+        _count: { select: { agents: true } },
+      },
     });
     if (!dept) throw new NotFoundException(`Department ${id} not found`);
     return dept;

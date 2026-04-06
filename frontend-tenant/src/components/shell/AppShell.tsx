@@ -1,5 +1,13 @@
 "use client";
+// ─── AppShell v2 ──────────────────────────────────────────────────────────────
+// S — Single Responsibility: layout orchestration only — nav config, keyboard
+//     shortcuts, and sidebar collapse. Delegates AI panel, search, and autonomy
+//     selector to focused sub-components.
+// O — Open/Closed: new nav groups added via NAV_GROUPS constant; never modify
+//     the render tree directly.
+// D — Dependency Inversion: all state via store abstractions; no localStorage.
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -21,24 +29,41 @@ import {
   TrendingUp,
   Settings,
   LogOut,
-  Sun,
-  Moon,
   ChevronLeft,
   ChevronRight,
   Zap,
-  Search,
+  type LucideIcon,
 } from "lucide-react";
+
 import { useAuthStore } from "@/stores/authStore";
 import { useUIPreferencesStore } from "@/shared/stores/uiPreferencesStore";
+import { useCommandStore } from "@/stores/commandStore";
 import { authService } from "@/services/auth.service";
 import { cn } from "@/lib/utils";
 
-const NAV_GROUPS = [
+import { CommandPalette } from "@/components/command-palette/CommandPalette";
+import { GlobalSearchBar } from "./GlobalSearchBar";
+import { AutonomyPill } from "./AutonomyPill";
+import { RightAIPanel } from "./RightAIPanel";
+import { registerTenantCommands } from "@/services/register-commands";
+
+// ─── Navigation config (OCP: add entries here — AppShell never changes) ───────
+interface NavItem {
+  icon: LucideIcon;
+  label: string;
+  href: string;
+}
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
   {
     label: "Workspace",
     items: [
       { icon: LayoutDashboard, label: "AI Office", href: "/dashboard" },
-      { icon: Bell, label: "Inbox", href: "/inbox", badge: true },
+      { icon: Bell, label: "Inbox", href: "/inbox" },
       { icon: Activity, label: "Activity", href: "/activity" },
     ],
   },
@@ -79,22 +104,49 @@ const NAV_GROUPS = [
   },
 ];
 
+// ─── AppShell ─────────────────────────────────────────────────────────────────
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+
   const { user, clearUser } = useAuthStore();
-  const { theme, setTheme, sidebarCollapsed, setSidebarCollapsed } =
+  const { sidebarCollapsed, setSidebarCollapsed, aiPanelOpen, toggleAIPanel } =
     useUIPreferencesStore();
-  const isDark = theme !== "light";
+  const { openPalette } = useCommandStore();
+
+  // Register navigation commands once on mount
+  useEffect(() => {
+    const unregister = registerTenantCommands(router);
+    return unregister;
+  }, [router]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        openPalette();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+        e.preventDefault();
+        toggleAIPanel();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [openPalette, toggleAIPanel]);
 
   async function handleLogout() {
     try {
       await authService.logout();
-    } catch {}
+    } catch {
+      /* swallow — always clear local state */
+    }
     clearUser();
     router.replace("/login");
   }
 
+  // Derive avatar initials
   const initials =
     user?.firstName || user?.lastName
       ? `${user.firstName} ${user.lastName}`
@@ -107,37 +159,43 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       : (user?.email?.[0] ?? "U").toUpperCase();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--surface)] text-[var(--text-primary)]">
-      {/* ── Sidebar ─────────────────────────────────── */}
+    <div className="flex h-screen overflow-hidden bg-surface text-text-primary">
+      {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside
         className={cn(
-          "flex flex-col border-r border-[var(--surface-border)] bg-[var(--surface-raised)] transition-all duration-200 flex-shrink-0",
+          "flex flex-col border-r border-surface-border bg-surface-raised transition-all duration-normal ease-out-expo flex-shrink-0",
           sidebarCollapsed ? "w-[56px]" : "w-56",
         )}
+        aria-label="Main navigation"
       >
         {/* Brand */}
         <div
           className={cn(
-            "flex items-center gap-2 border-b border-[var(--surface-border)] px-3 h-12 flex-shrink-0",
+            "flex items-center gap-2 border-b border-surface-border px-3 h-12 flex-shrink-0",
             sidebarCollapsed && "justify-center px-0",
           )}
         >
+          <div className="w-6 h-6 rounded-md bg-brand flex items-center justify-center flex-shrink-0">
+            <span
+              className="text-brand-foreground text-xs font-bold select-none"
+              aria-hidden="true"
+            >
+              N
+            </span>
+          </div>
           {!sidebarCollapsed && (
-            <span className="font-bold text-sm tracking-wide text-white truncate">
+            <span className="font-semibold text-body text-text-primary truncate">
               {user?.tenant?.name ?? "NeureCore"}
             </span>
           )}
-          {sidebarCollapsed && (
-            <span className="text-violet-400 font-bold text-base">N</span>
-          )}
         </div>
 
-        {/* Nav */}
+        {/* Nav groups */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 hide-scrollbar">
           {NAV_GROUPS.map((group) => (
             <div key={group.label} className="mb-1">
               {!sidebarCollapsed && (
-                <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-secondary)]">
+                <p className="px-3 pt-3 pb-1 text-micro font-semibold uppercase tracking-widest text-text-secondary">
                   {group.label}
                 </p>
               )}
@@ -150,14 +208,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     href={href}
                     title={sidebarCollapsed ? label : undefined}
                     className={cn(
-                      "flex items-center gap-3 mx-1 px-2 py-2 rounded-md text-sm transition-colors",
+                      "flex items-center gap-3 mx-1 px-2 py-2 rounded-input text-body transition-colors duration-fast",
                       active
-                        ? "bg-violet-600/20 text-violet-400"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--surface-overlay)] hover:text-[var(--text-primary)]",
+                        ? "bg-brand/20 text-brand"
+                        : "text-text-secondary hover:bg-surface-overlay hover:text-text-primary",
                       sidebarCollapsed && "justify-center px-0 mx-1",
                     )}
+                    aria-current={active ? "page" : undefined}
                   >
-                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <Icon
+                      className="w-4 h-4 flex-shrink-0"
+                      aria-hidden="true"
+                    />
                     {!sidebarCollapsed && (
                       <span className="truncate">{label}</span>
                     )}
@@ -168,45 +230,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* Bottom user row */}
-        <div
-          className={cn(
-            "border-t border-[var(--surface-border)] p-2 flex flex-col gap-1 flex-shrink-0",
-          )}
-        >
-          {/* Theme toggle */}
-          <button
-            onClick={() => setTheme(isDark ? "light" : "dark")}
-            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-            className={cn(
-              "flex items-center gap-3 w-full px-2 py-1.5 rounded-md text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-overlay)] hover:text-[var(--text-primary)] transition-colors",
-              sidebarCollapsed && "justify-center px-0",
-            )}
-          >
-            {isDark ? (
-              <Sun className="w-4 h-4 flex-shrink-0" />
-            ) : (
-              <Moon className="w-4 h-4 flex-shrink-0" />
-            )}
-            {!sidebarCollapsed && (
-              <span>{isDark ? "Light mode" : "Dark mode"}</span>
-            )}
-          </button>
-
-          {/* Collapse toggle */}
+        {/* Bottom: collapse toggle + user row */}
+        <div className="border-t border-surface-border p-2 flex flex-col gap-1 flex-shrink-0">
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={
+              sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+            }
             className={cn(
-              "flex items-center gap-3 w-full px-2 py-1.5 rounded-md text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-overlay)] hover:text-[var(--text-primary)] transition-colors",
+              "flex items-center gap-3 w-full px-2 py-1.5 rounded-input text-body text-text-secondary hover:bg-surface-overlay hover:text-text-primary transition-colors duration-fast",
               sidebarCollapsed && "justify-center px-0",
             )}
           >
             {sidebarCollapsed ? (
-              <ChevronRight className="w-4 h-4 flex-shrink-0" />
+              <ChevronRight
+                className="w-4 h-4 flex-shrink-0"
+                aria-hidden="true"
+              />
             ) : (
               <>
-                <ChevronLeft className="w-4 h-4 flex-shrink-0" />
+                <ChevronLeft
+                  className="w-4 h-4 flex-shrink-0"
+                  aria-hidden="true"
+                />
                 <span>Collapse</span>
               </>
             )}
@@ -215,56 +262,75 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* User */}
           <div
             className={cn(
-              "flex items-center gap-2 px-2 py-1.5 rounded-md mt-1",
+              "flex items-center gap-2 px-2 py-1.5 rounded-input mt-0.5",
               sidebarCollapsed && "justify-center px-0",
             )}
           >
-            <div className="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+            <div
+              className="w-7 h-7 rounded-full bg-brand flex items-center justify-center text-micro font-bold text-brand-foreground flex-shrink-0"
+              aria-hidden="true"
+            >
               {initials}
             </div>
             {!sidebarCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-[var(--text-primary)] truncate">
-                  {user
-                    ? `${user.firstName} ${user.lastName}`.trim() || user.email
-                    : ""}
-                </p>
-                <p className="text-[10px] text-[var(--text-secondary)] truncate capitalize">
-                  {user?.role?.toLowerCase() ?? "user"}
-                </p>
-              </div>
-            )}
-            {!sidebarCollapsed && (
-              <button
-                onClick={handleLogout}
-                title="Sign out"
-                className="text-[var(--text-secondary)] hover:text-red-400 transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
+              <>
+                <div className="flex-1 min-w-0">
+                  <p className="text-caption font-medium text-text-primary truncate">
+                    {user
+                      ? `${user.firstName} ${user.lastName}`.trim() ||
+                        user.email
+                      : ""}
+                  </p>
+                  <p className="text-micro text-text-secondary truncate capitalize">
+                    {user?.role?.toLowerCase() ?? "user"}
+                  </p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  title="Sign out"
+                  aria-label="Sign out"
+                  className="text-text-secondary hover:text-status-risk transition-colors duration-fast"
+                >
+                  <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              </>
             )}
           </div>
         </div>
       </aside>
 
-      {/* ── Main area ───────────────────────────────── */}
+      {/* ── Main column ─────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <header className="h-12 flex-shrink-0 flex items-center justify-between px-4 border-b border-[var(--surface-border)] bg-[var(--surface-raised)]">
-          <div className="flex items-center gap-2">
-            <Search className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-            <input
-              placeholder="Search anything… (⌘K)"
-              className="bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] outline-none w-48"
-              readOnly
-            />
+        {/* Top strip */}
+        <header className="h-12 flex-shrink-0 flex items-center justify-between px-4 border-b border-surface-border bg-surface-raised gap-3">
+          <div className="flex-1 min-w-0">
+            <GlobalSearchBar onOpenPalette={openPalette} />
           </div>
-          <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              System Online
-            </span>
-            <span className="px-2 py-0.5 rounded bg-violet-600/20 text-violet-400 text-[10px] font-semibold capitalize">
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <AutonomyPill />
+
+            {/* AI panel toggle */}
+            <button
+              onClick={toggleAIPanel}
+              title="Toggle AI panel (⌘/)"
+              aria-label="Toggle AI assistant panel"
+              aria-pressed={aiPanelOpen}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-input text-caption font-medium transition-colors duration-fast",
+                aiPanelOpen
+                  ? "bg-brand/20 text-brand"
+                  : "bg-surface-overlay text-text-secondary hover:bg-surface-muted hover:text-text-primary",
+              )}
+            >
+              <span className="text-sm select-none" aria-hidden="true">
+                ✦
+              </span>
+              <span>AI</span>
+            </button>
+
+            {/* Tenant tier badge */}
+            <span className="px-2 py-0.5 rounded-pill bg-brand/20 text-brand text-micro font-semibold capitalize">
               {user?.tenant?.tier?.name ?? "Starter"}
             </span>
           </div>
@@ -273,6 +339,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Page content */}
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
+
+      {/* ── Right AI panel (handles both docked & slide-in) ── */}
+      <RightAIPanel />
+
+      {/* ── Global command palette overlay ──────────────────── */}
+      <CommandPalette />
     </div>
   );
 }

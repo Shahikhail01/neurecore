@@ -125,7 +125,10 @@ export class ProvisioningJobService {
 
   async createManyJobs(inputs: CreateProvisioningJobInput[]): Promise<void> {
     if (inputs.length === 0) return;
-    await this.prisma.provisioningJob.createMany({ data: inputs as never });
+    await this.prisma.provisioningJob.createMany({
+      data: inputs as never,
+      skipDuplicates: true,
+    });
   }
 
   async listJobs(tenantId: string): Promise<ProvisioningJob[]> {

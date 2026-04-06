@@ -10,6 +10,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Post,
   Put,
   Query,
@@ -22,7 +23,12 @@ import type { Response } from 'express';
 import { ProvisioningJobService } from '../services/provisioning-job.service';
 import { ProvisioningOrchestratorService } from '../services/provisioning-orchestrator.service';
 import { UpdateProvisioningConfigDto } from '../dto/update-provisioning-config.dto';
+import {
+  BulkCreateProvisioningJobsDto,
+  CreateProvisioningJobDto,
+} from '../dto/create-provisioning-job.dto';
 import { ConfigService } from '@nestjs/config';
+import { Public } from '../../../common/decorators/roles.decorator';
 
 interface RequestWithUser extends Request {
   user?: { tenantId?: string; role?: string };
@@ -82,6 +88,7 @@ export class WorkspaceProvisioningController {
    * Exchanges the code for tokens, stores them, then redirects the admin
    * to the Settings → Workspace tab.
    */
+  @Public()
   @Get('oauth/google/callback')
   async handleGoogleCallback(
     @Query('code') code: string,
@@ -104,6 +111,7 @@ export class WorkspaceProvisioningController {
 
   // ─── GET /workspace-provisioning/oauth/microsoft/callback ────────────────
   /** Handles the Microsoft OAuth callback. */
+  @Public()
   @Get('oauth/microsoft/callback')
   async handleMicrosoftCallback(
     @Query('code') code: string,
@@ -182,6 +190,63 @@ export class WorkspaceProvisioningController {
     const tenantId = this.resolveTenantId(req);
     await this.jobService.disconnectOAuth(tenantId);
     return { success: true };
+  }
+
+  // ─── POST /workspace-provisioning/jobs ───────────────────────────────────
+  /**
+   * Adds a single team member as a pending provisioning job.
+   * The config must exist (connect Google/Microsoft first).
+   */
+  @Post('jobs')
+  @HttpCode(HttpStatus.CREATED)
+  async addJob(
+    @Body() dto: CreateProvisioningJobDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    const config = await this.jobService.getConfigByTenantId(tenantId);
+    if (!config) {
+      throw new NotFoundException(
+        'No provisioning config found. Connect a workspace first.',
+      );
+    }
+    await this.jobService.createManyJobs([
+      {
+        configId: config.id,
+        inviteeEmail: dto.inviteeEmail,
+        inviteeFirstName: dto.inviteeFirstName,
+        inviteeLastName: dto.inviteeLastName,
+        departmentName: dto.departmentName,
+      },
+    ]);
+    return { success: true };
+  }
+
+  // ─── POST /workspace-provisioning/jobs/bulk ───────────────────────────────
+  /** Adds multiple team members as pending provisioning jobs in one call. */
+  @Post('jobs/bulk')
+  @HttpCode(HttpStatus.CREATED)
+  async addJobsBulk(
+    @Body() dto: BulkCreateProvisioningJobsDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    const config = await this.jobService.getConfigByTenantId(tenantId);
+    if (!config) {
+      throw new NotFoundException(
+        'No provisioning config found. Connect a workspace first.',
+      );
+    }
+    await this.jobService.createManyJobs(
+      dto.members.map((m) => ({
+        configId: config.id,
+        inviteeEmail: m.inviteeEmail,
+        inviteeFirstName: m.inviteeFirstName,
+        inviteeLastName: m.inviteeLastName,
+        departmentName: m.departmentName,
+      })),
+    );
+    return { created: dto.members.length };
   }
 
   // ─── Private helpers ─────────────────────────────────────────────────────
