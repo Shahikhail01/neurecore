@@ -1,7 +1,7 @@
 /**
  * NocoDB API Integration Examples
  * Reference implementations for connecting repositories to NocoDB via @nocodb/sdk
- * 
+ *
  * Purpose: Show how to replace TODO comments with actual NocoDB SDK calls
  * This file serves as documentation + copy-paste reference
  *
@@ -204,7 +204,7 @@ export class UserRepository {
     }
   }
 }
-`
+`;
 
 /**
  * ============================================================================
@@ -395,7 +395,7 @@ export class SessionRepository {
     }
   }
 }
-`
+`;
 
 /**
  * ============================================================================
@@ -555,7 +555,7 @@ export class AuditLogRepository {
     }
   }
 }
-`
+`;
 
 /**
  * ============================================================================
