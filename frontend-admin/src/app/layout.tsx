@@ -1,18 +1,22 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import type { Metadata } from "next";
+import { AppProvider } from "@/application/AppProvider";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'NeureCore — Admin Portal',
-  description: 'Super Admin workspace',
-  icons: {
-    icon: '/favicon.svg',
-  },
+  title: "NeureCore Dashboard",
+  description: "AI Agent Management Platform",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
-      <body className="bg-gray-950 text-gray-100 antialiased">{children}</body>
+      <body>
+        <AppProvider>{children}</AppProvider>
+      </body>
     </html>
   );
 }

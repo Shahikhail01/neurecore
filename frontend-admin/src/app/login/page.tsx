@@ -1,69 +1,73 @@
-'use client';
+"use client";
 
-import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { authService } from '@/services/auth.service';
-import { useAuthStore } from '@/stores/authStore';
+import React, { useEffect } from "react";
+import { Card, Space, Typography, Row, Col } from "antd";
+import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
+import { LoginForm } from "@/components/Auth/LoginForm";
 
-export default function AdminLoginPage() {
+export default function LoginPage() {
   const router = useRouter();
-  const setUser = useAuthStore((s) => s.setUser);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { isAuthenticated } = useAuth();
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await authService.login(email, password);
-      const allowedRoles = ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'SECURITY_OFFICER', 'SUPPORT'];
-      if (!allowedRoles.includes(result.user.role)) {
-        throw new Error('Insufficient permissions for admin portal');
-      }
-      setUser(result.user);
-      router.push('/overview');
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
-        (err as Error).message ??
-        'Login failed';
-      setError(msg);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/dashboard");
     }
-  }
+  }, [isAuthenticated, router]);
+
+  const handleLoginSuccess = () => {
+    router.push("/dashboard");
+  };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-950 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-gray-900 border border-gray-800 p-8 shadow-xl">
-        <h1 className="mb-2 text-2xl font-bold text-white">NeureCore Admin</h1>
-        <p className="mb-6 text-sm text-gray-400">Super Admin access only</p>
-        {error && (
-          <div className="mb-4 rounded-lg bg-red-950 border border-red-800 p-3 text-sm text-red-300">{error}</div>
-        )}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium text-gray-300">
-            Email
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-gray-300">
-            Password
-            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-              className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </label>
-          <button type="submit" disabled={loading}
-            className="mt-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition"
-          >
-            {loading ? 'Signing in…' : 'Sign In'}
-          </button>
-        </form>
-      </div>
-    </main>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        background: "#f0f2f5",
+      }}
+    >
+      <Row justify="center" style={{ width: "100%" }}>
+        <Col xs={24} sm={20} md={16} lg={12} xl={8}>
+          <Space direction="vertical" style={{ width: "100%" }} size="large">
+            <div style={{ textAlign: "center" }}>
+              <Typography.Title level={1} style={{ margin: 0 }}>
+                NeureCore
+              </Typography.Title>
+              <Typography.Title
+                level={4}
+                type="secondary"
+                style={{ margin: 0 }}
+              >
+                Admin Dashboard
+              </Typography.Title>
+            </div>
+
+            <Card
+              style={{
+                boxShadow:
+                  "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)",
+                borderRadius: 8,
+              }}
+            >
+              <LoginForm onSuccess={handleLoginSuccess} />
+            </Card>
+
+            <Typography.Paragraph
+              style={{
+                textAlign: "center",
+                color: "#8c8c8c",
+                fontSize: 12,
+                margin: 0,
+              }}
+            >
+              Use your credentials to access the admin dashboard
+            </Typography.Paragraph>
+          </Space>
+        </Col>
+      </Row>
+    </div>
   );
 }
