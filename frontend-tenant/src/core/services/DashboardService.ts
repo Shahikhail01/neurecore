@@ -92,7 +92,9 @@ export class DashboardService implements IDashboardService {
     ]);
 
     const issues: string[] = [];
-    const errorAgents = agentResult.items.filter((a) => a.status === "ERROR" || a.status === "TERMINATED");
+    const errorAgents = agentResult.items.filter(
+      (a) => a.status === "ERROR" || a.status === "TERMINATED",
+    );
     if (errorAgents.length)
       issues.push(
         `${errorAgents.length} agent(s) in ERROR state: ${errorAgents.map((a) => a.name).join(", ")}`,
@@ -115,13 +117,13 @@ export class DashboardService implements IDashboardService {
         this._calculateTeamHarmony(agentResult.items) >= 70
           ? "positive"
           : "cautious",
-      autonomyRate: Math.round(
-        agentResult.items.length
-        agentResult.items.filter((a) => a.status === "RUNNING").length /
+      autonomyRate: agentResult.items.length
+        ? Math.round(
+            (agentResult.items.filter((a) => a.status === "RUNNING").length /
               agentResult.items.length) *
-              100
-          : 0,
-      ),
+              100,
+          )
+        : 0,
       generatedAt: new Date().toISOString(),
     };
   }
@@ -129,9 +131,7 @@ export class DashboardService implements IDashboardService {
   async getTopAgents(limit = 5): Promise<Agent[]> {
     const { items } = await this.agents.findAll({ limit: 100 });
     // Show all deployed agents (RUNNING first, then IDLE); exclude only TERMINATED
-    const deployed = items.filter(
-      (a) => a.status !== "TERMINATED",
-    );
+    const deployed = items.filter((a) => a.status !== "TERMINATED");
     return deployed
       .sort((a, b) => {
         // Running agents first, then idle
@@ -144,7 +144,9 @@ export class DashboardService implements IDashboardService {
         const aOrder = statusOrder[a.status ?? "IDLE"] ?? 1;
         const bOrder = statusOrder[b.status ?? "IDLE"] ?? 1;
         if (aOrder !== bOrder) return aOrder - bOrder;
-        return (b.performance?.successRate ?? 0) - (a.performance?.successRate ?? 0);
+        return (
+          (b.performance?.successRate ?? 0) - (a.performance?.successRate ?? 0)
+        );
       })
       .slice(0, limit);
   }

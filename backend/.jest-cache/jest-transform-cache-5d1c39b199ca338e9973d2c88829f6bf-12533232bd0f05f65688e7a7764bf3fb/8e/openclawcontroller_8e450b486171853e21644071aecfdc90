@@ -1,0 +1,188 @@
+6476359070b7b927a692d89f36be41bb
+"use strict";
+/**
+ * OpenClaw Inbound Webhook Controller
+ *
+ * Implements the Channel Adapter pattern for OpenClaw.
+ *
+ * Architecture rule (LOCKED):
+ *   OpenClaw is ONLY a channel. It carries messages in and out.
+ *   ALL AI reasoning happens inside LangGraph — never inside this controller.
+ *
+ * Security:
+ *   - @Public(): JWT guard skipped; security is via HMAC-SHA256 signature.
+ *   - X-OpenClaw-Signature must match HMAC-SHA256(rawBody, OPENCLAW_WEBHOOK_SECRET).
+ *   - Uses timingSafeEqual to prevent timing-oracle attacks.
+ *   - Tenant and Agent are verified against the DB before task creation.
+ *   - Raw body is required for signature verification (main.ts rawBody: true).
+ *
+ * SOLID:
+ *   SRP  — controller only handles channel-boundary concerns.
+ *   DIP  — depends on AgentExecutorService abstraction, not graph directly.
+ *   OCP  — adding new channels only requires new controllers; no existing code changes.
+ */
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var OpenClawWebhookController_1;
+var _a, _b, _c, _d, _e, _f;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OpenClawWebhookController = void 0;
+const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
+const crypto_1 = require("crypto");
+const class_validator_1 = require("class-validator");
+const prisma_service_1 = require("../../infrastructure/database/prisma.service");
+const agent_executor_service_1 = require("../agents/services/agent-executor.service");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const client_1 = require("@prisma/client");
+class InboundMessageDto {
+    agentId;
+    tenantId;
+    userMessage;
+    sessionId;
+    metadata;
+}
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], InboundMessageDto.prototype, "agentId", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], InboundMessageDto.prototype, "tenantId", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], InboundMessageDto.prototype, "userMessage", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], InboundMessageDto.prototype, "sessionId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsObject)(),
+    __metadata("design:type", typeof (_a = typeof Record !== "undefined" && Record) === "function" ? _a : Object)
+], InboundMessageDto.prototype, "metadata", void 0);
+let OpenClawWebhookController = OpenClawWebhookController_1 = class OpenClawWebhookController {
+    configService;
+    prisma;
+    executorService;
+    logger = new common_1.Logger(OpenClawWebhookController_1.name);
+    constructor(configService, prisma, executorService) {
+        this.configService = configService;
+        this.prisma = prisma;
+        this.executorService = executorService;
+    }
+    /**
+     * POST /api/v1/openclaw/message
+     *
+     * Receives an inbound message from OpenClaw, validates HMAC signature,
+     * verifies tenant/agent ownership, creates a Task, and dispatches it to
+     * the LangGraph pipeline (fire-and-forget).
+     *
+     * Returns {taskId} immediately — client tracks progress via WebSocket.
+     */
+    async receiveMessage(signature, rawBody, body) {
+        // ─── 1. HMAC-SHA256 signature validation ───────────────────────────────
+        const secret = this.configService.get('OPENCLAW_WEBHOOK_SECRET');
+        if (!secret) {
+            // Fail closed: if the secret is not configured, reject all inbound requests
+            this.logger.error('[Security] OPENCLAW_WEBHOOK_SECRET is not set — rejecting inbound webhook');
+            throw new common_1.UnauthorizedException('Webhook not configured');
+        }
+        if (!signature) {
+            throw new common_1.UnauthorizedException('Missing X-OpenClaw-Signature header');
+        }
+        if (!this.verifySignature(rawBody, signature, secret)) {
+            this.logger.warn(`[Security] Invalid OpenClaw signature for tenantId=${body.tenantId}`);
+            throw new common_1.UnauthorizedException('Invalid webhook signature');
+        }
+        // ─── 2. Validate tenant and agent exist and belong together ────────────
+        const { agentId, tenantId, userMessage, sessionId, metadata } = body;
+        const agent = await this.prisma.agent.findFirst({
+            where: { id: agentId, tenantId },
+            select: { id: true, tenantId: true, name: true },
+        });
+        if (!agent) {
+            throw new common_1.BadRequestException('Agent not found or does not belong to the specified tenant');
+        }
+        // ─── 3. Create Task with channel context stored in input JSON ──────────
+        const task = await this.prisma.task.create({
+            data: {
+                title: `OpenClaw: ${userMessage.slice(0, 100)}`,
+                description: userMessage,
+                status: client_1.TaskStatus.PENDING,
+                priority: client_1.TaskPriority.MEDIUM,
+                input: {
+                    channelSource: 'openclaw',
+                    channelContext: {
+                        // OpenClaw's own agent/session reference — used for outbound relay
+                        openClawAgentId: agentId,
+                        sessionId: sessionId ?? null,
+                        metadata: metadata ?? {},
+                    },
+                    userMessage,
+                },
+                agentId,
+                tenantId,
+            },
+        });
+        this.logger.log(`[AUDIT] OpenClaw inbound message accepted: taskId=${task.id} agentId=${agentId} tenantId=${tenantId}`);
+        // ─── 4. Fire-and-forget — LangGraph pipeline handles all AI reasoning ──
+        void this.executorService.executeTask(task.id, agentId, tenantId);
+        return { taskId: task.id, status: 'queued' };
+    }
+    /**
+     * Constant-time HMAC-SHA256 signature verification.
+     * Accepts both 'sha256=<hex>' and raw hex formats.
+     *
+     * SECURITY: uses timingSafeEqual to prevent timing-oracle attacks.
+     */
+    verifySignature(rawBody, receivedSignature, secret) {
+        try {
+            const expected = (0, crypto_1.createHmac)('sha256', secret)
+                .update(rawBody)
+                .digest('hex');
+            // Strip optional 'sha256=' prefix
+            const received = receivedSignature.startsWith('sha256=')
+                ? receivedSignature.slice(7)
+                : receivedSignature;
+            const expectedBuf = Buffer.from(expected, 'hex');
+            const receivedBuf = Buffer.from(received, 'hex');
+            if (expectedBuf.length !== receivedBuf.length)
+                return false;
+            return (0, crypto_1.timingSafeEqual)(expectedBuf, receivedBuf);
+        }
+        catch {
+            return false;
+        }
+    }
+};
+exports.OpenClawWebhookController = OpenClawWebhookController;
+__decorate([
+    (0, common_1.Post)('message'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.ACCEPTED),
+    __param(0, (0, common_1.Headers)('x-openclaw-signature')),
+    __param(1, (0, common_1.RawBody)()),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeof (_e = typeof Buffer !== "undefined" && Buffer) === "function" ? _e : Object, InboundMessageDto]),
+    __metadata("design:returntype", typeof (_f = typeof Promise !== "undefined" && Promise) === "function" ? _f : Object)
+], OpenClawWebhookController.prototype, "receiveMessage", null);
+exports.OpenClawWebhookController = OpenClawWebhookController = OpenClawWebhookController_1 = __decorate([
+    (0, roles_decorator_1.Public)(),
+    (0, common_1.Controller)({ path: 'openclaw', version: '1' }),
+    __metadata("design:paramtypes", [typeof (_b = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _b : Object, typeof (_c = typeof prisma_service_1.PrismaService !== "undefined" && prisma_service_1.PrismaService) === "function" ? _c : Object, typeof (_d = typeof agent_executor_service_1.AgentExecutorService !== "undefined" && agent_executor_service_1.AgentExecutorService) === "function" ? _d : Object])
+], OpenClawWebhookController);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL21udC9kYXRhL1dlYiBEZXYvTmV1cmVDb3JlL2JhY2tlbmQvc3JjL21vZHVsZXMvYWktZ2F0ZXdheS9vcGVuY2xhdy5jb250cm9sbGVyLnRzIiwibWFwcGluZ3MiOiI7QUFBQTs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7R0FvQkc7Ozs7Ozs7Ozs7Ozs7Ozs7O0FBRUgsMkNBV3dCO0FBQ3hCLDJDQUErQztBQUMvQyxtQ0FBcUQ7QUFDckQscURBQWlFO0FBQ2pFLGlGQUE2RTtBQUM3RSxzRkFBaUY7QUFDakYsNkVBQWlFO0FBQ2pFLDJDQUEwRDtBQUUxRCxNQUFNLGlCQUFpQjtJQUVyQixPQUFPLENBQVU7SUFHakIsUUFBUSxDQUFVO0lBR2xCLFdBQVcsQ0FBVTtJQUlyQixTQUFTLENBQVU7SUFJbkIsUUFBUSxDQUEyQjtDQUNwQztBQWZDO0lBREMsSUFBQSwwQkFBUSxHQUFFOztrREFDTTtBQUdqQjtJQURDLElBQUEsMEJBQVEsR0FBRTs7bURBQ087QUFHbEI7SUFEQyxJQUFBLDBCQUFRLEdBQUU7O3NEQUNVO0FBSXJCO0lBRkMsSUFBQSw0QkFBVSxHQUFFO0lBQ1osSUFBQSwwQkFBUSxHQUFFOztvREFDUTtBQUluQjtJQUZDLElBQUEsNEJBQVUsR0FBRTtJQUNaLElBQUEsMEJBQVEsR0FBRTtrREFDQSxNQUFNLG9CQUFOLE1BQU07bURBQWtCO0FBSzlCLElBQU0seUJBQXlCLGlDQUEvQixNQUFNLHlCQUF5QjtJQUlqQjtJQUNBO0lBQ0E7SUFMRixNQUFNLEdBQUcsSUFBSSxlQUFNLENBQUMsMkJBQXlCLENBQUMsSUFBSSxDQUFDLENBQUM7SUFFckUsWUFDbUIsYUFBNEIsRUFDNUIsTUFBcUIsRUFDckIsZUFBcUM7UUFGckMsa0JBQWEsR0FBYixhQUFhLENBQWU7UUFDNUIsV0FBTSxHQUFOLE1BQU0sQ0FBZTtRQUNyQixvQkFBZSxHQUFmLGVBQWUsQ0FBc0I7SUFDckQsQ0FBQztJQUVKOzs7Ozs7OztPQVFHO0lBR0csQUFBTixLQUFLLENBQUMsY0FBYyxDQUNlLFNBQTZCLEVBQ25ELE9BQWUs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S1gsc0JBQWEsb0JBQWIsc0JBQWEsb0RBQ3BCLDhCQUFhLG9CQUFiLDhCQUFhLG9EQUNKLDZDQUFvQixvQkFBcEIsNkNBQW9CO0dBTjdDLHlCQUF5QixDQTBIckMiLCJuYW1lcyI6W10sInNvdXJjZXMiOlsiL21udC9kYXRhL1dlYiBEZXYvTmV1cmVDb3JlL2JhY2tlbmQvc3JjL21vZHVsZXMvYWktZ2F0ZXdheS9vcGVuY2xhdy5jb250cm9sbGVyLnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKlxuICogT3BlbkNsYXcgSW5ib3VuZCBXZWJob29rIENvbnRyb2xsZXJcbiAqXG4gKiBJbXBsZW1lbnRzIHRoZSBDaGFubmVsIEFkYXB0ZXIgcGF0dGVybiBmb3IgT3BlbkNsYXcuXG4gKlxuICogQXJjaGl0ZWN0dXJlIHJ1bGUgKExPQ0tFRCk6XG4gKiAgIE9wZW5DbGF3IGlzIE9OTFkgYSBjaGFubmVsLiBJdCBjYXJyaWVzIG1lc3NhZ2VzIGluIGFuZCBvdXQuXG4gKiAgIEFMTCBBSSByZWFzb25pbmcgaGFwcGVucyBpbnNpZGUgTGFuZ0dyYXBoIOKAlCBuZXZlciBpbnNpZGUgdGhpcyBjb250cm9sbGVyLlxuICpcbiAqIFNlY3VyaXR5OlxuICogICAtIEBQdWJsaWMoKTogSldUIGd1YXJkIHNraXBwZWQ7IHNlY3VyaXR5IGlzIHZpYSBITUFDLVNIQTI1NiBzaWduYXR1cmUuXG4gKiAgIC0gWC1PcGVuQ2xhdy1TaWduYXR1cmUgbXVzdCBtYXRjaCBITUFDLVNIQTI1NihyYXdCb2R5LCBPUEVOQ0xBV19XRUJIT09LX1NFQ1JFVCkuXG4gKiAgIC0gVXNlcyB0aW1pbmdTYWZlRXF1YWwgdG8gcHJldmVudCB0aW1pbmctb3JhY2xlIGF0dGFja3MuXG4gKiAgIC0gVGVuYW50IGFuZCBBZ2VudCBhcmUgdmVyaWZpZWQgYWdhaW5zdCB0aGUgREIgYmVmb3JlIHRhc2sgY3JlYXRpb24uXG4gKiAgIC0gUmF3IGJvZHkgaXMgcmVxdWlyZWQgZm9yIHNpZ25hdHVyZSB2ZXJpZmljYXRpb24gKG1haW4udHMgcmF3Qm9keTogdHJ1ZSkuXG4gKlxuICogU09MSUQ6XG4gKiAgIFNSUCAg4oCUIGNvbnRyb2xsZXIgb25seSBoYW5kbGVzIGNoYW5uZWwtYm91bmRhcnkgY29uY2VybnMuXG4gKiAgIERJUCAg4oCUIGRlcGVuZHMgb24gQWdlbnRFeGVjdXRvclNlcnZpY2UgYWJzdHJhY3Rpb24sIG5vdCBncmFwaCBkaXJlY3RseS5cbiAqICAgT0NQICDigJQgYWRkaW5nIG5ldyBjaGFubmVscyBvbmx5IHJlcXVpcmVzIG5ldyBjb250cm9sbGVyczsgbm8gZXhpc3RpbmcgY29kZSBjaGFuZ2VzLlxuICovXG5cbmltcG9ydCB7XG4gIENvbnRyb2xsZXIsXG4gIFBvc3QsXG4gIEJvZHksXG4gIEhlYWRlcnMsXG4gIFJhd0JvZHksXG4gIEh0dHBDb2RlLFxuICBIdHRwU3RhdHVzLFxuICBVbmF1dGhvcml6ZWRFeGNlcHRpb24sXG4gIEJhZFJlcXVlc3RFeGNlcHRpb24sXG4gIExvZ2dlcixcbn0gZnJvbSAnQG5lc3Rqcy9jb21tb24nO1xuaW1wb3J0IHsgQ29uZmlnU2VydmljZSB9IGZyb20gJ0BuZXN0anMvY29uZmlnJztcbmltcG9ydCB7IGNyZWF0ZUhtYWMsIHRpbWluZ1NhZmVFcXVhbCB9IGZyb20gJ2NyeXB0byc7XG5pbXBvcnQgeyBJc1N0cmluZywgSXNPcHRpb25hbCwgSXNPYmplY3QgfSBmcm9tICdjbGFzcy12YWxpZGF0b3InO1xuaW1wb3J0IHsgUHJpc21hU2VydmljZSB9IGZyb20gJy4uLy4uL2luZnJhc3RydWN0dXJlL2RhdGFiYXNlL3ByaXNtYS5zZXJ2aWNlJztcbmltcG9ydCB7IEFnZW50RXhlY3V0b3JTZXJ2aWNlIH0gZnJvbSAnLi4vYWdlbnRzL3NlcnZpY2VzL2FnZW50LWV4ZWN1dG9yLnNlcnZpY2UnO1xuaW1wb3J0IHsgUHVibGljIH0gZnJvbSAnLi4vLi4vY29tbW9uL2RlY29yYXRvcnMvcm9sZXMuZGVjb3JhdG9yJztcbmltcG9ydCB7IFRhc2tTdGF0dXMsIFRhc2tQcmlvcml0eSB9IGZyb20gJ0BwcmlzbWEvY2xpZW50JztcblxuY2xhc3MgSW5ib3VuZE1lc3NhZ2VEdG8ge1xuICBASXNTdHJpbmcoKVxuICBhZ2VudElkITogc3RyaW5nO1xuXG4gIEBJc1N0cmluZygpXG4gIHRlbmFudElkITogc3RyaW5nO1xuXG4gIEBJc1N0cmluZygpXG4gIHVzZXJNZXNzYWdlITogc3RyaW5nO1xuXG4gIEBJc09wdGlvbmFsKClcbiAgQElzU3RyaW5nKClcbiAgc2Vzc2lvbklkPzogc3RyaW5nO1xuXG4gIEBJc09wdGlvbmFsKClcbiAgQElzT2JqZWN0KClcbiAgbWV0YWRhdGE/OiBSZWNvcmQ8c3RyaW5nLCB1bmtub3duPjtcbn1cblxuQFB1YmxpYygpXG5AQ29udHJvbGxlcih7IHBhdGg6ICdvcGVuY2xhdycsIHZlcnNpb246ICcxJyB9KVxuZXhwb3J0IGNsYXNzIE9wZW5DbGF3V2ViaG9va0NvbnRyb2xsZXIge1xuICBwcml2YXRlIHJlYWRvbmx5IGxvZ2dlciA9IG5ldyBMb2dnZXIoT3BlbkNsYXdXZWJob29rQ29udHJvbGxlci5uYW1lKTtcblxuICBjb25zdHJ1Y3RvcihcbiAgICBwcml2YXRlIHJlYWRvbmx5IGNvbmZpZ1NlcnZpY2U6IENvbmZpZ1NlcnZpY2UsXG4gICAgcHJpdmF0ZSByZWFkb25seSBwcmlzbWE6IFByaXNtYVNlcnZpY2UsXG4gICAgcHJpdmF0ZSByZWFkb25seSBleGVjdXRvclNlcnZpY2U6IEFnZW50RXhlY3V0b3JTZXJ2aWNlLFxuICApIHt9XG5cbiAgLyoqXG4gICAqIFBPU1QgL2FwaS92MS9vcGVuY2xhdy9tZXNzYWdlXG4gICAqXG4gICAqIFJlY2VpdmVzIGFuIGluYm91bmQgbWVzc2FnZSBmcm9tIE9wZW5DbGF3LCB2YWxpZGF0ZXMgSE1BQyBzaWduYXR1cmUsXG4gICAqIHZlcmlmaWVzIHRlbmFudC9hZ2VudCBvd25lcnNoaXAsIGNyZWF0ZXMgYSBUYXNrLCBhbmQgZGlzcGF0Y2hlcyBpdCB0b1xuICAgKiB0aGUgTGFuZ0dyYXBoIHBpcGVsaW5lIChmaXJlLWFuZC1mb3JnZXQpLlxuICAgKlxuICAgKiBSZXR1cm5zIHt0YXNrSWR9IGltbWVkaWF0ZWx5IOKAlCBjbGllbnQgdHJhY2tzIHByb2dyZXNzIHZpYSBXZWJTb2NrZXQuXG4gICAqL1xuICBAUG9zdCgnbWVzc2FnZScpXG4gIEBIdHRwQ29kZShIdHRwU3RhdHVzLkFDQ0VQVEVEKVxuICBhc3luYyByZWNlaXZlTWVzc2FnZShcbiAgICBASGVhZGVycygneC1vcGVuY2xhdy1zaWduYXR1cmUnKSBzaWduYXR1cmU6IHN0cmluZyB8IHVuZGVmaW5lZCxcbiAgICBAUmF3Qm9keSgpIHJhd0JvZHk6IEJ1ZmZlcixcbiAgICBAQm9keSgpIGJvZHk6IEluYm91bmRNZXNzYWdlRHRvLFxuICApOiBQcm9taXNlPHsgdGFza0lkOiBzdHJpbmc7IHN0YXR1czogc3RyaW5nIH0+IHtcbiAgICAvLyDilIDilIDilIAgMS4gSE1BQy1TSEEyNTYgc2lnbmF0dXJlIHZhbGlkYXRpb24g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXG4gICAgY29uc3Qgc2VjcmV0ID0gdGhpcy5jb25maWdTZXJ2aWNlLmdldDxzdHJpbmc+KCdPUEVOQ0xBV19XRUJIT09LX1NFQ1JFVCcpO1xuICAgIGlmICghc2VjcmV0KSB7XG4gICAgICAvLyBGYWlsIGNsb3NlZDogaWYgdGhlIHNlY3JldCBpcyBub3QgY29uZmlndXJlZCwgcmVqZWN0IGFsbCBpbmJvdW5kIHJlcXVlc3RzXG4gICAgICB0aGlzLmxvZ2dlci5lcnJvcihcbiAgICAgICAgJ1tTZWN1cml0eV0gT1BFTkNMQVdfV0VCSE9PS19TRUNSRVQgaXMgbm90IHNldCDigJQgcmVqZWN0aW5nIGluYm91bmQgd2ViaG9vaycsXG4gICAgICApO1xuICAgICAgdGhyb3cgbmV3IFVuYXV0aG9yaXplZEV4Y2VwdGlvbignV2ViaG9vayBub3QgY29uZmlndXJlZCcpO1xuICAgIH1cblxuICAgIGlmICghc2lnbmF0dXJlKSB7XG4gICAgICB0aHJvdyBuZXcgVW5hdXRob3JpemVkRXhjZXB0aW9uKCdNaXNzaW5nIFgtT3BlbkNsYXctU2lnbmF0dXJlIGhlYWRlcicpO1xuICAgIH1cblxuICAgIGlmICghdGhpcy52ZXJpZnlTaWduYXR1cmUocmF3Qm9keSwgc2lnbmF0dXJlLCBzZWNyZXQpKSB7XG4gICAgICB0aGlzLmxvZ2dlci53YXJuKFxuICAgICAgICBgW1NlY3VyaXR5XSBJbnZhbGlkIE9wZW5DbGF3IHNpZ25hdHVyZSBmb3IgdGVuYW50SWQ9JHtib2R5LnRlbmFudElkfWAsXG4gICAgICApO1xuICAgICAgdGhyb3cgbmV3IFVuYXV0aG9yaXplZEV4Y2VwdGlvbignSW52YWxpZCB3ZWJob29rIHNpZ25hdHVyZScpO1xuICAgIH1cblxuICAgIC8vIOKUgOKUgOKUgCAyLiBWYWxpZGF0ZSB0ZW5hbnQgYW5kIGFnZW50IGV4aXN0IGFuZCBiZWxvbmcgdG9nZXRoZXIg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXG4gICAgY29uc3QgeyBhZ2VudElkLCB0ZW5hbnRJZCwgdXNlck1lc3NhZ2UsIHNlc3Npb25JZCwgbWV0YWRhdGEgfSA9IGJvZHk7XG5cbiAgICBjb25zdCBhZ2VudCA9IGF3YWl0IHRoaXMucHJpc21hLmFnZW50LmZpbmRGaXJzdCh7XG4gICAgICB3aGVyZTogeyBpZDogYWdlbnRJZCwgdGVuYW50SWQgfSxcbiAgICAgIHNlbGVjdDogeyBpZDogdHJ1ZSwgdGVuYW50SWQ6IHRydWUsIG5hbWU6IHRydWUgfSxcbiAgICB9KTtcblxuICAgIGlmICghYWdlbnQpIHtcbiAgICAgIHRocm93IG5ldyBCYWRSZXF1ZXN0RXhjZXB0aW9uKFxuICAgICAgICAnQWdlbnQgbm90IGZvdW5kIG9yIGRvZXMgbm90IGJlbG9uZyB0byB0aGUgc3BlY2lmaWVkIHRlbmFudCcsXG4gICAgICApO1xuICAgIH1cblxuICAgIC8vIOKUgOKUgOKUgCAzLiBDcmVhdGUgVGFzayB3aXRoIGNoYW5uZWwgY29udGV4dCBzdG9yZWQgaW4gaW5wdXQgSlNPTiDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcbiAgICBjb25zdCB0YXNrID0gYXdhaXQgdGhpcy5wcmlzbWEudGFzay5jcmVhdGUoe1xuICAgICAgZGF0YToge1xuICAgICAgICB0aXRsZTogYE9wZW5DbGF3OiAke3VzZXJNZXNzYWdlLnNsaWNlKDAsIDEwMCl9YCxcbiAgICAgICAgZGVzY3JpcHRpb246IHVzZXJNZXNzYWdlLFxuICAgICAgICBzdGF0dXM6IFRhc2tTdGF0dXMuUEVORElORyxcbiAgICAgICAgcHJpb3JpdHk6IFRhc2tQcmlvcml0eS5NRURJVU0sXG4gICAgICAgIGlucHV0OiB7XG4gICAgICAgICAgY2hhbm5lbFNvdXJjZTogJ29wZW5jbGF3JyxcbiAgICAgICAgICBjaGFubmVsQ29udGV4dDoge1xuICAgICAgICAgICAgLy8gT3BlbkNsYXcncyBvd24gYWdlbnQvc2Vzc2lvbiByZWZlcmVuY2Ug4oCUIHVzZWQgZm9yIG91dGJvdW5kIHJlbGF5XG4gICAgICAgICAgICBvcGVuQ2xhd0FnZW50SWQ6IGFnZW50SWQsXG4gICAgICAgICAgICBzZXNzaW9uSWQ6IHNlc3Npb25JZCA/PyBudWxsLFxuICAgICAgICAgICAgbWV0YWRhdGE6IG1ldGFkYXRhID8/IHt9LFxuICAgICAgICAgIH0sXG4gICAgICAgICAgdXNlck1lc3NhZ2UsXG4gICAgICAgIH0gYXMgbmV2ZXIsXG4gICAgICAgIGFnZW50SWQsXG4gICAgICAgIHRlbmFudElkLFxuICAgICAgfSxcbiAgICB9KTtcblxuICAgIHRoaXMubG9nZ2VyLmxvZyhcbiAgICAgIGBbQVVESVRdIE9wZW5DbGF3IGluYm91bmQgbWVzc2FnZSBhY2NlcHRlZDogdGFza0lkPSR7dGFzay5pZH0gYWdlbnRJZD0ke2FnZW50SWR9IHRlbmFudElkPSR7dGVuYW50SWR9YCxcbiAgICApO1xuXG4gICAgLy8g4pSA4pSA4pSAIDQuIEZpcmUtYW5kLWZvcmdldCDigJQgTGFuZ0dyYXBoIHBpcGVsaW5lIGhhbmRsZXMgYWxsIEFJIHJlYXNvbmluZyDilIDilIBcbiAgICB2b2lkIHRoaXMuZXhlY3V0b3JTZXJ2aWNlLmV4ZWN1dGVUYXNrKHRhc2suaWQsIGFnZW50SWQsIHRlbmFudElkKTtcblxuICAgIHJldHVybiB7IHRhc2tJZDogdGFzay5pZCwgc3RhdHVzOiAncXVldWVkJyB9O1xuICB9XG5cbiAgLyoqXG4gICAqIENvbnN0YW50LXRpbWUgSE1BQy1TSEEyNTYgc2lnbmF0dXJlIHZlcmlmaWNhdGlvbi5cbiAgICogQWNjZXB0cyBib3RoICdzaGEyNTY9PGhleD4nIGFuZCByYXcgaGV4IGZvcm1hdHMuXG4gICAqXG4gICAqIFNFQ1VSSVRZOiB1c2VzIHRpbWluZ1NhZmVFcXVhbCB0byBwcmV2ZW50IHRpbWluZy1vcmFjbGUgYXR0YWNrcy5cbiAgICovXG4gIHByaXZhdGUgdmVyaWZ5U2lnbmF0dXJlKFxuICAgIHJhd0JvZHk6IEJ1ZmZlcixcbiAgICByZWNlaXZlZFNpZ25hdHVyZTogc3RyaW5nLFxuICAgIHNlY3JldDogc3RyaW5nLFxuICApOiBib29sZWFuIHtcbiAgICB0cnkge1xuICAgICAgY29uc3QgZXhwZWN0ZWQgPSBjcmVhdGVIbWFjKCdzaGEyNTYnLCBzZWNyZXQpXG4gICAgICAgIC51cGRhdGUocmF3Qm9keSlcbiAgICAgICAgLmRpZ2VzdCgnaGV4Jyk7XG5cbiAgICAgIC8vIFN0cmlwIG9wdGlvbmFsICdzaGEyNTY9JyBwcmVmaXhcbiAgICAgIGNvbnN0IHJlY2VpdmVkID0gcmVjZWl2ZWRTaWduYXR1cmUuc3RhcnRzV2l0aCgnc2hhMjU2PScpXG4gICAgICAgID8gcmVjZWl2ZWRTaWduYXR1cmUuc2xpY2UoNylcbiAgICAgICAgOiByZWNlaXZlZFNpZ25hdHVyZTtcblxuICAgICAgY29uc3QgZXhwZWN0ZWRCdWYgPSBCdWZmZXIuZnJvbShleHBlY3RlZCwgJ2hleCcpO1xuICAgICAgY29uc3QgcmVjZWl2ZWRCdWYgPSBCdWZmZXIuZnJvbShyZWNlaXZlZCwgJ2hleCcpO1xuXG4gICAgICBpZiAoZXhwZWN0ZWRCdWYubGVuZ3RoICE9PSByZWNlaXZlZEJ1Zi5sZW5ndGgpIHJldHVybiBmYWxzZTtcbiAgICAgIHJldHVybiB0aW1pbmdTYWZlRXF1YWwoZXhwZWN0ZWRCdWYsIHJlY2VpdmVkQnVmKTtcbiAgICB9IGNhdGNoIHtcbiAgICAgIHJldHVybiBmYWxzZTtcbiAgICB9XG4gIH1cbn1cbiJdLCJ2ZXJzaW9uIjozfQ==

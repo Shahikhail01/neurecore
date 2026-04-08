@@ -1,6 +1,9 @@
-// ─── useTimeRange ─────────────────────────────────────────────────────────────
-// S — Single Responsibility: shared chart time range selector state
+/**
+ * useTimeRange — shared chart time-range state for admin portal
+ * I principle: single responsibility — manages range toggle only
+ */
 'use client';
+
 import { useState } from 'react';
 import type { ChartTimeRange } from '@/types/ui.types';
 

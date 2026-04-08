@@ -12,7 +12,14 @@
 
 module.exports = {
   // Test file patterns
-  testMatch: ['<rootDir>/src/**/*.spec.ts', '<rootDir>/test/unit/**/*.spec.ts'],
+  testMatch: [
+    '<rootDir>/src/**/*.spec.ts',
+    '<rootDir>/test/unit/**/*.spec.ts',
+    '<rootDir>/test/e2e/**/*.spec.ts',
+  ],
+
+  // Ignore plugins-backup folder to avoid duplicate jest haste collisions
+  testPathIgnorePatterns: ['<rootDir>/src/plugins-backup/'],
 
   // File extensions to consider
   moduleFileExtensions: ['js', 'json', 'ts'],
@@ -91,8 +98,11 @@ module.exports = {
   // Setup files
   setupFilesAfterEnv: ['<rootDir>/test/setup/unit.setup.ts'],
 
-  // Module path ignore patterns
-  modulePathIgnorePatterns: ['<rootDir>/dist/'],
+  // Module path ignore patterns - exclude backup and node_modules
+  modulePathIgnorePatterns: [
+    '<rootDir>/dist/',
+    '<rootDir>/src/plugins-backup/',
+  ],
 
   // Roots
   roots: ['<rootDir>/src/', '<rootDir>/test/'],

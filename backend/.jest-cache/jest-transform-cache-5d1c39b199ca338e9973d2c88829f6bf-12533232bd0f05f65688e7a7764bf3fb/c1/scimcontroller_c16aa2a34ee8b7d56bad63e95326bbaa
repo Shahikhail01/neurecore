@@ -1,0 +1,310 @@
+11dcd9c0b1930a685fe11d74e003c9cc
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var _a;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ScimController = void 0;
+const common_1 = require("@nestjs/common");
+const jwt_auth_guard_1 = require("../guards/jwt-auth.guard");
+const current_user_decorator_1 = require("../../../common/decorators/current-user.decorator");
+const prisma_service_1 = require("../../../infrastructure/database/prisma.service");
+let ScimController = class ScimController {
+    prisma;
+    constructor(prisma) {
+        this.prisma = prisma;
+    }
+    // ─── Users ───────────────────────────────────────────────────────────────
+    async listUsers(user) {
+        const users = await this.prisma.user.findMany({
+            where: { tenantId: user.tenantId },
+            select: { id: true, email: true, firstName: true, lastName: true },
+        });
+        return {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+            totalResults: users.length,
+            Resources: users.map((u) => ({
+                schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+                id: u.id,
+                userName: u.email,
+                displayName: `${u.firstName} ${u.lastName}`.trim(),
+                emails: [{ value: u.email, primary: true }],
+                active: true,
+                meta: { resourceType: 'User' },
+            })),
+        };
+    }
+    async createUser(user, body) {
+        const email = body.emails?.[0]?.value ?? body.userName;
+        const [firstPart, ...rest] = (body.displayName ?? body.userName).split(' ');
+        const created = await this.prisma.user.create({
+            data: {
+                email,
+                firstName: firstPart ?? body.userName,
+                lastName: rest.join(' ') || '_',
+                tenantId: user.tenantId,
+                passwordHash: '__scim_provisioned__',
+            },
+        });
+        return {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            id: created.id,
+            userName: created.email,
+            displayName: `${created.firstName} ${created.lastName}`.trim(),
+            emails: [{ value: created.email, primary: true }],
+            active: true,
+            meta: { resourceType: 'User', created: created.createdAt },
+        };
+    }
+    async getUser(user, id) {
+        const u = await this.prisma.user.findFirstOrThrow({
+            where: { id, tenantId: user.tenantId },
+        });
+        return {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            id: u.id,
+            userName: u.email,
+            displayName: `${u.firstName} ${u.lastName}`.trim(),
+            emails: [{ value: u.email, primary: true }],
+            active: u.isActive,
+            meta: { resourceType: 'User' },
+        };
+    }
+    /** PUT /scim/v2/Users/:id — full replace */
+    async replaceUser(user, id, body) {
+        const existing = await this.prisma.user.findFirst({
+            where: { id, tenantId: user.tenantId },
+        });
+        if (!existing)
+            throw new common_1.NotFoundException(`User ${id} not found`);
+        const [firstPart, ...rest] = (body.displayName ?? body.userName).split(' ');
+        const updated = await this.prisma.user.update({
+            where: { id },
+            data: {
+                email: body.emails?.[0]?.value ?? body.userName,
+                firstName: firstPart ?? body.userName,
+                lastName: rest.join(' ') || existing.lastName,
+                isActive: body.active ?? existing.isActive,
+            },
+        });
+        return {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            id: updated.id,
+            userName: updated.email,
+            displayName: `${updated.firstName} ${updated.lastName}`.trim(),
+            emails: [{ value: updated.email, primary: true }],
+            active: updated.isActive,
+            meta: { resourceType: 'User' },
+        };
+    }
+    /** PATCH /scim/v2/Users/:id — partial update / deactivate */
+    async patchUser(user, id, body) {
+        const existing = await this.prisma.user.findFirst({
+            where: { id, tenantId: user.tenantId },
+        });
+        if (!existing)
+            throw new common_1.NotFoundException(`User ${id} not found`);
+        const data = {};
+        for (const op of body.Operations ?? []) {
+            if (op.path === 'active' || op.path === 'Active') {
+                data['isActive'] = Boolean(op.value);
+            }
+            else if (op.path === 'displayName') {
+                const [f, ...r] = String(op.value ?? '').split(' ');
+                data['firstName'] = f;
+                if (r.length)
+                    data['lastName'] = r.join(' ');
+            }
+        }
+        const updated = await this.prisma.user.update({ where: { id }, data });
+        return {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            id: updated.id,
+            userName: updated.email,
+            displayName: `${updated.firstName} ${updated.lastName}`.trim(),
+            emails: [{ value: updated.email, primary: true }],
+            active: updated.isActive,
+            meta: { resourceType: 'User' },
+        };
+    }
+    /** DELETE /scim/v2/Users/:id — deprovision (deactivate; soft delete) */
+    async deleteUser(user, id) {
+        const existing = await this.prisma.user.findFirst({
+            where: { id, tenantId: user.tenantId },
+        });
+        if (!existing)
+            throw new common_1.NotFoundException(`User ${id} not found`);
+        await this.prisma.user.update({ where: { id }, data: { isActive: false } });
+    }
+    // ─── Groups (Departments) ─────────────────────────────────────────────────
+    async listGroups(user) {
+        const departments = await this.prisma.department.findMany({
+            where: { tenantId: user.tenantId },
+        });
+        return {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+            totalResults: departments.length,
+            Resources: departments.map((d) => ({
+                schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+                id: d.id,
+                displayName: d.name,
+                members: [],
+                meta: { resourceType: 'Group' },
+            })),
+        };
+    }
+    async createGroup(user, body) {
+        const dept = await this.prisma.department.create({
+            data: {
+                name: body.displayName,
+                tenantId: user.tenantId,
+            },
+        });
+        return {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+            id: dept.id,
+            displayName: dept.name,
+            members: [],
+            meta: { resourceType: 'Group', created: dept.createdAt },
+        };
+    }
+    /** PATCH /scim/v2/Groups/:id — update group (rename / update members) */
+    async patchGroup(user, id, body) {
+        const existing = await this.prisma.department.findFirst({
+            where: { id, tenantId: user.tenantId },
+        });
+        if (!existing)
+            throw new common_1.NotFoundException(`Group ${id} not found`);
+        const data = {};
+        for (const op of body.Operations ?? []) {
+            if (op.path === 'displayName') {
+                data['name'] = String(op.value ?? '');
+            }
+        }
+        const updated = await this.prisma.department.update({
+            where: { id },
+            data,
+        });
+        return {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+            id: updated.id,
+            displayName: updated.name,
+            members: [],
+            meta: { resourceType: 'Group' },
+        };
+    }
+    /** DELETE /scim/v2/Groups/:id — archive department */
+    async deleteGroup(user, id) {
+        const existing = await this.prisma.department.findFirst({
+            where: { id, tenantId: user.tenantId },
+        });
+        if (!existing)
+            throw new common_1.NotFoundException(`Group ${id} not found`);
+        await this.prisma.department.update({
+            where: { id },
+            data: { status: 'INACTIVE' },
+        });
+    }
+};
+exports.ScimController = ScimController;
+__decorate([
+    (0, common_1.Get)('Users'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "listUsers", null);
+__decorate([
+    (0, common_1.Post)('Users'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "createUser", null);
+__decorate([
+    (0, common_1.Get)('Users/:id'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "getUser", null);
+__decorate([
+    (0, common_1.Put)('Users/:id'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "replaceUser", null);
+__decorate([
+    (0, common_1.Patch)('Users/:id'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "patchUser", null);
+__decorate([
+    (0, common_1.Delete)('Users/:id'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "deleteUser", null);
+__decorate([
+    (0, common_1.Get)('Groups'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "listGroups", null);
+__decorate([
+    (0, common_1.Post)('Groups'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "createGroup", null);
+__decorate([
+    (0, common_1.Patch)('Groups/:id'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "patchGroup", null);
+__decorate([
+    (0, common_1.Delete)('Groups/:id'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], ScimController.prototype, "deleteGroup", null);
+exports.ScimController = ScimController = __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Controller)('scim/v2'),
+    __metadata("design:paramtypes", [typeof (_a = typeof prisma_service_1.PrismaService !== "undefined" && prisma_service_1.PrismaService) === "function" ? _a : Object])
+], ScimController);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL21udC9kYXRhL1dlYiBEZXYvTmV1cmVDb3JlL2JhY2tlbmQvc3JjL21vZHVsZXMvYXV0aC9jb250cm9sbGVycy9zY2ltLmNvbnRyb2xsZXIudHMiLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7OztBQUFBLDJDQWF3QjtBQUN4Qiw2REFBd0Q7QUFDeEQsOEZBQWdGO0FBQ2hGLG9GQUFnRjtBQXVCekUsSUFBTSxjQUFjLEdBQXBCLE1BQU0sY0FBYztJQUNJO0lBQTdCLFlBQTZCLE1BQXFCO1FBQXJCLFdBQU0sR0FBTixNQUFNLENBQWU7SUFBRyxDQUFDO0lBRXRELDRFQUE0RTtJQUd0RSxBQUFOLEtBQUssQ0FBQyxTQUFTLENBQWdCLElBQWdCO1FBQzdDLE1BQU0sS0FBSyxHQUFHLE1BQU0sSUFBSSxDQUFDLE1BQU0sQ0FBQyxJQUFJLENBQUMsUUFBUSxDQUFDO1lBQzVDLEtBQUssRUFBRSxFQUFFLFFBQVEsRUFBRSxJQUFJLENBQUMsUUFBUSxFQUFFO1lBQ2xDLE1BQU0sRUFBRSxFQUFFLEVBQUUsRUFBRSxJQUFJLEVBQUUsS0FBSyxFQUFFLElBQUksRUFBRSxTQUFTLEVBQUUsSUFBSSxFQUFFLFFBQVEsRUFBRSxJQUFJLEVBQUU7U0FDbkUsQ0FBQyxDQUFDO1FBRUgsT0FBTztZQUNMLE9BQU8sRUFBRSxDQUFDLG9EQUFvRCxDQUFDO1lBQy9ELFlBQVksRUFBRSxLQUFLLENBQUMsTUFBTTtZQUMxQixTQUFTLEVBQUUsS0FBSyxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUMsRUFBRSxFQUFFLENBQUMsQ0FBQztnQkFDM0IsT0FBTyxFQUFFLENBQUMsNENBQTRDLENBQUM7Z0JBQ3ZELEVBQUUsRUFBRSxDQUFDLENBQUMsRUFBRTtnQkFDUixRQUFRLEVBQUUsQ0FBQyxDQUFDLEtBQUs7Z0JBQ2pCLFdBQVcsRUFBRSxHQUFHLENBQUMsQ0FBQyxTQUFTLElBQUksQ0FBQyxDQUFDLFFBQVEsRUFBRSxDQUFDLElBQUksRUFBRTtnQkFDbEQsTUFBTSxFQUFFLENBQUMsRUFBRSxLQUFLLEVBQUUs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REFFaUIsOEJBQWEsb0JBQWIsOEJBQWE7R0FEdkMsY0FBYyxDQTRPMUIiLCJuYW1lcyI6W10sInNvdXJjZXMiOlsiL21udC9kYXRhL1dlYiBEZXYvTmV1cmVDb3JlL2JhY2tlbmQvc3JjL21vZHVsZXMvYXV0aC9jb250cm9sbGVycy9zY2ltLmNvbnRyb2xsZXIudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHtcbiAgQ29udHJvbGxlcixcbiAgR2V0LFxuICBQb3N0LFxuICBQdXQsXG4gIFBhdGNoLFxuICBEZWxldGUsXG4gIEJvZHksXG4gIFBhcmFtLFxuICBVc2VHdWFyZHMsXG4gIEh0dHBDb2RlLFxuICBIdHRwU3RhdHVzLFxuICBOb3RGb3VuZEV4Y2VwdGlvbixcbn0gZnJvbSAnQG5lc3Rqcy9jb21tb24nO1xuaW1wb3J0IHsgSnd0QXV0aEd1YXJkIH0gZnJvbSAnLi4vZ3VhcmRzL2p3dC1hdXRoLmd1YXJkJztcbmltcG9ydCB7IEN1cnJlbnRVc2VyIH0gZnJvbSAnLi4vLi4vLi4vY29tbW9uL2RlY29yYXRvcnMvY3VycmVudC11c2VyLmRlY29yYXRvcic7XG5pbXBvcnQgeyBQcmlzbWFTZXJ2aWNlIH0gZnJvbSAnLi4vLi4vLi4vaW5mcmFzdHJ1Y3R1cmUvZGF0YWJhc2UvcHJpc21hLnNlcnZpY2UnO1xuaW1wb3J0IHR5cGUgeyBKd3RQYXlsb2FkIH0gZnJvbSAnLi4vaW50ZXJmYWNlcy90b2tlbi5pbnRlcmZhY2UnO1xuXG5pbnRlcmZhY2UgU2NpbVVzZXIge1xuICB1c2VyTmFtZTogc3RyaW5nO1xuICBkaXNwbGF5TmFtZT86IHN0cmluZztcbiAgZW1haWxzPzogeyB2YWx1ZTogc3RyaW5nOyBwcmltYXJ5PzogYm9vbGVhbiB9W107XG4gIGFjdGl2ZT86IGJvb2xlYW47XG59XG5cbmludGVyZmFjZSBTY2ltR3JvdXAge1xuICBkaXNwbGF5TmFtZTogc3RyaW5nO1xuICBtZW1iZXJzPzogeyB2YWx1ZTogc3RyaW5nOyBkaXNwbGF5Pzogc3RyaW5nIH1bXTtcbn1cblxuaW50ZXJmYWNlIFNjaW1QYXRjaE9wIHtcbiAgb3A6ICdhZGQnIHwgJ3JlbW92ZScgfCAncmVwbGFjZSc7XG4gIHBhdGg/OiBzdHJpbmc7XG4gIHZhbHVlPzogdW5rbm93bjtcbn1cblxuQFVzZUd1YXJkcyhKd3RBdXRoR3VhcmQpXG5AQ29udHJvbGxlcignc2NpbS92MicpXG5leHBvcnQgY2xhc3MgU2NpbUNvbnRyb2xsZXIge1xuICBjb25zdHJ1Y3Rvcihwcml2YXRlIHJlYWRvbmx5IHByaXNtYTogUHJpc21hU2VydmljZSkge31cblxuICAvLyDilIDilIDilIAgVXNlcnMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXG5cbiAgQEdldCgnVXNlcnMnKVxuICBhc3luYyBsaXN0VXNlcnMoQEN1cnJlbnRVc2VyKCkgdXNlcjogSnd0UGF5bG9hZCkge1xuICAgIGNvbnN0IHVzZXJzID0gYXdhaXQgdGhpcy5wcmlzbWEudXNlci5maW5kTWFueSh7XG4gICAgICB3aGVyZTogeyB0ZW5hbnRJZDogdXNlci50ZW5hbnRJZCB9LFxuICAgICAgc2VsZWN0OiB7IGlkOiB0cnVlLCBlbWFpbDogdHJ1ZSwgZmlyc3ROYW1lOiB0cnVlLCBsYXN0TmFtZTogdHJ1ZSB9LFxuICAgIH0pO1xuXG4gICAgcmV0dXJuIHtcbiAgICAgIHNjaGVtYXM6IFsndXJuOmlldGY6cGFyYW1zOnNjaW06YXBpOm1lc3NhZ2VzOjIuMDpMaXN0UmVzcG9uc2UnXSxcbiAgICAgIHRvdGFsUmVzdWx0czogdXNlcnMubGVuZ3RoLFxuICAgICAgUmVzb3VyY2VzOiB1c2Vycy5tYXAoKHUpID0+ICh7XG4gICAgICAgIHNjaGVtYXM6IFsndXJuOmlldGY6cGFyYW1zOnNjaW06c2NoZW1hczpjb3JlOjIuMDpVc2VyJ10sXG4gICAgICAgIGlkOiB1LmlkLFxuICAgICAgICB1c2VyTmFtZTogdS5lbWFpbCxcbiAgICAgICAgZGlzcGxheU5hbWU6IGAke3UuZmlyc3ROYW1lfSAke3UubGFzdE5hbWV9YC50cmltKCksXG4gICAgICAgIGVtYWlsczogW3sgdmFsdWU6IHUuZW1haWwsIHByaW1hcnk6IHRydWUgfV0sXG4gICAgICAgIGFjdGl2ZTogdHJ1ZSxcbiAgICAgICAgbWV0YTogeyByZXNvdXJjZVR5cGU6ICdVc2VyJyB9LFxuICAgICAgfSkpLFxuICAgIH07XG4gIH1cblxuICBAUG9zdCgnVXNlcnMnKVxuICBASHR0cENvZGUoSHR0cFN0YXR1cy5DUkVBVEVEKVxuICBhc3luYyBjcmVhdGVVc2VyKEBDdXJyZW50VXNlcigpIHVzZXI6IEp3dFBheWxvYWQsIEBCb2R5KCkgYm9keTogU2NpbVVzZXIpIHtcbiAgICBjb25zdCBlbWFpbCA9IGJvZHkuZW1haWxzPy5bMF0/LnZhbHVlID8/IGJvZHkudXNlck5hbWU7XG4gICAgY29uc3QgW2ZpcnN0UGFydCwgLi4ucmVzdF0gPSAoYm9keS5kaXNwbGF5TmFtZSA/PyBib2R5LnVzZXJOYW1lKS5zcGxpdCgnICcpO1xuICAgIGNvbnN0IGNyZWF0ZWQgPSBhd2FpdCB0aGlzLnByaXNtYS51c2VyLmNyZWF0ZSh7XG4gICAgICBkYXRhOiB7XG4gICAgICAgIGVtYWlsLFxuICAgICAgICBmaXJzdE5hbWU6IGZpcnN0UGFydCA/PyBib2R5LnVzZXJOYW1lLFxuICAgICAgICBsYXN0TmFtZTogcmVzdC5qb2luKCcgJykgfHwgJ18nLFxuICAgICAgICB0ZW5hbnRJZDogdXNlci50ZW5hbnRJZCxcbiAgICAgICAgcGFzc3dvcmRIYXNoOiAnX19zY2ltX3Byb3Zpc2lvbmVkX18nLFxuICAgICAgfSxcbiAgICB9KTtcblxuICAgIHJldHVybiB7XG4gICAgICBzY2hlbWFzOiBbJ3VybjppZXRmOnBhcmFtczpzY2ltOnNjaGVtYXM6Y29yZToyLjA6VXNlciddLFxuICAgICAgaWQ6IGNyZWF0ZWQuaWQsXG4gICAgICB1c2VyTmFtZTogY3JlYXRlZC5lbWFpbCxcbiAgICAgIGRpc3BsYXlOYW1lOiBgJHtjcmVhdGVkLmZpcnN0TmFtZX0gJHtjcmVhdGVkLmxhc3ROYW1lfWAudHJpbSgpLFxuICAgICAgZW1haWxzOiBbeyB2YWx1ZTogY3JlYXRlZC5lbWFpbCwgcHJpbWFyeTogdHJ1ZSB9XSxcbiAgICAgIGFjdGl2ZTogdHJ1ZSxcbiAgICAgIG1ldGE6IHsgcmVzb3VyY2VUeXBlOiAnVXNlcicsIGNyZWF0ZWQ6IGNyZWF0ZWQuY3JlYXRlZEF0IH0sXG4gICAgfTtcbiAgfVxuXG4gIEBHZXQoJ1VzZXJzLzppZCcpXG4gIGFzeW5jIGdldFVzZXIoQEN1cnJlbnRVc2VyKCkgdXNlcjogSnd0UGF5bG9hZCwgQFBhcmFtKCdpZCcpIGlkOiBzdHJpbmcpIHtcbiAgICBjb25zdCB1ID0gYXdhaXQgdGhpcy5wcmlzbWEudXNlci5maW5kRmlyc3RPclRocm93KHtcbiAgICAgIHdoZXJlOiB7IGlkLCB0ZW5hbnRJZDogdXNlci50ZW5hbnRJZCB9LFxuICAgIH0pO1xuXG4gICAgcmV0dXJuIHtcbiAgICAgIHNjaGVtYXM6IFsndXJuOmlldGY6cGFyYW1zOnNjaW06c2NoZW1hczpjb3JlOjIuMDpVc2VyJ10sXG4gICAgICBpZDogdS5pZCxcbiAgICAgIHVzZXJOYW1lOiB1LmVtYWlsLFxuICAgICAgZGlzcGxheU5hbWU6IGAke3UuZmlyc3ROYW1lfSAke3UubGFzdE5hbWV9YC50cmltKCksXG4gICAgICBlbWFpbHM6IFt7IHZhbHVlOiB1LmVtYWlsLCBwcmltYXJ5OiB0cnVlIH1dLFxuICAgICAgYWN0aXZlOiB1LmlzQWN0aXZlLFxuICAgICAgbWV0YTogeyByZXNvdXJjZVR5cGU6ICdVc2VyJyB9LFxuICAgIH07XG4gIH1cblxuICAvKiogUFVUIC9zY2ltL3YyL1VzZXJzLzppZCDigJQgZnVsbCByZXBsYWNlICovXG4gIEBQdXQoJ1VzZXJzLzppZCcpXG4gIGFzeW5jIHJlcGxhY2VVc2VyKFxuICAgIEBDdXJyZW50VXNlcigpIHVzZXI6IEp3dFBheWxvYWQsXG4gICAgQFBhcmFtKCdpZCcpIGlkOiBzdHJpbmcsXG4gICAgQEJvZHkoKSBib2R5OiBTY2ltVXNlcixcbiAgKSB7XG4gICAgY29uc3QgZXhpc3RpbmcgPSBhd2FpdCB0aGlzLnByaXNtYS51c2VyLmZpbmRGaXJzdCh7XG4gICAgICB3aGVyZTogeyBpZCwgdGVuYW50SWQ6IHVzZXIudGVuYW50SWQgfSxcbiAgICB9KTtcbiAgICBpZiAoIWV4aXN0aW5nKSB0aHJvdyBuZXcgTm90Rm91bmRFeGNlcHRpb24oYFVzZXIgJHtpZH0gbm90IGZvdW5kYCk7XG5cbiAgICBjb25zdCBbZmlyc3RQYXJ0LCAuLi5yZXN0XSA9IChib2R5LmRpc3BsYXlOYW1lID8/IGJvZHkudXNlck5hbWUpLnNwbGl0KCcgJyk7XG4gICAgY29uc3QgdXBkYXRlZCA9IGF3YWl0IHRoaXMucHJpc21hLnVzZXIudXBkYXRlKHtcbiAgICAgIHdoZXJlOiB7IGlkIH0sXG4gICAgICBkYXRhOiB7XG4gICAgICAgIGVtYWlsOiBib2R5LmVtYWlscz8uWzBdPy52YWx1ZSA/PyBib2R5LnVzZXJOYW1lLFxuICAgICAgICBmaXJzdE5hbWU6IGZpcnN0UGFydCA/PyBib2R5LnVzZXJOYW1lLFxuICAgICAgICBsYXN0TmFtZTogcmVzdC5qb2luKCcgJykgfHwgZXhpc3RpbmcubGFzdE5hbWUsXG4gICAgICAgIGlzQWN0aXZlOiBib2R5LmFjdGl2ZSA/PyBleGlzdGluZy5pc0FjdGl2ZSxcbiAgICAgIH0sXG4gICAgfSk7XG5cbiAgICByZXR1cm4ge1xuICAgICAgc2NoZW1hczogWyd1cm46aWV0ZjpwYXJhbXM6c2NpbTpzY2hlbWFzOmNvcmU6Mi4wOlVzZXInXSxcbiAgICAgIGlkOiB1cGRhdGVkLmlkLFxuICAgICAgdXNlck5hbWU6IHVwZGF0ZWQuZW1haWwsXG4gICAgICBkaXNwbGF5TmFtZTogYCR7dXBkYXRlZC5maXJzdE5hbWV9ICR7dXBkYXRlZC5sYXN0TmFtZX1gLnRyaW0oKSxcbiAgICAgIGVtYWlsczogW3sgdmFsdWU6IHVwZGF0ZWQuZW1haWwsIHByaW1hcnk6IHRydWUgfV0sXG4gICAgICBhY3RpdmU6IHVwZGF0ZWQuaXNBY3RpdmUsXG4gICAgICBtZXRhOiB7IHJlc291cmNlVHlwZTogJ1VzZXInIH0sXG4gICAgfTtcbiAgfVxuXG4gIC8qKiBQQVRDSCAvc2NpbS92Mi9Vc2Vycy86aWQg4oCUIHBhcnRpYWwgdXBkYXRlIC8gZGVhY3RpdmF0ZSAqL1xuICBAUGF0Y2goJ1VzZXJzLzppZCcpXG4gIGFzeW5jIHBhdGNoVXNlcihcbiAgICBAQ3VycmVudFVzZXIoKSB1c2VyOiBKd3RQYXlsb2FkLFxuICAgIEBQYXJhbSgnaWQnKSBpZDogc3RyaW5nLFxuICAgIEBCb2R5KCkgYm9keTogeyBzY2hlbWFzOiBzdHJpbmdbXTsgT3BlcmF0aW9uczogU2NpbVBhdGNoT3BbXSB9LFxuICApIHtcbiAgICBjb25zdCBleGlzdGluZyA9IGF3YWl0IHRoaXMucHJpc21hLnVzZXIuZmluZEZpcnN0KHtcbiAgICAgIHdoZXJlOiB7IGlkLCB0ZW5hbnRJZDogdXNlci50ZW5hbnRJZCB9LFxuICAgIH0pO1xuICAgIGlmICghZXhpc3RpbmcpIHRocm93IG5ldyBOb3RGb3VuZEV4Y2VwdGlvbihgVXNlciAke2lkfSBub3QgZm91bmRgKTtcblxuICAgIGNvbnN0IGRhdGE6IFJlY29yZDxzdHJpbmcsIHVua25vd24+ID0ge307XG4gICAgZm9yIChjb25zdCBvcCBvZiBib2R5Lk9wZXJhdGlvbnMgPz8gW10pIHtcbiAgICAgIGlmIChvcC5wYXRoID09PSAnYWN0aXZlJyB8fCBvcC5wYXRoID09PSAnQWN0aXZlJykge1xuICAgICAgICBkYXRhWydpc0FjdGl2ZSddID0gQm9vbGVhbihvcC52YWx1ZSk7XG4gICAgICB9IGVsc2UgaWYgKG9wLnBhdGggPT09ICdkaXNwbGF5TmFtZScpIHtcbiAgICAgICAgY29uc3QgW2YsIC4uLnJdID0gU3RyaW5nKG9wLnZhbHVlID8/ICcnKS5zcGxpdCgnICcpO1xuICAgICAgICBkYXRhWydmaXJzdE5hbWUnXSA9IGY7XG4gICAgICAgIGlmIChyLmxlbmd0aCkgZGF0YVsnbGFzdE5hbWUnXSA9IHIuam9pbignICcpO1xuICAgICAgfVxuICAgIH1cblxuICAgIGNvbnN0IHVwZGF0ZWQgPSBhd2FpdCB0aGlzLnByaXNtYS51c2VyLnVwZGF0ZSh7IHdoZXJlOiB7IGlkIH0sIGRhdGEgfSk7XG4gICAgcmV0dXJuIHtcbiAgICAgIHNjaGVtYXM6IFsndXJuOmlldGY6cGFyYW1zOnNjaW06c2NoZW1hczpjb3JlOjIuMDpVc2VyJ10sXG4gICAgICBpZDogdXBkYXRlZC5pZCxcbiAgICAgIHVzZXJOYW1lOiB1cGRhdGVkLmVtYWlsLFxuICAgICAgZGlzcGxheU5hbWU6IGAke3VwZGF0ZWQuZmlyc3ROYW1lfSAke3VwZGF0ZWQubGFzdE5hbWV9YC50cmltKCksXG4gICAgICBlbWFpbHM6IFt7IHZhbHVlOiB1cGRhdGVkLmVtYWlsLCBwcmltYXJ5OiB0cnVlIH1dLFxuICAgICAgYWN0aXZlOiB1cGRhdGVkLmlzQWN0aXZlLFxuICAgICAgbWV0YTogeyByZXNvdXJjZVR5cGU6ICdVc2VyJyB9LFxuICAgIH07XG4gIH1cblxuICAvKiogREVMRVRFIC9zY2ltL3YyL1VzZXJzLzppZCDigJQgZGVwcm92aXNpb24gKGRlYWN0aXZhdGU7IHNvZnQgZGVsZXRlKSAqL1xuICBARGVsZXRlKCdVc2Vycy86aWQnKVxuICBASHR0cENvZGUoSHR0cFN0YXR1cy5OT19DT05URU5UKVxuICBhc3luYyBkZWxldGVVc2VyKEBDdXJyZW50VXNlcigpIHVzZXI6IEp3dFBheWxvYWQsIEBQYXJhbSgnaWQnKSBpZDogc3RyaW5nKSB7XG4gICAgY29uc3QgZXhpc3RpbmcgPSBhd2FpdCB0aGlzLnByaXNtYS51c2VyLmZpbmRGaXJzdCh7XG4gICAgICB3aGVyZTogeyBpZCwgdGVuYW50SWQ6IHVzZXIudGVuYW50SWQgfSxcbiAgICB9KTtcbiAgICBpZiAoIWV4aXN0aW5nKSB0aHJvdyBuZXcgTm90Rm91bmRFeGNlcHRpb24oYFVzZXIgJHtpZH0gbm90IGZvdW5kYCk7XG4gICAgYXdhaXQgdGhpcy5wcmlzbWEudXNlci51cGRhdGUoeyB3aGVyZTogeyBpZCB9LCBkYXRhOiB7IGlzQWN0aXZlOiBmYWxzZSB9IH0pO1xuICB9XG5cbiAgLy8g4pSA4pSA4pSAIEdyb3VwcyAoRGVwYXJ0bWVudHMpIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFxuXG4gIEBHZXQoJ0dyb3VwcycpXG4gIGFzeW5jIGxpc3RHcm91cHMoQEN1cnJlbnRVc2VyKCkgdXNlcjogSnd0UGF5bG9hZCkge1xuICAgIGNvbnN0IGRlcGFydG1lbnRzID0gYXdhaXQgdGhpcy5wcmlzbWEuZGVwYXJ0bWVudC5maW5kTWFueSh7XG4gICAgICB3aGVyZTogeyB0ZW5hbnRJZDogdXNlci50ZW5hbnRJZCEgfSxcbiAgICB9KTtcblxuICAgIHJldHVybiB7XG4gICAgICBzY2hlbWFzOiBbJ3VybjppZXRmOnBhcmFtczpzY2ltOmFwaTptZXNzYWdlczoyLjA6TGlzdFJlc3BvbnNlJ10sXG4gICAgICB0b3RhbFJlc3VsdHM6IGRlcGFydG1lbnRzLmxlbmd0aCxcbiAgICAgIFJlc291cmNlczogZGVwYXJ0bWVudHMubWFwKChkKSA9PiAoe1xuICAgICAgICBzY2hlbWFzOiBbJ3VybjppZXRmOnBhcmFtczpzY2ltOnNjaGVtYXM6Y29yZToyLjA6R3JvdXAnXSxcbiAgICAgICAgaWQ6IGQuaWQsXG4gICAgICAgIGRpc3BsYXlOYW1lOiBkLm5hbWUsXG4gICAgICAgIG1lbWJlcnM6IFtdLFxuICAgICAgICBtZXRhOiB7IHJlc291cmNlVHlwZTogJ0dyb3VwJyB9LFxuICAgICAgfSkpLFxuICAgIH07XG4gIH1cblxuICBAUG9zdCgnR3JvdXBzJylcbiAgQEh0dHBDb2RlKEh0dHBTdGF0dXMuQ1JFQVRFRClcbiAgYXN5bmMgY3JlYXRlR3JvdXAoQEN1cnJlbnRVc2VyKCkgdXNlcjogSnd0UGF5bG9hZCwgQEJvZHkoKSBib2R5OiBTY2ltR3JvdXApIHtcbiAgICBjb25zdCBkZXB0ID0gYXdhaXQgdGhpcy5wcmlzbWEuZGVwYXJ0bWVudC5jcmVhdGUoe1xuICAgICAgZGF0YToge1xuICAgICAgICBuYW1lOiBib2R5LmRpc3BsYXlOYW1lLFxuICAgICAgICB0ZW5hbnRJZDogdXNlci50ZW5hbnRJZCEsXG4gICAgICB9LFxuICAgIH0pO1xuXG4gICAgcmV0dXJuIHtcbiAgICAgIHNjaGVtYXM6IFsndXJuOmlldGY6cGFyYW1zOnNjaW06c2NoZW1hczpjb3JlOjIuMDpHcm91cCddLFxuICAgICAgaWQ6IGRlcHQuaWQsXG4gICAgICBkaXNwbGF5TmFtZTogZGVwdC5uYW1lLFxuICAgICAgbWVtYmVyczogW10sXG4gICAgICBtZXRhOiB7IHJlc291cmNlVHlwZTogJ0dyb3VwJywgY3JlYXRlZDogZGVwdC5jcmVhdGVkQXQgfSxcbiAgICB9O1xuICB9XG5cbiAgLyoqIFBBVENIIC9zY2ltL3YyL0dyb3Vwcy86aWQg4oCUIHVwZGF0ZSBncm91cCAocmVuYW1lIC8gdXBkYXRlIG1lbWJlcnMpICovXG4gIEBQYXRjaCgnR3JvdXBzLzppZCcpXG4gIGFzeW5jIHBhdGNoR3JvdXAoXG4gICAgQEN1cnJlbnRVc2VyKCkgdXNlcjogSnd0UGF5bG9hZCxcbiAgICBAUGFyYW0oJ2lkJykgaWQ6IHN0cmluZyxcbiAgICBAQm9keSgpIGJvZHk6IHsgc2NoZW1hczogc3RyaW5nW107IE9wZXJhdGlvbnM6IFNjaW1QYXRjaE9wW10gfSxcbiAgKSB7XG4gICAgY29uc3QgZXhpc3RpbmcgPSBhd2FpdCB0aGlzLnByaXNtYS5kZXBhcnRtZW50LmZpbmRGaXJzdCh7XG4gICAgICB3aGVyZTogeyBpZCwgdGVuYW50SWQ6IHVzZXIudGVuYW50SWQhIH0sXG4gICAgfSk7XG4gICAgaWYgKCFleGlzdGluZykgdGhyb3cgbmV3IE5vdEZvdW5kRXhjZXB0aW9uKGBHcm91cCAke2lkfSBub3QgZm91bmRgKTtcblxuICAgIGNvbnN0IGRhdGE6IFJlY29yZDxzdHJpbmcsIHVua25vd24+ID0ge307XG4gICAgZm9yIChjb25zdCBvcCBvZiBib2R5Lk9wZXJhdGlvbnMgPz8gW10pIHtcbiAgICAgIGlmIChvcC5wYXRoID09PSAnZGlzcGxheU5hbWUnKSB7XG4gICAgICAgIGRhdGFbJ25hbWUnXSA9IFN0cmluZyhvcC52YWx1ZSA/PyAnJyk7XG4gICAgICB9XG4gICAgfVxuXG4gICAgY29uc3QgdXBkYXRlZCA9IGF3YWl0IHRoaXMucHJpc21hLmRlcGFydG1lbnQudXBkYXRlKHtcbiAgICAgIHdoZXJlOiB7IGlkIH0sXG4gICAgICBkYXRhLFxuICAgIH0pO1xuXG4gICAgcmV0dXJuIHtcbiAgICAgIHNjaGVtYXM6IFsndXJuOmlldGY6cGFyYW1zOnNjaW06c2NoZW1hczpjb3JlOjIuMDpHcm91cCddLFxuICAgICAgaWQ6IHVwZGF0ZWQuaWQsXG4gICAgICBkaXNwbGF5TmFtZTogdXBkYXRlZC5uYW1lLFxuICAgICAgbWVtYmVyczogW10sXG4gICAgICBtZXRhOiB7IHJlc291cmNlVHlwZTogJ0dyb3VwJyB9LFxuICAgIH07XG4gIH1cblxuICAvKiogREVMRVRFIC9zY2ltL3YyL0dyb3Vwcy86aWQg4oCUIGFyY2hpdmUgZGVwYXJ0bWVudCAqL1xuICBARGVsZXRlKCdHcm91cHMvOmlkJylcbiAgQEh0dHBDb2RlKEh0dHBTdGF0dXMuTk9fQ09OVEVOVClcbiAgYXN5bmMgZGVsZXRlR3JvdXAoQEN1cnJlbnRVc2VyKCkgdXNlcjogSnd0UGF5bG9hZCwgQFBhcmFtKCdpZCcpIGlkOiBzdHJpbmcpIHtcbiAgICBjb25zdCBleGlzdGluZyA9IGF3YWl0IHRoaXMucHJpc21hLmRlcGFydG1lbnQuZmluZEZpcnN0KHtcbiAgICAgIHdoZXJlOiB7IGlkLCB0ZW5hbnRJZDogdXNlci50ZW5hbnRJZCEgfSxcbiAgICB9KTtcbiAgICBpZiAoIWV4aXN0aW5nKSB0aHJvdyBuZXcgTm90Rm91bmRFeGNlcHRpb24oYEdyb3VwICR7aWR9IG5vdCBmb3VuZGApO1xuICAgIGF3YWl0IHRoaXMucHJpc21hLmRlcGFydG1lbnQudXBkYXRlKHtcbiAgICAgIHdoZXJlOiB7IGlkIH0sXG4gICAgICBkYXRhOiB7IHN0YXR1czogJ0lOQUNUSVZFJyBhcyBhbnkgfSxcbiAgICB9KTtcbiAgfVxufVxuIl0sInZlcnNpb24iOjN9

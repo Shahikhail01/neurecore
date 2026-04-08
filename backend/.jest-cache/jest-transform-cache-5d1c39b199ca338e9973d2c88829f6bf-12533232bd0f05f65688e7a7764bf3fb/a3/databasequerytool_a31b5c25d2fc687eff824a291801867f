@@ -1,0 +1,98 @@
+3de2a2d11b27235e432d22ce6650a281
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DatabaseQueryTool = void 0;
+/**
+ * DatabaseQueryTool
+ *
+ * Executes read-only (SELECT) SQL queries against the application database
+ * via Prisma's raw query interface.
+ *
+ * Security:
+ *   - SELECT-only gate: rejects any statement that does not start with SELECT.
+ *   - Parameterized execution: parameters are passed separately from the SQL
+ *     template, preventing SQL injection via the params array.
+ *   - Response truncation: returns at most 100 rows to avoid data exfiltration
+ *     at scale.
+ *   - Error sanitization: Prisma error details are never surfaced to the caller.
+ *   - Tenant isolation note: callers MUST include tenant filtering in the query;
+ *     this tool does NOT automatically append tenantId constraints.
+ *
+ * SOLID:
+ *   SRP  — query execution only; result interpretation is the caller's concern.
+ *   DIP  — depends on PrismaService abstraction.
+ */
+const common_1 = require("@nestjs/common");
+const zod_1 = require("zod");
+const structured_tool_base_1 = require("../structured-tool.base");
+const structured_tool_interface_1 = require("../interfaces/structured-tool.interface");
+const prisma_service_1 = require("../../../infrastructure/database/prisma.service");
+const DatabaseQueryInputSchema = zod_1.z.object({
+    query: zod_1.z
+        .string()
+        .min(1)
+        .max(2000)
+        .describe('A parameterized SELECT SQL statement. Use $1, $2, … placeholders for parameters.'),
+    params: zod_1.z
+        .array(zod_1.z.union([zod_1.z.string(), zod_1.z.number(), zod_1.z.boolean(), zod_1.z.null()]))
+        .max(20)
+        .optional()
+        .describe('Ordered list of parameter values matching $1, $2, … placeholders'),
+});
+const SELECT_REGEX = /^\s*SELECT\b/i;
+let DatabaseQueryTool = class DatabaseQueryTool extends structured_tool_base_1.BaseStructuredTool {
+    prisma;
+    name = 'database_query';
+    description = 'Execute a read-only (SELECT) SQL query against the application database. ' +
+        'Use parameterized placeholders ($1, $2, …) for dynamic values. ' +
+        'Returns up to 100 rows. ' +
+        'You MUST include tenantId in your WHERE clause to enforce data isolation.';
+    category = structured_tool_interface_1.ToolCategory.DATABASE;
+    inputSchema = DatabaseQueryInputSchema;
+    constructor(prisma) {
+        super();
+        this.prisma = prisma;
+    }
+    async executeImpl(input, _context) {
+        // ── Security gate: SELECT only ────────────────────────────────────────
+        if (!SELECT_REGEX.test(input.query)) {
+            return {
+                success: false,
+                error: 'Only SELECT statements are permitted',
+            };
+        }
+        const params = input.params ?? [];
+        try {
+            // $queryRawUnsafe with positional params is fully parameterized —
+            // the param values are never interpolated into the SQL string.
+            const rows = await this.prisma.$queryRawUnsafe(input.query, ...params);
+            // Truncate to 100 rows to prevent large data exfiltration
+            const truncated = Array.isArray(rows) ? rows.slice(0, 100) : [];
+            return {
+                success: true,
+                data: { rows: truncated, rowCount: truncated.length },
+            };
+        }
+        catch {
+            // Never surface Prisma internal error details (may contain schema info)
+            this.logger.error('[DatabaseQueryTool] Query failed');
+            return { success: false, error: 'Database query failed' };
+        }
+    }
+};
+exports.DatabaseQueryTool = DatabaseQueryTool;
+exports.DatabaseQueryTool = DatabaseQueryTool = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof prisma_service_1.PrismaService !== "undefined" && prisma_service_1.PrismaService) === "function" ? _a : Object])
+], DatabaseQueryTool);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL21udC9kYXRhL1dlYiBEZXYvTmV1cmVDb3JlL2JhY2tlbmQvc3JjL21vZHVsZXMvdG9vbHMvYnVpbHQtaW4vZGF0YWJhc2UtcXVlcnkudG9vbC50cyIsIm1hcHBpbmdzIjoiOzs7Ozs7Ozs7Ozs7O0FBQUE7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7R0FtQkc7QUFDSCwyQ0FBNEM7QUFDNUMsNkJBQXdCO0FBQ3hCLGtFQUE2RDtBQUM3RCx1RkFJaUQ7QUFDakQsb0ZBQWdGO0FBRWhGLE1BQU0sd0JBQXdCLEdBQUcsT0FBQyxDQUFDLE1BQU0sQ0FBQztJQUN4QyxLQUFLLEVBQUUsT0FBQztTQUNMLE1BQU0sRUFBRTtTQUNSLEdBQUcsQ0FBQyxDQUFDLENBQUM7U0FDTixHQUFHLENBQUMsSUFBSSxDQUFDO1NBQ1QsUUFBUSxDQUNQLGtGQUFrRixDQUNuRjtJQUNILE1BQU0sRUFBRSxPQUFDO1NBQ04sS0FBSyxDQUFDLE9BQUMsQ0FBQyxLQUFLLENBQUMsQ0FBQyxPQUFDLENBQUMsTUFBTSxFQUFFLEVBQUUsT0FBQyxDQUFDLE1BQU0sRUFBRSxFQUFFLE9BQUMsQ0FBQyxPQUFPLEVBQUUsRUFBRSxPQUFDLENBQUMsSUFBSSxFQUFFLENBQUMsQ0FBQyxDQUFDO1NBQy9ELEdBQUcsQ0FBQyxFQUFFLENBQUM7U0FDUCxRQUFRLEVBQUU7U0FDVixRQUFRLENBQ1Asa0VBQWtFLENBQ25FO0NBQ0osQ0FBQyxDQUFDO0FBSUgsTUFBTSxZQUFZLEdBQUcsZUFBZSxDQUFDO0FBRzlCLElBQU0saUJBQWlCLEdBQXZCLE1BQU0saUJBQWtCLFNBQVEseUNBQWtCO0lBVTFCO0lBVHBCLElBQUksR0FBRyxnQkFBZ0IsQ0FBQztJQUN4QixXQUFXLEdBQ2xCLDJFQUEyRTtRQUMzRSxpRUFBaUU7UUFDakUsMEJBQTBCO1FBQzFCLDJFQUEyRSxDQUFDO0lBQ3JFLFFBQVEsR0FBRyx3Q0FBWSxDQUFDLFFBQVEsQ0FBQztJQUNqQyxXQUFXLEdBQUcsd0JBQXdCLENBQUM7SUFFaEQsWUFBNkIsTUFBcUI7UUFDaEQsS0FBSyxFQUFFLENBQUM7UUFEbUIsV0FBTSxHQUFOLE1BQU0sQ0FBZTtJQUVsRCxDQUFDO0lBRVMsS0FBSyxDQUFDLFdBQVcsQ0FDekIsS0FBeUIsRUFDekIsUUFBdUM7UUFFdkMseUVBQXlFO1FBQ3pFLElBQUksQ0FBQyxZQUFZLENBQUMsSUFBSSxDQUFDLEtBQUssQ0FBQyxLQUFLLENBQUMsRUFBRSxDQUFDO1lBQ3BDLE9BQU87Z0JBQ0wsT0FBTyxFQUFFLEtBQUs7Z0JBQ2QsS0FBSyxFQUFFLHNDQUFzQzthQUM5QyxDQUFDO1FBQ0osQ0FBQztRQUVELE1BQU0sTUFBTSxHQUFHLEtBQUssQ0FBQyxNQUFNLElBQUksRUFBRSxDQUFDO1FBRWxDLElBQUksQ0FBQztZQUNILGtFQUFrRTtZQUNsRSwrREFBK0Q7WUFDL0QsTUFBTSxJQUFJLEdBQUcsTUFDWCxJQUFJLENBQUMsTUFBTSxDQUFDLGVBSWIsQ0FBQyxLQUFLLENBQUMsS0FBSyxFQUFFLEdBQUcsTUFBTSxDQUFDLENBQUM7WUFFMUIsMERBQTBEO1lBQzFELE1BQU0sU0FBUyxHQUFHLEtBQUssQ0FBQyxPQUFPLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQyxDQUFDLElBQUksQ0FBQyxLQUFLLENBQUMsQ0FBQyxFQUFFLEdBQUcsQ0FBQyxDQUFDLENBQUMsQ0FBQyxFQUFFLENBQUM7WUFFaEUsT0FBTztnQkFDTCxPQUFPLEVBQUUsSUFBSTtnQkFDYixJQUFJLEVBQUUsRUFBRSxJQUFJLEVBQUUsU0FBUyxFQUFFLFFBQVEsRUFBRSxTQUFTLENBQUMsTUFBTSxFQUFFO2FBQ3RELENBQUM7UUFDSixDQUFDO1FBQUMsTUFBTSxDQUFDO1lBQ1Asd0VBQXdFO1lBQ3hFLElBQUksQ0FBQyxNQUFNLENBQUMsS0FBSyxDQUFDLGtDQUFrQyxDQUFDLENBQUM7WUFDdEQsT0FBTyxFQUFFLE9BQU8sRUFBRSxLQUFLLEVBQUUsS0FBSyxFQUFFLHVCQUF1QixFQUFFLENBQUM7UUFDNUQsQ0FBQztJQUNILENBQUM7Q0FDRixDQUFBO0FBbkRZLDhDQUFpQjs0QkFBakIsaUJBQWlCO0lBRDdCLElBQUEsbUJBQVUsR0FBRTt5REFXMEIsOEJBQWEsb0JBQWIsOEJBQWE7R0FWdkMsaUJBQWlCLENBbUQ3QiIsIm5hbWVzIjpbXSwic291cmNlcyI6WyIvbW50L2RhdGEvV2ViIERldi9OZXVyZUNvcmUvYmFja2VuZC9zcmMvbW9kdWxlcy90b29scy9idWlsdC1pbi9kYXRhYmFzZS1xdWVyeS50b29sLnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKlxuICogRGF0YWJhc2VRdWVyeVRvb2xcbiAqXG4gKiBFeGVjdXRlcyByZWFkLW9ubHkgKFNFTEVDVCkgU1FMIHF1ZXJpZXMgYWdhaW5zdCB0aGUgYXBwbGljYXRpb24gZGF0YWJhc2VcbiAqIHZpYSBQcmlzbWEncyByYXcgcXVlcnkgaW50ZXJmYWNlLlxuICpcbiAqIFNlY3VyaXR5OlxuICogICAtIFNFTEVDVC1vbmx5IGdhdGU6IHJlamVjdHMgYW55IHN0YXRlbWVudCB0aGF0IGRvZXMgbm90IHN0YXJ0IHdpdGggU0VMRUNULlxuICogICAtIFBhcmFtZXRlcml6ZWQgZXhlY3V0aW9uOiBwYXJhbWV0ZXJzIGFyZSBwYXNzZWQgc2VwYXJhdGVseSBmcm9tIHRoZSBTUUxcbiAqICAgICB0ZW1wbGF0ZSwgcHJldmVudGluZyBTUUwgaW5qZWN0aW9uIHZpYSB0aGUgcGFyYW1zIGFycmF5LlxuICogICAtIFJlc3BvbnNlIHRydW5jYXRpb246IHJldHVybnMgYXQgbW9zdCAxMDAgcm93cyB0byBhdm9pZCBkYXRhIGV4ZmlsdHJhdGlvblxuICogICAgIGF0IHNjYWxlLlxuICogICAtIEVycm9yIHNhbml0aXphdGlvbjogUHJpc21hIGVycm9yIGRldGFpbHMgYXJlIG5ldmVyIHN1cmZhY2VkIHRvIHRoZSBjYWxsZXIuXG4gKiAgIC0gVGVuYW50IGlzb2xhdGlvbiBub3RlOiBjYWxsZXJzIE1VU1QgaW5jbHVkZSB0ZW5hbnQgZmlsdGVyaW5nIGluIHRoZSBxdWVyeTtcbiAqICAgICB0aGlzIHRvb2wgZG9lcyBOT1QgYXV0b21hdGljYWxseSBhcHBlbmQgdGVuYW50SWQgY29uc3RyYWludHMuXG4gKlxuICogU09MSUQ6XG4gKiAgIFNSUCAg4oCUIHF1ZXJ5IGV4ZWN1dGlvbiBvbmx5OyByZXN1bHQgaW50ZXJwcmV0YXRpb24gaXMgdGhlIGNhbGxlcidzIGNvbmNlcm4uXG4gKiAgIERJUCAg4oCUIGRlcGVuZHMgb24gUHJpc21hU2VydmljZSBhYnN0cmFjdGlvbi5cbiAqL1xuaW1wb3J0IHsgSW5qZWN0YWJsZSB9IGZyb20gJ0BuZXN0anMvY29tbW9uJztcbmltcG9ydCB7IHogfSBmcm9tICd6b2QnO1xuaW1wb3J0IHsgQmFzZVN0cnVjdHVyZWRUb29sIH0gZnJvbSAnLi4vc3RydWN0dXJlZC10b29sLmJhc2UnO1xuaW1wb3J0IHtcbiAgVG9vbENhdGVnb3J5LFxuICBTdHJ1Y3R1cmVkVG9vbFJlc3VsdCxcbiAgVG9vbEV4ZWN1dGlvbkNvbnRleHQsXG59IGZyb20gJy4uL2ludGVyZmFjZXMvc3RydWN0dXJlZC10b29sLmludGVyZmFjZSc7XG5pbXBvcnQgeyBQcmlzbWFTZXJ2aWNlIH0gZnJvbSAnLi4vLi4vLi4vaW5mcmFzdHJ1Y3R1cmUvZGF0YWJhc2UvcHJpc21hLnNlcnZpY2UnO1xuXG5jb25zdCBEYXRhYmFzZVF1ZXJ5SW5wdXRTY2hlbWEgPSB6Lm9iamVjdCh7XG4gIHF1ZXJ5OiB6XG4gICAgLnN0cmluZygpXG4gICAgLm1pbigxKVxuICAgIC5tYXgoMjAwMClcbiAgICAuZGVzY3JpYmUoXG4gICAgICAnQSBwYXJhbWV0ZXJpemVkIFNFTEVDVCBTUUwgc3RhdGVtZW50LiBVc2UgJDEsICQyLCDigKYgcGxhY2Vob2xkZXJzIGZvciBwYXJhbWV0ZXJzLicsXG4gICAgKSxcbiAgcGFyYW1zOiB6XG4gICAgLmFycmF5KHoudW5pb24oW3ouc3RyaW5nKCksIHoubnVtYmVyKCksIHouYm9vbGVhbigpLCB6Lm51bGwoKV0pKVxuICAgIC5tYXgoMjApXG4gICAgLm9wdGlvbmFsKClcbiAgICAuZGVzY3JpYmUoXG4gICAgICAnT3JkZXJlZCBsaXN0IG9mIHBhcmFtZXRlciB2YWx1ZXMgbWF0Y2hpbmcgJDEsICQyLCDigKYgcGxhY2Vob2xkZXJzJyxcbiAgICApLFxufSk7XG5cbnR5cGUgRGF0YWJhc2VRdWVyeUlucHV0ID0gei5pbmZlcjx0eXBlb2YgRGF0YWJhc2VRdWVyeUlucHV0U2NoZW1hPjtcblxuY29uc3QgU0VMRUNUX1JFR0VYID0gL15cXHMqU0VMRUNUXFxiL2k7XG5cbkBJbmplY3RhYmxlKClcbmV4cG9ydCBjbGFzcyBEYXRhYmFzZVF1ZXJ5VG9vbCBleHRlbmRzIEJhc2VTdHJ1Y3R1cmVkVG9vbCB7XG4gIHJlYWRvbmx5IG5hbWUgPSAnZGF0YWJhc2VfcXVlcnknO1xuICByZWFkb25seSBkZXNjcmlwdGlvbiA9XG4gICAgJ0V4ZWN1dGUgYSByZWFkLW9ubHkgKFNFTEVDVCkgU1FMIHF1ZXJ5IGFnYWluc3QgdGhlIGFwcGxpY2F0aW9uIGRhdGFiYXNlLiAnICtcbiAgICAnVXNlIHBhcmFtZXRlcml6ZWQgcGxhY2Vob2xkZXJzICgkMSwgJDIsIOKApikgZm9yIGR5bmFtaWMgdmFsdWVzLiAnICtcbiAgICAnUmV0dXJucyB1cCB0byAxMDAgcm93cy4gJyArXG4gICAgJ1lvdSBNVVNUIGluY2x1ZGUgdGVuYW50SWQgaW4geW91ciBXSEVSRSBjbGF1c2UgdG8gZW5mb3JjZSBkYXRhIGlzb2xhdGlvbi4nO1xuICByZWFkb25seSBjYXRlZ29yeSA9IFRvb2xDYXRlZ29yeS5EQVRBQkFTRTtcbiAgcmVhZG9ubHkgaW5wdXRTY2hlbWEgPSBEYXRhYmFzZVF1ZXJ5SW5wdXRTY2hlbWE7XG5cbiAgY29uc3RydWN0b3IocHJpdmF0ZSByZWFkb25seSBwcmlzbWE6IFByaXNtYVNlcnZpY2UpIHtcbiAgICBzdXBlcigpO1xuICB9XG5cbiAgcHJvdGVjdGVkIGFzeW5jIGV4ZWN1dGVJbXBsKFxuICAgIGlucHV0OiBEYXRhYmFzZVF1ZXJ5SW5wdXQsXG4gICAgX2NvbnRleHQ6IFBhcnRpYWw8VG9vbEV4ZWN1dGlvbkNvbnRleHQ+LFxuICApOiBQcm9taXNlPFN0cnVjdHVyZWRUb29sUmVzdWx0PHsgcm93czogdW5rbm93bltdOyByb3dDb3VudDogbnVtYmVyIH0+PiB7XG4gICAgLy8g4pSA4pSAIFNlY3VyaXR5IGdhdGU6IFNFTEVDVCBvbmx5IOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFxuICAgIGlmICghU0VMRUNUX1JFR0VYLnRlc3QoaW5wdXQucXVlcnkpKSB7XG4gICAgICByZXR1cm4ge1xuICAgICAgICBzdWNjZXNzOiBmYWxzZSxcbiAgICAgICAgZXJyb3I6ICdPbmx5IFNFTEVDVCBzdGF0ZW1lbnRzIGFyZSBwZXJtaXR0ZWQnLFxuICAgICAgfTtcbiAgICB9XG5cbiAgICBjb25zdCBwYXJhbXMgPSBpbnB1dC5wYXJhbXMgPz8gW107XG5cbiAgICB0cnkge1xuICAgICAgLy8gJHF1ZXJ5UmF3VW5zYWZlIHdpdGggcG9zaXRpb25hbCBwYXJhbXMgaXMgZnVsbHkgcGFyYW1ldGVyaXplZCDigJRcbiAgICAgIC8vIHRoZSBwYXJhbSB2YWx1ZXMgYXJlIG5ldmVyIGludGVycG9sYXRlZCBpbnRvIHRoZSBTUUwgc3RyaW5nLlxuICAgICAgY29uc3Qgcm93cyA9IGF3YWl0IChcbiAgICAgICAgdGhpcy5wcmlzbWEuJHF1ZXJ5UmF3VW5zYWZlIGFzIChcbiAgICAgICAgICBzcWw6IHN0cmluZyxcbiAgICAgICAgICAuLi52YWx1ZXM6IHVua25vd25bXVxuICAgICAgICApID0+IFByb21pc2U8dW5rbm93bltdPlxuICAgICAgKShpbnB1dC5xdWVyeSwgLi4ucGFyYW1zKTtcblxuICAgICAgLy8gVHJ1bmNhdGUgdG8gMTAwIHJvd3MgdG8gcHJldmVudCBsYXJnZSBkYXRhIGV4ZmlsdHJhdGlvblxuICAgICAgY29uc3QgdHJ1bmNhdGVkID0gQXJyYXkuaXNBcnJheShyb3dzKSA/IHJvd3Muc2xpY2UoMCwgMTAwKSA6IFtdO1xuXG4gICAgICByZXR1cm4ge1xuICAgICAgICBzdWNjZXNzOiB0cnVlLFxuICAgICAgICBkYXRhOiB7IHJvd3M6IHRydW5jYXRlZCwgcm93Q291bnQ6IHRydW5jYXRlZC5sZW5ndGggfSxcbiAgICAgIH07XG4gICAgfSBjYXRjaCB7XG4gICAgICAvLyBOZXZlciBzdXJmYWNlIFByaXNtYSBpbnRlcm5hbCBlcnJvciBkZXRhaWxzIChtYXkgY29udGFpbiBzY2hlbWEgaW5mbylcbiAgICAgIHRoaXMubG9nZ2VyLmVycm9yKCdbRGF0YWJhc2VRdWVyeVRvb2xdIFF1ZXJ5IGZhaWxlZCcpO1xuICAgICAgcmV0dXJuIHsgc3VjY2VzczogZmFsc2UsIGVycm9yOiAnRGF0YWJhc2UgcXVlcnkgZmFpbGVkJyB9O1xuICAgIH1cbiAgfVxufVxuIl0sInZlcnNpb24iOjN9

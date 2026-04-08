@@ -1,0 +1,91 @@
+d31dbfd7108ea0287810fe6762d67312
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a, _b;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AgentMessagingTool = void 0;
+/**
+ * AgentMessagingTool
+ *
+ * Sends a real-time message from one agent to another agent within the same
+ * tenant, emitted as a WebSocket event via EventsGateway.
+ *
+ * Security:
+ *   - Tenant isolation: the target agent is verified to belong to the same
+ *     tenantId as the executing context before any event is emitted.
+ *   - Message length capped at 1 000 characters to prevent abuse.
+ *   - Agent UUID validated by Zod z.string().uuid().
+ *
+ * SOLID:
+ *   SRP  — message routing only; no content generation or state mutation.
+ *   DIP  — depends on PrismaService and EventsGateway abstractions.
+ */
+const common_1 = require("@nestjs/common");
+const zod_1 = require("zod");
+const structured_tool_base_1 = require("../structured-tool.base");
+const structured_tool_interface_1 = require("../interfaces/structured-tool.interface");
+const prisma_service_1 = require("../../../infrastructure/database/prisma.service");
+const events_gateway_1 = require("../../events/events.gateway");
+const AgentMessagingInputSchema = zod_1.z.object({
+    targetAgentId: zod_1.z.string().uuid().describe('UUID of the target agent'),
+    message: zod_1.z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe('Message to send to the target agent (max 1 000 chars)'),
+});
+let AgentMessagingTool = class AgentMessagingTool extends structured_tool_base_1.BaseStructuredTool {
+    prisma;
+    events;
+    name = 'agent_messaging';
+    description = 'Send a real-time message to another agent within the same tenant. ' +
+        'The target agent must belong to the same tenant. ' +
+        'Delivers the message via WebSocket event "agent:message".';
+    category = structured_tool_interface_1.ToolCategory.AI;
+    inputSchema = AgentMessagingInputSchema;
+    constructor(prisma, events) {
+        super();
+        this.prisma = prisma;
+        this.events = events;
+    }
+    async executeImpl(input, context) {
+        const tenantId = context.tenantId;
+        if (!tenantId) {
+            return { success: false, error: 'Tenant context is required' };
+        }
+        // ── Security: verify target agent belongs to the caller's tenant ───────
+        const targetAgent = await this.prisma.agent.findFirst({
+            where: { id: input.targetAgentId, tenantId },
+            select: { id: true, name: true },
+        });
+        if (!targetAgent) {
+            return {
+                success: false,
+                error: 'Target agent not found or does not belong to the current tenant',
+            };
+        }
+        // ── Deliver via WebSocket ──────────────────────────────────────────────
+        this.events.emitToTenant(tenantId, 'agent:message', {
+            toAgentId: input.targetAgentId,
+            fromAgentId: context.agentId ?? null,
+            message: input.message,
+            timestamp: Date.now(),
+        });
+        this.logger.log(`[AgentMessagingTool] Message delivered to agent=${input.targetAgentId} tenant=${tenantId}`);
+        return { success: true, data: { delivered: true } };
+    }
+};
+exports.AgentMessagingTool = AgentMessagingTool;
+exports.AgentMessagingTool = AgentMessagingTool = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof prisma_service_1.PrismaService !== "undefined" && prisma_service_1.PrismaService) === "function" ? _a : Object, typeof (_b = typeof events_gateway_1.EventsGateway !== "undefined" && events_gateway_1.EventsGateway) === "function" ? _b : Object])
+], AgentMessagingTool);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL21udC9kYXRhL1dlYiBEZXYvTmV1cmVDb3JlL2JhY2tlbmQvc3JjL21vZHVsZXMvdG9vbHMvYnVpbHQtaW4vYWdlbnQtbWVzc2FnaW5nLnRvb2wudHMiLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7OztBQUFBOzs7Ozs7Ozs7Ozs7Ozs7R0FlRztBQUNILDJDQUE0QztBQUM1Qyw2QkFBd0I7QUFDeEIsa0VBQTZEO0FBQzdELHVGQUlpRDtBQUNqRCxvRkFBZ0Y7QUFDaEYsZ0VBQTREO0FBRTVELE1BQU0seUJBQXlCLEdBQUcsT0FBQyxDQUFDLE1BQU0sQ0FBQztJQUN6QyxhQUFhLEVBQUUsT0FBQyxDQUFDLE1BQU0sRUFBRSxDQUFDLElBQUksRUFBRSxDQUFDLFFBQVEsQ0FBQywwQkFBMEIsQ0FBQztJQUNyRSxPQUFPLEVBQUUsT0FBQztTQUNQLE1BQU0sRUFBRTtTQUNSLEdBQUcsQ0FBQyxDQUFDLENBQUM7U0FDTixHQUFHLENBQUMsSUFBSSxDQUFDO1NBQ1QsUUFBUSxDQUFDLHVEQUF1RCxDQUFDO0NBQ3JFLENBQUMsQ0FBQztBQUtJLElBQU0sa0JBQWtCLEdBQXhCLE1BQU0sa0JBQW1CLFNBQVEseUNBQWtCO0lBVXJDO0lBQ0E7SUFWVixJQUFJLEdBQUcsaUJBQWlCLENBQUM7SUFDekIsV0FBVyxHQUNsQixvRUFBb0U7UUFDcEUsbURBQW1EO1FBQ25ELDJEQUEyRCxDQUFDO0lBQ3JELFFBQVEsR0FBRyx3Q0FBWSxDQUFDLEVBQUUsQ0FBQztJQUMzQixXQUFXLEdBQUcseUJBQXlCLENBQUM7SUFFakQsWUFDbUIsTUFBcUIsRUFDckIsTUFBcUI7UUFFdEMsS0FBSyxFQUFFLENBQUM7UUFIUyxXQUFNLEdBQU4sTUFBTSxDQUFlO1FBQ3JCLFdBQU0sR0FBTixNQUFNLENBQWU7SUFHeEMsQ0FBQztJQUVTLEtBQUssQ0FBQyxXQUFXLENBQ3pCLEtBQTBCLEVBQzFCLE9BQXNDO1FBRXRDLE1BQU0sUUFBUSxHQUFHLE9BQU8sQ0FBQyxRQUFRLENBQUM7UUFFbEMsSUFBSSxDQUFDLFFBQVEsRUFBRSxDQUFDO1lBQ2QsT0FBTyxFQUFFLE9BQU8sRUFBRSxLQUFLLEVBQUUsS0FBSyxFQUFFLDRCQUE0QixFQUFFLENBQUM7UUFDakUsQ0FBQztRQUVELDBFQUEwRTtRQUMxRSxNQUFNLFdBQVcsR0FBRyxNQUFNLElBQUksQ0FBQyxNQUFNLENBQUMsS0FBSyxDQUFDLFNBQVMsQ0FBQztZQUNwRCxLQUFLLEVBQUUsRUFBRSxFQUFFLEVBQUUsS0FBSyxDQUFDLGFBQWEsRUFBRSxRQUFRLEVBQUU7WUFDNUMsTUFBTSxFQUFFLEVBQUUsRUFBRSxFQUFFLElBQUksRUFBRSxJQUFJLEVBQUUsSUFBSSxFQUFFO1NBQ2pDLENBQUMsQ0FBQztRQUVILElBQUksQ0FBQyxXQUFXLEVBQUUsQ0FBQztZQUNqQixPQUFPO2dCQUNMLE9BQU8sRUFBRSxLQUFLO2dCQUNkLEtBQUssRUFDSCxpRUFBaUU7YUFDcEUsQ0FBQztRQUNKLENBQUM7UUFFRCwwRUFBMEU7UUFDMUUsSUFBSSxDQUFDLE1BQU0sQ0FBQyxZQUFZLENBQUMsUUFBUSxFQUFFLGVBQWUsRUFBRTtZQUNsRCxTQUFTLEVBQUUsS0FBSyxDQUFDLGFBQWE7WUFDOUIsV0FBVyxFQUFFLE9BQU8sQ0FBQyxPQUFPLElBQUksSUFBSTtZQUNwQyxPQUFPLEVBQUUsS0FBSyxDQUFDLE9BQU87WUFDdEIsU0FBUyxFQUFFLElBQUksQ0FBQyxHQUFHLEVBQUU7U0FDdEIsQ0FBQyxDQUFDO1FBRUgsSUFBSSxDQUFDLE1BQU0sQ0FBQyxHQUFHLENBQ2IsbURBQW1ELEtBQUssQ0FBQyxhQUFhLFdBQVcsUUFBUSxFQUFFLENBQzVGLENBQUM7UUFFRixPQUFPLEVBQUUsT0FBTyxFQUFFLElBQUksRUFBRSxJQUFJLEVBQUUsRUFBRSxTQUFTLEVBQUUsSUFBSSxFQUFFLEVBQUUsQ0FBQztJQUN0RCxDQUFDO0NBQ0YsQ0FBQTtBQXREWSxnREFBa0I7NkJBQWxCLGtCQUFrQjtJQUQ5QixJQUFBLG1CQUFVLEdBQUU7eURBV2dCLDhCQUFhLG9CQUFiLDhCQUFhLG9EQUNiLDhCQUFhLG9CQUFiLDhCQUFhO0dBWDdCLGtCQUFrQixDQXNEOUIiLCJuYW1lcyI6W10sInNvdXJjZXMiOlsiL21udC9kYXRhL1dlYiBEZXYvTmV1cmVDb3JlL2JhY2tlbmQvc3JjL21vZHVsZXMvdG9vbHMvYnVpbHQtaW4vYWdlbnQtbWVzc2FnaW5nLnRvb2wudHMiXSwic291cmNlc0NvbnRlbnQiOlsiLyoqXG4gKiBBZ2VudE1lc3NhZ2luZ1Rvb2xcbiAqXG4gKiBTZW5kcyBhIHJlYWwtdGltZSBtZXNzYWdlIGZyb20gb25lIGFnZW50IHRvIGFub3RoZXIgYWdlbnQgd2l0aGluIHRoZSBzYW1lXG4gKiB0ZW5hbnQsIGVtaXR0ZWQgYXMgYSBXZWJTb2NrZXQgZXZlbnQgdmlhIEV2ZW50c0dhdGV3YXkuXG4gKlxuICogU2VjdXJpdHk6XG4gKiAgIC0gVGVuYW50IGlzb2xhdGlvbjogdGhlIHRhcmdldCBhZ2VudCBpcyB2ZXJpZmllZCB0byBiZWxvbmcgdG8gdGhlIHNhbWVcbiAqICAgICB0ZW5hbnRJZCBhcyB0aGUgZXhlY3V0aW5nIGNvbnRleHQgYmVmb3JlIGFueSBldmVudCBpcyBlbWl0dGVkLlxuICogICAtIE1lc3NhZ2UgbGVuZ3RoIGNhcHBlZCBhdCAxIDAwMCBjaGFyYWN0ZXJzIHRvIHByZXZlbnQgYWJ1c2UuXG4gKiAgIC0gQWdlbnQgVVVJRCB2YWxpZGF0ZWQgYnkgWm9kIHouc3RyaW5nKCkudXVpZCgpLlxuICpcbiAqIFNPTElEOlxuICogICBTUlAgIOKAlCBtZXNzYWdlIHJvdXRpbmcgb25seTsgbm8gY29udGVudCBnZW5lcmF0aW9uIG9yIHN0YXRlIG11dGF0aW9uLlxuICogICBESVAgIOKAlCBkZXBlbmRzIG9uIFByaXNtYVNlcnZpY2UgYW5kIEV2ZW50c0dhdGV3YXkgYWJzdHJhY3Rpb25zLlxuICovXG5pbXBvcnQgeyBJbmplY3RhYmxlIH0gZnJvbSAnQG5lc3Rqcy9jb21tb24nO1xuaW1wb3J0IHsgeiB9IGZyb20gJ3pvZCc7XG5pbXBvcnQgeyBCYXNlU3RydWN0dXJlZFRvb2wgfSBmcm9tICcuLi9zdHJ1Y3R1cmVkLXRvb2wuYmFzZSc7XG5pbXBvcnQge1xuICBUb29sQ2F0ZWdvcnksXG4gIFN0cnVjdHVyZWRUb29sUmVzdWx0LFxuICBUb29sRXhlY3V0aW9uQ29udGV4dCxcbn0gZnJvbSAnLi4vaW50ZXJmYWNlcy9zdHJ1Y3R1cmVkLXRvb2wuaW50ZXJmYWNlJztcbmltcG9ydCB7IFByaXNtYVNlcnZpY2UgfSBmcm9tICcuLi8uLi8uLi9pbmZyYXN0cnVjdHVyZS9kYXRhYmFzZS9wcmlzbWEuc2VydmljZSc7XG5pbXBvcnQgeyBFdmVudHNHYXRld2F5IH0gZnJvbSAnLi4vLi4vZXZlbnRzL2V2ZW50cy5nYXRld2F5JztcblxuY29uc3QgQWdlbnRNZXNzYWdpbmdJbnB1dFNjaGVtYSA9IHoub2JqZWN0KHtcbiAgdGFyZ2V0QWdlbnRJZDogei5zdHJpbmcoKS51dWlkKCkuZGVzY3JpYmUoJ1VVSUQgb2YgdGhlIHRhcmdldCBhZ2VudCcpLFxuICBtZXNzYWdlOiB6XG4gICAgLnN0cmluZygpXG4gICAgLm1pbigxKVxuICAgIC5tYXgoMTAwMClcbiAgICAuZGVzY3JpYmUoJ01lc3NhZ2UgdG8gc2VuZCB0byB0aGUgdGFyZ2V0IGFnZW50IChtYXggMSAwMDAgY2hhcnMpJyksXG59KTtcblxudHlwZSBBZ2VudE1lc3NhZ2luZ0lucHV0ID0gei5pbmZlcjx0eXBlb2YgQWdlbnRNZXNzYWdpbmdJbnB1dFNjaGVtYT47XG5cbkBJbmplY3RhYmxlKClcbmV4cG9ydCBjbGFzcyBBZ2VudE1lc3NhZ2luZ1Rvb2wgZXh0ZW5kcyBCYXNlU3RydWN0dXJlZFRvb2wge1xuICByZWFkb25seSBuYW1lID0gJ2FnZW50X21lc3NhZ2luZyc7XG4gIHJlYWRvbmx5IGRlc2NyaXB0aW9uID1cbiAgICAnU2VuZCBhIHJlYWwtdGltZSBtZXNzYWdlIHRvIGFub3RoZXIgYWdlbnQgd2l0aGluIHRoZSBzYW1lIHRlbmFudC4gJyArXG4gICAgJ1RoZSB0YXJnZXQgYWdlbnQgbXVzdCBiZWxvbmcgdG8gdGhlIHNhbWUgdGVuYW50LiAnICtcbiAgICAnRGVsaXZlcnMgdGhlIG1lc3NhZ2UgdmlhIFdlYlNvY2tldCBldmVudCBcImFnZW50Om1lc3NhZ2VcIi4nO1xuICByZWFkb25seSBjYXRlZ29yeSA9IFRvb2xDYXRlZ29yeS5BSTtcbiAgcmVhZG9ubHkgaW5wdXRTY2hlbWEgPSBBZ2VudE1lc3NhZ2luZ0lucHV0U2NoZW1hO1xuXG4gIGNvbnN0cnVjdG9yKFxuICAgIHByaXZhdGUgcmVhZG9ubHkgcHJpc21hOiBQcmlzbWFTZXJ2aWNlLFxuICAgIHByaXZhdGUgcmVhZG9ubHkgZXZlbnRzOiBFdmVudHNHYXRld2F5LFxuICApIHtcbiAgICBzdXBlcigpO1xuICB9XG5cbiAgcHJvdGVjdGVkIGFzeW5jIGV4ZWN1dGVJbXBsKFxuICAgIGlucHV0OiBBZ2VudE1lc3NhZ2luZ0lucHV0LFxuICAgIGNvbnRleHQ6IFBhcnRpYWw8VG9vbEV4ZWN1dGlvbkNvbnRleHQ+LFxuICApOiBQcm9taXNlPFN0cnVjdHVyZWRUb29sUmVzdWx0PHsgZGVsaXZlcmVkOiBib29sZWFuIH0+PiB7XG4gICAgY29uc3QgdGVuYW50SWQgPSBjb250ZXh0LnRlbmFudElkO1xuXG4gICAgaWYgKCF0ZW5hbnRJZCkge1xuICAgICAgcmV0dXJuIHsgc3VjY2VzczogZmFsc2UsIGVycm9yOiAnVGVuYW50IGNvbnRleHQgaXMgcmVxdWlyZWQnIH07XG4gICAgfVxuXG4gICAgLy8g4pSA4pSAIFNlY3VyaXR5OiB2ZXJpZnkgdGFyZ2V0IGFnZW50IGJlbG9uZ3MgdG8gdGhlIGNhbGxlcidzIHRlbmFudCDilIDilIDilIDilIDilIDilIDilIBcbiAgICBjb25zdCB0YXJnZXRBZ2VudCA9IGF3YWl0IHRoaXMucHJpc21hLmFnZW50LmZpbmRGaXJzdCh7XG4gICAgICB3aGVyZTogeyBpZDogaW5wdXQudGFyZ2V0QWdlbnRJZCwgdGVuYW50SWQgfSxcbiAgICAgIHNlbGVjdDogeyBpZDogdHJ1ZSwgbmFtZTogdHJ1ZSB9LFxuICAgIH0pO1xuXG4gICAgaWYgKCF0YXJnZXRBZ2VudCkge1xuICAgICAgcmV0dXJuIHtcbiAgICAgICAgc3VjY2VzczogZmFsc2UsXG4gICAgICAgIGVycm9yOlxuICAgICAgICAgICdUYXJnZXQgYWdlbnQgbm90IGZvdW5kIG9yIGRvZXMgbm90IGJlbG9uZyB0byB0aGUgY3VycmVudCB0ZW5hbnQnLFxuICAgICAgfTtcbiAgICB9XG5cbiAgICAvLyDilIDilIAgRGVsaXZlciB2aWEgV2ViU29ja2V0IOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFxuICAgIHRoaXMuZXZlbnRzLmVtaXRUb1RlbmFudCh0ZW5hbnRJZCwgJ2FnZW50Om1lc3NhZ2UnLCB7XG4gICAgICB0b0FnZW50SWQ6IGlucHV0LnRhcmdldEFnZW50SWQsXG4gICAgICBmcm9tQWdlbnRJZDogY29udGV4dC5hZ2VudElkID8/IG51bGwsXG4gICAgICBtZXNzYWdlOiBpbnB1dC5tZXNzYWdlLFxuICAgICAgdGltZXN0YW1wOiBEYXRlLm5vdygpLFxuICAgIH0pO1xuXG4gICAgdGhpcy5sb2dnZXIubG9nKFxuICAgICAgYFtBZ2VudE1lc3NhZ2luZ1Rvb2xdIE1lc3NhZ2UgZGVsaXZlcmVkIHRvIGFnZW50PSR7aW5wdXQudGFyZ2V0QWdlbnRJZH0gdGVuYW50PSR7dGVuYW50SWR9YCxcbiAgICApO1xuXG4gICAgcmV0dXJuIHsgc3VjY2VzczogdHJ1ZSwgZGF0YTogeyBkZWxpdmVyZWQ6IHRydWUgfSB9O1xuICB9XG59XG4iXSwidmVyc2lvbiI6M30=
