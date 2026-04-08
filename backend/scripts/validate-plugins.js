@@ -2,12 +2,12 @@
 
 /**
  * Phase 12: Plugin System Validation Script
- * 
+ *
  * Validates all 125+ plugins across:
  * - Frontend-Admin (33 NocoBase modules + extensions)
  * - Frontend-Tenant (33 replicated modules + extensions)
  * - Backend (33 integrated modules)
- * 
+ *
  * Checks:
  * - Plugin file existence and structure
  * - Module.exports/exports correctness
@@ -52,8 +52,12 @@ class PluginValidator {
   validateFrontendPlugins(componentPath, componentName) {
     this.log(`\n📦 Validating ${componentName}...`, 'blue');
 
-    const pluginPath = path.join(this.workspaceRoot, componentPath, 'src/plugins');
-    
+    const pluginPath = path.join(
+      this.workspaceRoot,
+      componentPath,
+      'src/plugins',
+    );
+
     if (!fs.existsSync(pluginPath)) {
       this.log(`  ⚠️  No plugins directory found at ${pluginPath}`, 'yellow');
       return;
@@ -62,7 +66,7 @@ class PluginValidator {
     const plugins = [];
     const items = fs.readdirSync(pluginPath);
 
-    items.forEach(item => {
+    items.forEach((item) => {
       const itemPath = path.join(pluginPath, item);
       const stat = fs.statSync(itemPath);
 
@@ -70,7 +74,7 @@ class PluginValidator {
         if (item.startsWith('@')) {
           // Namespace directory - extract plugins inside
           const nsPlugins = fs.readdirSync(itemPath);
-          nsPlugins.forEach(nsPlugin => {
+          nsPlugins.forEach((nsPlugin) => {
             const nsPluginPath = path.join(itemPath, nsPlugin);
             if (fs.statSync(nsPluginPath).isDirectory()) {
               plugins.push({
@@ -91,7 +95,7 @@ class PluginValidator {
       }
     });
 
-    plugins.forEach(plugin => {
+    plugins.forEach((plugin) => {
       this.results.total++;
       const packageJsonPath = path.join(plugin.path, 'package.json');
 
@@ -109,8 +113,10 @@ class PluginValidator {
         }
 
         // Validate package.json structure
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-        
+        const packageJson = JSON.parse(
+          fs.readFileSync(packageJsonPath, 'utf8'),
+        );
+
         if (!packageJson.name || !packageJson.version) {
           this.results.warnings++;
           this.results.errors.push({
@@ -118,12 +124,18 @@ class PluginValidator {
             error: 'Missing name or version in package.json',
             severity: 'WARNING',
           });
-          this.log(`  ⚠️  ${plugin.displayName}: Incomplete metadata`, 'yellow');
+          this.log(
+            `  ⚠️  ${plugin.displayName}: Incomplete metadata`,
+            'yellow',
+          );
           return;
         }
 
         this.results.passed++;
-        this.log(`  ✅ ${plugin.displayName} (v${packageJson.version})`, 'green');
+        this.log(
+          `  ✅ ${plugin.displayName} (v${packageJson.version})`,
+          'green',
+        );
       } catch (err) {
         this.results.failed++;
         this.results.errors.push({
@@ -145,18 +157,18 @@ class PluginValidator {
     this.log(`\n📦 Validating Backend Modules...`, 'blue');
 
     const srcPath = path.join(this.workspaceRoot, 'backend/src/modules');
-    
+
     if (!fs.existsSync(srcPath)) {
       this.log(`  ⚠️  No modules directory found`, 'yellow');
       return;
     }
 
-    const modules = fs.readdirSync(srcPath).filter(file => {
+    const modules = fs.readdirSync(srcPath).filter((file) => {
       const stat = fs.statSync(path.join(srcPath, file));
       return stat.isDirectory() && !file.startsWith('.');
     });
 
-    modules.forEach(module => {
+    modules.forEach((module) => {
       this.results.total++;
       const modulePath = path.join(srcPath, module);
       const moduleFile = path.join(modulePath, `${module}.module.ts`);
@@ -198,19 +210,22 @@ class PluginValidator {
   validateNocobaseModules() {
     this.log(`\n📦 Validating NocoBase Modules...`, 'blue');
 
-    const nocobasePath = path.join(this.workspaceRoot, 'backend/src/modules/nocobase');
-    
+    const nocobasePath = path.join(
+      this.workspaceRoot,
+      'backend/src/modules/nocobase',
+    );
+
     if (!fs.existsSync(nocobasePath)) {
       this.log(`  ℹ️  NocoBase modules not found (optional)`, 'yellow');
       return;
     }
 
-    const modules = fs.readdirSync(nocobasePath).filter(file => {
+    const modules = fs.readdirSync(nocobasePath).filter((file) => {
       const stat = fs.statSync(path.join(nocobasePath, file));
       return stat.isDirectory() && !file.startsWith('.');
     });
 
-    modules.forEach(module => {
+    modules.forEach((module) => {
       this.results.total++;
       const modulePath = path.join(nocobasePath, module);
 
@@ -244,17 +259,28 @@ class PluginValidator {
 
     this.log(`Total Items Checked: ${this.results.total}`);
     this.log(`✅ Passed: ${this.results.passed}`, 'green');
-    this.log(`❌ Failed: ${this.results.failed}`, this.results.failed > 0 ? 'red' : 'green');
-    this.log(`⚠️  Warnings: ${this.results.warnings}`, this.results.warnings > 0 ? 'yellow' : 'green');
+    this.log(
+      `❌ Failed: ${this.results.failed}`,
+      this.results.failed > 0 ? 'red' : 'green',
+    );
+    this.log(
+      `⚠️  Warnings: ${this.results.warnings}`,
+      this.results.warnings > 0 ? 'yellow' : 'green',
+    );
 
-    const passRate = ((this.results.passed / this.results.total) * 100).toFixed(1);
+    const passRate = ((this.results.passed / this.results.total) * 100).toFixed(
+      1,
+    );
     this.log(`\n📈 Pass Rate: ${passRate}%`);
 
     if (this.results.errors.length > 0) {
       this.log(`\n⚠️  Issues Found:\n`);
-      this.results.errors.forEach(error => {
+      this.results.errors.forEach((error) => {
         const color = error.severity === 'ERROR' ? 'red' : 'yellow';
-        this.log(`  [${error.severity}] ${error.plugin}: ${error.error}`, color);
+        this.log(
+          `  [${error.severity}] ${error.plugin}: ${error.error}`,
+          color,
+        );
       });
     }
 
@@ -292,7 +318,7 @@ class PluginValidator {
 
     // Generate report
     const summary = this.generateReport();
-    
+
     // Exit with appropriate code
     process.exit(summary.failed > 0 ? 1 : 0);
   }

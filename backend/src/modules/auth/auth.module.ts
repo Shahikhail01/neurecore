@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, Logger } from '@nestjs/common';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -16,6 +16,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { SecretProviderService } from '../security/providers/secret.provider';
 
+const logger = new Logger('AuthModule');
+
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -25,12 +27,26 @@ import { SecretProviderService } from '../security/providers/secret.provider';
       useFactory: (
         config: ConfigService,
         secrets: SecretProviderService,
-      ): JwtModuleOptions => ({
-        secret: secrets.getJwtSecret(),
-        signOptions: {
-          expiresIn: config.get<string>('JWT_ACCESS_EXPIRES', '15m') as any,
-        },
-      }),
+      ): JwtModuleOptions => {
+        const secret = secrets.getJwtSecret();
+
+        // Validate JWT_SECRET is set and of sufficient length
+        if (!secret || secret.length < 32) {
+          const error = new Error(
+            'CRITICAL: JWT_SECRET is missing or too short (minimum 32 characters). ' +
+              'Please set JWT_SECRET in your environment file.',
+          );
+          logger.error(error.message);
+          throw error;
+        }
+
+        return {
+          secret,
+          signOptions: {
+            expiresIn: config.get<string>('JWT_ACCESS_EXPIRES', '15m') as any,
+          },
+        };
+      },
     }),
   ],
   controllers: [AuthController, SsoController, ScimController],

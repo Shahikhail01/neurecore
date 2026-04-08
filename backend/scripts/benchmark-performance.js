@@ -2,12 +2,12 @@
 
 /**
  * Phase 12: Performance Benchmarking Script
- * 
+ *
  * Measures system performance metrics across all three tiers:
  * - Frontend-Admin: Build time, bundle size, page load
  * - Frontend-Tenant: Build time, bundle size, page load
  * - Backend: Compilation time, startup time, memory usage
- * 
+ *
  * Baseline metrics for:
  * - 32,809 total files
  * - 123 modules
@@ -74,7 +74,8 @@ class PerformanceBenchmark {
         const duration = endTime - startTime;
         const memoryDelta = {
           heapUsed: (endMemory.heapUsed - startMemory.heapUsed) / 1024 / 1024, // MB
-          heapTotal: (endMemory.heapTotal - startMemory.heapTotal) / 1024 / 1024,
+          heapTotal:
+            (endMemory.heapTotal - startMemory.heapTotal) / 1024 / 1024,
         };
 
         if (code === 0) {
@@ -115,7 +116,10 @@ class PerformanceBenchmark {
     const fullPath = path.join(this.workspaceRoot, componentPath);
 
     if (!fs.existsSync(fullPath)) {
-      this.log(`  ⚠️  ${componentName} not found at ${componentPath}`, 'yellow');
+      this.log(
+        `  ⚠️  ${componentName} not found at ${componentPath}`,
+        'yellow',
+      );
       return null;
     }
 
@@ -128,7 +132,7 @@ class PerformanceBenchmark {
       'npm',
       ['run', 'build'],
       fullPath,
-      'Next.js build (optimized)'
+      'Next.js build (optimized)',
     );
 
     // Extract metrics from output
@@ -172,7 +176,7 @@ class PerformanceBenchmark {
     // Count modules
     const modulesPath = path.join(backendPath, 'src/modules');
     const modules = fs.existsSync(modulesPath)
-      ? fs.readdirSync(modulesPath).filter(f => {
+      ? fs.readdirSync(modulesPath).filter((f) => {
           const stat = fs.statSync(path.join(modulesPath, f));
           return stat.isDirectory() && !f.startsWith('.');
         }).length
@@ -184,7 +188,7 @@ class PerformanceBenchmark {
       'npm',
       ['run', 'build'],
       backendPath,
-      'NestJS build (SWC compiler)'
+      'NestJS build (SWC compiler)',
     );
 
     this.results.metrics['Backend'] = {
@@ -209,11 +213,15 @@ class PerformanceBenchmark {
     function countRecursive(dir) {
       try {
         const items = fs.readdirSync(dir);
-        items.forEach(item => {
+        items.forEach((item) => {
           const fullPath = path.join(dir, item);
 
           // Skip node_modules, .git, dist, build, etc.
-          if (['node_modules', '.git', '.next', 'dist', 'build', '.swc'].includes(item)) {
+          if (
+            ['node_modules', '.git', '.next', 'dist', 'build', '.swc'].includes(
+              item,
+            )
+          ) {
             return;
           }
 
@@ -285,7 +293,9 @@ class PerformanceBenchmark {
 
     this.log(`Timestamp: ${this.results.timestamp}`);
     this.log(`Node: ${this.results.system.nodeVersion}`);
-    this.log(`Platform: ${this.results.system.platform} ${this.results.system.arch}\n`);
+    this.log(
+      `Platform: ${this.results.system.platform} ${this.results.system.arch}\n`,
+    );
 
     const metrics = this.results.metrics;
 
@@ -293,7 +303,10 @@ class PerformanceBenchmark {
       const admin = metrics['Frontend-Admin'];
       this.log('Frontend-Admin Build Metrics:', 'bold');
       this.log(`  Files: ${admin.files}`);
-      this.log(`  Build Duration: ${admin.buildDuration}ms (${(admin.buildDuration / 1000).toFixed(2)}s)`, 'green');
+      this.log(
+        `  Build Duration: ${admin.buildDuration}ms (${(admin.buildDuration / 1000).toFixed(2)}s)`,
+        'green',
+      );
       if (admin.bundleSize) {
         this.log(`  Bundle Size: ${admin.bundleSize}`);
       }
@@ -304,7 +317,10 @@ class PerformanceBenchmark {
       const tenant = metrics['Frontend-Tenant'];
       this.log('Frontend-Tenant Build Metrics:', 'bold');
       this.log(`  Files: ${tenant.files}`);
-      this.log(`  Build Duration: ${tenant.buildDuration}ms (${(tenant.buildDuration / 1000).toFixed(2)}s)`, 'green');
+      this.log(
+        `  Build Duration: ${tenant.buildDuration}ms (${(tenant.buildDuration / 1000).toFixed(2)}s)`,
+        'green',
+      );
       if (tenant.bundleSize) {
         this.log(`  Bundle Size: ${tenant.bundleSize}`);
       }
@@ -316,7 +332,10 @@ class PerformanceBenchmark {
       this.log('Backend Compilation Metrics:', 'bold');
       this.log(`  Files: ${backend.files}`);
       this.log(`  Modules: ${backend.modules}`);
-      this.log(`  Compilation Duration: ${backend.compilationDuration}ms (${(backend.compilationDuration / 1000).toFixed(2)}s)`, 'green');
+      this.log(
+        `  Compilation Duration: ${backend.compilationDuration}ms (${(backend.compilationDuration / 1000).toFixed(2)}s)`,
+        'green',
+      );
       this.log(`  Memory Delta: ${backend.memory.heapUsed.toFixed(2)} MB\n`);
     }
 
@@ -326,8 +345,8 @@ class PerformanceBenchmark {
     this.log(`${'='.repeat(70)}\n`);
 
     const durations = Object.values(metrics)
-      .filter(m => m.buildDuration || m.compilationDuration)
-      .map(m => m.buildDuration || m.compilationDuration);
+      .filter((m) => m.buildDuration || m.compilationDuration)
+      .map((m) => m.buildDuration || m.compilationDuration);
 
     if (durations.length > 0) {
       const total = durations.reduce((a, b) => a + b, 0);
@@ -343,7 +362,10 @@ class PerformanceBenchmark {
     this.log(`\n${'-'.repeat(70)}\n`);
 
     // Save report
-    const reportPath = path.join(this.workspaceRoot, 'PHASE_12_BENCHMARK_REPORT.json');
+    const reportPath = path.join(
+      this.workspaceRoot,
+      'PHASE_12_BENCHMARK_REPORT.json',
+    );
     fs.writeFileSync(reportPath, JSON.stringify(this.results, null, 2));
     this.log(`📄 Report saved to: PHASE_12_BENCHMARK_REPORT.json\n`);
 

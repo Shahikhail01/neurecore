@@ -160,6 +160,7 @@ export class SecretProviderService implements ISecretProvider {
 
   /**
    * Get environment variable with fallback to process.env
+   * @throws Error if environment variable is not found
    */
   private getEnvVariable(name: string): string {
     // Try ConfigService first (handles .env files)
@@ -174,8 +175,19 @@ export class SecretProviderService implements ISecretProvider {
       return envValue;
     }
 
-    // Log warning and return empty string
-    this.logger.warn(`Secret not found in environment: ${name}`);
+    // Throw error for missing critical secrets
+    const criticalSecrets = ['JWT_SECRET', 'DATABASE_URL', 'REDIS_URL'];
+    if (criticalSecrets.includes(name)) {
+      const error = new Error(
+        `CRITICAL: Required secret "${name}" is not defined in environment variables. ` +
+          `Please set ${name} before starting the application.`,
+      );
+      this.logger.error(error.message);
+      throw error;
+    }
+
+    // Log warning for non-critical secrets and return empty string
+    this.logger.warn(`Non-critical secret not found in environment: ${name}`);
     return '';
   }
 

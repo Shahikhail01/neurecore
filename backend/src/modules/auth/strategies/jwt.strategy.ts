@@ -1,26 +1,30 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { RedisService } from '../../../infrastructure/cache/redis.service';
+import { SecretProviderService } from '../../security/providers/secret.provider';
 import { JwtPayload } from '../interfaces/token.interface';
 import { ValidatedUser } from '../interfaces/auth.interface';
 
 // Single Responsibility: validate JWT access tokens only.
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     private readonly config: ConfigService,
+    private readonly secrets: SecretProviderService,
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
   ) {
+    const secret = secrets.getJwtSecret(); // Throws if missing
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: (config && typeof (config as any).get === 'function'
-        ? config.get<string>('JWT_SECRET')
-        : process.env.JWT_SECRET) as string,
+      secretOrKey: secret,
     });
   }
 

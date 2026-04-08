@@ -1,6 +1,6 @@
 /**
  * Phase 12: Integration Tests
- * 
+ *
  * Tests complete workflows across the system:
  * 1. Authentication Flow: Register → Login → Token → Logout
  * 2. Data Operations: Create collection → CRUD records → Filter/Sort
@@ -94,7 +94,9 @@ describe('Phase 12: Integration Tests', () => {
       // Step 3: Read record
       if (recordRes.body?.id) {
         const readRes = await request(app.getHttpServer())
-          .get(`/api/v1/collections/${collectionId}/records/${recordRes.body.id}`)
+          .get(
+            `/api/v1/collections/${collectionId}/records/${recordRes.body.id}`,
+          )
           .set('Authorization', `Bearer ${token}`);
 
         expect([200, 404]).toContain(readRes.status);
@@ -179,8 +181,9 @@ describe('Phase 12: Integration Tests', () => {
 
     it('should return appropriate status codes', async () => {
       // Not found
-      const notFoundRes = await request(app.getHttpServer())
-        .get('/api/v1/nonexistent/resource/123');
+      const notFoundRes = await request(app.getHttpServer()).get(
+        '/api/v1/nonexistent/resource/123',
+      );
 
       expect(notFoundRes.status).toBe(404);
 
@@ -205,13 +208,13 @@ describe('Phase 12: Integration Tests', () => {
         .map(() =>
           request(app.getHttpServer())
             .get('/api/v1/agents')
-            .set('Authorization', `Bearer ${token}`)
+            .set('Authorization', `Bearer ${token}`),
         );
 
       const responses = await Promise.all(requests);
 
       // All should complete without error
-      responses.forEach(res => {
+      responses.forEach((res) => {
         expect([200, 401, 403, 404]).toContain(res.status);
       });
     });

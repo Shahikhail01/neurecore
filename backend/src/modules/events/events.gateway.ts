@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { RedisService } from '../../infrastructure/cache/redis.service';
+import { SecretProviderService } from '../security/providers/secret.provider';
 
 // Single Responsibility: manage real-time Socket.IO connections with JWT auth + tenant namespacing.
 @WebSocketGateway({
@@ -24,12 +25,17 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(EventsGateway.name);
   private readonly userSockets = new Map<string, Set<string>>();
+  private readonly jwtSecret: string;
 
   constructor(
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly secrets: SecretProviderService,
     private readonly redis: RedisService,
-  ) {}
+  ) {
+    // Get JWT_SECRET from SecretProviderService (throws if missing)
+    this.jwtSecret = this.secrets.getJwtSecret();
+  }
 
   async handleConnection(client: Socket): Promise<void> {
     try {
@@ -46,7 +52,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         sub: string;
         tenantId?: string | null;
         jti: string;
-      }>(token, { secret: this.config.get<string>('JWT_SECRET') });
+      }>(token, { secret: this.jwtSecret });
 
       // Check blacklist
       if (await this.redis.isTokenBlacklisted(payload.jti)) {

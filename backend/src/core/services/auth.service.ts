@@ -9,8 +9,9 @@
  */
 
 import * as jwt from 'jsonwebtoken';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SecretProviderService } from '../../modules/security/providers/secret.provider';
 
 /**
  * JWT Payload - Embedded in token
@@ -81,17 +82,24 @@ export interface Session {
  */
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly jwtSecret: string;
   private readonly jwtRefreshSecret: string;
   private readonly accessTokenExpiry: string;
   private readonly refreshTokenExpiry: string;
 
-  constructor(private readonly configService: ConfigService) {
-    this.jwtSecret = this.configService.get<string>('JWT_SECRET', 'dev-secret');
-    this.jwtRefreshSecret = this.configService.get<string>(
-      'JWT_REFRESH_SECRET',
-      'dev-refresh-secret',
-    );
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly secretProvider: SecretProviderService,
+  ) {
+    // Get JWT_SECRET from SecretProviderService (throws if missing)
+    this.jwtSecret = this.secretProvider.getJwtSecret();
+
+    // Use ConfigService with proper fallback for refresh secret
+    this.jwtRefreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET') || this.jwtSecret; // Use JWT_SECRET as fallback for refresh secret
+
+    // Get expiry settings from ConfigService
     this.accessTokenExpiry = this.configService.get<string>(
       'JWT_ACCESS_TOKEN_EXPIRY',
       '15m',
@@ -100,6 +108,14 @@ export class AuthService {
       'JWT_REFRESH_TOKEN_EXPIRY',
       '7d',
     );
+
+    // Validate that secrets are set
+    if (!this.jwtSecret || this.jwtSecret.length < 32) {
+      this.logger.error(
+        'JWT_SECRET is missing or too short (minimum 32 characters)',
+      );
+      throw new Error('CRITICAL: JWT_SECRET configuration is invalid');
+    }
   }
 
   /**

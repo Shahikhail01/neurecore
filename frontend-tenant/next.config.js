@@ -26,6 +26,15 @@ const nextConfig = {
     optimizePackageImports: ["framer-motion", "zustand"],
   },
 
+  // ── Webpack: exclude nocobase plugin sources from compilation ─────────────
+  webpack(config) {
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: ["**/node_modules/**", "**/.git/**", "**/src/plugins/**"],
+    };
+    return config;
+  },
+
   // ── Security headers ───────────────────────────────────────────────────────
   async headers() {
     return [

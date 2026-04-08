@@ -1,7 +1,7 @@
 /**
  * Phase 12: Real API Integration Tests
  * Tests actual endpoints that exist in the backend
- * 
+ *
  * Scope:
  * - Agents API: /api/v1/agents
  * - Tasks API: /api/v1/tasks
@@ -192,16 +192,16 @@ describe('Phase 12: Real API Integration Tests', () => {
 
   describe('API Response Structure', () => {
     it('should return proper error on missing auth header', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/v1/agents');
+      const response = await request(app.getHttpServer()).get('/api/v1/agents');
 
       // Should be 401 or 403 for protected endpoint (or 404 if not implemented)
       expect([401, 403, 404]).toContain(response.status);
     });
 
     it('should return 404 for non-existent endpoints', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/v1/nonexistent-endpoint');
+      const response = await request(app.getHttpServer()).get(
+        '/api/v1/nonexistent-endpoint',
+      );
 
       expect(response.status).toBe(404);
     });
