@@ -13,7 +13,7 @@ import { Select, Tag } from 'antd';
 import { ArrayField } from '@formily/core';
 import { EllipsisWithTooltip, useAPIClient, useRequest } from '@nocobase/client';
 import { useVerificationTranslation } from '../locale';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat';
 import { FormItem } from '@formily/antd-v5';
 
 const ReadPretty: React.FC = () => {

@@ -12,7 +12,7 @@ import React from 'react';
 import { Button } from 'antd';
 import { css } from '@emotion/css';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { getConnectionCollectionPath } from '../constant';
 
 export const ViewDatabaseConnectionAction = () => {

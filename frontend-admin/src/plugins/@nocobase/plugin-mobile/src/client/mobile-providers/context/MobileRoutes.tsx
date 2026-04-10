@@ -10,7 +10,7 @@
 import { APIClient, LOADING_DELAY, useAPIClient, useRequest } from '@nocobase/client';
 import { Spin } from 'antd';
 import React, { createContext, FC, useContext, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 
 import type { IResource } from '@nocobase/sdk';
 

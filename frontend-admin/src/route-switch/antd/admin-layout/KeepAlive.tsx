@@ -17,7 +17,7 @@ import {
   UNSAFE_DataRouterStateContext,
   UNSAFE_LocationContext,
   UNSAFE_RouteContext,
-} from 'react-router-dom';
+} from '@/lib/router-compat';
 import { ACLContext } from '../../../acl/ACLProvider';
 import { IsSubPageClosedByPageMenuContext } from '../../../application/CustomRouterContextProvider';
 import { SchemaComponentContext } from '../../../schema-component/context';

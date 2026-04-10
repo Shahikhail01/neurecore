@@ -19,7 +19,7 @@ import {
 } from '@nocobase/client';
 import { TabsProps } from 'antd';
 import React, { useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from '@/lib/router-compat';
 import { countGridCol, findSchema } from '../../helpers';
 import { PageDesigner } from './Page.Designer';
 import useStyles from './style';

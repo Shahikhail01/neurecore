@@ -25,7 +25,7 @@ import { blockKeepProps } from '../initializers/TemplateBlockInitializer';
 import _ from 'lodash';
 import { addToolbarClass, syncExtraTemplateInfo } from '../utils/template';
 import { useBlockTemplateMenus } from './BlockTemplateMenusProvider';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 
 const blockDecoratorMenuMaps = {
   TableBlockProvider: ['Table', 'table'],

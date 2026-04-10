@@ -10,7 +10,7 @@
 import { uid } from '@formily/shared';
 import { SchemaInitializerItemActionModalType } from '@nocobase/client';
 import { App } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 
 import { generatePluginTranslationTemplate, usePluginTranslation } from '../../../../locale';
 import { MobileRouteItem, useMobileRoutes } from '../../../../mobile-providers';

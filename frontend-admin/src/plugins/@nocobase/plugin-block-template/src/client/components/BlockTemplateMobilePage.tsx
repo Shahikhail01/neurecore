@@ -9,7 +9,7 @@
 
 import React, { useEffect } from 'react';
 import { MobilePage } from '@nocobase/plugin-mobile/client';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { useRequest } from '@nocobase/client';
 import { Spin } from 'antd';
 import { BlockTemplateInfoContext } from './BlockTemplateInfoContext';

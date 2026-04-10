@@ -14,7 +14,7 @@ import { getSubAppName } from '@nocobase/sdk';
 import { tval } from '@nocobase/utils/client';
 import { Button, Modal, Result, Spin } from 'antd';
 import React, { FC } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from '@/lib/router-compat';
 import { ACLPlugin } from '../acl';
 import { Application } from '../application';
 import { Plugin } from '../application/Plugin';

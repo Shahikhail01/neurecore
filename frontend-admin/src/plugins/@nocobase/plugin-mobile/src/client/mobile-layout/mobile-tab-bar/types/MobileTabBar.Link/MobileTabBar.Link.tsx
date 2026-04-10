@@ -8,7 +8,7 @@
  */
 
 import React, { FC } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 
 import { MobileTabBarItemProps, MobileTabBarItem } from '../../MobileTabBar.Item';
 import { useLinkActionProps } from '@nocobase/client';

@@ -31,7 +31,7 @@ import { tval } from '@nocobase/utils/client';
 import { cloneDeep, omit } from 'lodash';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { NAMESPACE } from '../../locale';
 
 const getSchema = (schema: IField, record: any, compile, getContainer): ISchema => {

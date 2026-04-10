@@ -9,7 +9,7 @@
 
 import { RemoteSchemaComponent } from '@nocobase/client';
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { useMobileRoutes } from '../../../mobile-providers';
 import { MobilePageContentContainer } from './MobilePageContentContainer';
 

@@ -9,7 +9,7 @@
 
 import { Space, Tabs, TabsProps } from 'antd-mobile';
 import React, { FC, useCallback } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from '@/lib/router-compat';
 
 import { DndContext, DndContextProps, Icon, SortableItem, useCompile } from '@nocobase/client';
 import { useTranslation } from 'react-i18next';

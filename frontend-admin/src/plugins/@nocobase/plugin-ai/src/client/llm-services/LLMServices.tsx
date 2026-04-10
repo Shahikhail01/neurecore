@@ -23,7 +23,7 @@ import {
   useRequest,
 } from '@nocobase/client';
 import React, { useMemo, useState, useEffect, createContext, useContext } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 import { useT } from '../locale';
 
 // Context for auto-open drawer functionality

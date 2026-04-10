@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { ISchema } from '@formily/react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat';
 import { useTranslation } from 'react-i18next';
 import { message } from 'antd';
 

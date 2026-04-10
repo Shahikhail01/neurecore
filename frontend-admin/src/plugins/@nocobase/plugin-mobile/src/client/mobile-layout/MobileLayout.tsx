@@ -8,7 +8,7 @@
  */
 
 import React, { FC } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from '@/lib/router-compat';
 
 import { useMobileApp } from '../mobile';
 import { MobileProviders } from '../mobile-providers/MobileProviders';

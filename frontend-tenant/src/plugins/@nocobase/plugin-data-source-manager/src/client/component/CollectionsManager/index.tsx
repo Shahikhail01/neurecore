@@ -30,7 +30,7 @@ import {
   CollectionCategoriesProvider,
   usePlugin,
 } from '@nocobase/client';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 import { ConfigurationTable } from './ConfigurationTable';
 import { ConfigurationTabs } from './ConfigurationTabs';
 import PluginDatabaseConnectionsClient from '../../';

@@ -16,7 +16,7 @@
  * For more information, see <https://www.nocobase.com/agreement>
  */
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { App } from 'antd';
 import { useField, useFieldSchema, useForm } from '@formily/react';
 

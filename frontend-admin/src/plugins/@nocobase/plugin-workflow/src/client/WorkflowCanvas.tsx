@@ -9,7 +9,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '@/lib/router-compat';
 import { Alert, App, Breadcrumb, Button, Dropdown, Result, Spin, Switch, Tag, Tooltip } from 'antd';
 import { DownOutlined, EllipsisOutlined, RightOutlined } from '@ant-design/icons';
 import { NoticeType } from 'antd/es/message/interface';

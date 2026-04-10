@@ -11,7 +11,7 @@ import { useField } from '@formily/react';
 import { cx, SortableItem, useCompile, useDesigner, useDocumentTitle, useToken } from '@nocobase/client';
 import { NavBar, NavBarProps } from 'antd-mobile';
 import React, { useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { generateNTemplate } from '../../../../locale';
 import { HeaderDesigner } from './Header.Designer';
 

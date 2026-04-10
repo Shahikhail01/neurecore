@@ -12,7 +12,7 @@ import React from 'react';
 // @ts-ignore
 import { name } from '../../package.json';
 
-import { Outlet } from 'react-router-dom';
+import { Outlet } from '@/lib/router-compat';
 
 import { generatePluginTranslationTemplate } from './locale';
 import { Mobile } from './mobile';

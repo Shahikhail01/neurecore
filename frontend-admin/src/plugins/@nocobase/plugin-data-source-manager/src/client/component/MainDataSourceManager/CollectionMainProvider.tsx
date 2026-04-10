@@ -9,7 +9,7 @@
 
 import React, { useCallback } from 'react';
 import { CollectionCategoriesProvider, useAPIClient, useRequest } from '@nocobase/client';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from '@/lib/router-compat';
 
 export const CollectionMainProvider = (props) => {
   const api = useAPIClient();

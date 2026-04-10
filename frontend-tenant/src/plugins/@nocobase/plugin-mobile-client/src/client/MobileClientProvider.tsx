@@ -9,7 +9,7 @@
 
 import { useNavigateNoUpdate } from '@nocobase/client';
 import React, { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 import { isJSBridge } from './core/bridge';
 
 export const MobileClientProvider = React.memo((props) => {

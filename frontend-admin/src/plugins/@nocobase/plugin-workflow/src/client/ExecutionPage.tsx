@@ -9,7 +9,7 @@
 
 import { cx, SchemaComponent } from '@nocobase/client';
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { ExecutionCanvas } from './ExecutionCanvas';
 import useStyles from './style';
 

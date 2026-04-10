@@ -11,7 +11,7 @@ import { ApiOutlined, SettingOutlined } from '@ant-design/icons';
 import { Button, Dropdown, Tooltip } from 'antd';
 import React, { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat';
 import { useACLRoleContext } from '../acl';
 import { useApp, useNavigateNoUpdate } from '../application';
 import { useMobileLayout } from '../route-switch/antd/admin-layout';

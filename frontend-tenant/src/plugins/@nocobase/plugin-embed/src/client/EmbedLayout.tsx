@@ -31,7 +31,7 @@ import { App, Layout, Result } from 'antd';
 import copy from 'copy-to-clipboard';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 // @ts-ignore
 import pkg from './../../package.json';
 

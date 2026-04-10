@@ -15,7 +15,7 @@ import { Button } from 'antd';
 import { cloneDeep, omit } from 'lodash';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { useAPIClient, useRequest } from '../../api-client';
 import { RecordProvider, useRecord } from '../../record-provider';
 import { ActionContextProvider, SchemaComponent, useActionContext, useCompile } from '../../schema-component';

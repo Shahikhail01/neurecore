@@ -9,7 +9,7 @@
 
 import { ISchema, createModalSettingsItem, createTextSettingsItem } from '@nocobase/client';
 import { useFieldSchema } from '@formily/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { App } from 'antd';
 
 import { generatePluginTranslationTemplate, usePluginTranslation } from '../../../locale';

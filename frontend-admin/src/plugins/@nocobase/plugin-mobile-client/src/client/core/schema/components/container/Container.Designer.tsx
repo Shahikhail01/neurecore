@@ -13,7 +13,7 @@ import { uid } from '@formily/shared';
 import { SchemaSettingsDropdown, SchemaSettingsSwitchItem, useDesignable } from '@nocobase/client';
 import { Button } from 'antd';
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { generateNTemplate, useTranslation } from '../../../../locale';
 import { findSchema } from '../../helpers';
 import { useSchemaPatch } from '../../hooks';

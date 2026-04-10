@@ -14,7 +14,7 @@ import { uid } from '@formily/shared';
 import { useAuthTranslation } from '../locale';
 import { useAPIClient } from '@nocobase/client';
 import { useForm } from '@formily/react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate } from '@/lib/router-compat';
 import { message } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useAuthenticator } from '../authenticator';

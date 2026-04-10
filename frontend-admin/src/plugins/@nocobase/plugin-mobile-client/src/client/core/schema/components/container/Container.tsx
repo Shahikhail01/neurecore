@@ -10,7 +10,7 @@
 import { useField, useFieldSchema } from '@formily/react';
 import { cx, SchemaComponent, SortableItem, useDesigner, useToken } from '@nocobase/client';
 import React, { useEffect } from 'react';
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams } from '@/lib/router-compat';
 import { ContainerDesigner } from './Container.Designer';
 import useStyles from './style';
 

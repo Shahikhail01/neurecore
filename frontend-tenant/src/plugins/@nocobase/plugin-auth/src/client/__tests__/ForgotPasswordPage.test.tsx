@@ -12,7 +12,7 @@ import { render, screen } from '@testing-library/react';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useAuthenticator } from '../authenticator';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from '@/lib/router-compat';
 
 // 模拟认证组件和路由组件`
 vi.mock('react-router-dom', () => ({

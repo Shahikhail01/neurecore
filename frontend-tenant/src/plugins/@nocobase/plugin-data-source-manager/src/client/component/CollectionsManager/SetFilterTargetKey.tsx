@@ -10,7 +10,7 @@
 import { useAPIClient, useApp, useCollectionRecordData, useCompile, useResourceActionContext } from '@nocobase/client';
 import { Button, Popconfirm, Select, Space } from 'antd';
 import React, { useContext, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { useDSMTranslation } from '../../locale';
 import { CollectionListContext } from '../MainDataSourceManager/Configuration/CollectionFields';
 

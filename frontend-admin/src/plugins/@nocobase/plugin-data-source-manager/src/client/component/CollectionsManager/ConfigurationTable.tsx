@@ -30,7 +30,7 @@ import {
 import { getPickerFormat } from '@nocobase/utils/client';
 import React, { useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { useDataSourceRefresh } from '../../hooks/useDataSourceRefresh';
 import { useDataSourceData } from '../../hooks/useResourceData';
 import { CollectionFields } from './CollectionFields';

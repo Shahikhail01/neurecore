@@ -10,7 +10,7 @@
 import { useForm } from '@formily/react';
 import { useRecord, useCollectionManager_deprecated } from '@nocobase/client';
 import { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 
 export const useMBMFields = () => {
   const { collectionName, name } = useRecord();

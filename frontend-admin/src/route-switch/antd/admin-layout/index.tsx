@@ -16,7 +16,7 @@ import { createStyles, createGlobalStyle } from 'antd-style';
 import React, { createContext, FC, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation, useNavigate } from '@/lib/router-compat';
 import {
   ACLRolesCheckProvider,
   CurrentAppInfoProvider,

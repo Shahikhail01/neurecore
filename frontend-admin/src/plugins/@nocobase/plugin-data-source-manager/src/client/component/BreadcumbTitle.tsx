@@ -11,7 +11,7 @@ import { RightOutlined } from '@ant-design/icons';
 import { useApp, useCompile, useDataSourceManager } from '@nocobase/client';
 import { Breadcrumb, Space, Tag } from 'antd';
 import React, { useContext, useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from '@/lib/router-compat';
 import { DataSourceContext } from '../DatabaseConnectionProvider';
 import { NAMESPACE, lang } from '../locale';
 import { statusEnum } from '../schema';

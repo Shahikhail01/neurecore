@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from '@/lib/router-compat';
 import { render, waitFor } from '@testing-library/react';
 import { FlowEngine, FlowEngineProvider } from '@nocobase/flow-engine';
 import { resolveViewParamsToViewList } from '../resolveViewParamsToViewList';

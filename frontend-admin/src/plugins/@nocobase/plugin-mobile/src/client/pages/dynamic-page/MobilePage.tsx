@@ -20,7 +20,7 @@ import {
 import { Button as MobileButton, Dialog as MobileDialog } from 'antd-mobile';
 import React, { useCallback } from 'react';
 import { isMobile } from 'react-device-detect';
-import { Outlet, useParams } from 'react-router-dom';
+import { Outlet, useParams } from '@/lib/router-compat';
 import {
   MobileDateFilterWithPicker,
   MobileDateTimePicker,

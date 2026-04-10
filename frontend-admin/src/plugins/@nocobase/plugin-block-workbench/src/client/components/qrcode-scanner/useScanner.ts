@@ -11,7 +11,7 @@ import PluginMobileClient from '@nocobase/plugin-mobile/client';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 
 function removeStringIfStartsWith(text: string, prefix: string): string {
   if (text.startsWith(prefix)) {

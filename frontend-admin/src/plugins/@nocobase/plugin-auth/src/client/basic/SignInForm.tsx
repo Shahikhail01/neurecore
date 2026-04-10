@@ -11,7 +11,7 @@ import { ISchema } from '@formily/react';
 import { SchemaComponent, useAPIClient, useCurrentUserContext, useLazy } from '@nocobase/client';
 import React, { useCallback } from 'react';
 import { useAuthTranslation } from '../locale';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from '@/lib/router-compat';
 import { useForm } from '@formily/react';
 // import { useSignUpForms } from '../pages';
 import { Authenticator } from '../authenticator';

@@ -14,7 +14,7 @@ import { Layout, Menu } from 'antd';
 import _ from 'lodash';
 import React, { createContext, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useNavigate, useParams } from '@/lib/router-compat';
 import { useACLRoleContext } from '../acl';
 import { ADMIN_SETTINGS_PATH, PluginSettingsPageType, useApp } from '../application';
 import { AppNotFound } from '../common/AppNotFound';

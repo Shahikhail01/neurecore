@@ -14,7 +14,7 @@ import { Col, Row } from "antd";
 import { isArray } from "lodash";
 import template from "lodash/template";
 import React, { createContext, useCallback, useContext, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link } from '@/lib/router-compat';
 import {
   DataBlockProvider,
   TableFieldResource,

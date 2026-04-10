@@ -24,7 +24,7 @@ import { useT } from '../locale';
 import { findBlockRootSchema } from '../utils/schema';
 import { convertTemplateToBlock, correctIdReferences } from '../initializers/TemplateBlockInitializer';
 import { useMemoizedFn } from 'ahooks';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 
 interface BlockTemplateContextProps {
   loading: boolean;

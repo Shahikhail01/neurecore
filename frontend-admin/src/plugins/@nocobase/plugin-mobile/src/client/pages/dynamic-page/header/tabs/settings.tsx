@@ -17,7 +17,7 @@ import {
 } from '@nocobase/client';
 import { App } from 'antd';
 import React, { FC } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 
 import { generatePluginTranslationTemplate, usePluginTranslation } from '../../../../locale';
 import { MobileRouteItem, useMobileRoutes } from '../../../../mobile-providers';

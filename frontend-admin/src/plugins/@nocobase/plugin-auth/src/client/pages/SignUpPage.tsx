@@ -9,7 +9,7 @@
 
 import { useCurrentDocumentTitle, usePlugin, useViewport } from '@nocobase/client';
 import React, { useContext, createContext, FunctionComponent, createElement } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from '@/lib/router-compat';
 import AuthPlugin, { AuthOptions } from '..';
 import { useAuthenticator } from '../authenticator';
 

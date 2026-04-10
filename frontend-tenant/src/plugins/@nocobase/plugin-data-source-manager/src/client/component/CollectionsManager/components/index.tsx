@@ -11,7 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { Select } from 'antd';
 import { castArray } from 'lodash';
 import { observer, useForm, useField } from '@formily/react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { useRecord, useCompile, useAPIClient, useCollectionManager_deprecated } from '@nocobase/client';
 import { useRemoteCollectionContext } from '../CollectionFields';
 

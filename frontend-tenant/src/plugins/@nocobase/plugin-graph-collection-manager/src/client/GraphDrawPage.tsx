@@ -38,7 +38,7 @@ import { App, Button, ConfigProvider, Layout, Spin, Switch, Tooltip } from 'antd
 import dagre from 'dagre';
 import lodash from 'lodash';
 import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from '@/lib/router-compat';
 import { useAsyncDataSource, useCreateActionAndRefreshCM } from './action-hooks';
 import { AddCollectionAction } from './components/AddCollectionAction';
 import { ConnectorAction } from './components/ConnectorAction';

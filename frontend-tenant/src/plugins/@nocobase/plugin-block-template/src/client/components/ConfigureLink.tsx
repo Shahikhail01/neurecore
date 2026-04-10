@@ -9,7 +9,7 @@
 
 import { useCollectionRecordData, useFilterByTk } from '@nocobase/client';
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat';
 import { useT } from '../locale';
 export const ConfigureLink = () => {
   const value = useFilterByTk();

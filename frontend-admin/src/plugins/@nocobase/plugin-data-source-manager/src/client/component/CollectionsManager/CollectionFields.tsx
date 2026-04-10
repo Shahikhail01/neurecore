@@ -25,7 +25,7 @@ import {
 import { message } from 'antd';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { AddCollectionField } from './AddFieldAction';
 import { ForeignKey, SourceCollection, SourceKey, TargetKey, ThroughCollection } from './components';
 import { CollectionFieldInterfaceSelect } from './components/CollectionFieldInterfaceSelect';

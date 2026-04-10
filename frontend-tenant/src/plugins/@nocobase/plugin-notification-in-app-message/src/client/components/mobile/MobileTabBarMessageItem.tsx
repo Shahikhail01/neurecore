@@ -10,7 +10,7 @@
 import { observer } from '@nocobase/flow-engine';
 import { MobileTabBarItem } from '@nocobase/plugin-mobile/client';
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from '@/lib/router-compat';
 import { unreadMsgsCountObs } from '../../observables';
 
 const InnerMobileTabBarMessageItem = (props) => {

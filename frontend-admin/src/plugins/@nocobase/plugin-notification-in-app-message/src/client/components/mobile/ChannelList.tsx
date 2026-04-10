@@ -14,7 +14,7 @@ import { useApp } from '@nocobase/client';
 import { dayjs } from '@nocobase/utils/client';
 import { Badge, InfiniteScroll, List, ListRef } from 'antd-mobile';
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { channelListObs, channelStatusFilterObs, fetchChannels, showChannelLoadingMoreObs } from '../../observables';
 import InfiniteScrollContent from './InfiniteScrollContent';
 

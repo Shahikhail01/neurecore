@@ -8,7 +8,7 @@
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@/lib/router-compat';
 import { useField, useFieldSchema, useForm } from '@formily/react';
 import { FormLayout } from '@formily/antd-v5';
 import { Button, Card, ConfigProvider, Descriptions, Space, Spin, Tag } from 'antd';

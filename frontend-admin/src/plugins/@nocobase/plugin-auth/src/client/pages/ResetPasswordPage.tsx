@@ -3,7 +3,7 @@ import { SchemaComponent, useAPIClient, useNavigateNoUpdate } from '@nocobase/cl
 import { useAuthTranslation } from '../locale';
 import React, { useEffect } from 'react';
 import { Button, message, Result } from 'antd';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from '@/lib/router-compat';
 import { useAuthenticator } from '../authenticator';
 
 const getResetPasswordForm = (): ISchema => ({

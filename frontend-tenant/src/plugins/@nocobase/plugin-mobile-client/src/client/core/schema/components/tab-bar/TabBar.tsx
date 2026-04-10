@@ -22,7 +22,7 @@ import {
 } from '@nocobase/client';
 import { TabBar } from 'antd-mobile';
 import React, { useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@/lib/router-compat';
 import { useTranslation } from '../../../../locale';
 import { PageSchema } from '../../common';
 import { tabItemSchema } from './schema';

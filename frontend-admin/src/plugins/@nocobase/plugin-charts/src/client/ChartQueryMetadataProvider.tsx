@@ -10,7 +10,7 @@
 import { useAPIClient, useRequest } from '@nocobase/client';
 import { Spin } from 'antd';
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 
 export const ChartQueryMetadataContext = createContext({
   refresh: () => {},

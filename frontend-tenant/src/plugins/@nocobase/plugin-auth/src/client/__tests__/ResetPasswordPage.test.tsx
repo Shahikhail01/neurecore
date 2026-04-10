@@ -12,7 +12,7 @@ import { render, screen } from '@testing-library/react';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useAuthenticator } from '../authenticator';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from '@/lib/router-compat';
 import { useAPIClient } from '@nocobase/client';
 
 // 模拟认证组件和路由组件

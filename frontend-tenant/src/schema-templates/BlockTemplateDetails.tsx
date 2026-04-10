@@ -10,7 +10,7 @@
 import { PageHeader as AntdPageHeader } from '@ant-design/pro-layout';
 import { Input, Spin } from 'antd';
 import React, { useContext, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { useAPIClient, useRequest, useSchemaTemplateManager } from '..';
 import { useNavigateNoUpdate } from '../application/CustomRouterContextProvider';
 import { RemoteSchemaComponent, SchemaComponentContext } from '../schema-component';

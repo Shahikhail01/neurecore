@@ -10,7 +10,7 @@
 import { useApp } from '@nocobase/client';
 import { Alert } from 'antd';
 import React, { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { SetFilterTargetKey } from './SetFilterTargetKey';
 
 export const FilterTargetKeyAlert = ({ collectionName }) => {

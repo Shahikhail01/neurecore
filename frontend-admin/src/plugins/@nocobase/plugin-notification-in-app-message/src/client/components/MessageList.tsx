@@ -12,7 +12,7 @@ import { observer } from '@nocobase/flow-engine';
 import { dayjs } from '@nocobase/utils/client';
 import { Button, Card, ConfigProvider, Descriptions, Spin, Tag, Tooltip, Typography, theme } from 'antd';
 import React, { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { useLocalTranslation } from '../../locale';
 
 import { useApp } from '@nocobase/client';

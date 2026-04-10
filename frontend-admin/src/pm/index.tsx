@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from '@/lib/router-compat';
 import { ACLPane } from '../acl/ACLShortcut';
 import { ADMIN_SETTINGS_PATH } from '../application';
 import { Plugin } from '../application/Plugin';

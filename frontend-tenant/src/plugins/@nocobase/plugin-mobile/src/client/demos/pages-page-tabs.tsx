@@ -8,7 +8,7 @@ import {
   MobileTitleProvider,
 } from '@nocobase/plugin-mobile/client';
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 
 const Demo = () => {
   const { pathname } = useLocation();

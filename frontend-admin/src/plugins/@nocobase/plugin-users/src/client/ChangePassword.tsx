@@ -10,7 +10,7 @@
 import { ISchema, useForm } from '@formily/react';
 import { uid } from '@formily/shared';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import React, { useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import {
   ActionContextProvider,

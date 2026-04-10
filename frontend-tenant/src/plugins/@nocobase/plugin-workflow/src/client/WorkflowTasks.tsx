@@ -13,7 +13,7 @@ import { App, Badge, Button, Flex, Layout, Menu, Result, Segmented, Tabs, theme,
 import { NavBar, Toast } from 'antd-mobile';
 import classnames from 'classnames';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from '@/lib/router-compat';
 
 import {
   ActionContextProvider,

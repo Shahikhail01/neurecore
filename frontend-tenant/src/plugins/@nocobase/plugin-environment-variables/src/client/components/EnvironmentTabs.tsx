@@ -18,7 +18,7 @@ import {
   useGlobalTheme,
   removeNullCondition,
 } from '@nocobase/client';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@/lib/router-compat';
 import { Alert, App, Button, Card, Dropdown, Flex, Space, Table, Tag } from 'antd';
 import React, { useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';

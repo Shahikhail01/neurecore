@@ -3,7 +3,7 @@ import { SchemaComponent, useAPIClient } from '@nocobase/client';
 import { useAuthTranslation } from '../locale';
 import React from 'react';
 import { message } from 'antd';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from '@/lib/router-compat';
 import { useAuthenticator } from '../authenticator';
 
 const getForgotPasswordForm = (): ISchema => ({

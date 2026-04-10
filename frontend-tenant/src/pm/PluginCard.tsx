@@ -21,7 +21,7 @@ import { App, Card, Divider, Modal, Popconfirm, Result, Space, Switch, Tooltip, 
 import classnames from 'classnames';
 import React, { FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { useAPIClient } from '../api-client';
 import { useApp } from '../application';
 import { PluginDetail } from './PluginDetail';

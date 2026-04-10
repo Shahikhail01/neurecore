@@ -10,7 +10,7 @@
 import { ActionContextProvider, AdminProvider, css, cx, RemoteSchemaComponent, useViewport } from '@nocobase/client';
 import { DrawerProps, ModalProps } from 'antd';
 import React, { useMemo } from 'react';
-import { Outlet, useParams } from 'react-router-dom';
+import { Outlet, useParams } from '@/lib/router-compat';
 import { MobileCore } from '../core';
 import { useInterfaceContext } from './InterfaceProvider';
 import { OpenInNewTab } from './OpenInNewTab';

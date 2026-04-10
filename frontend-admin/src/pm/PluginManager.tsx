@@ -14,7 +14,7 @@ import { Button, Card, Col, Divider, Input, List, Modal, Row, Space, Spin, Table
 import _ from 'lodash';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@/lib/router-compat';
 
 import { css } from '@emotion/css';
 import { useACLRoleContext } from '../acl/ACLProvider';

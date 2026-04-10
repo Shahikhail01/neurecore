@@ -9,7 +9,7 @@
 
 import { createRouterManager, Plugin, RouterManager, RouteSchemaComponent } from '@nocobase/client';
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet } from '@/lib/router-compat';
 import { MobileClientProvider } from './MobileClientProvider';
 import MApplication from './router/Application';
 import { mBlockInitializers, mBlockInitializers_deprecated } from './core/schema';

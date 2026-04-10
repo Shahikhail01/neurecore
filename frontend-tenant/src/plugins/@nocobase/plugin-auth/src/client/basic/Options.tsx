@@ -21,7 +21,7 @@ import { lang, useAuthTranslation } from '../locale';
 import { FormTab, ArrayTable } from '@formily/antd-v5';
 import { Alert, Divider } from 'antd';
 import { uid } from '@formily/shared';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat';
 
 const SignupFormSettings = () => {
   const record = useRecord();

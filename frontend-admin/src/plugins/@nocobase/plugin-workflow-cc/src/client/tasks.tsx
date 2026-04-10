@@ -10,7 +10,7 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAntdToken } from 'antd-style';
 import { Card, ConfigProvider, Descriptions, Spin } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { get } from 'lodash';
 
 import {

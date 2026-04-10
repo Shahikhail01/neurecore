@@ -9,7 +9,7 @@
 
 import { FlowModel, useFlowEngine } from '@nocobase/flow-engine';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation } from '@/lib/router-compat';
 import { AIEmployeeShortcutListModel } from '../flow/models';
 import { contextAware } from '../stores/context-aware';
 

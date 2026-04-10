@@ -19,7 +19,7 @@ import {
 } from '@nocobase/client';
 import { Spin } from 'antd';
 import React, { FC } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from '@/lib/router-compat';
 import { useTranslation } from 'react-i18next';
 import { AuthenticatorsContext } from '../authenticator';
 

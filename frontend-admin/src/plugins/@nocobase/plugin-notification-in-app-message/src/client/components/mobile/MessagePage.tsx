@@ -12,7 +12,7 @@ import { css, useApp, useCurrentUserContext } from '@nocobase/client';
 import { dayjs } from '@nocobase/utils/client';
 import { Badge, InfiniteScroll, List, NavBar } from 'antd-mobile';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from '@/lib/router-compat';
 
 import { Schema } from '@formily/react';
 import { MobilePageContentContainer, MobilePageHeader, MobilePageProvider } from '@nocobase/plugin-mobile/client';

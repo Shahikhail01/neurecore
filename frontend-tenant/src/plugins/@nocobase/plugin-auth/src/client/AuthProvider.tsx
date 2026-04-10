@@ -9,7 +9,7 @@
 
 import { useApp } from '@nocobase/client';
 import React, { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from '@/lib/router-compat';
 
 export const AuthProvider: React.FC = (props) => {
   const app = useApp();

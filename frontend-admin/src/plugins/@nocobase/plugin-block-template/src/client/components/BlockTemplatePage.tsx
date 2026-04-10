@@ -11,7 +11,7 @@ import { useRequest, RemoteSchemaComponent, AllDataBlocksProvider } from '@nocob
 import React from 'react';
 import { useT } from '../locale';
 import { useParams } from 'react-router';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat';
 import { Breadcrumb, Spin, theme } from 'antd';
 import { BlockTemplateInfoContext } from './BlockTemplateInfoContext';
 

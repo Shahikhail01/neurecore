@@ -10,7 +10,7 @@
 import React from 'react';
 import { Result } from 'antd';
 import { Button } from 'antd-mobile';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@/lib/router-compat';
 import { usePluginTranslation } from '../../locale';
 
 export const MobileNotFoundPage = () => {

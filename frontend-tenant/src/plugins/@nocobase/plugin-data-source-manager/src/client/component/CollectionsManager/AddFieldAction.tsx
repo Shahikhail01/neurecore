@@ -32,7 +32,7 @@ import { Button, Dropdown, MenuProps } from 'antd';
 import { cloneDeep } from 'lodash';
 import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { ForeignKey } from './components';
 
 const getSchema = (schema: IField, record: any, compile) => {

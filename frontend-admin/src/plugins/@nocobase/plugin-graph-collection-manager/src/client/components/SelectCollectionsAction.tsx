@@ -10,7 +10,7 @@
 import React, { useContext, useMemo } from 'react';
 import { CollapsedContext } from '../GraphDrawPage';
 import { Select, useCompile } from '@nocobase/client';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from '@/lib/router-compat';
 import { getPopupContainer } from '../utils';
 
 export const SelectCollectionsAction = (props) => {

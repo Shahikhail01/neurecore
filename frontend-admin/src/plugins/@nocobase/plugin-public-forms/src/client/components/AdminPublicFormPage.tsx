@@ -41,7 +41,7 @@ import {
 } from 'antd';
 import React, { useState } from 'react';
 import { useParams } from 'react-router';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat';
 import { FormLayout } from '@formily/antd-v5';
 import { usePublicSubmitActionProps } from '../hooks';
 import { usePublicFormTranslation, NAMESPACE } from '../locale';

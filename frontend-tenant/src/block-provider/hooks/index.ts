@@ -20,7 +20,7 @@ import omit from 'lodash/omit';
 import qs from 'qs';
 import { ChangeEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NavigateFunction } from 'react-router-dom';
+import { NavigateFunction } from '@/lib/router-compat';
 import {
   AssociationFilter,
   useCollection,

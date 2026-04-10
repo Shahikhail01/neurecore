@@ -30,7 +30,7 @@ import {
 import { cloneDeep, omit, set } from 'lodash';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@/lib/router-compat';
 import { useRemoteCollectionContext } from './CollectionFields';
 
 const getSchema = ({
