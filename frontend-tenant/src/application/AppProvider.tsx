@@ -7,7 +7,6 @@ import React from "react";
 import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { APIClientProvider } from "../api-client";
-import { CurrentUserProvider } from "../user";
 import { SchemaInitializerProvider } from "../schema-initializer";
 
 interface AppProviderProps {
@@ -17,18 +16,18 @@ interface AppProviderProps {
 /**
  * Provider wrapper with correct hierarchy:
  * 1. APIClientProvider - HTTP client access
- * 2. CurrentUserProvider - User auth state
- * 3. SchemaInitializerProvider - NocoBase schema initialization
- * 4. AntD ConfigProvider - UI styling
+ * 2. SchemaInitializerProvider - NocoBase schema initialization
+ * 3. AntD ConfigProvider - UI styling
+ *
+ * Note: CurrentUserProvider omitted — tenant uses Zustand (useAuthStore) for auth,
+ * not the NocoBase user provider pattern.
  */
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   return (
     <APIClientProvider baseURL={process.env.NEXT_PUBLIC_API_URL}>
-      <CurrentUserProvider>
-        <SchemaInitializerProvider>
-          <ConfigProvider locale={zhCN}>{children}</ConfigProvider>
-        </SchemaInitializerProvider>
-      </CurrentUserProvider>
+      <SchemaInitializerProvider>
+        <ConfigProvider locale={zhCN}>{children}</ConfigProvider>
+      </SchemaInitializerProvider>
     </APIClientProvider>
   );
 };

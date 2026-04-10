@@ -1,20 +1,20 @@
 /**
  * NocoBase Components Demo Page
- * 
+ *
  * Demonstrates usage of NocoBase components integrated into NeureCore
  * Shows BlockProvider, SchemaComponent, SchemaInitializer, and other key components
  */
 
-'use client';
+"use client";
 
-import React, { useState, useCallback } from 'react';
-import { Button, Card, Space, Tabs, Alert } from 'antd';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { useSchemaInitializer } from '@/schema-initializer';
+import React, { useState, useCallback } from "react";
+import { Button, Card, Space, Tabs, Alert } from "antd";
+import { PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { useSchemaInitializer } from "@/schema-initializer";
 
 interface Block {
   id: string;
-  type: 'table' | 'form' | 'grid' | 'details';
+  type: "table" | "form" | "grid" | "details";
   title: string;
   created: Date;
 }
@@ -22,24 +22,24 @@ interface Block {
 export default function NocoBaseDemoPage() {
   const [blocks, setBlocks] = useState<Block[]>([
     {
-      id: '1',
-      type: 'table',
-      title: 'Sample Table Block',
+      id: "1",
+      type: "table",
+      title: "Sample Table Block",
       created: new Date(),
     },
     {
-      id: '2',
-      type: 'form',
-      title: 'Sample Form Block',
+      id: "2",
+      type: "form",
+      title: "Sample Form Block",
       created: new Date(),
     },
   ]);
 
-  const [selectedTab, setSelectedTab] = useState('overview');
+  const [selectedTab, setSelectedTab] = useState("overview");
   const schemaInitializer = useSchemaInitializer();
 
   const handleAddBlock = useCallback(
-    (type: 'table' | 'form' | 'grid' | 'details') => {
+    (type: "table" | "form" | "grid" | "details") => {
       const newBlock: Block = {
         id: `block-${Date.now()}`,
         type,
@@ -48,7 +48,7 @@ export default function NocoBaseDemoPage() {
       };
       setBlocks((prev) => [...prev, newBlock]);
     },
-    []
+    [],
   );
 
   const handleRemoveBlock = useCallback((id: string) => {
@@ -57,7 +57,7 @@ export default function NocoBaseDemoPage() {
 
   const handleRefresh = useCallback(() => {
     // Simulate refresh
-    console.log('Refreshing blocks...');
+    console.log("Refreshing blocks...");
   }, []);
 
   return (
@@ -65,9 +65,12 @@ export default function NocoBaseDemoPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">NocoBase Integration Demo</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            NocoBase Integration Demo
+          </h1>
           <p className="text-gray-600">
-            This page demonstrates the NeureCore NocoBase integration with real component examples.
+            This page demonstrates the NeureCore NocoBase integration with real
+            component examples.
           </p>
         </div>
 
@@ -87,13 +90,13 @@ export default function NocoBaseDemoPage() {
           onChange={setSelectedTab}
           items={[
             {
-              key: 'overview',
-              label: 'Overview',
+              key: "overview",
+              label: "Overview",
               children: <OverviewTab />,
             },
             {
-              key: 'blocks',
-              label: 'Blocks & Components',
+              key: "blocks",
+              label: "Blocks & Components",
               children: (
                 <BlocksTab
                   blocks={blocks}
@@ -104,13 +107,15 @@ export default function NocoBaseDemoPage() {
               ),
             },
             {
-              key: 'schema-initializer',
-              label: 'Schema Initializer',
-              children: <SchemaInitializerTab initializer={schemaInitializer} />,
+              key: "schema-initializer",
+              label: "Schema Initializer",
+              children: (
+                <SchemaInitializerTab initializer={schemaInitializer} />
+              ),
             },
             {
-              key: 'docs',
-              label: 'Documentation',
+              key: "docs",
+              label: "Documentation",
               children: <DocumentationTab />,
             },
           ]}
@@ -127,7 +132,9 @@ export default function NocoBaseDemoPage() {
 const OverviewTab: React.FC = () => (
   <div className="space-y-4">
     <Card>
-      <h2 className="text-xl font-semibold mb-4">NocoBase Integration Status</h2>
+      <h2 className="text-xl font-semibold mb-4">
+        NocoBase Integration Status
+      </h2>
       <div className="space-y-3">
         <StatusItem label="BlockProvider" status="✓ Active" />
         <StatusItem label="SchemaComponent" status="✓ Active" />
@@ -154,19 +161,31 @@ const OverviewTab: React.FC = () => (
 
 const BlocksTab: React.FC<{
   blocks: Block[];
-  onAddBlock: (type: 'table' | 'form' | 'grid' | 'details') => void;
+  onAddBlock: (type: "table" | "form" | "grid" | "details") => void;
   onRemoveBlock: (id: string) => void;
   onRefresh: () => void;
 }> = ({ blocks, onAddBlock, onRemoveBlock, onRefresh }) => (
   <div className="space-y-4">
     <div className="flex gap-2 flex-wrap">
-      <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBlock('table')}>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={() => onAddBlock("table")}
+      >
         Add Table
       </Button>
-      <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBlock('form')}>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={() => onAddBlock("form")}
+      >
         Add Form
       </Button>
-      <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBlock('grid')}>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={() => onAddBlock("grid")}
+      >
         Add Grid
       </Button>
       <Button type="default" icon={<ReloadOutlined />} onClick={onRefresh}>
@@ -180,7 +199,9 @@ const BlocksTab: React.FC<{
           <div className="space-y-2">
             <h3 className="font-semibold">{block.title}</h3>
             <p className="text-sm text-gray-500">Type: {block.type}</p>
-            <p className="text-sm text-gray-500">Created: {block.created.toLocaleString()}</p>
+            <p className="text-sm text-gray-500">
+              Created: {block.created.toLocaleString()}
+            </p>
             <Button
               type="text"
               danger
@@ -205,10 +226,14 @@ const BlocksTab: React.FC<{
   </div>
 );
 
-const SchemaInitializerTab: React.FC<{ initializer: any }> = ({ initializer }) => (
+const SchemaInitializerTab: React.FC<{ initializer: any }> = ({
+  initializer,
+}) => (
   <div className="space-y-4">
     <Card>
-      <h2 className="text-xl font-semibold mb-4">Schema Initializer Configuration</h2>
+      <h2 className="text-xl font-semibold mb-4">
+        Schema Initializer Configuration
+      </h2>
       <div className="bg-gray-100 p-4 rounded font-mono text-sm overflow-auto">
         <pre>{JSON.stringify(initializer.getAll(), null, 2)}</pre>
       </div>
@@ -219,11 +244,15 @@ const SchemaInitializerTab: React.FC<{ initializer: any }> = ({ initializer }) =
       <div className="space-y-2">
         <div className="p-3 bg-blue-50 border border-blue-200 rounded">
           <p className="font-semibold">add-block</p>
-          <p className="text-sm text-gray-600">Create new data blocks (table, form, grid)</p>
+          <p className="text-sm text-gray-600">
+            Create new data blocks (table, form, grid)
+          </p>
         </div>
         <div className="p-3 bg-blue-50 border border-blue-200 rounded">
           <p className="font-semibold">add-field</p>
-          <p className="text-sm text-gray-600">Add fields to collections (text, number, date)</p>
+          <p className="text-sm text-gray-600">
+            Add fields to collections (text, number, date)
+          </p>
         </div>
       </div>
     </Card>
@@ -270,8 +299,8 @@ const blockConfig = initializer.get('add-block');`}
     <Card>
       <h2 className="text-xl font-semibold mb-4">Router Compatibility</h2>
       <p className="text-gray-700 mb-3">
-        The app uses a custom router compatibility layer that bridges Next.js App Router with
-        react-router-dom API patterns.
+        The app uses a custom router compatibility layer that bridges Next.js
+        App Router with react-router-dom API patterns.
       </p>
       <pre className="bg-gray-100 p-2 rounded text-sm">
         {`import { useNavigate, useParams, Link } from '@/lib/router-compat';
@@ -288,7 +317,10 @@ const params = useParams();`}
 // Helper Components
 // ============================================================
 
-const StatusItem: React.FC<{ label: string; status: string }> = ({ label, status }) => (
+const StatusItem: React.FC<{ label: string; status: string }> = ({
+  label,
+  status,
+}) => (
   <div className="flex justify-between items-center p-2 border-b">
     <span className="text-gray-700">{label}</span>
     <span className="text-green-600 font-semibold">{status}</span>

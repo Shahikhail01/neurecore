@@ -46,6 +46,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { WorkspaceProvisioningModule } from './modules/workspace-provisioning/workspace-provisioning.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { NocoBaseModule } from './modules/nocobase/nocobase.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -131,6 +132,9 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
 
     // Phase 2.4 — Knowledge Spaces
     KnowledgeModule,
+
+    // Phase 13 — NocoBase Integration
+    NocoBaseModule,
   ],
   providers: [
     // Global rate-limit guard

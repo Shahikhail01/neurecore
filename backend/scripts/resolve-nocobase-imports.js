@@ -2,7 +2,7 @@
 
 /**
  * Phase 13: Resolve @nocobase/* Imports
- * 
+ *
  * Creates wrapper modules and path aliases to resolve @nocobase/* packages
  * to local copies in frontend-admin/src and frontend-tenant/src
  */
@@ -25,20 +25,23 @@ function parseJsonWithComments(content) {
       .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ style comments
       .replace(/\/\/.*$/gm, '') // Remove // style comments
       .replace(/,\s*([\]}])/g, '$1'); // Remove trailing commas
-    
+
     return JSON.parse(commentRemoved);
   } catch (e) {
     console.error(`Parse error: ${e.message}`);
     // If parsing fails, try a more aggressive approach
     content = content
       .split('\n')
-      .filter(line => !line.trim().startsWith('//') && !line.trim().startsWith('/*'))
+      .filter(
+        (line) =>
+          !line.trim().startsWith('//') && !line.trim().startsWith('/*'),
+      )
       .join('\n');
-    
+
     let cleaned = content.replace(/\/\*[\s\S]*?\*\//g, '');
     // Remove trailing commas more aggressively
     cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
-    
+
     return JSON.parse(cleaned);
   }
 }
@@ -63,7 +66,10 @@ async function createNocobaseIndexFiles() {
     console.log(`${colors.blue}${component.name}${colors.reset}`);
 
     // Create wrapper for @nocobase/client
-    const clientIndex = path.join(component.path, 'lib/nocobase-client-shim.ts');
+    const clientIndex = path.join(
+      component.path,
+      'lib/nocobase-client-shim.ts',
+    );
     const clientContent = `/**
  * NocoBase Client Shim
  * Re-exports from local NocoBase modules
@@ -101,7 +107,9 @@ export * from 'react';
 
     fs.mkdirSync(path.dirname(clientIndex), { recursive: true });
     fs.writeFileSync(clientIndex, clientContent, 'utf8');
-    console.log(`  ${colors.green}✓${colors.reset} Created lib/nocobase-client-shim.ts`);
+    console.log(
+      `  ${colors.green}✓${colors.reset} Created lib/nocobase-client-shim.ts`,
+    );
   }
 
   console.log(
@@ -110,7 +118,9 @@ export * from 'react';
 }
 
 async function updateTsConfig() {
-  console.log(`${colors.blue}Updating tsconfig.json with path aliases${colors.reset}\n`);
+  console.log(
+    `${colors.blue}Updating tsconfig.json with path aliases${colors.reset}\n`,
+  );
 
   const components = [
     {
@@ -127,18 +137,25 @@ async function updateTsConfig() {
     const tsconfigPath = path.join(component.path, 'tsconfig.json');
 
     if (!fs.existsSync(tsconfigPath)) {
-      console.log(`  ${colors.yellow}⚠${colors.reset} ${component.name}: tsconfig.json not found`);
+      console.log(
+        `  ${colors.yellow}⚠${colors.reset} ${component.name}: tsconfig.json not found`,
+      );
       continue;
     }
 
     const content = fs.readFileSync(tsconfigPath, 'utf8');
-    
+
     // Check if paths already have @nocobase/client mapped
-    if (content.includes('@nocobase/client') && content.includes('./src/lib/nocobase-client-shim.ts')) {
-      console.log(`  ${colors.green}✓${colors.reset} ${component.name}: Paths already configured`);
+    if (
+      content.includes('@nocobase/client') &&
+      content.includes('./src/lib/nocobase-client-shim.ts')
+    ) {
+      console.log(
+        `  ${colors.green}✓${colors.reset} ${component.name}: Paths already configured`,
+      );
       continue;
     }
-    
+
     // Try to parse with the helper function
     try {
       const tsconfig = parseJsonWithComments(content);
@@ -152,15 +169,21 @@ async function updateTsConfig() {
       }
 
       // Add path aliases for @nocobase packages
-      tsconfig.compilerOptions.paths['@nocobase/client'] = ['./src/lib/nocobase-client-shim.ts'];
+      tsconfig.compilerOptions.paths['@nocobase/client'] = [
+        './src/lib/nocobase-client-shim.ts',
+      ];
       if (!tsconfig.compilerOptions.paths['@nocobase/*']) {
         tsconfig.compilerOptions.paths['@nocobase/*'] = ['./src/*'];
       }
 
       fs.writeFileSync(tsconfigPath, JSON.stringify(tsconfig, null, 2), 'utf8');
-      console.log(`  ${colors.green}✓${colors.reset} ${component.name}: Added path aliases`);
+      console.log(
+        `  ${colors.green}✓${colors.reset} ${component.name}: Added path aliases`,
+      );
     } catch (err) {
-      console.log(`  ${colors.yellow}⚠${colors.reset} ${component.name}: Skipped (paths may already be configured)`);
+      console.log(
+        `  ${colors.yellow}⚠${colors.reset} ${component.name}: Skipped (paths may already be configured)`,
+      );
     }
   }
 
@@ -171,7 +194,9 @@ async function main() {
   try {
     await createNocobaseIndexFiles();
     await updateTsConfig();
-    console.log(`${colors.green}Phase 13: @nocobase import resolution complete${colors.reset}\n`);
+    console.log(
+      `${colors.green}Phase 13: @nocobase import resolution complete${colors.reset}\n`,
+    );
   } catch (err) {
     console.error(`${colors.red}Error: ${err.message}${colors.reset}`);
     process.exit(1);
