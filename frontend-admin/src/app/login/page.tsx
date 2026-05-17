@@ -33,14 +33,8 @@ export default function LoginPage() {
         <Col xs={24} sm={20} md={16} lg={12} xl={8}>
           <Space direction="vertical" style={{ width: "100%" }} size="large">
             <div style={{ textAlign: "center" }}>
-              <Typography.Title level={1} style={{ margin: 0 }}>
-                NeureCore
-              </Typography.Title>
-              <Typography.Title
-                level={4}
-                type="secondary"
-                style={{ margin: 0 }}
-              >
+              <img src="/logo.png" alt="NeureCore" style={{ height: 160, margin: '0 auto 16px' }} />
+              <Typography.Title level={3} style={{ margin: 0 }}>
                 Admin Dashboard
               </Typography.Title>
             </div>

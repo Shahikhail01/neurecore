@@ -6,7 +6,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useCurrentUser, useIsLoggedIn } from "@/user";
+import { useCurrentUser, useIsLoggedIn, useCurrentUserContext } from "@/user";
 import { useAPIClient } from "@/api-client";
 
 export interface LoginRequest {
@@ -40,6 +40,7 @@ export function useAuth() {
   const user = useCurrentUser();
   const isLoggedIn = useIsLoggedIn();
   const api = useAPIClient();
+  const currentUserCtx = useCurrentUserContext();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,11 +52,15 @@ export function useAuth() {
         const response = await api.post("/auth/login", credentials);
         const data = response.data?.data || response.data;
         if (data.accessToken) {
-          localStorage.setItem("accessToken", data.accessToken);
+          // Use "auth_token" to match what APIClientProvider reads on init
+          localStorage.setItem("auth_token", data.accessToken);
+          api.setToken(data.accessToken);
         }
         if (data.refreshToken) {
           localStorage.setItem("refreshToken", data.refreshToken);
         }
+        // Re-fetch current user so isAuthenticated updates immediately
+        await currentUserCtx.refresh?.();
         return data as AuthResponse;
       } catch (err: any) {
         const message =
@@ -99,9 +104,11 @@ export function useAuth() {
     setIsLoading(true);
     try {
       await api.post("/auth/logout", {});
-      localStorage.removeItem("accessToken");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("accessToken"); // legacy cleanup
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
+      api.setToken(null);
     } catch (err: any) {
       console.error("Logout error:", err);
     } finally {

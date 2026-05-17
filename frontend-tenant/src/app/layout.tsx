@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   description: 'Tenant workspace',
   manifest: '/manifest.json',
   themeColor: '#09090b',
+  icons: {
+    icon: '/logo.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

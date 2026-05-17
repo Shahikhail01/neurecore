@@ -57,10 +57,18 @@ export class APIClient {
             description: error.response?.data?.message || error.message,
           });
         }
+        const skipAuth = error.config?.skipAuth;
         if (error.response?.status === 401) {
-          // Handle unauthorized - clear token and redirect
           this.setToken(null);
-          window.location.href = "/auth/login";
+          if (skipAuth) {
+            // Caller handles unauthenticated state — suppress the error silently
+            return Promise.resolve({ data: null });
+          }
+          // Redirect to login only if not already there
+          if (!window.location.pathname.startsWith('/login')) {
+            window.location.href = "/login";
+          }
+          return Promise.reject(error);
         }
         throw error;
       },

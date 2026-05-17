@@ -71,7 +71,8 @@
 |---|---|
 | **Email** | `noreply@neurecore.ai` |
 | **Password** | `Admin@2026!` |
-| **Login URL** | `http://localhost:3001/login` |
+| **Tenant Portal Login URL** | `http://localhost:3001/login` |
+| **Admin Frontend Login URL** | `http://localhost:3002/login` |
 | **Notes** | Bypasses tenant isolation. Use only for platform administration. |
 
 ---

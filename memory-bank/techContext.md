@@ -1,8 +1,26 @@
 # Tech Context — NeureCore Gold Stack
 
-## Last Updated: March 31, 2026
+## Last Updated: May 18, 2026
 
 ## Technology Stack
+
+### Frontend-Admin (port 3002)
+
+- **Framework**: Next.js 15.5.12 (App Router, Webpack)
+- **React**: 18.3.1 (downgraded from 19.x for antd v5 compatibility)
+- **UI**: Ant Design v5.24.2 + `@ant-design/pro-layout` v7
+- **HTTP client**: Custom `APIClient` (axios-based) at `src/api-client/APIClient.ts`
+- **Auth token storage key**: `localStorage["auth_token"]` (APIClientProvider reads this on init)
+- **Auth flow**: Login → `api.setToken()` + `localStorage["auth_token"]` + `currentUserCtx.refresh()` → `/auth/me` re-fetched → `isAuthenticated` true → navigate to `/dashboard`
+- **Protected routes**: `ProtectedRoute` uses `useCurrentUserContext().loading` (real request state) to gate redirect
+- **Super admin**: `noreply@neurecore.ai` / `Admin@2026!` — login at `http://localhost:3002/login`
+- **Dev start**: `bash -c 'cd /path/to/frontend-admin && node_modules/.bin/next dev -p 3002' &`
+  (Cannot use `pnpm run dev` from workspace root — not registered in pnpm-workspace.yaml)
+
+### Frontend-Tenant (port 3001)
+
+- **Framework**: Next.js 15.5.12 (App Router)
+- **UI**: Tailwind CSS, Zustand, Socket.IO
 
 ### Backend Runtime & Framework
 

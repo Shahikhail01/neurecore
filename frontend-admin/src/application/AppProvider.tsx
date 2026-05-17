@@ -3,6 +3,8 @@
  * Sets up all providers in correct order
  */
 
+'use client';
+
 import React from "react";
 import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";

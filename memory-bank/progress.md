@@ -1,8 +1,27 @@
 # Progress Tracking — NeureCore Gold Phase 1 + Phase 2 LangChain
 
-**Last Updated**: April 5, 2026 (update 26 — Implementation Plan Phases 2–4 COMPLETE: Evaluation, Workflow Canvas, Multi-Agent Orchestration, Knowledge Spaces, Maturity, CSV/PDF Exports, Routines, Agent Packs, SCIM/SSO, NL→Report)
-**Current Phase**: Phase 4 (Enterprise Sales Unlock) — ALL PHASES COMPLETE
-**Overall Status**: 🟢 355 files compiled, 0 TypeScript errors ✅
+**Last Updated**: May 18, 2026 (update 29 — Frontend-Admin fixes: branding, auth loop, React 18, missing module)
+**Current Phase**: Frontend-Admin stabilisation complete
+**Overall Status**: 🟢 Admin frontend healthy at `http://localhost:3002`
+
+---
+
+## ✅ Update 29 — May 18, 2026 — Frontend-Admin Fixes
+
+| # | Fix | Status |
+|---|---|---|
+| 1 | NeureCore logo added to admin login + landing pages | ✅ |
+| 2 | React 19 → 18.3.1 downgrade (antd v5 compatibility) | ✅ |
+| 3 | 404: `/auth:check` → `/auth/me` in `CurrentUserProvider` | ✅ |
+| 4 | 404: `systemSettings:get` NocoBase call removed | ✅ |
+| 5 | 401 loop: `skipAuth` flag suppresses redirect+throw silently | ✅ |
+| 6 | 401 redirect URL: `/auth/login` → `/login` | ✅ |
+| 7 | Login flash: token key unified to `"auth_token"` | ✅ |
+| 8 | Login flash: `api.setToken()` called after login | ✅ |
+| 9 | Login flash: `currentUserCtx.refresh()` called after login | ✅ |
+| 10 | `ProtectedRoute` loading: uses real request `loading` state | ✅ |
+| 11 | Missing module: `@/components/Layout/AdminLayout` shim added | ✅ |
+| 12 | Super admin credentials confirmed and saved | ✅ |
 
 ---
 

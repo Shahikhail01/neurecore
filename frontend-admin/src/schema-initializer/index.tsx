@@ -8,6 +8,8 @@
  * Adapted for NeureCore v1.0
  */
 
+'use client';
+
 import React, { useMemo, useCallback } from 'react';
 
 // ============================================================

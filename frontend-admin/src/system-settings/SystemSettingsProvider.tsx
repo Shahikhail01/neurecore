@@ -19,8 +19,6 @@ export const useSystemSettings = () => {
 };
 
 export const SystemSettingsProvider: React.FC<{ children?: ReactNode }> = (props) => {
-  const result = useRequest({
-    url: 'systemSettings:get',
-  });
+  const result = useRequest(() => Promise.resolve({ data: {} }));
   return <SystemSettingsContext.Provider value={{ ...result }}>{props.children}</SystemSettingsContext.Provider>;
 };

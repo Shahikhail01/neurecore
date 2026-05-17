@@ -34,29 +34,32 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
-        <h1 className="mb-6 text-2xl font-bold">Sign In</h1>
+        <div className="flex justify-center mb-6">
+          <img src="/logo.png" alt="NeureCore Logo" className="h-24 w-auto" />
+        </div>
+        <h1 className="mb-6 text-2xl font-bold text-center text-gray-900">Sign In</h1>
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>
         )}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium">
+          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             Email
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-lg border border-gray-300 px-3 py-2 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm font-medium">
+          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             Password
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-lg border border-gray-300 px-3 py-2 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             />
           </label>
           <button

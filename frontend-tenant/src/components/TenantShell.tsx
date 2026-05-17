@@ -64,9 +64,7 @@ export default function TenantShell({
       <aside className="w-56 shrink-0 border-r border-surface-border flex flex-col bg-surface-raised">
         {/* Brand */}
         <div className="px-5 py-4 border-b border-surface-border">
-          <span className="text-sm font-bold tracking-widest text-violet-400 uppercase">
-            NeureCore
-          </span>
+          <img src="/logo.png" alt="NeureCore" className="h-10 w-auto mb-2" />
           <div className="text-xs text-zinc-500 mt-0.5">Agent Portal</div>
         </div>
 

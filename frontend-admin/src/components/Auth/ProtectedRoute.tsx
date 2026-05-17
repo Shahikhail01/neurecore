@@ -8,6 +8,7 @@
 
 import React, { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUserContext } from "@/user";
 import { useRouter } from "next/navigation";
 import { Spin } from "antd";
 
@@ -24,10 +25,10 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
-  const [isLoading, setIsLoading] = React.useState(true);
+  const { loading } = useCurrentUserContext();
 
   useEffect(() => {
-    setIsLoading(false);
+    if (loading) return;
 
     if (!isAuthenticated) {
       router.push("/login");
@@ -38,9 +39,10 @@ export function ProtectedRoute({
       router.push("/unauthorized");
       return;
     }
-  }, [isAuthenticated, user, requiredRoles, router]);
+  }, [isAuthenticated, loading, user, requiredRoles, router]);
 
-  if (isLoading) {
+  // While the /auth/me request is in-flight, show spinner (not redirect)
+  if (loading) {
     return (
       <div
         style={{

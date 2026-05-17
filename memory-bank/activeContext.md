@@ -2,11 +2,67 @@
 
 ## Last Updated
 
-2026-05-17 (update 28 — PoolSlotGuard dependency crisis RESOLVED, Tier Agent Pool system in progress, SWC path stripping fixed, tier pool endpoints routing correctly)
+2026-05-18 (update 29 — frontend-admin branding, auth loop fixes, React 18 downgrade)
 
 ---
 
-## Update 27 — Tier Agent Pool System Implementation (May 17, 2026)
+## Update 29 — Frontend-Admin Fixes (May 18, 2026)
+
+### NeureCore Logo Added
+- Logo file: `neurecore_logo.png` copied to `frontend-admin/public/logo.png`, `favicon.png`, `favicon.ico`
+- Added to: admin login page (160px), admin landing page (200px)
+- Both frontends updated (tenant + admin)
+
+### React Downgrade (antd compatibility)
+- **Problem**: antd v5 warns on React 19 (`antd v5 support React is 16 ~ 18`)
+- **Fix**: Downgraded `react` + `react-dom` from 19.2.4 → 18.3.1 in `frontend-admin`
+- **Action**: Cleared `.next` cache and restarted dev server for clean build
+
+### API Client 404 Fixes
+- `CurrentUserProvider`: Changed `/auth:check` → `/auth/me` (NestJS backend has `/api/v1/auth/me`)
+- `SystemSettingsProvider`: Removed `systemSettings:get` NocoBase call (no backend route); replaced with `Promise.resolve({ data: {} })`
+
+### 401 Redirect Loop Fix
+- `APIClient` interceptor: `/auth/login` redirect → `/login`; added `skipAuth` flag check; suppressed redirect when already on `/login`
+- `CurrentUserProvider`: Set `skipAuth: true` so unauthenticated `/auth/me` 401 resolves silently with null (no console error, no redirect)
+- Interceptor: when `skipAuth: true` and 401 → `return Promise.resolve({ data: null })` instead of throwing
+
+### Login Flash / Redirect Back to Login — Fixed
+**Root causes**:
+1. Token key mismatch: `login()` saved to `localStorage["accessToken"]` but `APIClientProvider` reads `localStorage["auth_token"]`
+2. API client not updated: `login()` never called `api.setToken()` — no Bearer header on subsequent requests
+3. `ProtectedRoute` flawed loading: set `isLoading=false` immediately in `useEffect`, redirected before `/auth/me` returned
+
+**Fixes**:
+- `useAuth.login()`: now stores to `"auth_token"`, calls `api.setToken(token)`, then `currentUserCtx.refresh()` before navigating
+- `useAuth.logout()`: clears both `"auth_token"` and `"accessToken"` (legacy), calls `api.setToken(null)`
+- `ProtectedRoute`: replaced local `isLoading` state with `loading` from `useCurrentUserContext()` — shows spinner while `/auth/me` is in-flight instead of immediately redirecting
+
+### Missing Module Fix
+- `@/components/Layout/AdminLayout` was missing; actual file at `components/layout(1)/AdminLayout.tsx`
+- Added shim: `src/components/Layout/AdminLayout.tsx` re-exports from `../layout(1)/AdminLayout`
+
+### Super Admin Credentials Confirmed
+- Email: `noreply@neurecore.ai` / Password: `Admin@2026!`
+- Login at `http://localhost:3002/login`
+- Backend confirmed returning JWT with `role: SUPER_ADMIN`
+- Credentials file updated: `memory-bank/credentials.md`
+
+### Files Changed (frontend-admin)
+| File | Change |
+|---|---|
+| `src/user/CurrentUserProvider.tsx` | URL `/auth:check` → `/auth/me`; `skipAuth: true` |
+| `src/system-settings/SystemSettingsProvider.tsx` | Removed 404-causing NocoBase URL; returns empty settings |
+| `src/api-client/APIClient.ts` | Fixed 401 redirect to `/login`; `skipAuth` suppresses redirect+throw |
+| `src/hooks/useAuth.ts` | Unified token key; `api.setToken()`; `currentUserCtx.refresh()`; logout cleanup |
+| `src/components/Auth/ProtectedRoute.tsx` | Uses `useCurrentUserContext().loading` instead of local state |
+| `src/components/Layout/AdminLayout.tsx` | New shim re-exporting from `layout(1)/AdminLayout` |
+| `public/logo.png`, `favicon.png`, `favicon.ico` | NeureCore logo |
+| `package.json` | `react` + `react-dom`: 19.x → 18.3.1 |
+
+---
+
+## Update 28 — Tier Agent Pool System (May 17, 2026)
 
 ### Current System State
 

@@ -88,8 +88,8 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
         >
           Remember me
         </Checkbox>
-        <Link href="/forgot-password">
-          <Typography.Link>Forgot password?</Typography.Link>
+        <Link href="/forgot-password" className="ant-btn-link" style={{ padding: 0 }}>
+          <span style={{ color: '#1677ff' }}>Forgot password?</span>
         </Link>
       </Space>
 
@@ -106,9 +106,9 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
       </Form.Item>
 
       <Typography.Paragraph style={{ textAlign: "center", marginBottom: 0 }}>
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <Link href="/register">
-          <Typography.Link>Register here</Typography.Link>
+          <span style={{ color: '#1677ff' }}>Register here</span>
         </Link>
       </Typography.Paragraph>
     </Form>

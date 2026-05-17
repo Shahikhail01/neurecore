@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "NeureCore Dashboard",
   description: "AI Agent Management Platform",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({

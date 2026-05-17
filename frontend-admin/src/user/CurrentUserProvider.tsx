@@ -35,9 +35,9 @@ export const CurrentUserProvider: React.FC<CurrentUserProviderProps> = ({
 }) => {
   const result = useRequest(
     {
-      url: "/auth:check",
+      url: "/auth/me",
       skipNotify: true,
-      skipAuth: false,
+      skipAuth: true,
     },
     {
       manual: false,
