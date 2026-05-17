@@ -12,6 +12,7 @@ import {
   HttpStatus,
   ForbiddenException,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { AgentVersionService } from './services/agent-version.service';
 import {
@@ -31,6 +32,8 @@ import type { JwtPayload } from '../auth/interfaces/token.interface';
 import { AgentStatus, AgentType } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { RolesGuard } from '../security/guards/roles.guard';
+import { TierEnforcementService } from '../tiers/services/tier-enforcement.service';
 
 class UpdatePermissionsDto {
   @IsArray()
@@ -221,7 +224,8 @@ export class AgentsController {
   // ─── Delete ──────────────────────────────────────────────
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN)
+  @UseGuards(RolesGuard)  // PoolSlotGuard temporarily disabled — requires TiersModule in AgentsModule
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OWNER)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @Param('id', ParseUUIDPipe) id: string,

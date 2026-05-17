@@ -28,11 +28,7 @@ export function unwrapItem(res: any): any | null {
   const { items } = unwrapList(res);
   if (items.length > 0) return items[0];
   const data = res?.data ?? res;
-  // Handle nested data object (e.g., { status, data: { user, tokens } })
   if (data?.data && !Array.isArray(data.data)) return data.data;
-  // Handle flat data object (e.g., { user, tokens } at top level of response)
-  if (typeof data === "object" && data !== null && !Array.isArray(data))
-    return data;
   return null;
 }
 

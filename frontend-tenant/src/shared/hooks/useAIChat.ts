@@ -1,29 +1,26 @@
-"use client";
+'use client';
 // ─── useAIChat.ts ─────────────────────────────────────────────────────────────
 // SRP: Bridges ConversationalAIService ↔ React component state.
 // DIP: Depends on IConversationalAIService abstraction.
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { conversationalAIService } from "@/core/services/ConversationalAIService";
-import type {
-  ChatMessage,
-  ConversationContext,
-} from "@/core/services/interfaces/IConversationalAIService";
-import { useAgentStore } from "@/stores/agentStore";
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { conversationalAIService }                   from '@/core/services/ConversationalAIService';
+import type { ChatMessage, ConversationContext }      from '@/core/services/interfaces/IConversationalAIService';
+import { useAgentStore }                             from '@/stores/agentStore';
 
 interface UseAIChatReturn {
-  messages: ChatMessage[];
-  isTyping: boolean;
-  error: string | null;
-  isAvailable: boolean;
+  messages:     ChatMessage[];
+  isTyping:     boolean;
+  error:        string | null;
+  isAvailable:  boolean;
   /** Send a message */
-  send: (text: string) => Promise<void>;
+  send:         (text: string) => Promise<void>;
   /** Apply a suggestion */
   applySuggestion: (text: string) => Promise<void>;
   /** Reset conversation */
-  clear: () => void;
+  clear:        () => void;
   /** Auto-scroll ref — attach to message container */
-  bottomRef: React.RefObject<HTMLDivElement | null>;
+  bottomRef:    React.RefObject<HTMLDivElement | null>;
 }
 
 export function useAIChat(pageContext?: string): UseAIChatReturn {
@@ -31,9 +28,9 @@ export function useAIChat(pageContext?: string): UseAIChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>(() =>
     conversationalAIService.getHistory(),
   );
-  const [isTyping, setTyping] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [isTyping, setTyping]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const bottomRef               = useRef<HTMLDivElement>(null);
 
   // Keep local messages in sync with service history
   const syncMessages = useCallback(() => {
@@ -42,37 +39,30 @@ export function useAIChat(pageContext?: string): UseAIChatReturn {
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const buildContext = useCallback(
-    (): ConversationContext => ({
-      currentPage: pageContext,
-      systemContext:
-        agents.length > 0
-          ? `Active agents: ${agents.filter((a) => a.status === "ACTIVE").length}/${agents.length}.`
-          : undefined,
-    }),
-    [agents, pageContext],
-  );
+  const buildContext = useCallback((): ConversationContext => ({
+    currentPage:   pageContext,
+    systemContext: agents.length > 0
+      ? `Active agents: ${agents.filter((a) => a.status === 'ACTIVE').length}/${agents.length}.`
+      : undefined,
+  }), [agents, pageContext]);
 
-  const send = useCallback(
-    async (text: string) => {
-      if (!text.trim()) return;
-      setError(null);
-      syncMessages(); // show user message immediately
-      setTyping(true);
-      try {
-        await conversationalAIService.sendMessage(text, buildContext());
-        syncMessages();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to send message");
-      } finally {
-        setTyping(false);
-      }
-    },
-    [buildContext, syncMessages],
-  );
+  const send = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+    setError(null);
+    syncMessages(); // show user message immediately
+    setTyping(true);
+    try {
+      await conversationalAIService.sendMessage(text, buildContext());
+      syncMessages();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to send message');
+    } finally {
+      setTyping(false);
+    }
+  }, [buildContext, syncMessages]);
 
   const applySuggestion = useCallback((text: string) => send(text), [send]);
 

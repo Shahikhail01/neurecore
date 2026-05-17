@@ -89,11 +89,11 @@ function ScoreRing({ score }: { score: number }) {
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
 interface DailyBriefingModalProps {
-  isOpen:    boolean;
-  onClose:   () => void;
+  isOpen?:   boolean;
+  onClose?:  () => void;
 }
 
-export function DailyBriefingModal({ isOpen, onClose }: DailyBriefingModalProps) {
+export function DailyBriefingModal({ isOpen = false, onClose = () => {} }: DailyBriefingModalProps) {
   const {
     briefing, isLoading, isNarrating, error,
     isSupported, open, refresh, toggleNarration,
@@ -234,13 +234,13 @@ export function DailyBriefingModal({ isOpen, onClose }: DailyBriefingModalProps)
 
 // ─── Trigger button ───────────────────────────────────────────────────────────
 interface DailyBriefingButtonProps {
-  onClick: () => void;
+  onClick?: () => void;
 }
 
 export function DailyBriefingButton({ onClick }: DailyBriefingButtonProps) {
   return (
     <button
-      onClick={onClick}
+      onClick={onClick ?? (() => {})}
       title="Open Daily Briefing"
       className="flex items-center gap-2 rounded-lg bg-indigo-900/40 px-3 py-1.5 text-xs font-medium text-indigo-300 ring-1 ring-indigo-700/50 hover:bg-indigo-900/70 transition-colors"
     >

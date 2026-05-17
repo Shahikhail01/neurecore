@@ -19,6 +19,7 @@ import { AgentVersionService } from './services/agent-version.service';
 import { PrismaAgentVersionRepository } from './repositories/prisma-agent-version.repository';
 import { EvaluationService } from './services/evaluation.service';
 import { PrismaEvaluationRepository } from './repositories/prisma-evaluation.repository';
+import { TiersModule } from '../tiers/tiers.module';
 
 /**
  * AgentsModule
@@ -33,6 +34,7 @@ import { PrismaEvaluationRepository } from './repositories/prisma-evaluation.rep
     GovernanceModule,
     ModelsModule,
     SecurityModule,
+    TiersModule,
   ],
   controllers: [
     AgentsController,

@@ -14,24 +14,24 @@ import type {
   ReportFormat,
   ReportGroupBy,
   ReportSortField,
-} from "@/core/services/reporting/interfaces/IReportBuilder";
-import type { QueryParams } from "@/core/repositories/interfaces/IRepository";
-import { agentRepository } from "@/core/repositories/AgentRepository";
-import { taskRepository } from "@/core/repositories/TaskRepository";
-import { workflowRepository } from "@/core/repositories/WorkflowRepository";
-import { departmentRepository } from "@/core/repositories/DepartmentRepository";
-import { csvExporter } from "@/core/services/reporting/exporters/CsvExporter";
-import { jsonExporter } from "@/core/services/reporting/exporters/JsonExporter";
+} from './interfaces/IReportBuilder';
+import type { QueryParams } from '@/core/repositories/interfaces/IRepository';
+import { agentRepository } from '@/core/repositories/AgentRepository';
+import { taskRepository } from '@/core/repositories/TaskRepository';
+import { workflowRepository } from '@/core/repositories/WorkflowRepository';
+import { departmentRepository } from '@/core/repositories/DepartmentRepository';
+import { csvExporter } from '@/core/services/reporting/exporters/CsvExporter';
+import { jsonExporter } from '@/core/services/reporting/exporters/JsonExporter';
 
 const EXPORTERS: Record<ReportFormat, IReportExporter> = {
-  csv: csvExporter,
+  csv:  csvExporter,
   json: jsonExporter,
-  pdf: jsonExporter, // PDF falls back to JSON until a pdf lib is added
+  pdf:  jsonExporter, // PDF falls back to JSON until a pdf lib is added
 };
 
 export class ReportBuilder implements IReportBuilder {
-  private _entity: ReportEntityType = "tasks";
-  private _title = "Report";
+  private _entity: ReportEntityType = 'tasks';
+  private _title = 'Report';
   private _fields: ReportField[] = [];
   private _filters: ReportFilter[] = [];
   private _sort: ReportSortField[] = [];
@@ -59,7 +59,7 @@ export class ReportBuilder implements IReportBuilder {
     return this;
   }
 
-  sortBy(field: string, order: "asc" | "desc" = "asc"): this {
+  sortBy(field: string, order: 'asc' | 'desc' = 'asc'): this {
     this._sort.push({ field, order });
     return this;
   }
@@ -112,78 +112,46 @@ export class ReportBuilder implements IReportBuilder {
   private async _fetchData(): Promise<Record<string, unknown>[]> {
     const query: QueryParams = { limit: 500 };
     if (this._from) query.from = this._from.toISOString();
-    if (this._to) query.to = this._to.toISOString();
+    if (this._to)   query.to   = this._to.toISOString();
 
-    const loaders: Record<
-      ReportEntityType,
-      () => Promise<Record<string, unknown>[]>
-    > = {
-      agents: async () => {
-        const { items } = await agentRepository.findAll(query);
-        return items as unknown as Record<string, unknown>[];
-      },
-      tasks: async () => {
-        const { items } = await taskRepository.findAll(query);
-        return items as unknown as Record<string, unknown>[];
-      },
-      workflows: async () => {
-        const { items } = await workflowRepository.findAll(query);
-        return items as unknown as Record<string, unknown>[];
-      },
-      departments: async () => {
-        const { items } = await departmentRepository.findAll(query);
-        return items as unknown as Record<string, unknown>[];
-      },
-      analytics: async () => [], // analytics data fetched directly from AnalyticsService
+    const loaders: Record<ReportEntityType, () => Promise<Record<string, unknown>[]>> = {
+      agents:      async () => { const { items } = await agentRepository.findAll(query); return items as unknown as Record<string, unknown>[]; },
+      tasks:       async () => { const { items } = await taskRepository.findAll(query); return items as unknown as Record<string, unknown>[]; },
+      workflows:   async () => { const { items } = await workflowRepository.findAll(query); return items as unknown as Record<string, unknown>[]; },
+      departments: async () => { const { items } = await departmentRepository.findAll(query); return items as unknown as Record<string, unknown>[]; },
+      analytics:   async () => [], // analytics data fetched directly from AnalyticsService
     };
 
     return loaders[this._entity]?.() ?? [];
   }
 
-  private _applyFilters(
-    data: Record<string, unknown>[],
-  ): Record<string, unknown>[] {
+  private _applyFilters(data: Record<string, unknown>[]): Record<string, unknown>[] {
     return data.filter((row) =>
       this._filters.every((f) => {
         const val = row[f.field];
         switch (f.operator) {
-          case "eq":
-            return val === f.value;
-          case "neq":
-            return val !== f.value;
-          case "gt":
-            return (val as number) > (f.value as number);
-          case "gte":
-            return (val as number) >= (f.value as number);
-          case "lt":
-            return (val as number) < (f.value as number);
-          case "lte":
-            return (val as number) <= (f.value as number);
-          case "contains":
-            return String(val)
-              .toLowerCase()
-              .includes(String(f.value).toLowerCase());
-          case "in":
-            return (
-              Array.isArray(f.value) && (f.value as unknown[]).includes(val)
-            );
-          default:
-            return true;
+          case 'eq':       return val === f.value;
+          case 'neq':      return val !== f.value;
+          case 'gt':       return (val as number) > (f.value as number);
+          case 'gte':      return (val as number) >= (f.value as number);
+          case 'lt':       return (val as number) < (f.value as number);
+          case 'lte':      return (val as number) <= (f.value as number);
+          case 'contains': return String(val).toLowerCase().includes(String(f.value).toLowerCase());
+          case 'in':       return Array.isArray(f.value) && (f.value as unknown[]).includes(val);
+          default:         return true;
         }
       }),
     );
   }
 
-  private _applySort(
-    data: Record<string, unknown>[],
-  ): Record<string, unknown>[] {
+  private _applySort(data: Record<string, unknown>[]): Record<string, unknown>[] {
     if (!this._sort.length) return data;
     return [...data].sort((a, b) => {
       for (const sortCfg of this._sort) {
-        const aVal = String(a[sortCfg.field] ?? "");
-        const bVal = String(b[sortCfg.field] ?? "");
+        const aVal = String(a[sortCfg.field] ?? '');
+        const bVal = String(b[sortCfg.field] ?? '');
         const cmp = aVal.localeCompare(bVal);
-        if (cmp !== 0) return sortCfg.order === "asc" ? cmp : -cmp;
+        if (cmp !== 0) return sortCfg.order === 'asc' ? cmp : -cmp;
       }
       return 0;
     });
@@ -202,50 +170,42 @@ export function createReportBuilder(): ReportBuilder {
 export const REPORT_TEMPLATES = {
   agentPerformance: () =>
     createReportBuilder()
-      .forEntity("agents")
-      .setTitle("Agent Performance Report")
+      .forEntity('agents')
+      .setTitle('Agent Performance Report')
       .selectFields(
-        { key: "name", label: "Agent Name" },
-        { key: "status", label: "Status" },
-        {
-          key: "performance.successRate",
-          label: "Success Rate (%)",
-          formatter: (v) => `${v}%`,
-        },
-        { key: "performance.tasksCompleted", label: "Tasks Completed" },
-        { key: "performance.avgTaskDuration", label: "Avg Duration (s)" },
-        { key: "departmentName", label: "Department" },
+        { key: 'name',                          label: 'Agent Name' },
+        { key: 'status',                        label: 'Status' },
+        { key: 'performance.successRate',       label: 'Success Rate (%)', formatter: (v) => `${v}%` },
+        { key: 'performance.tasksCompleted',    label: 'Tasks Completed' },
+        { key: 'performance.avgTaskDuration',   label: 'Avg Duration (s)' },
+        { key: 'departmentName',                label: 'Department' },
       )
-      .sortBy("performance.successRate", "desc"),
+      .sortBy('performance.successRate', 'desc'),
 
   taskSummary: () =>
     createReportBuilder()
-      .forEntity("tasks")
-      .setTitle("Task Summary Report")
+      .forEntity('tasks')
+      .setTitle('Task Summary Report')
       .selectFields(
-        { key: "title", label: "Title" },
-        { key: "status", label: "Status" },
-        { key: "priority", label: "Priority" },
-        { key: "agentName", label: "Assigned Agent" },
-        { key: "dueAt", label: "Due Date" },
-        { key: "createdAt", label: "Created" },
+        { key: 'title',    label: 'Title' },
+        { key: 'status',   label: 'Status' },
+        { key: 'priority', label: 'Priority' },
+        { key: 'agentName',label: 'Assigned Agent' },
+        { key: 'dueAt',    label: 'Due Date' },
+        { key: 'createdAt',label: 'Created' },
       )
-      .sortBy("createdAt", "desc"),
+      .sortBy('createdAt', 'desc'),
 
   workflowActivity: () =>
     createReportBuilder()
-      .forEntity("workflows")
-      .setTitle("Workflow Activity Report")
+      .forEntity('workflows')
+      .setTitle('Workflow Activity Report')
       .selectFields(
-        { key: "name", label: "Workflow Name" },
-        { key: "status", label: "Status" },
-        { key: "executionCount", label: "Executions" },
-        {
-          key: "successRate",
-          label: "Success Rate (%)",
-          formatter: (v) => `${v}%`,
-        },
-        { key: "lastExecutedAt", label: "Last Executed" },
+        { key: 'name',            label: 'Workflow Name' },
+        { key: 'status',          label: 'Status' },
+        { key: 'executionCount',  label: 'Executions' },
+        { key: 'successRate',     label: 'Success Rate (%)', formatter: (v) => `${v}%` },
+        { key: 'lastExecutedAt',  label: 'Last Executed' },
       )
-      .sortBy("executionCount", "desc"),
+      .sortBy('executionCount', 'desc'),
 } as const;

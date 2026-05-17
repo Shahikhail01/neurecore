@@ -1,6 +1,7 @@
 'use client';
-// ─── useChat Hook (Admin Portal) ──────────────────────────────────────────────
-// Mirror of tenant useChat — no shared code (D principle)
+// ─── useChat Hook ─────────────────────────────────────────────────────────────
+// S — Single Responsibility: message send/receive pipeline only
+// D — Dependency Inversion: depends on chatService abstraction, not api directly
 import { useCallback, useState } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import chatService from '@/services/chat.service';
@@ -18,6 +19,7 @@ export function useChat() {
     async (query: string, context?: ChatRequest['context']) => {
       if (!query.trim() || sending) return;
 
+      // Optimistically add user message
       const userMsg: ConversationMessage = {
         id: makeId(),
         role: 'user',
@@ -26,14 +28,16 @@ export function useChat() {
       };
       addMessage(userMsg);
 
+      // Placeholder assistant message (streaming state)
       const assistantId = makeId();
-      addMessage({
+      const placeholder: ConversationMessage = {
         id: assistantId,
         role: 'assistant',
         content: '',
         streaming: true,
         timestamp: new Date().toISOString(),
-      });
+      };
+      addMessage(placeholder);
       setSending(true);
 
       try {
@@ -43,8 +47,13 @@ export function useChat() {
           conversationId: conversationId ?? undefined,
         });
 
-        if (response.id && !conversationId) setConversationId(response.id);
+        if (response.id && !conversationId) {
+          setConversationId(response.id);
+        }
 
+        updateStreamingMessage(assistantId, response.message, true);
+
+        // Patch in data/suggestion/type on the final message
         const finalMsg: ConversationMessage = {
           id: assistantId,
           role: 'assistant',
@@ -56,11 +65,18 @@ export function useChat() {
           timestamp: response.timestamp,
           streaming: false,
         };
+        // Replace placeholder with full message
+        useChatStore.getState().updateStreamingMessage(assistantId, response.message, true);
+        // Manually set the full object (updateStreamingMessage only patches content+streaming)
         useChatStore.setState((s) => ({
           messages: s.messages.map((m) => (m.id === assistantId ? finalMsg : m)),
         }));
       } catch {
-        updateStreamingMessage(assistantId, '_Error. Try again._', true);
+        updateStreamingMessage(
+          assistantId,
+          '_Sorry, something went wrong. Please try again._',
+          true,
+        );
       } finally {
         setSending(false);
       }
