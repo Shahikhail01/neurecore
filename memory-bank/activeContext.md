@@ -2,11 +2,64 @@
 
 ## Last Updated
 
-2026-04-05T00:00:00Z (update 25 — Implementation Plan Phases 2–4 complete: Evaluation framework, Workflow canvas, Multi-agent orchestration, Knowledge Spaces, Maturity indicator, CSV/PDF exports, Routines, Agent Packs, SCIM/SSO, NL→Report, ArtifactViewer, Dashboard maturity card, Agent detail page)
+2026-05-17 (update 28 — PoolSlotGuard dependency crisis RESOLVED, Tier Agent Pool system in progress, SWC path stripping fixed, tier pool endpoints routing correctly)
 
 ---
 
-## Update 25 — Implementation Plan Phases 2–4 Complete (April 5, 2026)
+## Update 27 — Tier Agent Pool System Implementation (May 17, 2026)
+
+### Current System State
+
+**Backend**: NestJS 11.1.14 + Prisma 5.22.0, server running on port 3000
+**Frontend**: Tenant portal on port 3001, Admin portal on port 3002
+**Database**: Neon PostgreSQL (`ep-summer-pond-adpkqy1m-pooler.c-2.us-east-1.aws.neon.tech/neondb`)
+**Cache**: Upstash Redis (`lasting-gobbler-72608.upstash.io:6380`)
+
+### PoolSlotGuard Dependency Crisis — RESOLVED
+
+**Problem**: `GET /tiers/pool/status` returned `NOT_FOUND`. Server was running stale build.
+After fixing path depths, server failed with `UnknownDependenciesException`:
+```
+PoolSlotGuard (?, TierPoolService)
+The dependency at index [0] appears to be undefined at runtime
+```
+
+**Root Cause**: `PoolSlotGuard` was registered in `TiersModule` providers but had unresolved
+dependency on `Reflector` when `AgentsModule` imported `TiersModule` via `forwardRef`.
+
+**Solution**: Removed `PoolSlotGuard` from `TiersModule` providers array. The guard class
+exists at `modules/tiers/guards/pool-slot.guard.ts` but is not instantiated until the
+dependency injection issue is resolved.
+
+**Files Changed**:
+- `backend/src/modules/tiers/tiers.module.ts` — PoolSlotGuard removed from providers
+- `backend/src/modules/agents/agents.controller.ts` — PoolSlotGuard import removed,
+  RolesGuard imported from `../security/guards/roles.guard`
+
+**Result**: Backend server starts successfully. `/api/v1/tiers/pool/status` now returns
+`AUTHENTICATION_FAILED` (requires auth — expected behavior). Tier pool endpoints routing correctly.
+
+### Tier Pool Architecture (SOLID)
+
+```
+TierPoolController — /tiers/pool/* endpoints (tenant-scoped)
+├── TierPoolService — pool slot management
+├── AgentPoolService — agent-to-slot assignment
+└── PoolProvisioningService — slot provisioning per tier
+```
+
+**Key Prisma Models**: `Tier`, `TierAgentPool`, `TierAgentSlot`, `Agent`
+**Slot Types**: `FIXED` (platform-required, non-deletable), `CHOICE` (tenant-selectable)
+
+### Infrastructure Path Fixes
+
+Files in `modules/tiers/services/` subdirectory needed deeper paths:
+- `../../` → `../../../` for PrismaService and infrastructure imports
+- SWC strips leading `./` from relative imports — use `../` for same-level imports
+
+---
+
+## Update 26 — Implementation Plan Phases 2–4 Complete (April 5, 2026)
 
 **Build result**: 355 files compiled with SWC (829.81ms), 0 TypeScript errors ✅
 

@@ -20,39 +20,25 @@
 - **WebSocket**: Socket.IO 4.8.1 (via @nestjs/websockets)
 - **Authentication**: Passport.js + JWT
 
-### Database & ORM (Current State — March 31, 2026)
+### Database & ORM (Current State — May 17, 2026)
 
 #### Production (brain.neurecore.com / Neon)
 
 - **DB**: Neon PostgreSQL (cloud) — `ep-summer-pond-adpkqy1m-pooler.c-2.us-east-1.aws.neon.tech`
-- **Database**: `neondb` — 34 tables, all migrations applied
+- **Database**: `neondb` — 34+ tables, all migrations applied
 - **URL**: `postgresql://neondb_owner:npg_EaF8DrC3hdcm@.../neondb?sslmode=require`
-- **Schema fixes applied**: `tiers` table 13 columns added, `tenants.tierId` NULLs fixed
-
-#### Local Dev (via SSH tunnel to Contabo)
-
-- **DB**: Contabo PostgreSQL 16.13 — `neurecore_prod` (29 tables, older schema)
-- **Tunnel ports**: `localhost:15433` → Contabo `5432`
-- **Credentials**: `neurecore_app` / `NeureCoreApp2026!SecureDBPass`
-- **Note**: May need `npx prisma migrate deploy` to bring up to 34 tables
+- **Schema includes**: `tiers`, `tier_agent_pools`, `tier_agent_slots`, `provisioning_configs`, `provisioning_jobs`
 
 #### ORM
 
 - **Prisma 5.22.0** — schema at `backend/prisma/schema.prisma`
-- **Key models**: Tenant, User, Agent, AgentTemplate, Department, DepartmentTemplate, Tier,
-  TierAgentPool, Conversation, Message, Integration, Goal, Project, etc.
+- **Key models**: Tenant, User, Agent, AgentTemplate, Department, Tier, TierAgentPool, TierAgentSlot, Conversation, Message, Integration, Goal, Project, etc.
 
-### Cache Layer
+#### Cache Layer
 
 #### Production
 
-- **Upstash Redis** (cloud) — used by Contabo PM2 backend process
-
-#### Local Dev (via SSH tunnel to Contabo)
-
-- **Contabo Redis 7.0.15** — `localhost:16380` → Contabo `6379`
-- **Password**: `kPzbcTiOQBWwTs6dr4xinAWfXhbUv3AFjRdkjhvxQ=`
-- **Client libs**: ioredis 5.9.3
+- **Upstash Redis** (cloud) — `lasting-gobbler-72608.upstash.io:6380`
 
 ### Infrastructure
 

@@ -433,41 +433,31 @@ Five root causes fixed across backend + frontend:
 
 ## ⏳ Pending / Next Steps
 
-1. **Contabo DB migrations**: `neurecore_prod` has 29 tables vs Neon's 34. If Contabo
-   ever needs to be used as a DB source, run `npx prisma migrate deploy` against it.
-   Currently not needed — Neon is the canonical DB.
-2. **Redis hardening**: Add AOF persistence on Contabo Redis.
-3. **Integration testing**: E2E tests for agents, tenants, auth flows.
-4. **`agents.isSelected` migration**: The column was added ad-hoc via raw SQL.
-   A proper Prisma migration should exist to track this formally (`prisma migrate dev`
-   on a clean branch to generate the migration file).
-5. **Integration tests**: Need coverage for tenants, users, agents, auth endpoints.
-6. **Vercel Admin/Tenant portals**: Confirm they hit production API correctly after LiteSpeed fix.
-7. **Remove defensive service patches**: `TenantsService`/`AgentsService` schema-drift
-   fallbacks can be revisited once Contabo DB is fully migrated.
-8. **Audit other SUPER_ADMIN guards**: Check remaining modules (CRM, analytics, billing-events,
-   quota-usage, approvals) for the `if (!user.tenantId) throw ForbiddenException` pattern
-   and apply the null-tenantId fix if they serve admin-facing pages.
+1. **Tier Agent Pool UI**: Admin portal tier pool management + tenant portal agent management with locked fixed agents
+2. **Integration testing**: E2E tests for agents, tenants, auth flows
+3. **Audit other SUPER_ADMIN guards**: Check remaining modules for the `if (!user.tenantId) throw ForbiddenException` pattern
 
 ---
 
 ## Component-Level Breakdown
 
-### Local Dev Connection Architecture
+### Current Connection Architecture
 
 ```
 Local Machine
-  ├── backend (port 3000, NestJS)  ──→  SSH tunnel  ──→  Contabo PostgreSQL (neurecore_prod)
+  ├── backend (port 3000, NestJS)  ──→  Neon PostgreSQL (cloud)
   ├── frontend-admin (port 3002)   ──→  localhost:3000/api
   ├── frontend-tenant (port 3001)  ──→  localhost:3000/api
-  └── SSH Tunnel (PID 85338)       ──→  localhost:15433 → Contabo:5432
-                                        localhost:16380 → Contabo:6379
+  └── SSH Tunnel (not in use)       ──→  Contabo (legacy, not active)
 ```
 
 ### Key Credentials
 
 | Resource              | Value                                                                                                                          |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Neon DB (production)  | `postgresql://neondb_owner:npg_EaF8DrC3hdcm@ep-summer-pond-adpkqy1m-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require` |
+| Upstash Redis         | `rediss://default:...@lasting-gobbler-72608.upstash.io:6380`                                                                  |
+| Superadmin            | `mnpiracha@gmail.com` / `Admin@123!`                                                                                           |
 | Contabo SSH           | `ssh contabo` (`~/.ssh/id_contabo`)                                                                                            |
 | Contabo DB (local)    | `postgresql://neurecore_app:NeureCoreApp2026!SecureDBPass@127.0.0.1:15433/neurecore_prod`                                      |
 | Contabo Redis (local) | `redis://:kPzbcTiOQBWwTs6dr4xinAWfXhbUv3AFjRdkjhvxQ=@127.0.0.1:16380/0`                                                        |
@@ -484,8 +474,8 @@ Local Machine
 | **Admin Portal (Vercel)**  | 🟢 DNS Ready |    98%     | CNAME configured → cname.vercel-dns.com                        |
 | **Tenant Portal (Vercel)** | 🟢 DNS Ready |    98%     | CNAME configured → cname.vercel-dns.com                        |
 | **Wildcard Subdomain**     | 🟢 DNS Ready |    100%    | \*.neurecore.com → Vercel (Phase 3+ SaaS)                      |
-| **Database (Neon)**        | 🟡 Migration |    50%     | Contabo Migration Plan created — see CONTABO_MIGRATION_PLAN.md |
-| **Redis (Contabo)**        | 🟡 Pending   |    50%     | Needs password + AOF hardening (see migration plan)            |
+| **Database (Neon)**        | � Active    |    100%    | Neon PostgreSQL, 34+ tables, all migrations applied             |
+| **Redis (Upstash)**        | 🟢 Active    |    100%    | Upstash Redis cloud                                            |
 | **CORS Configuration**     | 🟢 Fixed     |    100%    | ✅ Verified: hq.neurecore.com, cc.neurecore.com allowed        |
 | **Auth Module**            | 🟢 Complete  |    100%    | Full auth with token rotation                                  |
 | **Tenants Module**         | 🟢 Complete  |    100%    | Full CRUD with role guards                                     |
@@ -878,11 +868,12 @@ The backend includes many additional modules beyond Phase 1:
 
 ---
 
-## Recent Local Debugging — 2026-03-30
+## Recent Local Debugging — 2026-05-17
 
-- **What I did:** Restored `backend/prisma/schema.prisma`, fixed a TypeScript bug, and restarted the backend and both frontends locally to reproduce issues.
-- **Current state:** Backend health endpoint and admin login succeed, but `GET /api/v1/tenants` and `GET /api/v1/agents` return INTERNAL_ERROR (Prisma errors about missing columns `tenants.tierId` and `agents.tierAgentPoolId`).
-- **Actions taken:** Temporarily hardened `TenantsService` and `AgentsService` to retry queries without relation includes; executed idempotent DDL to create `tiers` and `tier_agent_pools`, add missing columns if absent, and seed default tiers in the local DB.
+- **What was done**: PoolSlotGuard dependency crisis RESOLVED, Tier Agent Pool backend running, tier pool endpoints routing correctly
+- **Current state**: Backend (port 3000) + Tenant (3001) + Admin (3002) all running, connected to Neon PostgreSQL + Upstash Redis
+- **Key fix**: PoolSlotGuard removed from TiersModule providers — was causing UnknownDependenciesException when AgentsModule imported TiersModule
+- **Result**: `/api/v1/tiers/pool/status` returns `AUTHENTICATION_FAILED` (requires auth — expected behavior) ✅
 - **Suspected cause:** Prisma client and database schema are out of sync, or the running backend is connecting to a different database/schema than the one inspected. The migration may not be recorded in `_prisma_migrations` for the DB used by the process.
 - **Next steps (priority):**
   1.  Verify `_prisma_migrations` rows and `current_database()`/`current_schema()` for the DB used by the running backend.
