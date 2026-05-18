@@ -3,6 +3,7 @@ import Link from 'next/link';
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
+      <img src="/logo.png" alt="NeureCore" className="h-32 w-auto mb-4" />
       <h1 className="text-4xl font-bold tracking-tight">NeureCore Tenant Portal</h1>
       <p className="text-gray-500 text-lg">Your AI-powered workspace</p>
       <div className="flex gap-4">
