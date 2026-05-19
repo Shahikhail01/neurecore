@@ -8,6 +8,12 @@
 import { useCallback, useState } from "react";
 import { useCurrentUser, useIsLoggedIn, useCurrentUserContext } from "@/user";
 import { useAPIClient } from "@/api-client";
+import {
+  clearStoredAuthSession,
+  extractAuthSessionPayload,
+  getStoredAccessToken,
+  setStoredAuthSession,
+} from "@/lib/auth-session";
 
 export interface LoginRequest {
   email: string;
@@ -50,15 +56,14 @@ export function useAuth() {
       setError(null);
       try {
         const response = await api.post("/auth/login", credentials);
-        const data = response.data?.data || response.data;
-        if (data.accessToken) {
-          // Use "auth_token" to match what APIClientProvider reads on init
-          localStorage.setItem("auth_token", data.accessToken);
-          api.setToken(data.accessToken);
+        const data = extractAuthSessionPayload(response);
+
+        if (!data?.accessToken) {
+          throw new Error("Login response missing access token");
         }
-        if (data.refreshToken) {
-          localStorage.setItem("refreshToken", data.refreshToken);
-        }
+
+        setStoredAuthSession(data);
+        api.setToken(data.accessToken);
         // Re-fetch current user so isAuthenticated updates immediately
         await currentUserCtx.refresh?.();
         return data as AuthResponse;
@@ -71,7 +76,7 @@ export function useAuth() {
         setIsLoading(false);
       }
     },
-    [api],
+    [api, currentUserCtx],
   );
 
   const register = useCallback(
@@ -80,13 +85,14 @@ export function useAuth() {
       setError(null);
       try {
         const response = await api.post("/auth/register", credentials);
-        const data = response.data?.data || response.data;
-        if (data.accessToken) {
-          localStorage.setItem("accessToken", data.accessToken);
+        const data = extractAuthSessionPayload(response);
+
+        if (!data?.accessToken) {
+          throw new Error("Registration response missing access token");
         }
-        if (data.refreshToken) {
-          localStorage.setItem("refreshToken", data.refreshToken);
-        }
+
+        setStoredAuthSession(data);
+        api.setToken(data.accessToken);
         return data as AuthResponse;
       } catch (err: any) {
         const message =
@@ -104,17 +110,16 @@ export function useAuth() {
     setIsLoading(true);
     try {
       await api.post("/auth/logout", {});
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("accessToken"); // legacy cleanup
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("user");
-      api.setToken(null);
     } catch (err: any) {
       console.error("Logout error:", err);
     } finally {
+      clearStoredAuthSession({ includeUser: true });
+      currentUserCtx.mutate?.(null);
+      setError(null);
+      api.setToken(null);
       setIsLoading(false);
     }
-  }, [api]);
+  }, [api, currentUserCtx]);
 
   const requestPasswordReset = useCallback(
     async (email: string) => {
@@ -180,7 +185,7 @@ export function useAuth() {
   );
 
   const accessToken =
-    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    typeof window !== "undefined" ? getStoredAccessToken() : null;
 
   return {
     user,

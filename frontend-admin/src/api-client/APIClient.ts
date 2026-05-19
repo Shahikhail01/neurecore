@@ -10,6 +10,13 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import { notification } from "antd";
+import {
+  clearStoredAuthSession,
+  extractAuthSessionPayload,
+  getStoredRefreshToken,
+  setStoredAccessToken,
+  setStoredAuthSession,
+} from "@/lib/auth-session";
 
 export class APIClient {
   public axios: AxiosInstance;
@@ -49,7 +56,7 @@ export class APIClient {
     // Response interceptor
     this.axios.interceptors.response.use(
       (response: AxiosResponse) => response,
-      (error: any) => {
+      async (error: any) => {
         const skipNotify = error.config?.skipNotify;
         if (!skipNotify && error.response?.status !== 401) {
           notification.error({
@@ -57,9 +64,53 @@ export class APIClient {
             description: error.response?.data?.message || error.message,
           });
         }
-        const skipAuth = error.config?.skipAuth;
+
+        const originalConfig =
+          (error.config as InternalAxiosRequestConfig & { _retry?: boolean }) ||
+          undefined;
+        const skipAuth = originalConfig?.skipAuth;
+
         if (error.response?.status === 401) {
+          if (originalConfig && !originalConfig._retry) {
+            originalConfig._retry = true;
+
+            try {
+              const refreshToken = getStoredRefreshToken();
+
+              if (!refreshToken) {
+                throw new Error("No refresh token available");
+              }
+
+              const refreshResponse = await axios.post(
+                `${this.baseURL}/auth/refresh`,
+                { refreshToken },
+                {
+                  timeout: 5000,
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                },
+              );
+              const session = extractAuthSessionPayload(refreshResponse);
+
+              if (!session?.accessToken) {
+                throw new Error("Refresh response missing access token");
+              }
+
+              setStoredAuthSession(session);
+              this.token = session.accessToken;
+              originalConfig.headers = originalConfig.headers || {};
+              originalConfig.headers.Authorization =
+                `Bearer ${session.accessToken}`;
+
+              return this.axios.request(originalConfig);
+            } catch {
+              // Fall through to the shared unauthenticated cleanup path.
+            }
+          }
+
           this.setToken(null);
+          clearStoredAuthSession({ includeUser: true });
           if (skipAuth) {
             // Caller handles unauthenticated state — suppress the error silently
             return Promise.resolve({ data: null });
@@ -77,11 +128,7 @@ export class APIClient {
 
   public setToken(token: string | null) {
     this.token = token;
-    if (token) {
-      localStorage.setItem("auth_token", token);
-    } else {
-      localStorage.removeItem("auth_token");
-    }
+    setStoredAccessToken(token);
   }
 
   public getToken() {

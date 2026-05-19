@@ -47,7 +47,6 @@ export function AreaChart({
     <div
       className={className}
       style={{
-        width: "100%",
         height: typeof height === "number" ? `${height}px` : height,
         minWidth: 0,
         minHeight: typeof height === "number" ? `${height}px` : height,

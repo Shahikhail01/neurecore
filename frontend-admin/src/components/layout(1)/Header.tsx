@@ -6,7 +6,8 @@
 "use client";
 
 import React from "react";
-import { Layout, Menu, Dropdown, Avatar, Space, Button } from "antd";
+import { Layout, Dropdown, Avatar, Space } from "antd";
+import type { MenuProps } from "antd";
 import {
   UserOutlined,
   LogoutOutlined,
@@ -26,20 +27,29 @@ export function DashboardHeader() {
     router.push("/login");
   };
 
-  const userMenu = (
-    <Menu>
-      <Menu.Item key="profile" icon={<UserOutlined />}>
-        Profile
-      </Menu.Item>
-      <Menu.Item key="settings" icon={<SettingOutlined />}>
-        Settings
-      </Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="logout" icon={<LogoutOutlined />} onClick={handleLogout}>
-        Logout
-      </Menu.Item>
-    </Menu>
-  );
+  const userMenuItems: MenuProps["items"] = [
+    {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: "Profile",
+    },
+    {
+      key: "settings",
+      icon: <SettingOutlined />,
+      label: "Settings",
+    },
+    {
+      type: "divider",
+    },
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      label: "Logout",
+      onClick: () => {
+        void handleLogout();
+      },
+    },
+  ];
 
   return (
     <Header
@@ -57,7 +67,7 @@ export function DashboardHeader() {
       </div>
 
       <Space>
-        <Dropdown menu={{ items: userMenu }} trigger={["click"]}>
+        <Dropdown menu={{ items: userMenuItems }} trigger={["click"]}>
           <Space style={{ cursor: "pointer" }}>
             <Avatar size="large" icon={<UserOutlined />} />
             <div>

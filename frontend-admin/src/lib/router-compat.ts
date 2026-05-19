@@ -10,15 +10,13 @@
 
 'use client';
 
-import {
+import React, {
   ReactNode,
   CSSProperties,
   FC,
-  ComponentProps,
-  AnchorHTMLAttributes,
 } from 'react';
 import NextLink from 'next/link';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams as useNextSearchParams } from 'next/navigation';
 
 /**
  * Link Component - Next.js compatible replacement for react-router Link
@@ -30,10 +28,10 @@ export const Link: FC<{
   style?: CSSProperties;
   [key: string]: any;
 }> = ({ to, children, className, style, ...props }) => {
-  return (
-    <NextLink href={to} className={className} style={style} {...props}>
-      {children}
-    </NextLink>
+  return React.createElement(
+    NextLink,
+    { href: to, className, style, ...props },
+    children,
   );
 };
 
@@ -50,7 +48,7 @@ export function useNavigate() {
  */
 export function useLocation() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const searchParams = useNextSearchParams();
   
   return {
     pathname,
@@ -73,7 +71,7 @@ export function useParams() {
  * useSearchParams Hook - Parse URL search parameters
  */
 export function useSearchParams() {
-  const params = useSearchParams();
+  const params = useNextSearchParams();
   const obj: Record<string, string> = {};
   params.forEach((value, key) => {
     obj[key] = value;
@@ -99,7 +97,7 @@ export const Navigate: FC<{ to: string; replace?: boolean }> = ({ to }) => {
  * Note: These are minimal stubs. For complex routing, use Next.js file-based routing.
  */
 export const Routes: FC<{ children: ReactNode }> = ({ children }) => {
-  return <>{children}</>;
+  return React.createElement(React.Fragment, null, children);
 };
 
 export const Route: FC<{
@@ -114,7 +112,7 @@ export const Route: FC<{
  * BrowserRouter - Stub (not needed in Next.js)
  */
 export const BrowserRouter: FC<{ children: ReactNode }> = ({ children }) => {
-  return <>{children}</>;
+  return React.createElement(React.Fragment, null, children);
 };
 
 /**
@@ -130,6 +128,3 @@ export const Outlet = () => null;
 export const useOutletContext = () => ({});
 export const useResolvedPath = (path: string) => ({ pathname: path, search: '', hash: '' });
 export const useMatch = () => null;
-
-// Support for React usage
-import React from 'react';

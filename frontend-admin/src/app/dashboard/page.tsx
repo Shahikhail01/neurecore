@@ -104,6 +104,7 @@ export default function DashboardHome() {
       >
         <Table
           dataSource={recentActivity}
+          rowKey="id"
           columns={[
             { title: "Action", dataIndex: "action", key: "action" },
             { title: "User", dataIndex: "user", key: "user" },

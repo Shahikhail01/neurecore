@@ -57,7 +57,7 @@ export default function AgentsPage() {
     { manual: false },
   );
 
-  const agents = listData?.data || [];
+  const agents = Array.isArray(listData?.data?.data) ? listData.data.data : [];
 
   const columns: ColumnsType<Agent> = [
     {

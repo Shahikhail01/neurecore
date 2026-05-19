@@ -63,7 +63,9 @@ export default function ApprovalsPage() {
     { manual: false },
   );
 
-  const allApprovals = listData?.data || [];
+  const allApprovals = Array.isArray(listData?.data?.data)
+    ? listData.data.data
+    : [];
 
   const pendingApprovals = useMemo(
     () => allApprovals.filter((a) => a.status === "pending"),

@@ -6,6 +6,11 @@
 "use client";
 
 import React, { createContext, useState, useEffect } from "react";
+import {
+  AUTH_STORAGE_KEYS,
+  getStoredAccessToken,
+  getStoredRefreshToken,
+} from "@/lib/auth-session";
 
 export interface AuthUser {
   id: string;
@@ -35,9 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Load from localStorage on mount
   useEffect(() => {
-    const storedAccessToken = localStorage.getItem("accessToken");
-    const storedRefreshToken = localStorage.getItem("refreshToken");
-    const storedUser = localStorage.getItem("user");
+    const storedAccessToken = getStoredAccessToken();
+    const storedRefreshToken = getStoredRefreshToken();
+    const storedUser = localStorage.getItem(AUTH_STORAGE_KEYS.user);
 
     if (storedAccessToken) {
       setAccessToken(storedAccessToken);

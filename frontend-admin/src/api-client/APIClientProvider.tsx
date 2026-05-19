@@ -6,6 +6,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { APIClient } from "./APIClient";
+import { getStoredAccessToken } from "@/lib/auth-session";
 
 interface APIClientContextType {
   api: APIClient;
@@ -25,8 +26,7 @@ export const APIClientProvider: React.FC<APIClientProviderProps> = ({
   baseURL = process.env.NEXT_PUBLIC_API_URL,
 }) => {
   const [api] = useState(() => {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    const token = getStoredAccessToken();
     return new APIClient({
       baseURL,
       token: token || undefined,
@@ -34,7 +34,7 @@ export const APIClientProvider: React.FC<APIClientProviderProps> = ({
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
+    const token = getStoredAccessToken();
     if (token) {
       api.setToken(token);
     }

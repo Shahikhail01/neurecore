@@ -161,8 +161,13 @@ api.interceptors.response.use(
 export async function apiCall<T>(
   requestFn: () => Promise<{ data: T }>,
 ): Promise<T> {
-  const response = await requestFn();
-  return response.data;
+  try {
+    const response = await requestFn();
+    return response.data;
+  } catch (error) {
+    // Error is already handled by interceptor
+    throw error;
+  }
 }
 
 export { AppError };

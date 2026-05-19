@@ -60,7 +60,7 @@ export default function TasksPage() {
     { manual: false },
   );
 
-  const tasks = listData?.data || [];
+  const tasks = Array.isArray(listData?.data?.data) ? listData.data.data : [];
 
   const columns: ColumnsType<Task> = [
     {

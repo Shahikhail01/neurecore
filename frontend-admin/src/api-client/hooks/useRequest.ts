@@ -14,6 +14,109 @@ import merge from "lodash/merge";
 import { useMemo } from "react";
 import { useAPIClient } from "./useAPIClient";
 
+const API_BASE_PATH = (() => {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  if (!apiUrl) {
+    return "";
+  }
+
+  try {
+    return new URL(apiUrl, "http://localhost").pathname.replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+})();
+
+const stripResourceIdentifier = (value: Record<string, any>) => {
+  const { filterByTk, id, ...rest } = value;
+  return rest;
+};
+
+const normalizeResourcePath = (resource: string) => {
+  if (!resource) {
+    return resource;
+  }
+
+  if (/^https?:\/\//i.test(resource)) {
+    return resource;
+  }
+
+  let normalizedPath = resource.startsWith("/") ? resource : `/${resource}`;
+
+  if (API_BASE_PATH && normalizedPath.startsWith(`${API_BASE_PATH}/`)) {
+    normalizedPath = normalizedPath.slice(API_BASE_PATH.length);
+  }
+
+  return normalizedPath;
+};
+
+const buildResourceRequestConfig = (
+  service: ResourceActionOptions,
+  params: Record<string, any>,
+): AxiosRequestConfig => {
+  const {
+    resource = "",
+    action = "list",
+    skipAuth,
+    skipNotify,
+  } = service;
+  const normalizedPath = normalizeResourcePath(resource);
+  const requestParams = { ...service.params, ...params };
+  const recordId = requestParams.filterByTk ?? requestParams.id;
+
+  const config: AxiosRequestConfig = {
+    skipAuth,
+    skipNotify,
+  } as AxiosRequestConfig;
+
+  switch (action) {
+    case "list":
+      config.url = normalizedPath;
+      config.method = "get";
+      config.params = requestParams;
+      return config;
+    case "get":
+    case "read":
+      config.url =
+        recordId && !normalizedPath.endsWith(`/${recordId}`)
+          ? `${normalizedPath}/${recordId}`
+          : normalizedPath;
+      config.method = "get";
+      config.params = stripResourceIdentifier(requestParams);
+      return config;
+    case "create":
+      config.url = normalizedPath;
+      config.method = "post";
+      config.data = requestParams;
+      return config;
+    case "update":
+      config.url =
+        recordId && !normalizedPath.endsWith(`/${recordId}`)
+          ? `${normalizedPath}/${recordId}`
+          : normalizedPath;
+      config.method = "patch";
+      config.data = stripResourceIdentifier(requestParams);
+      return config;
+    case "delete":
+    case "destroy":
+      config.url =
+        recordId && !Array.isArray(recordId) && !normalizedPath.endsWith(`/${recordId}`)
+          ? `${normalizedPath}/${recordId}`
+          : normalizedPath;
+      config.method = "delete";
+      config.data = Array.isArray(recordId)
+        ? { ids: recordId }
+        : stripResourceIdentifier(requestParams);
+      return config;
+    default:
+      config.url = `${normalizedPath}/${action}`;
+      config.method = "get";
+      config.params = requestParams;
+      return config;
+  }
+};
+
 type FunctionService = (...args: any[]) => Promise<any>;
 
 export type ReturnTypeOfUseRequest<TData = any> = ReturnType<
@@ -75,7 +178,7 @@ export function useRequest<P = any>(
     tempService = service;
   } else if (service) {
     tempService = async (params = {}) => {
-      const { resource, url, action, skipAuth, skipNotify } =
+      const { resource, url, skipAuth, skipNotify } =
         service as ResourceActionOptions;
 
       // Build the request config
@@ -84,11 +187,11 @@ export function useRequest<P = any>(
         skipNotify,
       } as AxiosRequestConfig;
 
-      if (resource && action) {
-        // Resource-based action: GET /api/agents:list
-        config.url = `${resource}:${action}`;
-        config.method = "get";
-        config.params = { ...service.params, ...params };
+      if (resource) {
+        config = buildResourceRequestConfig(
+          service as ResourceActionOptions,
+          params as Record<string, any>,
+        );
       } else if (url) {
         // Direct URL
         config.url = url;

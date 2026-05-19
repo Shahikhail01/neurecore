@@ -6,7 +6,8 @@
 
 "use client";
 
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useEffect } from "react";
+import { AUTH_SESSION_CLEARED_EVENT } from "@/lib/auth-session";
 import { useRequest, ReturnTypeOfUseRequest } from "../api-client";
 
 interface User {
@@ -17,9 +18,24 @@ interface User {
 }
 
 export interface CurrentUserContextData extends ReturnTypeOfUseRequest {
-  data?: {
-    data: User;
-  };
+  data?: User | { data: User } | null;
+}
+
+function extractCurrentUser(data: CurrentUserContextData["data"]): User | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return null;
+  }
+
+  const candidate =
+    "data" in data && data.data && typeof data.data === "object"
+      ? data.data
+      : data;
+
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+
+  return typeof candidate.id === "string" ? (candidate as User) : null;
 }
 
 export const CurrentUserContext = createContext<CurrentUserContextData | null>(
@@ -44,6 +60,21 @@ export const CurrentUserProvider: React.FC<CurrentUserProviderProps> = ({
       cacheKey: "currentUser",
     },
   );
+
+  useEffect(() => {
+    const handleSessionCleared = () => {
+      result.mutate?.(null);
+    };
+
+    window.addEventListener(AUTH_SESSION_CLEARED_EVENT, handleSessionCleared);
+
+    return () => {
+      window.removeEventListener(
+        AUTH_SESSION_CLEARED_EVENT,
+        handleSessionCleared,
+      );
+    };
+  }, [result.mutate]);
 
   return (
     <CurrentUserContext.Provider value={result}>
@@ -70,7 +101,7 @@ export const useCurrentUserContext = (): CurrentUserContextData => {
  */
 export const useIsLoggedIn = (): boolean => {
   const ctx = useCurrentUserContext();
-  return !!ctx?.data?.data?.id;
+  return !!extractCurrentUser(ctx?.data)?.id;
 };
 
 /**
@@ -78,7 +109,7 @@ export const useIsLoggedIn = (): boolean => {
  */
 export const useCurrentRoles = (): string[] => {
   const ctx = useCurrentUserContext();
-  return (ctx?.data?.data?.roles || []).map((r: any) => r.name || r);
+  return (extractCurrentUser(ctx?.data)?.roles || []).map((r: any) => r.name || r);
 };
 
 /**
@@ -86,7 +117,7 @@ export const useCurrentRoles = (): string[] => {
  */
 export const useCurrentUser = (): User | null => {
   const ctx = useCurrentUserContext();
-  return ctx?.data?.data || null;
+  return extractCurrentUser(ctx?.data);
 };
 
 export default CurrentUserProvider;

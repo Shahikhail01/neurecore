@@ -9,6 +9,13 @@ import axios, {
   AxiosResponse,
   AxiosError,
 } from "axios";
+import {
+  clearStoredAuthSession,
+  extractAuthSessionPayload,
+  getStoredAccessToken,
+  getStoredRefreshToken,
+  setStoredAuthSession,
+} from "@/lib/auth-session";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -37,7 +44,7 @@ export function setupAxiosInterceptors(axiosInstance: AxiosInstance) {
   // Request interceptor - add JWT token
   axiosInstance.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      const token = localStorage.getItem("accessToken");
+      const token = getStoredAccessToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -73,13 +80,11 @@ export function setupAxiosInterceptors(axiosInstance: AxiosInstance) {
         originalRequest._retry = true;
         isRefreshing = true;
 
-        const refreshToken = localStorage.getItem("refreshToken");
+        const refreshToken = getStoredRefreshToken();
 
         if (!refreshToken) {
           // No refresh token available, logout
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-          localStorage.removeItem("user");
+          clearStoredAuthSession({ includeUser: true });
           window.location.href = "/login";
           return Promise.reject(error);
         }
@@ -91,23 +96,24 @@ export function setupAxiosInterceptors(axiosInstance: AxiosInstance) {
             { withCredentials: true },
           );
 
-          const { accessToken, refreshToken: newRefreshToken } = response.data;
+          const tokens = extractAuthSessionPayload(response);
 
-          localStorage.setItem("accessToken", accessToken);
-          localStorage.setItem("refreshToken", newRefreshToken);
+          if (!tokens?.accessToken) {
+            throw new Error("Refresh response missing access token");
+          }
+
+          setStoredAuthSession(tokens);
 
           axiosInstance.defaults.headers.common["Authorization"] =
-            `Bearer ${accessToken}`;
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            `Bearer ${tokens.accessToken}`;
+          originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
 
-          processQueue(null, accessToken);
+          processQueue(null, tokens.accessToken);
 
           return axiosInstance(originalRequest);
         } catch (err) {
           processQueue(err, null);
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-          localStorage.removeItem("user");
+          clearStoredAuthSession({ includeUser: true });
           window.location.href = "/login";
           return Promise.reject(err);
         }
