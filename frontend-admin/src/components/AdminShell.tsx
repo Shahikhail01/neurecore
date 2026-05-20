@@ -38,6 +38,12 @@ const NAV = [
   },
   // ── Live Fleet ───────────────────────────────────────
   { label: "Agent Fleet", href: "/agents", icon: "◈", group: "fleet" },
+  {
+    label: "Department Fleet",
+    href: "/departments",
+    icon: "⬟",
+    group: "fleet",
+  },
   // ── Intelligence ─────────────────────────────────────
   { label: "Models", href: "/models", icon: "⬡", group: "intelligence" },
   { label: "Brain Map", href: "/brain", icon: "⬡", group: "intelligence" },
@@ -55,6 +61,12 @@ const NAV = [
   },
   { label: "Audit Logs", href: "/audit", icon: "◫", group: "control" },
   // ── Settings ─────────────────────────────────────────
+  {
+    label: "Tenant Tiers",
+    href: "/settings/tiers",
+    icon: "📊",
+    group: "settings",
+  },
   { label: "Settings", href: "/settings", icon: "⚙", group: "settings" },
 ];
 
