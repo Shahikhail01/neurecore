@@ -48,6 +48,11 @@ export default function ApprovalsPage() {
   const [filter, setFilter] = useState<"pending" | "completed">("pending");
   const currentUser = useCurrentUser();
   const api = useAPIClient();
+  const isPlatformViewer =
+    currentUser?.role === "SUPER_ADMIN" ||
+    currentUser?.role === "PLATFORM_ADMIN" ||
+    currentUser?.role === "SECURITY_OFFICER" ||
+    currentUser?.role === "SUPPORT";
 
   // List approvals
   const {
@@ -58,7 +63,10 @@ export default function ApprovalsPage() {
     {
       resource: "approvals",
       action: "list",
-      params: { limit: 100 },
+      params: {
+        limit: 100,
+        ...(isPlatformViewer ? { scope: "platform" } : {}),
+      },
     },
     { manual: false },
   );

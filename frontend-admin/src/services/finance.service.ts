@@ -1,10 +1,16 @@
-import api from './api';
-import { unwrapItem } from './unwrap';
+import api from "./api";
+import { unwrapItem } from "./unwrap";
 
-export type InvoiceStatus = 'DRAFT' | 'ISSUED' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+export type InvoiceStatus =
+  | "DRAFT"
+  | "ISSUED"
+  | "PAID"
+  | "OVERDUE"
+  | "CANCELLED";
 
 export interface Invoice {
   id: string;
+  tenantId?: string;
   number: string;
   status: InvoiceStatus;
   currency: string;
@@ -27,10 +33,11 @@ export interface PaginatedResult<T> {
 class FinanceService {
   async listInvoices(params?: {
     tenantId?: string;
+    scope?: "platform";
     page?: number;
     limit?: number;
   }): Promise<PaginatedResult<Invoice>> {
-    const res = await api.get('/finance/invoices', { params });
+    const res = await api.get("/finance/invoices", { params });
     return unwrapItem(res) as PaginatedResult<Invoice>;
   }
 

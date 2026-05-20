@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   ForbiddenException,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { AuditService } from './audit.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -21,7 +22,12 @@ export class AuditController {
 
   /** Platform-wide audit log — super-admin / platform-admin only */
   @Get()
-  @Roles('SUPER_ADMIN', 'PLATFORM_ADMIN', 'SECURITY_OFFICER', 'AUDITOR')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.PLATFORM_ADMIN,
+    UserRole.SECURITY_OFFICER,
+    UserRole.AUDITOR,
+  )
   findAll(
     @Query('tenantId') tenantId?: string,
     @Query('actor') actor?: string,

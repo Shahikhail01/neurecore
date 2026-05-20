@@ -5,6 +5,7 @@ const isProd = process.env.NODE_ENV === "production";
 // Set outputFileTracingRoot to the repository root to avoid Next.js inferring
 // the wrong workspace root when multiple lockfiles exist in parent folders.
 const nextConfig = {
+  outputFileTracingRoot: path.join(__dirname, ".."),
   typescript: {
     ignoreBuildErrors: true,
   },

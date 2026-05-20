@@ -9,10 +9,15 @@ import {
   MaxLength,
   Min,
   Max,
+  IsUUID,
 } from 'class-validator';
 import { AgentStatus } from '@prisma/client';
 
 export class UpdateAgentDto {
+  @IsOptional()
+  @IsUUID()
+  tenantId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(100)
@@ -62,4 +67,16 @@ export class UpdateAgentDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  tierAgentPoolId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isSelected?: boolean;
 }

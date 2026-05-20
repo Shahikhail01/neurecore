@@ -16,16 +16,22 @@ import {
   HttpStatus,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { UserRole } from '@prisma/client';
 import {
   AgentStreamingService,
   AgentStreamingEvent,
   StreamingEventType,
+  type StreamingConnection,
 } from './agent-streaming.service';
 import { AgentExecutorService } from '../services/agent-executor.service';
 import { StructuredToolRegistry } from '../../tools/structured-tool.registry';
 import { SkipThrottle } from '@nestjs/throttler';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../../auth/interfaces/token.interface';
+import { isPlatformOperatorRole } from '../../../common/types/user-role.utils';
 
 @Controller('api/v1/agents/streaming')
 @SkipThrottle()
@@ -36,14 +42,58 @@ export class AgentStreamingController {
     private readonly toolRegistry: StructuredToolRegistry,
   ) {}
 
+  private isPlatformRole(user: JwtPayload): boolean {
+    return isPlatformOperatorRole(user.role);
+  }
+
+  private resolveStreamingTenantId(
+    user: JwtPayload,
+    tenantId?: string,
+  ): string {
+    if (this.isPlatformRole(user)) {
+      if (!tenantId) {
+        throw new BadRequestException(
+          'tenantId is required for platform-scoped streaming sessions',
+        );
+      }
+      return tenantId;
+    }
+
+    if (!user.tenantId) {
+      throw new ForbiddenException('Tenant context required');
+    }
+
+    return user.tenantId;
+  }
+
+  private getAuthorizedSession(
+    sessionId: string,
+    user: JwtPayload,
+  ): StreamingConnection {
+    const session = this.streamingService.getSession(sessionId);
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    if (this.isPlatformRole(user)) {
+      return session;
+    }
+
+    if (session.userId !== user.sub) {
+      throw new ForbiddenException('Session access denied');
+    }
+
+    return session;
+  }
+
   /**
    * Create a new streaming session
    */
   @Post('sessions')
   @HttpCode(HttpStatus.CREATED)
   createSession(
+    @CurrentUser() user: JwtPayload,
     @Query('taskId') taskId: string,
-    @Query('userId') userId?: string,
     @Query('tenantId') tenantId?: string,
   ): { sessionId: string; url: string } {
     if (!taskId) {
@@ -55,8 +105,8 @@ export class AgentStreamingController {
     this.streamingService.createSession({
       taskId,
       sessionId,
-      userId,
-      tenantId,
+      userId: user.sub,
+      tenantId: this.resolveStreamingTenantId(user, tenantId),
     });
 
     return {
@@ -69,17 +119,29 @@ export class AgentStreamingController {
    * Get streaming events for a session (SSE endpoint)
    */
   @Get('sessions/:sessionId/events')
-  getEvents(@Param('sessionId') sessionId: string, @Res() res: Response): void {
+  getEvents(
+    @Param('sessionId') sessionId: string,
+    @CurrentUser() user: JwtPayload,
+    @Res() res: Response,
+  ): void {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
-    const session = this.streamingService.getSession(sessionId);
-    if (!session) {
+    let session: StreamingConnection;
+    try {
+      session = this.getAuthorizedSession(sessionId, user);
+    } catch (error) {
+      const status =
+        error instanceof NotFoundException
+          ? HttpStatus.NOT_FOUND
+          : HttpStatus.FORBIDDEN;
       res
-        .status(HttpStatus.NOT_FOUND)
-        .send(`data: ${JSON.stringify({ error: 'Session not found' })}\n\n`);
+        .status(status)
+        .send(
+          `data: ${JSON.stringify({ error: (error as Error).message })}\n\n`,
+        );
       return;
     }
 
@@ -138,23 +200,20 @@ export class AgentStreamingController {
   @HttpCode(HttpStatus.ACCEPTED)
   executeWithStreaming(
     @Param('sessionId') sessionId: string,
+    @CurrentUser() user: JwtPayload,
     @Query('goal') goal: string,
     @Query('agentId') agentId: string = 'default',
-    @Query('tenantId') tenantId?: string,
   ): { taskId: string; status: string } {
     if (!goal) {
       throw new BadRequestException('goal is required');
     }
 
-    const session = this.streamingService.getSession(sessionId);
-    if (!session) {
-      throw new NotFoundException('Session not found');
-    }
+    const session = this.getAuthorizedSession(sessionId, user);
 
     const taskId = session.taskId;
 
     // Execute in background (fire and forget)
-    void this.executeAgentTask(sessionId, taskId, agentId, tenantId);
+    void this.executeAgentTask(sessionId, taskId, agentId, session.tenantId);
 
     return { taskId, status: 'started' };
   }
@@ -251,11 +310,11 @@ export class AgentStreamingController {
    */
   @Delete('sessions/:sessionId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  cancelSession(@Param('sessionId') sessionId: string): void {
-    const session = this.streamingService.getSession(sessionId);
-    if (!session) {
-      throw new NotFoundException('Session not found');
-    }
+  cancelSession(
+    @Param('sessionId') sessionId: string,
+    @CurrentUser() user: JwtPayload,
+  ): void {
+    this.getAuthorizedSession(sessionId, user);
     this.streamingService.cancelSession(sessionId);
   }
 
@@ -263,16 +322,16 @@ export class AgentStreamingController {
    * Get session status
    */
   @Get('sessions/:sessionId')
-  getSessionStatus(@Param('sessionId') sessionId: string): {
+  getSessionStatus(
+    @Param('sessionId') sessionId: string,
+    @CurrentUser() user: JwtPayload,
+  ): {
     sessionId: string;
     taskId: string;
     connectedAt: number;
     active: boolean;
   } {
-    const session = this.streamingService.getSession(sessionId);
-    if (!session) {
-      throw new NotFoundException('Session not found');
-    }
+    const session = this.getAuthorizedSession(sessionId, user);
     return {
       sessionId: session.sessionId,
       taskId: session.taskId,
@@ -285,10 +344,14 @@ export class AgentStreamingController {
    * List active sessions
    */
   @Get('sessions')
-  listSessions(): {
+  listSessions(@CurrentUser() user: JwtPayload): {
     sessions: Array<{ sessionId: string; taskId: string; connectedAt: number }>;
   } {
-    const sessions = this.streamingService.getActiveSessions();
+    const sessions = this.streamingService
+      .getActiveSessions()
+      .filter(
+        (session) => this.isPlatformRole(user) || session.userId === user.sub,
+      );
     return {
       sessions: sessions.map((s) => ({
         sessionId: s.sessionId,

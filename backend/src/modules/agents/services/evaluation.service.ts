@@ -62,6 +62,15 @@ export class EvaluationService {
     return run;
   }
 
+  async getRunByIdForTenant(
+    id: string,
+    tenantId: string,
+  ): Promise<EvaluationRunRecord> {
+    const run = await this.repo.findByIdAndTenant(id, tenantId);
+    if (!run) throw new NotFoundException(`EvaluationRun ${id} not found`);
+    return run;
+  }
+
   /**
    * Promote a staging agent to production: flip deploymentMode to PRODUCTION.
    * Must have at least one COMPLETED evaluation with score ≥ 70.

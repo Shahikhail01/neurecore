@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { MemoryService } from './memory.service';
 import { CreateMemoryDto, SearchMemoryDto } from './dto/memory.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -54,7 +55,7 @@ export class MemoryController {
   /** Purge expired entries scoped to the calling tenant */
   @Delete('purge')
   @HttpCode(HttpStatus.OK)
-  @Roles('ADMIN', 'OWNER')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
   purge(@CurrentUser() user: JwtPayload) {
     return this.memoryService
       .purgeExpired(user.tenantId!)

@@ -1,8 +1,41 @@
 # Progress Tracking — NeureCore Gold Phase 1 + Phase 2 LangChain
 
-**Last Updated**: May 18, 2026 (update 29 — Frontend-Admin fixes: branding, auth loop, React 18, missing module)
-**Current Phase**: Frontend-Admin stabilisation complete
+**Last Updated**: May 18, 2026 (update 30 — Frontend-Admin auth hardening, dashboard repair, checked-in auth e2e)
+**Current Phase**: Frontend-Admin auth and dashboard stabilisation complete
 **Overall Status**: 🟢 Admin frontend healthy at `http://localhost:3002`
+
+---
+
+## ✅ Update 30 — May 18, 2026 — Admin Auth Hardening + Dashboard Repair
+
+| # | Fix | Status |
+|---|---|---|
+| 1 | Canonical admin session storage introduced (`admin_accessToken`, `admin_refreshToken`) | ✅ |
+| 2 | Login and refresh payloads normalized through shared auth-session helper | ✅ |
+| 3 | `/auth/me` bootstrap path now refreshes on 401 before forcing logout | ✅ |
+| 4 | Logout now clears stale session state consistently across hooks, API clients, and current-user cache | ✅ |
+| 5 | Header dropdown logout action fixed in active dashboard layout | ✅ |
+| 6 | Browser-driven login → refresh recovery → logout regression passed | ✅ |
+| 7 | Checked-in Playwright auth e2e added under `frontend-admin/tests/e2e` | ✅ |
+| 8 | CI workflow added for frontend-admin auth e2e with Postgres pgvector + Redis | ✅ |
+| 9 | Nested plugin `resolutions` warning removed from admin install output | ✅ |
+| 10 | Dashboard 404 root cause fixed by replacing broken `resource:action` request URLs with REST path mapping | ✅ |
+| 11 | Dashboard list pages updated to read backend envelope `{ data: { data: [...] } }` correctly | ✅ |
+| 12 | Missing `dayjs` dependency added; dashboard routes compile and return `200` | ✅ |
+| 13 | Backend health and DB-backed endpoints revalidated (`/api/v1/health/detailed`, auth login, agents/tasks/approvals) | ✅ |
+
+### Validation
+
+- Auth endpoints verified live against backend response shapes for login, refresh, logout, and `/auth/me`
+- Checked-in auth spec passed locally with `PLAYWRIGHT_SKIP_WEBSERVER=1 pnpm run test:e2e:auth`
+- `/api/v1/health/detailed` returned `200`
+- Authenticated requests to `/api/v1/agents`, `/api/v1/tasks`, and `/api/v1/approvals` returned `200`
+- `/dashboard/agents`, `/dashboard/tasks`, and `/dashboard/approvals` returned `200` after fixes
+
+### Residual Notes
+
+- Full workspace `tsc` still fails on broader existing hoisted React 19 typing issues outside this dashboard/auth slice
+- Browser smoke no longer reproduced the original dashboard `404`, but separate console warnings remain for a `401` path and a React state-update warning
 
 ---
 

@@ -309,7 +309,7 @@ export function logError(
     context: context ?? null,
   };
 
-  console.error("Error occurred:", safeLog);
+  console.error(`Error occurred: ${JSON.stringify(safeLog)}`);
 }
 
 // ============================================

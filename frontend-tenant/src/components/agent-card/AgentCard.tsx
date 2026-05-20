@@ -1,21 +1,21 @@
-'use client';
+"use client";
 // ─── Agent Card ───────────────────────────────────────────────────────────────
 // O — Open/Closed: three variants via props, new variants add without changing core logic
 // S — Single Responsibility: card rendering + emitting actions up only
 
-import { motion } from 'framer-motion';
-import { useInspectorStore } from '@/stores/inspectorStore';
-import { STATUS_BADGE_CLASS, STATUS_COLOR_MAP } from '@/types/ui.types';
-import type { AgentCardProps, AgentCardAction } from '@/types/ui.types';
+import { motion } from "framer-motion";
+import { useInspectorStore } from "@/stores/inspectorStore";
+import { STATUS_BADGE_CLASS, STATUS_COLOR_MAP } from "@/types/ui.types";
+import type { AgentCardProps, AgentCardAction } from "@/types/ui.types";
 
 const STATUS_DOT: Record<string, string> = {
-  RUNNING:  'bg-status-ops animate-pulse-slow',
-  ACTIVE:   'bg-status-profit animate-pulse-slow',
-  IDLE:     'bg-status-neutral',
-  PAUSED:   'bg-status-warn',
-  FAILED:   'bg-status-risk',
-  ERROR:    'bg-status-risk',
-  STOPPED:  'bg-surface-muted',
+  RUNNING: "bg-status-ops animate-pulse-slow",
+  ACTIVE: "bg-status-profit animate-pulse-slow",
+  IDLE: "bg-status-neutral",
+  PAUSED: "bg-status-warn",
+  FAILED: "bg-status-risk",
+  ERROR: "bg-status-risk",
+  STOPPED: "bg-surface-muted",
 };
 
 function WorkloadBar({ pct, color }: { pct: number; color: string }) {
@@ -24,7 +24,7 @@ function WorkloadBar({ pct, color }: { pct: number; color: string }) {
       <motion.div
         initial={{ width: 0 }}
         animate={{ width: `${pct}%` }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
         className={`h-full rounded-full ${color}`}
       />
     </div>
@@ -32,34 +32,60 @@ function WorkloadBar({ pct, color }: { pct: number; color: string }) {
 }
 
 // L — Liskov: compact/full/inspector all satisfy AgentCardProps contract
-export function AgentCard({ agent, variant = 'full', onAction, selected = false, className = '' }: AgentCardProps) {
+export function AgentCard({
+  agent,
+  variant = "full",
+  onAction,
+  selected = false,
+  className = "",
+}: AgentCardProps) {
   const { openInspector } = useInspectorStore();
-  const statusColor = STATUS_COLOR_MAP[agent.status] ?? 'neutral';
-  const dotClass = STATUS_DOT[agent.status] ?? 'bg-surface-muted';
+  const statusColor = STATUS_COLOR_MAP[agent.status] ?? "neutral";
+  const dotClass = STATUS_DOT[agent.status] ?? "bg-surface-muted";
+  const badges = agent.badges ?? [];
 
   const workloadColor =
-    (agent.workloadPct ?? 0) > 80 ? 'bg-status-risk' :
-    (agent.workloadPct ?? 0) > 50 ? 'bg-status-warn' : 'bg-status-ops';
+    (agent.workloadPct ?? 0) > 80
+      ? "bg-status-risk"
+      : (agent.workloadPct ?? 0) > 50
+        ? "bg-status-warn"
+        : "bg-status-ops";
 
   const handleAction = (action: AgentCardAction) => {
-    if (action === 'inspect') {
-      openInspector('agent', agent.id);
+    if (action === "inspect") {
+      openInspector("agent", agent.id);
       return;
     }
     onAction?.(action, agent.id);
   };
 
   // ─── Compact variant ─────────────────────────────────────────────────────
-  if (variant === 'compact') {
+  if (variant === "compact") {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className={`flex items-center gap-3 p-3 rounded-xl border border-surface-border bg-surface-raised hover:bg-surface-overlay cursor-pointer transition-colors ${selected ? 'ring-1 ring-status-ops' : ''} ${className}`}
-        onClick={() => handleAction('inspect')}
+        className={`flex items-center gap-3 p-3 rounded-xl border border-surface-border bg-surface-raised hover:bg-surface-overlay cursor-pointer transition-colors ${selected ? "ring-1 ring-status-ops" : ""} ${className}`}
+        onClick={() => handleAction("inspect")}
       >
         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotClass}`} />
-        <span className="text-sm font-medium text-zinc-200 truncate flex-1">{agent.name}</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium text-zinc-200 truncate block">
+            {agent.name}
+          </span>
+          {badges.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {badges.slice(0, 2).map((badge) => (
+                <span
+                  key={badge.label}
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] ${STATUS_BADGE_CLASS[badge.tone ?? "neutral"]}`}
+                >
+                  {badge.label}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
         {agent.workloadPct !== undefined && (
           <span className="text-xs text-zinc-500">{agent.workloadPct}%</span>
         )}
@@ -73,28 +99,48 @@ export function AgentCard({ agent, variant = 'full', onAction, selected = false,
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className={`rounded-2xl border border-surface-border bg-surface-raised p-5 flex flex-col gap-3 hover:border-surface-muted transition-colors ${selected ? 'ring-1 ring-status-ops' : ''} ${className}`}
+      className={`rounded-2xl border border-surface-border bg-surface-raised p-5 flex flex-col gap-3 hover:border-surface-muted transition-colors ${selected ? "ring-1 ring-status-ops" : ""} ${className}`}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${dotClass}`} />
+          <span
+            className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${dotClass}`}
+          />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-zinc-100 truncate">{agent.name}</p>
-            {agent.role && <p className="text-xs text-zinc-500 truncate">{agent.role}</p>}
+            <p className="text-sm font-semibold text-zinc-100 truncate">
+              {agent.name}
+            </p>
+            {agent.role && (
+              <p className="text-xs text-zinc-500 truncate">{agent.role}</p>
+            )}
           </div>
         </div>
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_BADGE_CLASS[statusColor]}`}>
+        <span
+          className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_BADGE_CLASS[statusColor]}`}
+        >
           {agent.status}
         </span>
       </div>
 
       {/* Type badge + tenant */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs px-2 py-0.5 rounded bg-surface-muted text-zinc-400">{agent.type}</span>
+        <span className="text-xs px-2 py-0.5 rounded bg-surface-muted text-zinc-400">
+          {agent.type}
+        </span>
         {agent.tenantName && (
-          <span className="text-xs text-zinc-600 truncate">{agent.tenantName}</span>
+          <span className="text-xs text-zinc-600 truncate">
+            {agent.tenantName}
+          </span>
         )}
+        {badges.map((badge) => (
+          <span
+            key={badge.label}
+            className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE_CLASS[badge.tone ?? "neutral"]}`}
+          >
+            {badge.label}
+          </span>
+        ))}
       </div>
 
       {/* Workload */}
@@ -113,7 +159,9 @@ export function AgentCard({ agent, variant = 'full', onAction, selected = false,
         {agent.successRate !== undefined && (
           <div>
             <p className="text-xs text-zinc-500">Success</p>
-            <p className={`text-sm font-bold ${agent.successRate >= 80 ? 'text-status-profit' : agent.successRate >= 50 ? 'text-status-warn' : 'text-status-risk'}`}>
+            <p
+              className={`text-sm font-bold ${agent.successRate >= 80 ? "text-status-profit" : agent.successRate >= 50 ? "text-status-warn" : "text-status-risk"}`}
+            >
               {agent.successRate}%
             </p>
           </div>
@@ -121,43 +169,53 @@ export function AgentCard({ agent, variant = 'full', onAction, selected = false,
         {agent.tasksToday !== undefined && (
           <div>
             <p className="text-xs text-zinc-500">Tasks</p>
-            <p className="text-sm font-bold text-zinc-200">{agent.tasksToday}</p>
+            <p className="text-sm font-bold text-zinc-200">
+              {agent.tasksToday}
+            </p>
           </div>
         )}
         {agent.costToday !== undefined && (
           <div>
             <p className="text-xs text-zinc-500">Cost</p>
-            <p className="text-sm font-bold text-status-strategy">${agent.costToday.toFixed(3)}</p>
+            <p className="text-sm font-bold text-status-strategy">
+              ${agent.costToday.toFixed(3)}
+            </p>
           </div>
         )}
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 pt-1 border-t border-surface-border">
+      <div className="grid grid-cols-4 gap-2 pt-1 border-t border-surface-border">
         <button
-          className="flex-1 text-xs py-1.5 rounded-lg bg-surface-muted hover:bg-surface-overlay text-zinc-300 transition-colors"
-          onClick={() => handleAction('inspect')}
+          className="text-xs py-1.5 rounded-lg bg-surface-muted hover:bg-surface-overlay text-zinc-300 transition-colors"
+          onClick={() => handleAction("inspect")}
         >
           Inspect
         </button>
-        {agent.status === 'RUNNING' ? (
+        {agent.status === "RUNNING" ? (
           <button
-            className="flex-1 text-xs py-1.5 rounded-lg bg-status-warn/10 hover:bg-status-warn/20 text-status-warn transition-colors"
-            onClick={() => handleAction('pause')}
+            className="text-xs py-1.5 rounded-lg bg-status-warn/10 hover:bg-status-warn/20 text-status-warn transition-colors"
+            onClick={() => handleAction("pause")}
           >
             Pause
           </button>
         ) : (
           <button
-            className="flex-1 text-xs py-1.5 rounded-lg bg-status-ops/10 hover:bg-status-ops/20 text-status-ops transition-colors"
-            onClick={() => handleAction('resume')}
+            className="text-xs py-1.5 rounded-lg bg-status-ops/10 hover:bg-status-ops/20 text-status-ops transition-colors"
+            onClick={() => handleAction("resume")}
           >
             Resume
           </button>
         )}
         <button
-          className="flex-1 text-xs py-1.5 rounded-lg bg-surface-muted hover:bg-surface-overlay text-zinc-400 transition-colors"
-          onClick={() => handleAction('audit')}
+          className="text-xs py-1.5 rounded-lg bg-surface-muted hover:bg-surface-overlay text-zinc-400 transition-colors"
+          onClick={() => handleAction("edit")}
+        >
+          Edit
+        </button>
+        <button
+          className="text-xs py-1.5 rounded-lg bg-surface-muted hover:bg-surface-overlay text-zinc-400 transition-colors"
+          onClick={() => handleAction("audit")}
         >
           Audit
         </button>

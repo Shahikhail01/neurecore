@@ -26,7 +26,8 @@ import {
   ReorderTiersDto,
 } from './dto/tier.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../security/guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuditLog } from '../../common/decorators/auth.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 
@@ -61,12 +62,14 @@ export class TiersController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('TIER_CREATE')
   create(@Body() dto: CreateTierDto) {
     return this.tiersService.create(dto);
   }
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('TIER_UPDATE')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTierDto) {
     return this.tiersService.update(id, dto);
   }
@@ -74,6 +77,7 @@ export class TiersController {
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
+  @AuditLog('TIER_DELETE')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.tiersService.delete(id);
   }
@@ -82,6 +86,7 @@ export class TiersController {
 
   @Patch(':id/toggle')
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('TIER_TOGGLE_ACTIVE')
   toggleActive(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ToggleTierDto,
@@ -91,12 +96,14 @@ export class TiersController {
 
   @Post(':id/set-default')
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('TIER_SET_DEFAULT')
   setDefault(@Param('id', ParseUUIDPipe) id: string) {
     return this.tiersService.setDefault(id);
   }
 
   @Post('reorder')
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('TIER_REORDER')
   reorder(@Body() dto: ReorderTiersDto) {
     return this.tiersService.reorder(dto.orderedIds);
   }

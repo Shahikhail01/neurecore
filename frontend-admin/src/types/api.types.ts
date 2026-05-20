@@ -1,5 +1,5 @@
 export interface ApiResponse<T = unknown> {
-  status: 'success' | 'error';
+  status: "success" | "error";
   data?: T;
   error?: { code: string; message: string; details?: Record<string, unknown> };
   meta: { timestamp: string; requestId: string };
@@ -16,8 +16,16 @@ export interface Tenant {
   id: string;
   name: string;
   slug: string;
-  plan: string;
   status: string;
-  agentLimit: number;
   createdAt: string;
+  tierId?: string;
+  tier?: {
+    id: string;
+    name: string;
+    slug: string;
+    maxAgents: number;
+    isActive?: boolean;
+  };
+  plan?: string;
+  agentLimit?: number;
 }

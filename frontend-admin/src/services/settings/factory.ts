@@ -21,10 +21,11 @@ import { TierSettingsService } from "./tierSettings.service";
 import { EmailSettingsService } from "./emailSettings.service";
 import { AuditLogsService } from "./auditSettings.service";
 import { PlatformSettingsService } from "./platformSettings.service";
-import { getSettingsApiClient } from "./apiClient";
+import { getSettingsApiClient, SettingsApiClient } from "./apiClient";
 
 export class SettingsServiceFactory implements ISettingsServiceFactory {
   private apiClient: ISettingsApiClient;
+  private tierApiClient: ISettingsApiClient;
   private aiService: IAISettingsService | null = null;
   private tierService: ITierSettingsService | null = null;
   private emailService: IEmailSettingsService | null = null;
@@ -33,6 +34,7 @@ export class SettingsServiceFactory implements ISettingsServiceFactory {
 
   constructor(apiClient?: ISettingsApiClient) {
     this.apiClient = apiClient ?? getSettingsApiClient();
+    this.tierApiClient = new SettingsApiClient("");
   }
 
   createAISettingsService(): IAISettingsService {
@@ -44,7 +46,7 @@ export class SettingsServiceFactory implements ISettingsServiceFactory {
 
   createTierSettingsService(): ITierSettingsService {
     if (!this.tierService) {
-      this.tierService = new TierSettingsService(this.apiClient);
+      this.tierService = new TierSettingsService(this.tierApiClient);
     }
     return this.tierService;
   }

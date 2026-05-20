@@ -35,6 +35,10 @@ export interface EvaluationRunRecord {
 export interface IEvaluationRepository {
   create(input: CreateEvaluationInput): Promise<EvaluationRunRecord>;
   findById(id: string): Promise<EvaluationRunRecord | null>;
+  findByIdAndTenant(
+    id: string,
+    tenantId: string,
+  ): Promise<EvaluationRunRecord | null>;
   findByAgent(
     agentId: string,
     tenantId: string,

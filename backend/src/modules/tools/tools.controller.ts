@@ -10,6 +10,7 @@ import {
   HttpStatus,
   UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { Public } from '../../common/decorators/roles.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { ToolsService } from './tools.service';
@@ -77,7 +78,7 @@ export class ToolsController {
   // ─── Register a new tool integration ────────────────────
 
   @Post('register')
-  @Roles('ADMIN', 'OWNER')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
   registerIntegration(
     @Body()
     body: {

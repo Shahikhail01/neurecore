@@ -2,7 +2,50 @@
 
 ## Last Updated
 
-2026-05-18 (update 29 — frontend-admin branding, auth loop fixes, React 18 downgrade)
+2026-05-18 (update 30 — frontend-admin auth hardening, checked-in auth e2e, dashboard repair)
+
+---
+
+## Update 30 — Admin Auth Hardening + Dashboard Repair (May 18, 2026)
+
+### Auth session normalization
+- Added shared canonical session helper in `frontend-admin/src/lib/auth-session.ts`
+- Canonical keys now used across admin auth surfaces: `admin_accessToken`, `admin_refreshToken`
+- Login and refresh payload shape differences normalized in one place
+
+### `/auth/me`, logout, and expired-session cleanup
+- `CurrentUserProvider` now normalizes both raw user payloads and wrapped `{ data: user }` payloads
+- `APIClient` now retries once on `401` via `/auth/refresh` before clearing session for `/auth/me` bootstrap
+- Session-cleared event added so cached current-user state is nulled immediately on logout or expired refresh
+- `useAuth.logout()` now clears canonical session state in `finally`
+
+### Dashboard header/logout fix
+- Active header at `components/layout(1)/Header.tsx` was passing a rendered `<Menu>` into Ant `Dropdown`
+- Replaced with proper `menu.items` config so logout control renders and works in the active dashboard layout
+
+### Checked-in auth regression coverage
+- Added Playwright config in `frontend-admin/playwright.config.ts`
+- Added checked-in spec `frontend-admin/tests/e2e/auth-session.spec.ts`
+- Added backend prep script `backend/scripts/prepare-auth-e2e.sh`
+- Added CI workflow `.github/workflows/frontend-admin-auth-e2e.yml` provisioning pgvector Postgres + Redis
+- Local validation passed with `PLAYWRIGHT_SKIP_WEBSERVER=1 pnpm run test:e2e:auth`
+
+### Dashboard 404 audit and fix
+- Root cause: admin request builder synthesized invalid NocoBase-style URLs such as `agents:list`
+- `frontend-admin/src/api-client/hooks/useRequest.ts` now maps standard resource actions to REST paths
+- Dashboard list pages updated to consume backend envelope shape `response.data.data`
+- Secondary route failure resolved by adding missing `dayjs` dependency to `frontend-admin/package.json`
+- Added `rowKey="id"` to root dashboard recent-activity table to remove the table key warning source
+
+### Backend and database connectivity rechecked
+- `/api/v1/health/detailed` returned `200`
+- Backend auth login succeeded
+- Authenticated `/api/v1/agents`, `/api/v1/tasks`, and `/api/v1/approvals` returned `200`
+- Dashboard routes `/dashboard/agents`, `/dashboard/tasks`, `/dashboard/approvals` returned `200` after fixes
+
+### Residual issues not fixed in this slice
+- Browser smoke still reported a separate `401` and a React state-update warning unrelated to the dashboard `404`
+- Full admin `tsc` remains blocked by broader pre-existing hoisted React 19 declaration issues outside touched files
 
 ---
 

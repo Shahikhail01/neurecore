@@ -37,6 +37,16 @@ export class PrismaEvaluationRepository implements IEvaluationRepository {
     return record ? this.toRecord(record) : null;
   }
 
+  async findByIdAndTenant(
+    id: string,
+    tenantId: string,
+  ): Promise<EvaluationRunRecord | null> {
+    const record = await this.prisma.evaluationRun.findFirst({
+      where: { id, tenantId },
+    });
+    return record ? this.toRecord(record) : null;
+  }
+
   async findByAgent(
     agentId: string,
     tenantId: string,

@@ -23,19 +23,23 @@ import {
 } from '@nestjs/common';
 import { TierPoolService } from './services/tier-pool.service';
 import { PoolProvisioningService } from './services/pool-provisioning.service';
+import { DepartmentPoolProvisioningService } from './services/department-pool-provisioning.service';
 import { TierEnforcementService } from './services/tier-enforcement.service';
+import { AgentPoolService } from './services/agent-pool.service';
 import {
   CreatePoolSlotDto,
+  ProvisionDepartmentFromSlotDto,
   UpdatePoolSlotDto,
   ProvisionToTenantDto,
   ProvisionAgentFromSlotDto,
   ReplaceSlotAgentDto,
 } from './dto/pool-provisioning.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../security/guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { TENANT_ADMIN_ROLES } from '../../common/types/user-role.utils';
 
 @Controller({ path: 'tiers', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -43,7 +47,9 @@ export class TierPoolController {
   constructor(
     private readonly tierPoolService: TierPoolService,
     private readonly poolProvisioningService: PoolProvisioningService,
+    private readonly departmentPoolProvisioningService: DepartmentPoolProvisioningService,
     private readonly tierEnforcementService: TierEnforcementService,
+    private readonly agentPoolService: AgentPoolService,
   ) {}
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -55,6 +61,7 @@ export class TierPoolController {
    * Tenant ADMIN — get current tenant's pool status (which slots filled, remaining)
    */
   @Get('pool/status')
+  @Roles(...TENANT_ADMIN_ROLES)
   async getTenantPoolStatus(@CurrentUser() user: any) {
     if (!user?.tenantId) {
       throw new Error('No tenant associated with this user');
@@ -63,14 +70,54 @@ export class TierPoolController {
   }
 
   /**
+   * GET /tiers/pool/status/departments
+   * Tenant ADMIN — get current tenant's department pool status
+   */
+  @Get('pool/status/departments')
+  @Roles(...TENANT_ADMIN_ROLES)
+  async getTenantDepartmentPoolStatus(@CurrentUser() user: any) {
+    if (!user?.tenantId) {
+      throw new Error('No tenant associated with this user');
+    }
+    return this.tierPoolService.getDepartmentPoolStatusForTenant(user.tenantId);
+  }
+
+  /**
    * POST /tiers/pool/provision-slot
    * Tenant ADMIN — provision an agent from a specific choice slot
    */
   @Post('pool/provision-slot')
-  async provisionFromSlot(@Body() dto: ProvisionAgentFromSlotDto, @CurrentUser() user: any) {
+  @Roles(...TENANT_ADMIN_ROLES)
+  async provisionFromSlot(
+    @Body() dto: ProvisionAgentFromSlotDto,
+    @CurrentUser() user: any,
+  ) {
     if (!user?.tenantId) throw new Error('No tenant associated with this user');
     await this.tierEnforcementService.enforceAgentLimit(user.tenantId);
-    return this.poolProvisioningService.provisionFromSlot(user.tenantId, dto.slotId, user.userId);
+    return this.poolProvisioningService.provisionFromSlot(
+      user.tenantId,
+      dto.slotId,
+      user.userId,
+    );
+  }
+
+  /**
+   * POST /tiers/pool/provision-department-slot
+   * Tenant ADMIN — provision a department from a specific choice slot
+   */
+  @Post('pool/provision-department-slot')
+  @Roles(...TENANT_ADMIN_ROLES)
+  async provisionDepartmentFromSlot(
+    @Body() dto: ProvisionDepartmentFromSlotDto,
+    @CurrentUser() user: any,
+  ) {
+    if (!user?.tenantId) throw new Error('No tenant associated with this user');
+    return this.departmentPoolProvisioningService.provisionFromSlot(
+      user.tenantId,
+      dto.slotId,
+      dto,
+      user.userId,
+    );
   }
 
   /**
@@ -78,7 +125,11 @@ export class TierPoolController {
    * Tenant ADMIN — release a choice slot (remove the agent)
    */
   @Delete('pool/slots/:slotId')
-  async releaseSlot(@Param('slotId', ParseUUIDPipe) slotId: string, @CurrentUser() user: any) {
+  @Roles(...TENANT_ADMIN_ROLES)
+  async releaseSlot(
+    @Param('slotId', ParseUUIDPipe) slotId: string,
+    @CurrentUser() user: any,
+  ) {
     if (!user?.tenantId) throw new Error('No tenant associated with this user');
     await this.poolProvisioningService.releaseSlot(user.tenantId, slotId);
     return { success: true, slotId, message: 'Slot released successfully' };
@@ -89,6 +140,7 @@ export class TierPoolController {
    * Tenant ADMIN — replace agent in a choice slot with a new template
    */
   @Patch('pool/slots/:slotId')
+  @Roles(...TENANT_ADMIN_ROLES)
   async replaceSlotAgent(
     @Param('slotId', ParseUUIDPipe) slotId: string,
     @Body() dto: ReplaceSlotAgentDto,
@@ -135,23 +187,20 @@ export class TierPoolController {
    */
   @Post(':id/pool/slots')
   @Roles(UserRole.SUPER_ADMIN)
-  async createSlot(@Param('id', ParseUUIDPipe) tierId: string, @Body() dto: CreatePoolSlotDto) {
-    const { PrismaService } = await import('../../infrastructure/database/prisma.service');
-    const prisma = new PrismaService();
-    const slot = await prisma.tierAgentPool.create({
-      data: {
-        tierId,
-        templateId: dto.templateId,
-        slot: dto.slot,
-        slotType: dto.slotType,
-        isRequired: dto.isRequired ?? dto.slotType === 'FIXED',
-        isDefaultSelected: dto.isDefaultSelected ?? true,
-        defaultBudgetPerDay: dto.defaultBudgetPerDay,
-        defaultModel: dto.defaultModel,
-      },
-      include: { template: true },
+  async createSlot(
+    @Param('id', ParseUUIDPipe) tierId: string,
+    @Body() dto: CreatePoolSlotDto,
+  ) {
+    return this.agentPoolService.addToPool({
+      tierId,
+      templateId: dto.templateId,
+      slot: dto.slot,
+      slotType: dto.slotType,
+      isRequired: dto.isRequired,
+      isDefaultSelected: dto.isDefaultSelected,
+      defaultBudgetPerDay: dto.defaultBudgetPerDay,
+      defaultModel: dto.defaultModel,
     });
-    return slot;
   }
 
   /**
@@ -165,19 +214,14 @@ export class TierPoolController {
     @Param('slotId', ParseUUIDPipe) slotId: string,
     @Body() dto: UpdatePoolSlotDto,
   ) {
-    const { PrismaService } = await import('../../infrastructure/database/prisma.service');
-    const prisma = new PrismaService();
-    return prisma.tierAgentPool.update({
-      where: { id: slotId, tierId },
-      data: {
-        slot: dto.slot,
-        slotType: dto.slotType,
-        isRequired: dto.isRequired,
-        isDefaultSelected: dto.isDefaultSelected,
-        defaultBudgetPerDay: dto.defaultBudgetPerDay,
-        defaultModel: dto.defaultModel,
-      },
-      include: { template: true },
+    void tierId;
+    return this.agentPoolService.updatePoolEntry(slotId, {
+      slot: dto.slot,
+      slotType: dto.slotType,
+      isRequired: dto.isRequired,
+      isDefaultSelected: dto.isDefaultSelected,
+      defaultBudgetPerDay: dto.defaultBudgetPerDay,
+      defaultModel: dto.defaultModel,
     });
   }
 
@@ -191,16 +235,8 @@ export class TierPoolController {
     @Param('id', ParseUUIDPipe) tierId: string,
     @Param('slotId', ParseUUIDPipe) slotId: string,
   ) {
-    const { PrismaService } = await import('../../infrastructure/database/prisma.service');
-    const prisma = new PrismaService();
-    const agentCount = await prisma.agent.count({ where: { tierAgentPoolId: slotId } });
-    if (agentCount > 0) {
-      throw new Error(
-        `Cannot delete slot — ${agentCount} agent(s) already created from it. ` +
-          'Remove the agents first or reassign them to a different slot.',
-      );
-    }
-    await prisma.tierAgentPool.delete({ where: { id: slotId, tierId } });
+    void tierId;
+    await this.agentPoolService.removeFromPool(slotId);
     return { success: true, deleted: slotId };
   }
 
@@ -215,7 +251,16 @@ export class TierPoolController {
     @Body() dto: ProvisionToTenantDto,
     @CurrentUser() user: any,
   ) {
-    const results = await this.poolProvisioningService.provisionDefaultPool(dto.tenantId, user.userId);
-    return { success: true, tenantId: dto.tenantId, tierId, provisioned: results, totalProvisioned: results.length };
+    const results = await this.poolProvisioningService.provisionDefaultPool(
+      dto.tenantId,
+      user.userId,
+    );
+    return {
+      success: true,
+      tenantId: dto.tenantId,
+      tierId,
+      provisioned: results,
+      totalProvisioned: results.length,
+    };
   }
 }

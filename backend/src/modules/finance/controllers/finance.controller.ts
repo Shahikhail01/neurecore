@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Param,
@@ -23,9 +24,32 @@ import { BillingFilterDto } from '../dto/billing-filter.dto';
 
 function resolveTenantId(user: JwtPayload, explicit?: string): string {
   if (user.role === UserRole.SUPER_ADMIN) {
-    if (!explicit) throw new Error('tenantId is required for SUPER_ADMIN');
+    if (!explicit)
+      throw new BadRequestException('tenantId is required for SUPER_ADMIN');
     return explicit;
   }
+  return user.tenantId!;
+}
+
+function resolveInvoiceListTenantId(
+  user: JwtPayload,
+  explicit?: string,
+  scope?: string,
+): string | null {
+  if (user.role === UserRole.SUPER_ADMIN) {
+    if (scope === 'platform') {
+      return null;
+    }
+
+    if (!explicit) {
+      throw new BadRequestException(
+        'tenantId is required unless scope=platform',
+      );
+    }
+
+    return explicit;
+  }
+
   return user.tenantId!;
 }
 
@@ -62,14 +86,11 @@ export class FinanceController {
   async listInvoices(
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') qTenantId: string | undefined,
+    @Query('scope') scope?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    // SUPER_ADMIN without explicit tenantId lists all invoices across tenants
-    const tenantId =
-      user.role === UserRole.SUPER_ADMIN && !qTenantId
-        ? null
-        : resolveTenantId(user, qTenantId);
+    const tenantId = resolveInvoiceListTenantId(user, qTenantId, scope);
     return this.invoiceService.findAll(
       tenantId,
       Number(page ?? 1),

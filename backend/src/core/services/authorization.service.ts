@@ -10,7 +10,10 @@
 
 import { Injectable } from '@nestjs/common';
 import { JwtPayload, UserRole } from './auth.service';
-import { hasPermission, ROLE_PERMISSIONS } from '../guards/roles.guard';
+import {
+  hasLegacyPermission,
+  LEGACY_ROLE_PERMISSIONS,
+} from './legacy-authorization.constants';
 import { AuditLogService } from './audit-log.service';
 
 /**
@@ -54,7 +57,7 @@ export class AuthorizationService {
     resource: string,
     action: string,
   ): boolean {
-    return hasPermission(user.role, resource, action);
+    return hasLegacyPermission(user.role, resource, action);
   }
 
   /**
@@ -166,7 +169,7 @@ export class AuthorizationService {
    * @returns Permission object for role
    */
   getRolePermissions(user: JwtPayload): Record<string, string[]> {
-    return ROLE_PERMISSIONS[user.role] || {};
+    return LEGACY_ROLE_PERMISSIONS[user.role] || {};
   }
 
   /**

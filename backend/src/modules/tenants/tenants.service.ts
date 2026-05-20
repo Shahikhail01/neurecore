@@ -3,22 +3,23 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
-  Optional,
-  Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CreateTenantDto, UpdateTenantDto } from './dto/tenant.dto';
 import { TenantStatus } from '@prisma/client';
-import { TierProvisioningService } from '../tiers/services/tier-provisioning.service';
+import {
+  TenantDeploymentService,
+  type TierDeploymentPreview,
+} from '../tiers/services/tenant-deployment.service';
+
+export type TierChangePreview = TierDeploymentPreview;
 
 @Injectable()
 export class TenantsService {
   private readonly logger = new Logger(TenantsService.name);
   constructor(
     private readonly prisma: PrismaService,
-    @Optional()
-    @Inject('TIER_PROVISIONING')
-    private readonly provisioningService?: TierProvisioningService,
+    private readonly tenantDeploymentService: TenantDeploymentService,
   ) {}
 
   async findAll(page = 1, limit = 20, search?: string) {
@@ -54,7 +55,7 @@ export class TenantsService {
     return tenant;
   }
 
-  async create(dto: CreateTenantDto) {
+  async create(dto: CreateTenantDto, actorId?: string) {
     const existing = await this.prisma.tenant.findUnique({
       where: { slug: dto.slug },
     });
@@ -93,23 +94,21 @@ export class TenantsService {
     });
 
     // Auto-provision agents based on tier
-    if (this.provisioningService) {
-      try {
-        const result = await this.provisioningService.provisionAgents(
-          tenant.id,
-          tenant.tierId,
-        );
-        this.logger.log(
-          `Tenant ${tenant.slug} provisioned with ${result.agentsProvisioned} agents`,
-        );
-      } catch (error) {
-        this.logger.error(
-          `Failed to provision agents for tenant ${tenant.id}: ${(error as Error).message}`,
-          (error as Error).stack,
-        );
-        // Don't fail tenant creation if provisioning fails
-        // Admin can manually provision later
-      }
+    try {
+      const result = await this.tenantDeploymentService.bootstrapTenantTier(
+        tenant.id,
+        tenant.tierId,
+        actorId,
+      );
+      this.logger.log(
+        `Tenant ${tenant.slug} provisioned with ${result.departmentsProvisioned} departments and ${result.agentsProvisioned} agents`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to provision tier resources for tenant ${tenant.id}: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      // Don't fail tenant creation if provisioning fails.
     }
 
     this.logger.log(`Tenant created: ${tenant.slug} on tier ${tier.name}`);
@@ -129,27 +128,21 @@ export class TenantsService {
     });
   }
 
-  async changeTier(tenantId: string, newTierId: string) {
+  async previewTierChange(
+    tenantId: string,
+    newTierId: string,
+  ): Promise<TierChangePreview> {
+    return this.tenantDeploymentService.previewTierBootstrap(
+      tenantId,
+      newTierId,
+    );
+  }
+
+  async changeTier(tenantId: string, newTierId: string, actorId?: string) {
     const tenant = await this.findOne(tenantId);
-
-    const newTier = await this.prisma.tier.findUnique({
-      where: { id: newTierId },
-    });
-    if (!newTier) {
-      throw new NotFoundException(`Tier ${newTierId} not found`);
-    }
-
-    // Get current selected agent count
-    const currentAgentCount = await this.prisma.agent.count({
-      where: { tenantId, isSelected: true },
-    });
-
-    // Check if new tier allows current agent count
-    if (currentAgentCount > newTier.maxAgents) {
-      throw new ConflictException(
-        `Cannot change to tier "${newTier.name}" - it allows only ${newTier.maxAgents} agents, ` +
-          `but tenant has ${currentAgentCount} agents selected`,
-      );
+    const preview = await this.previewTierChange(tenantId, newTierId);
+    if (!preview.compatibility.canChange) {
+      throw new ConflictException(preview.compatibility.blockingReasons[0]);
     }
 
     const updated = await this.prisma.tenant.update({
@@ -158,10 +151,39 @@ export class TenantsService {
       include: { tier: true },
     });
 
+    if (preview.impact.tierLinkedAgentsOutsideTargetPolicy.length > 0) {
+      await Promise.all(
+        preview.impact.tierLinkedAgentsOutsideTargetPolicy.map((agent) =>
+          this.prisma.agent.update({
+            where: { id: agent.id },
+            data: { isSelected: false, isActive: false },
+          }),
+        ),
+      );
+    }
+
+    if (preview.impact.tierLinkedDepartmentsOutsideTargetPolicy.length > 0) {
+      await Promise.all(
+        preview.impact.tierLinkedDepartmentsOutsideTargetPolicy.map(
+          (department) =>
+            this.prisma.department.update({
+              where: { id: department.id },
+              data: { isSelected: false, status: 'INACTIVE' },
+            }),
+        ),
+      );
+    }
+
+    await this.tenantDeploymentService.bootstrapTenantTier(
+      updated.id,
+      newTierId,
+      actorId,
+    );
+
     const oldTierName =
       (tenant as any).tier?.name ?? (tenant as any).tierId ?? 'unknown';
     this.logger.log(
-      `Tenant ${tenant.slug} changed from tier ${oldTierName} to ${newTier.name}`,
+      `Tenant ${tenant.slug} changed from tier ${oldTierName} to ${preview.targetTier.name}`,
     );
     return updated;
   }

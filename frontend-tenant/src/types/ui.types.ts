@@ -1,15 +1,21 @@
 // ─── UI Type System ───────────────────────────────────────────────────────────
 // I — Interface Segregation: each interface covers exactly its domain
 
-export type StatusColor = 'profit' | 'risk' | 'ops' | 'strategy' | 'warn' | 'neutral';
-export type ChartTimeRange = '1h' | '24h' | '7d' | '30d' | '90d';
+export type StatusColor =
+  | "profit"
+  | "risk"
+  | "ops"
+  | "strategy"
+  | "warn"
+  | "neutral";
+export type ChartTimeRange = "1h" | "24h" | "7d" | "30d" | "90d";
 
 // ─── KPI Tile ─────────────────────────────────────────────────────────────────
 export interface KpiTileProps {
   label: string;
   value: string | number;
-  delta?: number;        // % change from previous period (positive = up)
-  deltaLabel?: string;   // e.g. "vs last 7d"
+  delta?: number; // % change from previous period (positive = up)
+  deltaLabel?: string; // e.g. "vs last 7d"
   color: StatusColor;
   icon?: React.ReactNode;
   loading?: boolean;
@@ -17,8 +23,15 @@ export interface KpiTileProps {
 }
 
 // ─── Agent Card ───────────────────────────────────────────────────────────────
-export type AgentCardVariant = 'compact' | 'full' | 'inspector';
-export type AgentCardAction = 'pause' | 'resume' | 'retrain' | 'audit' | 'inspect' | 'delete';
+export type AgentCardVariant = "compact" | "full" | "inspector";
+export type AgentCardAction =
+  | "pause"
+  | "resume"
+  | "retrain"
+  | "audit"
+  | "inspect"
+  | "delete"
+  | "edit";
 
 export interface AgentCardProps {
   agent: AgentCardData;
@@ -34,19 +47,23 @@ export interface AgentCardData {
   role?: string;
   type: string;
   status: string;
-  workloadPct?: number;     // 0–100
-  workload?: number;        // alias for workloadPct (used in page mappers)
-  successRate?: number;     // 0–100
+  workloadPct?: number; // 0–100
+  workload?: number; // alias for workloadPct (used in page mappers)
+  successRate?: number; // 0–100
   costToday?: number;
   tasksToday?: number;
-  taskCount?: number;       // raw task count
-  budgetUsed?: number;      // amount used from budget
-  budgetTotal?: number;     // total budget limit
-  tenantName?: string;      // admin portal only
+  taskCount?: number; // raw task count
+  budgetUsed?: number; // amount used from budget
+  budgetTotal?: number; // total budget limit
+  tenantName?: string; // admin portal only
   lastActiveAt?: string;
-  department?: string;      // department name for display
-  model?: string;           // LLM model identifier
-  updatedAt?: string;       // ISO timestamp of last update
+  department?: string; // department name for display
+  model?: string; // LLM model identifier
+  updatedAt?: string; // ISO timestamp of last update
+  badges?: Array<{
+    label: string;
+    tone?: StatusColor;
+  }>;
 }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
@@ -60,7 +77,7 @@ export interface ChartProps<T = Record<string, unknown>> {
 }
 
 export interface TimeSeriesPoint {
-  ts: string;       // ISO timestamp
+  ts: string; // ISO timestamp
   value: number;
   label?: string;
 }
@@ -77,7 +94,12 @@ export interface BarDataPoint {
 }
 
 // ─── Inspector Panel ──────────────────────────────────────────────────────────
-export type InspectorType = 'agent' | 'task' | 'workflow' | 'department' | 'tenant';
+export type InspectorType =
+  | "agent"
+  | "task"
+  | "workflow"
+  | "department"
+  | "tenant";
 
 export interface InspectorState {
   open: boolean;
@@ -100,8 +122,8 @@ export interface ActivityEvent {
   id: string;
   timestamp: string;
   message: string;
-  type: 'agent' | 'task' | 'workflow' | 'system' | 'approval';
-  severity: 'info' | 'success' | 'warn' | 'error';
+  type: "agent" | "task" | "workflow" | "system" | "approval";
+  severity: "info" | "success" | "warn" | "error";
 }
 
 // ─── Dashboard KPIs ──────────────────────────────────────────────────────────
@@ -123,25 +145,27 @@ export interface DashboardKpis {
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 export const STATUS_COLOR_MAP: Record<string, StatusColor> = {
-  RUNNING:    'ops',
-  ACTIVE:     'profit',
-  COMPLETED:  'profit',
-  SUCCESS:    'profit',
-  IDLE:       'neutral',
-  DRAFT:      'neutral',
-  PAUSED:     'warn',
-  PENDING:    'warn',
-  QUEUED:     'warn',
-  FAILED:     'risk',
-  ERROR:      'risk',
-  CANCELLED:  'neutral',
+  RUNNING: "ops",
+  ACTIVE: "profit",
+  COMPLETED: "profit",
+  SUCCESS: "profit",
+  IDLE: "neutral",
+  DRAFT: "neutral",
+  PAUSED: "warn",
+  PENDING: "warn",
+  QUEUED: "warn",
+  FAILED: "risk",
+  ERROR: "risk",
+  CANCELLED: "neutral",
 };
 
 export const STATUS_BADGE_CLASS: Record<StatusColor, string> = {
-  profit:   'bg-status-profit/15 text-status-profit border border-status-profit/30',
-  risk:     'bg-status-risk/15 text-status-risk border border-status-risk/30',
-  ops:      'bg-status-ops/15 text-status-ops border border-status-ops/30',
-  strategy: 'bg-status-strategy/15 text-status-strategy border border-status-strategy/30',
-  warn:     'bg-status-warn/15 text-status-warn border border-status-warn/30',
-  neutral:  'bg-surface-muted/40 text-zinc-400 border border-surface-border',
+  profit:
+    "bg-status-profit/15 text-status-profit border border-status-profit/30",
+  risk: "bg-status-risk/15 text-status-risk border border-status-risk/30",
+  ops: "bg-status-ops/15 text-status-ops border border-status-ops/30",
+  strategy:
+    "bg-status-strategy/15 text-status-strategy border border-status-strategy/30",
+  warn: "bg-status-warn/15 text-status-warn border border-status-warn/30",
+  neutral: "bg-surface-muted/40 text-zinc-400 border border-surface-border",
 };

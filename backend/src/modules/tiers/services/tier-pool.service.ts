@@ -10,8 +10,10 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type {
+  DepartmentPoolSlot,
   ITierPoolService,
   PoolSlot,
+  TenantDepartmentPoolStatus,
   TenantPoolStatus,
 } from '../interfaces/pool-slot.interface';
 
@@ -165,16 +167,76 @@ export class TierPoolService implements ITierPoolService {
     return this.mapPoolToSlot(agent.tierAgentPool as any, agent.tenantId);
   }
 
+  async getDepartmentPoolStatusForTenant(
+    tenantId: string,
+  ): Promise<TenantDepartmentPoolStatus> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        tier: {
+          include: {
+            tierDepartmentPools: {
+              include: {
+                departmentTemplate: true,
+                departments: {
+                  where: { tenantId },
+                },
+              },
+              orderBy: { slot: 'asc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    const fixedSlots: DepartmentPoolSlot[] = [];
+    const choiceSlots: DepartmentPoolSlot[] = [];
+    let filledFixed = 0;
+    let filledChoice = 0;
+
+    for (const pool of tenant.tier.tierDepartmentPools) {
+      const slot = this.mapDepartmentPoolToSlot(pool, tenantId);
+      if (slot.slotType === 'FIXED') {
+        fixedSlots.push(slot);
+        if (slot.filledDepartmentId) filledFixed++;
+      } else {
+        choiceSlots.push(slot);
+        if (slot.filledDepartmentId) filledChoice++;
+      }
+    }
+
+    const totalChoice = choiceSlots.length;
+    const choiceRemaining = totalChoice - filledChoice;
+
+    return {
+      tenantId,
+      tierId: tenant.tierId,
+      tierName: tenant.tier.name,
+      tierSlug: tenant.tier.slug,
+      fixedSlots,
+      choiceSlots,
+      totalFixed: fixedSlots.length,
+      totalChoice,
+      filledFixed,
+      filledChoice,
+      choiceRemaining,
+      canAddMoreChoiceDepartments: choiceRemaining > 0,
+      isAtLimit: choiceRemaining <= 0,
+    };
+  }
+
   // ─── Private Helpers ─────────────────────────────────────────────────────────
 
-  private async mapPoolToSlot(
-    pool: any,
-    tenantId?: string,
-  ): Promise<PoolSlot> {
+  private async mapPoolToSlot(pool: any, tenantId?: string): Promise<PoolSlot> {
     // Get the filled agent for this specific tenant (if tenantId provided)
     let filledAgent = null;
     if (tenantId) {
-      filledAgent = pool.agents?.find((a: any) => a.tenantId === tenantId) ?? null;
+      filledAgent =
+        pool.agents?.find((a: any) => a.tenantId === tenantId) ?? null;
     } else if (pool.agents?.length > 0) {
       filledAgent = pool.agents[0];
     }
@@ -196,6 +258,35 @@ export class TierPoolService implements ITierPoolService {
       filledAgentName: filledAgent?.name ?? undefined,
       filledAgentStatus: filledAgent?.status ?? undefined,
       filledAt: filledAgent?.createdAt?.toISOString() ?? undefined,
+    };
+  }
+
+  private mapDepartmentPoolToSlot(
+    pool: any,
+    tenantId?: string,
+  ): DepartmentPoolSlot {
+    let filledDepartment = null;
+    if (tenantId) {
+      filledDepartment =
+        pool.departments?.find(
+          (department: any) => department.tenantId === tenantId,
+        ) ?? null;
+    } else if (pool.departments?.length > 0) {
+      filledDepartment = pool.departments[0];
+    }
+
+    return {
+      id: pool.id,
+      tierId: pool.tierId,
+      departmentTemplateId: pool.departmentTemplateId,
+      templateName: pool.departmentTemplate?.name ?? 'Unknown Template',
+      slot: pool.slot,
+      slotType: pool.slotType as 'FIXED' | 'CHOICE',
+      isRequired: pool.isRequired,
+      isDefaultSelected: pool.isDefaultSelected,
+      filledDepartmentId: filledDepartment?.id ?? undefined,
+      filledDepartmentName: filledDepartment?.name ?? undefined,
+      filledAt: filledDepartment?.createdAt?.toISOString() ?? undefined,
     };
   }
 }

@@ -25,15 +25,23 @@ import { EvaluationService } from './services/evaluation.service';
 import { CreateEvaluationRunDto } from './dto/evaluation.dto';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
+import {
+  AssignAgentDepartmentDto,
+  AssignAgentTierSlotDto,
+} from './dto/agent-assignment.dto';
 import { DispatchTaskDto } from './dto/dispatch-task.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuditLog } from '../../common/decorators/auth.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
 import { AgentStatus, AgentType } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { RolesGuard } from '../security/guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { TierEnforcementService } from '../tiers/services/tier-enforcement.service';
+import { AssignmentService } from '../tiers/services/assignment.service';
+import { TenantResourcePolicyService } from '../tiers/services/tenant-resource-policy.service';
+import { isPlatformOperatorRole } from '../../common/types/user-role.utils';
 
 class UpdatePermissionsDto {
   @IsArray()
@@ -67,6 +75,8 @@ export class AgentsController {
     private readonly executorService: AgentExecutorService,
     private readonly agentVersionService: AgentVersionService,
     private readonly evaluationService: EvaluationService,
+    private readonly assignmentService: AssignmentService,
+    private readonly tenantPolicy: TenantResourcePolicyService,
   ) {}
 
   private resolveTenantId(user: JwtPayload, tenantId?: string): string {
@@ -79,29 +89,58 @@ export class AgentsController {
     return user.tenantId;
   }
 
+  private isPlatformRole(user: JwtPayload): boolean {
+    return isPlatformOperatorRole(user.role);
+  }
+
+  private async resolveExistingAgentTenantId(
+    user: JwtPayload,
+    agentId: string,
+    tenantId?: string,
+  ): Promise<string> {
+    if (!this.isPlatformRole(user)) {
+      return this.resolveTenantId(user, tenantId);
+    }
+
+    const agent = (await this.agentsService.findOneForPlatform(agentId)) as {
+      tenantId?: string;
+    };
+
+    if (!agent.tenantId) {
+      throw new NotFoundException(`Agent ${agentId} not found`);
+    }
+
+    return agent.tenantId;
+  }
+
   // ─── List ────────────────────────────────────────────────
 
   @Get()
   findAll(
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
     @Query('departmentId') departmentId?: string,
     @Query('status') status?: AgentStatus,
     @Query('type') type?: AgentType,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
-    // SUPER_ADMIN may list globally (no tenantId) or for a specific tenant.
-    const isPlatformRole =
-      user.role === UserRole.SUPER_ADMIN ||
-      user.role === UserRole.PLATFORM_ADMIN ||
-      user.role === UserRole.SUPPORT;
+    const isPlatformRole = this.isPlatformRole(user);
+
+    const effectiveTenantId = isPlatformRole ? tenantId : user.tenantId;
 
     if (!isPlatformRole && !user.tenantId)
       throw new ForbiddenException('Tenant context required');
 
+    if (isPlatformRole && !tenantId && scope !== 'platform') {
+      throw new BadRequestException(
+        'tenantId is required unless scope=platform is explicitly provided',
+      );
+    }
+
     return this.agentsService.findAll({
-      tenantId: user.role === UserRole.SUPER_ADMIN ? tenantId : user.tenantId,
+      tenantId: effectiveTenantId,
       departmentId,
       status,
       type,
@@ -117,7 +156,12 @@ export class AgentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
+    if (this.isPlatformRole(user) && scope === 'platform') {
+      return this.agentsService.findOneForPlatform(id);
+    }
+
     return this.agentsService.findOne(id, this.resolveTenantId(user, tenantId));
   }
 
@@ -128,7 +172,12 @@ export class AgentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
+    if (this.isPlatformRole(user) && scope === 'platform') {
+      return this.agentsService.findOneForPlatform(id);
+    }
+
     return this.agentsService.findOne(id, this.resolveTenantId(user, tenantId));
   }
 
@@ -136,6 +185,7 @@ export class AgentsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('AGENT_CREATE')
   create(
     @Body() dto: CreateAgentDto,
     @CurrentUser() user: JwtPayload,
@@ -152,17 +202,80 @@ export class AgentsController {
   // ─── Update ──────────────────────────────────────────────
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OWNER)
+  @AuditLog('AGENT_UPDATE')
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAgentDto,
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    return this.agentsService.update(
-      id,
-      dto,
-      this.resolveTenantId(user, tenantId),
+    const sanitizedDto =
+      user.role === UserRole.SUPER_ADMIN
+        ? dto
+        : this.tenantPolicy.assertAllowedTenantAgentUpdate(
+            dto as Record<string, unknown>,
+          );
+
+    return this.resolveExistingAgentTenantId(user, id, tenantId).then(
+      (effectiveTenantId) =>
+        this.agentsService.update(id, sanitizedDto, effectiveTenantId),
+    );
+  }
+
+  @Post(':id/assign-department')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OWNER)
+  @AuditLog('AGENT_ASSIGN_DEPARTMENT')
+  assignDepartment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssignAgentDepartmentDto,
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    return this.resolveExistingAgentTenantId(user, id, tenantId).then(
+      (effectiveTenantId) =>
+        this.assignmentService.assignAgentToDepartment(
+          effectiveTenantId,
+          id,
+          dto.departmentId,
+        ),
+    );
+  }
+
+  @Post(':id/unassign-department')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OWNER)
+  @AuditLog('AGENT_UNASSIGN_DEPARTMENT')
+  unassignDepartment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    return this.resolveExistingAgentTenantId(user, id, tenantId).then(
+      (effectiveTenantId) =>
+        this.assignmentService.assignAgentToDepartment(
+          effectiveTenantId,
+          id,
+          null,
+        ),
+    );
+  }
+
+  @Post(':id/assign-tier-slot')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OWNER)
+  @AuditLog('AGENT_ASSIGN_TIER_SLOT')
+  assignTierSlot(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssignAgentTierSlotDto,
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    return this.resolveExistingAgentTenantId(user, id, tenantId).then(
+      (effectiveTenantId) =>
+        this.assignmentService.assignAgentToTierSlot(
+          effectiveTenantId,
+          id,
+          dto.slotId,
+        ),
     );
   }
 
@@ -171,19 +284,23 @@ export class AgentsController {
   /** PATCH /agents/:id/permissions — update allowed actions & budget */
   @Patch(':id/permissions')
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('AGENT_UPDATE_PERMISSIONS')
   updatePermissions(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdatePermissionsDto,
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    return this.agentsService.update(
-      id,
-      {
-        permissions: dto.permissions,
-        budgetPerDay: dto.budgetPerDay,
-      } as UpdateAgentDto,
-      this.resolveTenantId(user, tenantId),
+    return this.resolveExistingAgentTenantId(user, id, tenantId).then(
+      (effectiveTenantId) =>
+        this.agentsService.update(
+          id,
+          {
+            permissions: dto.permissions,
+            budgetPerDay: dto.budgetPerDay,
+          } as UpdateAgentDto,
+          effectiveTenantId,
+        ),
     );
   }
 
@@ -199,7 +316,7 @@ export class AgentsController {
     const agent = await this.agentsService.updateStatus(
       id,
       AgentStatus.PAUSED,
-      this.resolveTenantId(user, tenantId),
+      await this.resolveExistingAgentTenantId(user, id, tenantId),
     );
     return { message: 'Agent paused', agent };
   }
@@ -216,7 +333,7 @@ export class AgentsController {
     const agent = await this.agentsService.updateStatus(
       id,
       AgentStatus.IDLE,
-      this.resolveTenantId(user, tenantId),
+      await this.resolveExistingAgentTenantId(user, id, tenantId),
     );
     return { message: 'Agent resumed', agent };
   }
@@ -224,7 +341,7 @@ export class AgentsController {
   // ─── Delete ──────────────────────────────────────────────
 
   @Delete(':id')
-  @UseGuards(RolesGuard)  // PoolSlotGuard temporarily disabled — requires TiersModule in AgentsModule
+  @UseGuards(RolesGuard) // PoolSlotGuard temporarily disabled — requires TiersModule in AgentsModule
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OWNER)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
@@ -232,7 +349,9 @@ export class AgentsController {
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    return this.agentsService.remove(id, this.resolveTenantId(user, tenantId));
+    return this.resolveExistingAgentTenantId(user, id, tenantId).then(
+      (effectiveTenantId) => this.agentsService.remove(id, effectiveTenantId),
+    );
   }
 
   // ─── Dispatch task to agent ──────────────────────────────
@@ -246,10 +365,15 @@ export class AgentsController {
     @Query('tenantId') tenantId?: string,
   ) {
     // Fire-and-forget; client tracks progress via WebSocket
+    const effectiveTenantId = await this.resolveExistingAgentTenantId(
+      user,
+      agentId,
+      tenantId,
+    );
     void this.executorService.executeTask(
       dto.taskId,
       agentId,
-      this.resolveTenantId(user, tenantId),
+      effectiveTenantId,
     );
     return { message: 'Task dispatched', taskId: dto.taskId, agentId };
   }
@@ -263,10 +387,15 @@ export class AgentsController {
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
+    const effectiveTenantId = await this.resolveExistingAgentTenantId(
+      user,
+      agentId,
+      tenantId,
+    );
     void this.executorService.executeTask(
       dto.taskId,
       agentId,
-      this.resolveTenantId(user, tenantId),
+      effectiveTenantId,
     );
     return { message: 'Task dispatched', taskId: dto.taskId, agentId };
   }
@@ -317,9 +446,9 @@ export class AgentsController {
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    return this.agentVersionService.listVersions(
-      id,
-      this.resolveTenantId(user, tenantId),
+    return this.resolveExistingAgentTenantId(user, id, tenantId).then(
+      (effectiveTenantId) =>
+        this.agentVersionService.listVersions(id, effectiveTenantId),
     );
   }
 
@@ -334,7 +463,11 @@ export class AgentsController {
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    const effectiveTenantId = this.resolveTenantId(user, tenantId);
+    const effectiveTenantId = await this.resolveExistingAgentTenantId(
+      user,
+      id,
+      tenantId,
+    );
     const agent = (await this.agentsService.findOne(
       id,
       effectiveTenantId,
@@ -362,10 +495,13 @@ export class AgentsController {
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    return this.agentVersionService.rollback(
-      id,
-      this.resolveTenantId(user, tenantId),
-      dto.versionNumber,
+    return this.resolveExistingAgentTenantId(user, id, tenantId).then(
+      (effectiveTenantId) =>
+        this.agentVersionService.rollback(
+          id,
+          effectiveTenantId,
+          dto.versionNumber,
+        ),
     );
   }
 
@@ -382,7 +518,7 @@ export class AgentsController {
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    const tid = this.resolveTenantId(user, tenantId);
+    const tid = await this.resolveExistingAgentTenantId(user, id, tenantId);
     const source = (await this.agentsService.findOne(id, tid)) as Record<
       string,
       unknown
@@ -434,13 +570,15 @@ export class AgentsController {
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    const tid = this.resolveTenantId(user, tenantId);
-    return this.evaluationService.startEvaluation(
-      agentId,
-      tid,
-      dto.testCases,
-      user.sub,
-      dto.notes,
+    return this.resolveExistingAgentTenantId(user, agentId, tenantId).then(
+      (effectiveTenantId) =>
+        this.evaluationService.startEvaluation(
+          agentId,
+          effectiveTenantId,
+          dto.testCases,
+          user.sub,
+          dto.notes,
+        ),
     );
   }
 
@@ -454,8 +592,10 @@ export class AgentsController {
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    const tid = this.resolveTenantId(user, tenantId);
-    return this.evaluationService.getRunsForAgent(agentId, tid);
+    return this.resolveExistingAgentTenantId(user, agentId, tenantId).then(
+      (effectiveTenantId) =>
+        this.evaluationService.getRunsForAgent(agentId, effectiveTenantId),
+    );
   }
 
   /**
@@ -463,8 +603,20 @@ export class AgentsController {
    * Get a single evaluation run by ID.
    */
   @Get('evaluation-runs/:runId')
-  getEvaluationRun(@Param('runId', ParseUUIDPipe) runId: string) {
-    return this.evaluationService.getRunById(runId);
+  getEvaluationRun(
+    @Param('runId', ParseUUIDPipe) runId: string,
+    @CurrentUser() user: JwtPayload,
+    @Query('scope') scope?: string,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    if (this.isPlatformRole(user) && scope === 'platform') {
+      return this.evaluationService.getRunById(runId);
+    }
+
+    return this.evaluationService.getRunByIdForTenant(
+      runId,
+      this.resolveTenantId(user, tenantId),
+    );
   }
 
   /**
@@ -478,7 +630,11 @@ export class AgentsController {
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
   ) {
-    const tid = this.resolveTenantId(user, tenantId);
+    const tid = await this.resolveExistingAgentTenantId(
+      user,
+      agentId,
+      tenantId,
+    );
     await this.evaluationService.promoteToProduction(agentId, tid);
     return { message: 'Agent promoted to production', agentId };
   }

@@ -48,6 +48,32 @@ export class AnalyticsController {
     return user.tenantId;
   }
 
+  private resolveAggregateTenantId(
+    user: JwtPayload,
+    tenantId?: string,
+    scope?: string,
+  ): string | null {
+    if (user.role === UserRole.SUPER_ADMIN) {
+      if (scope === 'platform') {
+        return null;
+      }
+
+      if (tenantId) {
+        return tenantId;
+      }
+
+      throw new BadRequestException(
+        'tenantId is required unless scope=platform',
+      );
+    }
+
+    if (!user.tenantId) {
+      throw new ForbiddenException('Tenant context required');
+    }
+
+    return user.tenantId;
+  }
+
   /** GET /v1/analytics/models */
   @Get('models')
   getModels(
@@ -64,14 +90,9 @@ export class AnalyticsController {
   async getSummary(
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    const tid =
-      user.role === UserRole.SUPER_ADMIN && tenantId
-        ? tenantId
-        : (user.tenantId ?? null);
-    if (!tid && user.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Tenant context required');
-    }
+    const tid = this.resolveAggregateTenantId(user, tenantId, scope);
     return this.analyticsService.getSummary(tid);
   }
 
@@ -144,15 +165,15 @@ export class AnalyticsController {
   getMaturity(
     @CurrentUser() user: JwtPayload,
     @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    const tid =
-      user.role === UserRole.SUPER_ADMIN && tenantId
-        ? tenantId
-        : (user.tenantId ?? null);
-    if (!tid && user.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Tenant context required');
+    const tid = this.resolveAggregateTenantId(user, tenantId, scope);
+    if (!tid) {
+      throw new BadRequestException(
+        'tenantId is required for maturity unless a platform-wide implementation is added',
+      );
     }
-    return this.maturityService.getMaturityReport(tid!);
+    return this.maturityService.getMaturityReport(tid);
   }
 
   /** GET /v1/analytics/export/csv — download analytics report as CSV (Phase 3.2) */
@@ -183,7 +204,10 @@ export class AnalyticsController {
   @Post('nl-report')
   @HttpCode(HttpStatus.OK)
   async nlReport(@CurrentUser() user: JwtPayload, @Body() dto: NlReportDto) {
-    const tid = dto.tenantId ?? user.tenantId ?? undefined;
+    const tid =
+      user.role === UserRole.SUPER_ADMIN
+        ? dto.tenantId
+        : this.resolveTenantId(user, dto.tenantId);
     return this.nlReportService.generateReport(dto.query, tid);
   }
 }

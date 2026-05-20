@@ -1,6 +1,7 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import { TiersService } from '../tiers/tiers.service';
 
 // Simple file-based storage for development
 // This ensures data persists across backend restarts
@@ -142,109 +143,11 @@ export interface EmailLog {
   clickedAt?: string;
 }
 
-// Default tiers
-const DEFAULT_TIERS: TenantTier[] = [
-  {
-    id: 'tier-free',
-    name: 'Free',
-    slug: 'free',
-    description: 'Free tier for testing',
-    isActive: true,
-    isDefault: true,
-    sortOrder: 1,
-    pricing: {
-      monthlyPrice: 0,
-      yearlyPrice: 0,
-      currency: 'USD',
-      billingCycle: 'monthly',
-    },
-    limits: {
-      maxUsers: 2,
-      maxAgents: 3,
-      maxStorageGB: 1,
-      maxApiCalls: 1000,
-      maxConversationMessages: 500,
-      maxFileSizeMB: 10,
-      allowCustomBranding: false,
-      allowApiAccess: false,
-      allowSso: false,
-      allowAuditExport: false,
-    },
-    features: [],
-    permissions: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'tier-starter',
-    name: 'Starter',
-    slug: 'starter',
-    description: 'Starter tier for small teams',
-    isActive: true,
-    isDefault: false,
-    sortOrder: 2,
-    pricing: {
-      monthlyPrice: 29,
-      yearlyPrice: 290,
-      currency: 'USD',
-      billingCycle: 'monthly',
-    },
-    limits: {
-      maxUsers: 10,
-      maxAgents: 10,
-      maxStorageGB: 10,
-      maxApiCalls: 10000,
-      maxConversationMessages: 5000,
-      maxFileSizeMB: 50,
-      allowCustomBranding: false,
-      allowApiAccess: true,
-      allowSso: false,
-      allowAuditExport: true,
-    },
-    features: [],
-    permissions: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'tier-pro',
-    name: 'Pro',
-    slug: 'pro',
-    description: 'Professional tier',
-    isActive: true,
-    isDefault: false,
-    sortOrder: 3,
-    pricing: {
-      monthlyPrice: 99,
-      yearlyPrice: 990,
-      currency: 'USD',
-      billingCycle: 'monthly',
-    },
-    limits: {
-      maxUsers: 50,
-      maxAgents: 50,
-      maxStorageGB: 100,
-      maxApiCalls: 100000,
-      maxConversationMessages: 50000,
-      maxFileSizeMB: 100,
-      allowCustomBranding: true,
-      allowApiAccess: true,
-      allowSso: true,
-      allowAuditExport: true,
-    },
-    features: [],
-    permissions: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
 // Load persisted data or use defaults
 const persisted = loadSettings();
 
 // File-based storage (persists across restarts)
 const aiProviders: AIProviderConfig[] = persisted?.aiProviders || [];
-const tiers: TenantTier[] = persisted?.tiers || DEFAULT_TIERS;
 const emailConfigs: EmailConfig[] = persisted?.emailConfigs || [];
 const emailTemplates: EmailTemplate[] = persisted?.emailTemplates || [];
 const emailLogs: EmailLog[] = persisted?.emailLogs || [];
@@ -256,10 +159,6 @@ let aiProviderCounter =
     1,
     ...aiProviders.map((p) => parseInt(p.id.replace('provider-', '')) || 0),
   ) + 1;
-let tierCounter =
-  persisted?.counters?.tierCounter ||
-  Math.max(4, ...tiers.map((t) => parseInt(t.id.replace('tier-', '')) || 0)) +
-    1;
 let emailConfigCounter =
   persisted?.counters?.emailConfigCounter ||
   Math.max(
@@ -281,13 +180,11 @@ let emailTemplateCounter =
 function persistData() {
   saveSettings({
     aiProviders,
-    tiers,
     emailConfigs,
     emailTemplates,
     emailLogs,
     counters: {
       aiProviderCounter,
-      tierCounter,
       emailConfigCounter,
       emailTemplateCounter,
     },
@@ -296,6 +193,8 @@ function persistData() {
 
 @Injectable()
 export class SettingsService {
+  constructor(private readonly tiersService: TiersService) {}
+
   // ==================== AI PROVIDERS ====================
 
   async getAIProviders(): Promise<AIProviderConfig[]> {
@@ -401,82 +300,188 @@ export class SettingsService {
   // ==================== TIERS ====================
 
   async getTiers(): Promise<TenantTier[]> {
-    return tiers;
+    const items = await this.tiersService.findAll();
+    return items.map((tier) => this.mapTierToLegacyShape(tier));
   }
 
   async getTier(id: string): Promise<TenantTier | undefined> {
-    return tiers.find((t) => t.id === id);
+    const tier = await this.tiersService.findById(id);
+    return this.mapTierToLegacyShape(tier);
   }
 
   async createTier(data: Partial<TenantTier>): Promise<TenantTier> {
-    const tier: TenantTier = {
-      id: `tier-${tierCounter++}`,
-      name: data.name || 'New Tier',
-      slug: data.slug || 'new-tier',
-      description: data.description || '',
-      isActive: true,
-      isDefault: false,
-      sortOrder: tiers.length + 1,
-      pricing: data.pricing || {
-        monthlyPrice: 0,
-        yearlyPrice: 0,
-        currency: 'USD',
-        billingCycle: 'monthly',
-      },
-      limits: data.limits || {
-        maxUsers: 5,
-        maxAgents: 10,
-        maxStorageGB: 10,
-        maxApiCalls: 10000,
-        maxConversationMessages: 5000,
-        maxFileSizeMB: 50,
-        allowCustomBranding: false,
-        allowApiAccess: false,
-        allowSso: false,
-        allowAuditExport: false,
-      },
-      features: data.features || [],
-      permissions: data.permissions || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    tiers.push(tier);
-    return tier;
+    const tier = await this.tiersService.create(
+      this.mapLegacyInputToTierPayload(data),
+    );
+    return this.mapTierToLegacyShape(tier);
   }
 
   async updateTier(id: string, data: Partial<TenantTier>): Promise<TenantTier> {
-    const tier = tiers.find((t) => t.id === id);
-    if (!tier) throw new Error('Tier not found');
-    Object.assign(tier, data, { updatedAt: new Date().toISOString() });
-    return tier;
+    const tier = await this.tiersService.update(
+      id,
+      this.mapLegacyInputToTierPayload(data),
+    );
+    return this.mapTierToLegacyShape(tier);
   }
 
   async deleteTier(id: string): Promise<void> {
-    const index = tiers.findIndex((t) => t.id === id);
-    if (index >= 0) tiers.splice(index, 1);
+    await this.tiersService.delete(id);
   }
 
   async toggleTier(id: string, isActive: boolean): Promise<TenantTier> {
-    const tier = tiers.find((t) => t.id === id);
-    if (!tier) throw new Error('Tier not found');
-    tier.isActive = isActive;
-    tier.updatedAt = new Date().toISOString();
-    return tier;
+    const tier = await this.tiersService.toggleActive(id, isActive);
+    return this.mapTierToLegacyShape(tier);
   }
 
   async setDefaultTier(id: string): Promise<TenantTier> {
-    tiers.forEach((t) => (t.isDefault = t.id === id));
-    const tier = tiers.find((t) => t.id === id);
-    if (!tier) throw new Error('Tier not found');
-    return tier;
+    const tier = await this.tiersService.setDefault(id);
+    return this.mapTierToLegacyShape(tier);
   }
 
   async reorderTiers(orderedIds: string[]): Promise<TenantTier[]> {
-    orderedIds.forEach((id, index) => {
-      const tier = tiers.find((t) => t.id === id);
-      if (tier) tier.sortOrder = index + 1;
-    });
-    return tiers.sort((a, b) => a.sortOrder - b.sortOrder);
+    const items = await this.tiersService.reorder(orderedIds);
+    return items.map((tier) => this.mapTierToLegacyShape(tier));
+  }
+
+  async getTierUsage(id: string): Promise<{ tenants: number; users: number }> {
+    return this.tiersService.getUsage(id);
+  }
+
+  private mapTierToLegacyShape(tier: any): TenantTier {
+    const limits = {
+      maxUsers: tier.maxUsers ?? 0,
+      maxAgents: tier.maxAgents ?? 0,
+      maxStorageGB: tier.maxStorageGB ?? 0,
+      maxApiCalls: tier.maxApiCalls ?? 0,
+      maxConversationMessages: tier.maxConversationMessages ?? 0,
+      maxFileSizeMB: tier.maxFileSizeMB ?? 0,
+      allowCustomBranding: tier.allowCustomBranding ?? false,
+      allowApiAccess: tier.allowApiAccess ?? false,
+      allowSso: tier.allowSso ?? false,
+      allowAuditExport: tier.allowAuditExport ?? false,
+    };
+
+    return {
+      id: tier.id,
+      name: tier.name,
+      slug: tier.slug,
+      description: tier.description ?? '',
+      isActive: tier.isActive,
+      isDefault: tier.isDefault,
+      sortOrder: tier.sortOrder ?? 0,
+      pricing: {
+        monthlyPrice: Number(tier.monthlyPrice ?? 0),
+        yearlyPrice: Number(tier.yearlyPrice ?? 0),
+        currency: tier.currency ?? 'USD',
+        billingCycle: 'monthly',
+      },
+      limits,
+      features: this.buildTierFeatures(limits),
+      permissions: this.buildTierPermissions(),
+      createdAt: new Date(tier.createdAt).toISOString(),
+      updatedAt: new Date(tier.updatedAt).toISOString(),
+    };
+  }
+
+  private mapLegacyInputToTierPayload(data: Partial<TenantTier>) {
+    const pricing = data.pricing;
+    const limits = data.limits;
+    const featureFlags = this.extractFeatureFlags(data.features);
+
+    return {
+      name: data.name,
+      slug: data.slug,
+      description: data.description,
+      isActive: data.isActive,
+      isDefault: data.isDefault,
+      sortOrder: data.sortOrder,
+      monthlyPrice: pricing?.monthlyPrice,
+      yearlyPrice: pricing?.yearlyPrice,
+      currency: pricing?.currency,
+      maxUsers: limits?.maxUsers,
+      maxAgents: limits?.maxAgents,
+      maxStorageGB: limits?.maxStorageGB,
+      maxApiCalls: limits?.maxApiCalls,
+      maxConversationMessages: limits?.maxConversationMessages,
+      maxFileSizeMB: limits?.maxFileSizeMB,
+      allowCustomBranding:
+        limits?.allowCustomBranding ?? featureFlags.allowCustomBranding,
+      allowApiAccess: limits?.allowApiAccess ?? featureFlags.allowApiAccess,
+      allowSso: limits?.allowSso ?? featureFlags.allowSso,
+      allowAuditExport:
+        limits?.allowAuditExport ?? featureFlags.allowAuditExport,
+    };
+  }
+
+  private extractFeatureFlags(features?: any[]) {
+    const hasEnabled = (id: string) =>
+      Array.isArray(features) &&
+      features.some((feature) => feature?.id === id && feature?.enabled);
+
+    return {
+      allowCustomBranding: hasEnabled('custom_branding'),
+      allowApiAccess: hasEnabled('api_access'),
+      allowSso: hasEnabled('sso'),
+      allowAuditExport: hasEnabled('audit_export'),
+    };
+  }
+
+  private buildTierFeatures(limits: TenantTier['limits']) {
+    return [
+      {
+        id: 'custom_branding',
+        name: 'Custom Branding',
+        description: 'White-label your instance',
+        enabled: limits.allowCustomBranding,
+      },
+      {
+        id: 'api_access',
+        name: 'API Access',
+        description: 'Programmatic access to your data',
+        enabled: limits.allowApiAccess,
+      },
+      {
+        id: 'sso',
+        name: 'Single Sign-On',
+        description: 'Integrate with your identity provider',
+        enabled: limits.allowSso,
+      },
+      {
+        id: 'audit_export',
+        name: 'Audit Export',
+        description: 'Export audit logs',
+        enabled: limits.allowAuditExport,
+      },
+    ];
+  }
+
+  private buildTierPermissions() {
+    return [
+      {
+        id: 'manage_users',
+        name: 'Manage Users',
+        description: 'Create and manage users',
+        enabled: true,
+      },
+      {
+        id: 'manage_agents',
+        name: 'Manage Agents',
+        description: 'Create and manage agents',
+        enabled: true,
+      },
+      {
+        id: 'view_analytics',
+        name: 'View Analytics',
+        description: 'View analytics dashboards',
+        enabled: true,
+      },
+      {
+        id: 'manage_billing',
+        name: 'Manage Billing',
+        description: 'Manage subscription',
+        enabled: false,
+      },
+    ];
   }
 
   // ==================== EMAIL CONFIGS ====================

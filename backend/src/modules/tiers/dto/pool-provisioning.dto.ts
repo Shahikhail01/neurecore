@@ -5,7 +5,15 @@
  * No fat DTOs — separate DTOs for each use case.
  */
 
-import { IsString, IsOptional, IsBoolean, IsNumber, IsUUID, IsEnum, Min } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+  IsUUID,
+  IsEnum,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 // ─── Slot Type Enum ───────────────────────────────────────────────────────────
@@ -102,7 +110,7 @@ export class ProvisionToTenantDto {
 
   @IsOptional()
   @IsUUID('4', { each: true })
-  slotIds?: string[];  // If omitted, provisions all default-selected slots
+  slotIds?: string[]; // If omitted, provisions all default-selected slots
 }
 
 // ─── Agent Slot Management (Tenant ADMIN) ─────────────────────────────────────
@@ -110,6 +118,27 @@ export class ProvisionToTenantDto {
 export class ProvisionAgentFromSlotDto {
   @IsUUID()
   slotId!: string;
+}
+
+export class ProvisionDepartmentFromSlotDto {
+  @IsUUID()
+  slotId!: string;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsUUID()
+  headAgentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  parentId?: string;
 }
 
 export class ReplaceSlotAgentDto {

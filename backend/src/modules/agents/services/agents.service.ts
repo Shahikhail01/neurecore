@@ -14,6 +14,8 @@ import type {
   UpdateAgentInput,
 } from '../interfaces/agent.interface';
 import { AgentVersionService } from './agent-version.service';
+import { AssignmentService } from '../../tiers/services/assignment.service';
+import { TenantResourcePolicyService } from '../../tiers/services/tenant-resource-policy.service';
 
 /**
  * AgentsService
@@ -28,6 +30,8 @@ export class AgentsService implements IAgentService {
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
     private readonly agentVersionService: AgentVersionService,
+    private readonly assignmentService: AssignmentService,
+    private readonly tenantPolicy: TenantResourcePolicyService,
   ) {}
 
   async findAll(filter: AgentFilter): Promise<{
@@ -62,7 +66,31 @@ export class AgentsService implements IAgentService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: { _count: { select: { tasks: true } } },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              tierId: true,
+              tier: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  maxAgents: true,
+                },
+              },
+            },
+          },
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          _count: { select: { tasks: true } },
+        },
       }),
       this.prisma.agent.count({ where }),
     ]);
@@ -89,11 +117,38 @@ export class AgentsService implements IAgentService {
     return agent;
   }
 
+  async findOneForPlatform(id: string): Promise<unknown> {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { tasks: true, memoryEntries: true, executionLogs: true },
+        },
+      },
+    });
+    if (!agent) throw new NotFoundException(`Agent ${id} not found`);
+    return agent;
+  }
+
   async create(
     input: CreateAgentInput,
     tenantId: string,
     userId: string,
   ): Promise<unknown> {
+    const resolvedDepartmentId = input.departmentId
+      ? await this.assignmentService.resolveDepartmentAssignment(
+          tenantId,
+          input.departmentId,
+        )
+      : null;
+
+    const slotAssignment = input.tierAgentPoolId
+      ? await this.tenantPolicy.assertTierAgentPoolBelongsToTenant(
+          tenantId,
+          input.tierAgentPoolId,
+        )
+      : null;
+
     return this.prisma.agent.create({
       data: {
         name: input.name,
@@ -106,6 +161,14 @@ export class AgentsService implements IAgentService {
         permissions: (input.permissions ?? []) as never,
         config: (input.config ?? {}) as never,
         metadata: (input.metadata ?? {}) as never,
+        departmentId: resolvedDepartmentId,
+        tierAgentPoolId: slotAssignment?.poolSlot.id,
+        deployedFromTierId: slotAssignment?.tenant.tierId,
+        isFixed:
+          slotAssignment?.poolSlot.slotType === 'FIXED' ||
+          slotAssignment?.poolSlot.isRequired ||
+          false,
+        isSelected: input.isSelected ?? true,
         tenantId,
         createdById: userId,
       },
@@ -117,7 +180,35 @@ export class AgentsService implements IAgentService {
     input: UpdateAgentInput,
     tenantId: string,
   ): Promise<unknown> {
-    await this.assertOwnership(id, tenantId);
+    const existingAgent = await this.getOwnedAgent(id, tenantId);
+
+    const effectiveTenantId = input.tenantId ?? tenantId;
+    const isTenantReassignment = effectiveTenantId !== tenantId;
+
+    if (isTenantReassignment) {
+      const targetTenant = await this.prisma.tenant.findUnique({
+        where: { id: effectiveTenantId },
+        select: { id: true },
+      });
+      if (!targetTenant) {
+        throw new NotFoundException(`Tenant ${effectiveTenantId} not found`);
+      }
+    }
+
+    const resolvedDepartmentId = input.departmentId
+      ? await this.assignmentService.resolveDepartmentAssignment(
+          effectiveTenantId,
+          input.departmentId,
+        )
+      : undefined;
+
+    const slotAssignment = input.tierAgentPoolId
+      ? await this.tenantPolicy.assertTierAgentPoolBelongsToTenant(
+          effectiveTenantId,
+          input.tierAgentPoolId,
+        )
+      : undefined;
+
     const updated = await this.prisma.agent.update({
       where: { id },
       data: {
@@ -140,6 +231,28 @@ export class AgentsService implements IAgentService {
         ...(input.config && { config: input.config as never }),
         ...(input.metadata && { metadata: input.metadata as never }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
+        ...(input.tenantId && { tenantId: effectiveTenantId }),
+        ...(resolvedDepartmentId !== undefined && {
+          departmentId: resolvedDepartmentId,
+        }),
+        ...(isTenantReassignment &&
+          input.departmentId === undefined && {
+            departmentId: null,
+          }),
+        ...(slotAssignment !== undefined && {
+          tierAgentPoolId: slotAssignment.poolSlot.id,
+          deployedFromTierId: slotAssignment.tenant.tierId,
+          isFixed:
+            slotAssignment.poolSlot.slotType === 'FIXED' ||
+            slotAssignment.poolSlot.isRequired,
+        }),
+        ...(isTenantReassignment &&
+          input.tierAgentPoolId === undefined && {
+            tierAgentPoolId: null,
+            deployedFromTierId: null,
+            isFixed: false,
+          }),
+        ...(input.isSelected !== undefined && { isSelected: input.isSelected }),
       },
     });
 
@@ -189,10 +302,16 @@ export class AgentsService implements IAgentService {
   // ───────────────────────────────────────────────────────────
 
   private async assertOwnership(id: string, tenantId: string): Promise<void> {
+    const exists = await this.getOwnedAgent(id, tenantId);
+    if (!exists) throw new NotFoundException(`Agent ${id} not found`);
+  }
+
+  private async getOwnedAgent(id: string, tenantId: string) {
     const exists = await this.prisma.agent.findFirst({
       where: { id, tenantId },
-      select: { id: true },
+      select: { id: true, tenantId: true },
     });
     if (!exists) throw new NotFoundException(`Agent ${id} not found`);
+    return exists;
   }
 }

@@ -18,6 +18,7 @@ import {
   ChangeTierDto,
 } from './dto/tenant.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuditLog } from '../../common/decorators/auth.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -75,25 +76,40 @@ export class TenantsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.PLATFORM_ADMIN)
-  create(@Body() dto: CreateTenantDto) {
-    return this.tenantsService.create(dto);
+  @AuditLog('TENANT_CREATE')
+  create(@Body() dto: CreateTenantDto, @CurrentUser() user: any) {
+    return this.tenantsService.create(dto, user?.sub);
   }
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.PLATFORM_ADMIN)
+  @AuditLog('TENANT_UPDATE')
   update(@Param('id') id: string, @Body() dto: UpdateTenantDto) {
     return this.tenantsService.update(id, dto);
   }
 
   @Patch(':id/suspend')
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('TENANT_SUSPEND')
   suspend(@Param('id') id: string) {
     return this.tenantsService.suspend(id);
   }
 
+  @Post(':id/change-tier/preview')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.PLATFORM_ADMIN)
+  @AuditLog('TENANT_CHANGE_TIER_PREVIEW')
+  previewChangeTier(@Param('id') id: string, @Body() dto: ChangeTierDto) {
+    return this.tenantsService.previewTierChange(id, dto.tierId);
+  }
+
   @Patch(':id/change-tier')
   @Roles(UserRole.SUPER_ADMIN, UserRole.PLATFORM_ADMIN)
-  changeTier(@Param('id') id: string, @Body() dto: ChangeTierDto) {
-    return this.tenantsService.changeTier(id, dto.tierId);
+  @AuditLog('TENANT_CHANGE_TIER')
+  changeTier(
+    @Param('id') id: string,
+    @Body() dto: ChangeTierDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.tenantsService.changeTier(id, dto.tierId, user?.sub);
   }
 }

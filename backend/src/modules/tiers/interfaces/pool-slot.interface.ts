@@ -17,11 +17,11 @@ export interface PoolSlot {
   id: string;
   tierId: string;
   templateId: string;
-  templateName: string;       // resolved from template relation
-  slot: number;               // position (1-based)
+  templateName: string; // resolved from template relation
+  slot: number; // position (1-based)
   slotType: SlotType;
-  isRequired: boolean;         // true = fixed, false = choice
-  isDefaultSelected: boolean;  // pre-selected when tenant is created
+  isRequired: boolean; // true = fixed, false = choice
+  isDefaultSelected: boolean; // pre-selected when tenant is created
   defaultBudgetPerDay?: number;
   defaultModel?: string;
   // Filled state — present when a tenant agent was created from this slot
@@ -45,9 +45,39 @@ export interface TenantPoolStatus {
   totalChoice: number;
   filledFixed: number;
   filledChoice: number;
-  choiceRemaining: number;   // totalChoice - filledChoice
+  choiceRemaining: number; // totalChoice - filledChoice
   // Flags
   canAddMoreChoiceAgents: boolean;
+  isAtLimit: boolean;
+}
+
+export interface DepartmentPoolSlot {
+  id: string;
+  tierId: string;
+  departmentTemplateId: string;
+  templateName: string;
+  slot: number;
+  slotType: SlotType;
+  isRequired: boolean;
+  isDefaultSelected: boolean;
+  filledDepartmentId?: string;
+  filledDepartmentName?: string;
+  filledAt?: string;
+}
+
+export interface TenantDepartmentPoolStatus {
+  tenantId: string;
+  tierId: string;
+  tierName: string;
+  tierSlug: string;
+  fixedSlots: DepartmentPoolSlot[];
+  choiceSlots: DepartmentPoolSlot[];
+  totalFixed: number;
+  totalChoice: number;
+  filledFixed: number;
+  filledChoice: number;
+  choiceRemaining: number;
+  canAddMoreChoiceDepartments: boolean;
   isAtLimit: boolean;
 }
 
@@ -112,7 +142,11 @@ export interface IPoolProvisioningService {
    * Used when tenant picks a template for an empty choice slot.
    * Throws if slot is already filled or is a FIXED slot.
    */
-  provisionFromSlot(tenantId: string, slotId: string, userId?: string): Promise<Agent>;
+  provisionFromSlot(
+    tenantId: string,
+    slotId: string,
+    userId?: string,
+  ): Promise<Agent>;
 
   /**
    * Bulk-provision all default-selected slots for a new tenant.
@@ -131,7 +165,12 @@ export interface IPoolProvisioningService {
    * Replace an agent in a CHOICE slot with a new template choice.
    * Releases old slot and provisions new one atomically.
    */
-  replaceChoiceSlot(tenantId: string, slotId: string, newTemplateId: string, userId?: string): Promise<Agent>;
+  replaceChoiceSlot(
+    tenantId: string,
+    slotId: string,
+    newTemplateId: string,
+    userId?: string,
+  ): Promise<Agent>;
 }
 
 // ─── Prisma Include Types ─────────────────────────────────────────────────────
@@ -142,7 +181,9 @@ export type PoolSlotWithRelations = TierAgentPool & {
 };
 
 export type AgentWithPoolEntry = Agent & {
-  tierAgentPool: TierAgentPool & {
-    template: AgentTemplate;
-  } | null;
+  tierAgentPool:
+    | (TierAgentPool & {
+        template: AgentTemplate;
+      })
+    | null;
 };

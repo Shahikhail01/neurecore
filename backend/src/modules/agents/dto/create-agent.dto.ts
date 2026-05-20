@@ -17,6 +17,14 @@ export class CreateAgentDto {
   @IsUUID()
   tenantId?: string;
 
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  tierAgentPoolId?: string;
+
   @IsString()
   @MaxLength(100)
   name!: string;
@@ -61,4 +69,7 @@ export class CreateAgentDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;
+
+  @IsOptional()
+  isSelected?: boolean;
 }

@@ -228,4 +228,15 @@ export class TiersService implements ITierService {
     this.logger.log(`Reordered ${tiers.length} tiers`);
     return tiers;
   }
+
+  async getUsage(id: string) {
+    await this.findById(id);
+
+    const [tenants, users] = await this.prisma.$transaction([
+      this.prisma.tenant.count({ where: { tierId: id } }),
+      this.prisma.user.count({ where: { tenant: { tierId: id } } }),
+    ]);
+
+    return { tenants, users };
+  }
 }

@@ -8,6 +8,7 @@ import {
   IsEnum,
   Min,
   Max,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -88,5 +89,12 @@ export class DeployDeptTemplateDto {
 
   /** When true, also creates agents for each dept item using matching platform agent templates */
   @IsOptional()
+  @IsBoolean()
   withAgents?: boolean;
+}
+
+export class TierBootstrapDto {
+  @IsOptional()
+  @IsUUID()
+  tierId?: string;
 }

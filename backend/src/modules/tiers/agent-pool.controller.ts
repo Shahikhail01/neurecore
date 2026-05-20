@@ -25,7 +25,8 @@ import {
   UpdatePoolEntryInput,
 } from './services/agent-pool.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../security/guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { AuditLog } from '../../common/decorators/auth.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import {
@@ -35,7 +36,9 @@ import {
   IsOptional,
   IsUUID,
   Min,
+  IsEnum,
 } from 'class-validator';
+import { SlotType } from './dto/pool-provisioning.dto';
 
 class AddToPoolDto implements AddToPoolInput {
   @IsUUID()
@@ -48,6 +51,10 @@ class AddToPoolDto implements AddToPoolInput {
   @IsNumber()
   @Min(1)
   slot?: number;
+
+  @IsOptional()
+  @IsEnum(SlotType)
+  slotType?: SlotType;
 
   @IsOptional()
   @IsBoolean()
@@ -72,6 +79,10 @@ class UpdatePoolEntryDto implements UpdatePoolEntryInput {
   @IsNumber()
   @Min(1)
   slot?: number;
+
+  @IsOptional()
+  @IsEnum(SlotType)
+  slotType?: SlotType;
 
   @IsOptional()
   @IsBoolean()
@@ -119,12 +130,14 @@ export class AgentPoolController {
 
   @Post('pool')
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('TIER_AGENT_POOL_SLOT_CREATE')
   addToPool(@Body() dto: AddToPoolDto) {
     return this.agentPoolService.addToPool(dto);
   }
 
   @Patch('pool/:id')
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('TIER_AGENT_POOL_SLOT_UPDATE')
   updatePoolEntry(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdatePoolEntryDto,
@@ -135,12 +148,14 @@ export class AgentPoolController {
   @Delete('pool/:id')
   @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
+  @AuditLog('TIER_AGENT_POOL_SLOT_DELETE')
   removeFromPool(@Param('id', ParseUUIDPipe) id: string) {
     return this.agentPoolService.removeFromPool(id);
   }
 
   @Post(':tierId/pool/reorder')
   @Roles(UserRole.SUPER_ADMIN)
+  @AuditLog('TIER_AGENT_POOL_REORDER')
   reorderPool(
     @Param('tierId', ParseUUIDPipe) tierId: string,
     @Body() dto: ReorderPoolDto,

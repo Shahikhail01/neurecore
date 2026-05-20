@@ -11,11 +11,11 @@ import {
   Injectable,
   CanActivate,
   ForbiddenException,
-  NotFoundException,
   ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/common';
 import { TierPoolService } from '../services/tier-pool.service';
+import { isPlatformAdminRole } from '../../../common/types/user-role.utils';
 
 // ─── Guard Metadata Key ────────────────────────────────────────────────────────
 
@@ -37,7 +37,9 @@ export class PoolSlotGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const user = request.user as { role?: string; tenantId?: string } | undefined;
+    const user = request.user as
+      | { role?: string; tenantId?: string }
+      | undefined;
     const agentId = request.params?.id;
 
     if (!agentId) {
@@ -46,7 +48,7 @@ export class PoolSlotGuard implements CanActivate {
     }
 
     // SUPER_ADMIN can always delete agents (platform management context)
-    if (user?.role === 'SUPER_ADMIN') {
+    if (isPlatformAdminRole(user?.role)) {
       return true;
     }
 

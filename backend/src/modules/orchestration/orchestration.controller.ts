@@ -26,6 +26,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
 import { UserRole } from '@prisma/client';
 import type { TaskStatus, WorkflowStatus } from '@prisma/client';
+import { isPlatformAuditorRole } from '../../common/types/user-role.utils';
 
 // ─────────────────────────────────────────────────────────────
 // Tasks controller
@@ -38,17 +39,47 @@ export class TasksController {
     private readonly csvExportService: CsvExportService,
   ) {}
 
+  private isPlatformRole(user: JwtPayload): boolean {
+    return isPlatformAuditorRole(user.role);
+  }
+
+  private resolveTaskTenantId(
+    user: JwtPayload,
+    tenantId?: string,
+    scope?: string,
+  ): string | null {
+    if (this.isPlatformRole(user)) {
+      if (scope === 'platform') {
+        return null;
+      }
+
+      if (tenantId) {
+        return tenantId;
+      }
+
+      throw new BadRequestException(
+        'tenantId is required unless scope=platform',
+      );
+    }
+
+    if (!user.tenantId) {
+      throw new ForbiddenException('Tenant context required');
+    }
+
+    return user.tenantId;
+  }
+
   /** GET /v1/tasks/export/csv — download all tasks as CSV (Phase 3.2) */
   @Get('export/csv')
   async exportCsv(
     @CurrentUser() user: JwtPayload,
     @Res() res: Response,
     @Query('status') status?: TaskStatus,
+    @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    if (!user.tenantId && user.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Tenant context required');
-    }
-    const { data } = await this.tasksService.findAll(user.tenantId, {
+    const resolvedTenantId = this.resolveTaskTenantId(user, tenantId, scope);
+    const { data } = await this.tasksService.findAll(resolvedTenantId, {
       status,
       page: 1,
       limit: 5000,
@@ -77,11 +108,11 @@ export class TasksController {
     @Query('agentId') agentId?: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
+    @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
-      throw new ForbiddenException('Tenant context required');
-    }
-    return this.tasksService.findAll(user.tenantId, {
+    const resolvedTenantId = this.resolveTaskTenantId(user, tenantId, scope);
+    return this.tasksService.findAll(resolvedTenantId, {
       status,
       agentId,
       page: Number(page),
@@ -93,8 +124,13 @@ export class TasksController {
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    return this.tasksService.findOne(id, user.tenantId!);
+    const resolvedTenantId = this.resolveTaskTenantId(user, tenantId, scope);
+    return resolvedTenantId === null
+      ? this.tasksService.findOneForPlatform(id)
+      : this.tasksService.findOne(id, resolvedTenantId);
   }
 
   @Post()

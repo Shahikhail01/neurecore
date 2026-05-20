@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { Prisma } from '@prisma/client';
+import { TenantDeploymentService } from './tenant-deployment.service';
 
 export interface ProvisioningResult {
   tenantId: string;
@@ -62,7 +63,10 @@ export interface AvailableAgent {
 export class TierProvisioningService implements ITierProvisioningService {
   private readonly logger = new Logger(TierProvisioningService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantDeploymentService: TenantDeploymentService,
+  ) {}
 
   /**
    * Provision agents for a new tenant based on their tier's agent pool
@@ -73,78 +77,11 @@ export class TierProvisioningService implements ITierProvisioningService {
     tierId: string,
     actorId?: string,
   ): Promise<ProvisioningResult> {
-    // Verify tenant exists
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      include: { tier: true },
-    });
-    if (!tenant) {
-      throw new NotFoundException(`Tenant ${tenantId} not found`);
-    }
-
-    // Verify tier exists and matches
-    if (tenant.tierId !== tierId) {
-      throw new BadRequestException(
-        `Tenant ${tenantId} is not on tier ${tierId}`,
-      );
-    }
-
-    // Get tier's agent pool
-    const tierPools = await this.prisma.tierAgentPool.findMany({
-      where: { tierId },
-      include: { template: true },
-      orderBy: { slot: 'asc' },
-    });
-
-    if (tierPools.length === 0) {
-      this.logger.warn(`Tier ${tierId} has no agent pool configured`);
-      return { tenantId, tierId, agentsProvisioned: 0, agentIds: [] };
-    }
-
-    // Create agents from pool (only those marked as default selected)
-    const agentCreations = tierPools
-      .filter((pool) => pool.isDefaultSelected)
-      .map((pool, index) => ({
-        name: pool.template.name,
-        description: pool.template.description,
-        type: pool.template.type,
-        model: pool.defaultModel ?? pool.template.model,
-        systemPrompt: pool.template.systemPrompt,
-        instructions: pool.template.instructions,
-        permissions: (pool.template.permissions ?? []) as Prisma.InputJsonValue,
-        config: (pool.template.config ?? {}) as Prisma.InputJsonValue,
-        budgetPerDay: pool.defaultBudgetPerDay,
-        isActive: true,
-        isSelected: true,
-        tenantId,
-        tierAgentPoolId: pool.id,
-        templateId: pool.template.id,
-        templateVersion: pool.template.version,
-        createdById: actorId,
-      }));
-
-    if (agentCreations.length === 0) {
-      this.logger.warn(`No default agents to provision for tenant ${tenantId}`);
-      return { tenantId, tierId, agentsProvisioned: 0, agentIds: [] };
-    }
-
-    // Create all agents in transaction
-    const createdAgents = await this.prisma.$transaction(
-      agentCreations.map((data) => this.prisma.agent.create({ data })),
-    );
-
-    const agentIds = createdAgents.map((a) => a.id);
-
-    this.logger.log(
-      `Provisioned ${createdAgents.length} agents for tenant ${tenantId} (${tenant.slug})`,
-    );
-
-    return {
+    return this.tenantDeploymentService.provisionAgentsForTier(
       tenantId,
       tierId,
-      agentsProvisioned: createdAgents.length,
-      agentIds,
-    };
+      actorId,
+    );
   }
 
   /**

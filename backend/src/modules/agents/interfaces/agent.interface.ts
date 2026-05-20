@@ -23,9 +23,13 @@ export interface CreateAgentInput {
   permissions?: string[];
   config?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  departmentId?: string;
+  tierAgentPoolId?: string;
+  isSelected?: boolean;
 }
 
 export interface UpdateAgentInput {
+  tenantId?: string;
   name?: string;
   description?: string;
   status?: AgentStatus;
@@ -37,6 +41,9 @@ export interface UpdateAgentInput {
   config?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   isActive?: boolean;
+  departmentId?: string;
+  tierAgentPoolId?: string;
+  isSelected?: boolean;
 }
 
 export interface AgentFilter {

@@ -45,6 +45,11 @@ export default function TasksPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const currentUser = useCurrentUser();
   const api = useAPIClient();
+  const isPlatformViewer =
+    currentUser?.role === "SUPER_ADMIN" ||
+    currentUser?.role === "PLATFORM_ADMIN" ||
+    currentUser?.role === "SECURITY_OFFICER" ||
+    currentUser?.role === "SUPPORT";
 
   // List tasks
   const {
@@ -55,7 +60,10 @@ export default function TasksPage() {
     {
       resource: "tasks",
       action: "list",
-      params: { limit: 100 },
+      params: {
+        limit: 100,
+        ...(isPlatformViewer ? { scope: "platform" } : {}),
+      },
     },
     { manual: false },
   );

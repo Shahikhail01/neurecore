@@ -51,6 +51,18 @@ export class TasksService {
     return task;
   }
 
+  async findOneForPlatform(id: string) {
+    const task = await this.prisma.task.findUnique({
+      where: { id },
+      include: {
+        agent: { select: { id: true, name: true, status: true } },
+        executionLogs: true,
+      },
+    });
+    if (!task) throw new NotFoundException(`Task ${id} not found`);
+    return task;
+  }
+
   async create(input: {
     title: string;
     description?: string;

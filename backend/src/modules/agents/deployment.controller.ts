@@ -4,7 +4,9 @@ import {
   SpawnAgentFromTemplateDto,
   BulkDeployAgentsDto,
   DeployDeptTemplateDto,
+  TierBootstrapDto,
 } from './dto/deployment.dto';
+import { AuditLog } from '../../common/decorators/auth.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
@@ -28,6 +30,7 @@ export class DeploymentController {
    * Spawn a single agent from a platform template and assign to a tenant.
    */
   @Post('agents/from-template/:templateId')
+  @AuditLog('DEPLOY_AGENT_FROM_TEMPLATE')
   spawnFromTemplate(
     @Param('templateId', ParseUUIDPipe) templateId: string,
     @Body() dto: SpawnAgentFromTemplateDto,
@@ -42,6 +45,7 @@ export class DeploymentController {
    * All-or-nothing transaction.
    */
   @Post('tenants/:tenantId/agents')
+  @AuditLog('DEPLOY_AGENTS_TO_TENANT')
   bulkDeployAgents(
     @Param('tenantId', ParseUUIDPipe) tenantId: string,
     @Body() dto: BulkDeployAgentsDto,
@@ -56,11 +60,31 @@ export class DeploymentController {
    * Optionally bootstraps head agents for each department.
    */
   @Post('tenants/:tenantId/dept-template')
+  @AuditLog('DEPLOY_DEPARTMENT_TEMPLATE_TO_TENANT')
   deployDeptTemplate(
     @Param('tenantId', ParseUUIDPipe) tenantId: string,
     @Body() dto: DeployDeptTemplateDto,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.deploymentService.deployDeptTemplate(tenantId, dto, user.sub);
+  }
+
+  @Post('tenants/:tenantId/tier-bootstrap/preview')
+  @AuditLog('TENANT_TIER_BOOTSTRAP_PREVIEW')
+  previewTierBootstrap(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Body() dto: TierBootstrapDto,
+  ) {
+    return this.deploymentService.previewTierBootstrap(tenantId, dto);
+  }
+
+  @Post('tenants/:tenantId/tier-bootstrap')
+  @AuditLog('TENANT_TIER_BOOTSTRAP_EXECUTE')
+  bootstrapTenantTier(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Body() dto: TierBootstrapDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.deploymentService.bootstrapTenantTier(tenantId, dto, user.sub);
   }
 }

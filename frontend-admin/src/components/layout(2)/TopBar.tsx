@@ -22,7 +22,13 @@ export function TopBar({ title }: TopBarProps) {
 
   useEffect(() => {
     api
-      .get("/approvals?status=PENDING&limit=1")
+      .get("/approvals", {
+        params: {
+          scope: "platform",
+          status: "PENDING",
+          limit: 1,
+        },
+      })
       .then((res) => setPendingApprovals(unwrapList(res).total ?? 0))
       .catch(() => setPendingApprovals(0));
   }, []);

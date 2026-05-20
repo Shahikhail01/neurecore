@@ -17,6 +17,10 @@ import {
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '../decorators/auth.decorator';
 import { AuditLogService } from '../services/audit-log.service';
+import {
+  hasLegacyPermission,
+  LEGACY_ROLE_PERMISSIONS,
+} from '../../core/services/legacy-authorization.constants';
 
 /**
  * RolesGuard - Enforces role-based access control
@@ -82,36 +86,7 @@ export class RolesGuard implements CanActivate {
   }
 }
 
-/**
- * Permission Matrix - What each role can do
- * Used by authorization service
- */
-export const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
-  [UserRole.ADMIN]: {
-    agents: ['create', 'read', 'update', 'delete'],
-    tasks: ['create', 'read', 'update', 'delete'],
-    approvals: ['create', 'read', 'update', 'delete', 'approve', 'reject'],
-    users: ['create', 'read', 'update', 'delete'],
-    settings: ['read', 'update'],
-    reports: ['read', 'export'],
-  },
-  [UserRole.AGENT_MANAGER]: {
-    agents: ['create', 'read', 'update'],
-    tasks: ['create', 'read', 'update'],
-    approvals: ['read', 'approve', 'reject'],
-    reports: ['read'],
-  },
-  [UserRole.TASK_APPROVER]: {
-    tasks: ['read'],
-    approvals: ['read', 'approve', 'reject'],
-  },
-  [UserRole.VIEWER]: {
-    agents: ['read'],
-    tasks: ['read'],
-    approvals: ['read'],
-    reports: ['read'],
-  },
-};
+export const ROLE_PERMISSIONS = LEGACY_ROLE_PERMISSIONS;
 
 /**
  * Check if user has permission for resource + action
@@ -125,17 +100,5 @@ export function hasPermission(
   resource: string,
   action: string,
 ): boolean {
-  const permissions = ROLE_PERMISSIONS[userRole];
-
-  if (!permissions) {
-    return false;
-  }
-
-  const resourcePermissions = permissions[resource];
-
-  if (!resourcePermissions) {
-    return false;
-  }
-
-  return resourcePermissions.includes(action);
+  return hasLegacyPermission(userRole, resource, action);
 }

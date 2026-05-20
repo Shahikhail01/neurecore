@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useTenantAuth } from '@/hooks/useTenantAuth';
-import TenantShell from '@/components/TenantShell';
-import { AgentCard } from '@/components/agent-card/AgentCard';
-import { useInspectorStore } from '@/stores/inspectorStore';
-import api from '@/services/api';
-import { unwrapArrayOrEmpty, unwrapList } from '@/services/unwrap';
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { useTenantAuth } from "@/hooks/useTenantAuth";
+import TenantShell from "@/components/TenantShell";
+import { AgentCard } from "@/components/agent-card/AgentCard";
+import { useInspectorStore } from "@/stores/inspectorStore";
+import api from "@/services/api";
+import { unwrapArrayOrEmpty, unwrapList } from "@/services/unwrap";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AgentRaw {
@@ -18,26 +18,70 @@ interface AgentRaw {
   type: string;
   status: string;
   isActive: boolean;
+  systemPrompt?: string;
+  instructions?: string;
   monthlyBudget?: number;
   budgetUsed?: number;
   createdAt: string;
   updatedAt: string;
+  templateId?: string | null;
+  tierAgentPoolId?: string | null;
+  deployedFromTierId?: string | null;
+  isFixed?: boolean;
+  isSelected?: boolean;
   department?: { name: string };
   model?: { name: string };
   _count?: { tasks: number };
 }
 
-type ViewMode = 'grid' | 'list';
-type FilterStatus = 'ALL' | 'ACTIVE' | 'RUNNING' | 'PAUSED' | 'IDLE' | 'ERROR';
+interface AgentEditFormState {
+  id: string;
+  name: string;
+  description: string;
+  model: string;
+  systemPrompt: string;
+  instructions: string;
+}
 
-const STATUS_FILTERS: FilterStatus[] = ['ALL', 'ACTIVE', 'RUNNING', 'IDLE', 'PAUSED', 'ERROR'];
+function getLineageBadges(agent: AgentRaw) {
+  if (agent.deployedFromTierId) {
+    if (agent.isFixed) {
+      return [{ label: "Tier Fixed", tone: "ops" as const }];
+    }
+
+    return [
+      {
+        label: agent.isSelected ? "Tier Selected" : "Tier Optional",
+        tone: agent.isSelected ? ("strategy" as const) : ("neutral" as const),
+      },
+    ];
+  }
+
+  if (agent.templateId) {
+    return [{ label: "Template Deploy", tone: "profit" as const }];
+  }
+
+  return [{ label: "Tenant Custom", tone: "warn" as const }];
+}
+
+type ViewMode = "grid" | "list";
+type FilterStatus = "ALL" | "ACTIVE" | "RUNNING" | "PAUSED" | "IDLE" | "ERROR";
+
+const STATUS_FILTERS: FilterStatus[] = [
+  "ALL",
+  "ACTIVE",
+  "RUNNING",
+  "IDLE",
+  "PAUSED",
+  "ERROR",
+];
 
 const STATUS_COUNT_COLOR: Record<string, string> = {
-  ACTIVE: 'text-status-profit',
-  RUNNING: 'text-status-ops',
-  IDLE: 'text-zinc-400',
-  PAUSED: 'text-status-warn',
-  ERROR: 'text-status-risk',
+  ACTIVE: "text-status-profit",
+  RUNNING: "text-status-ops",
+  IDLE: "text-zinc-400",
+  PAUSED: "text-status-warn",
+  ERROR: "text-status-risk",
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -49,9 +93,15 @@ export default function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<FilterStatus>('ALL');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>("ALL");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [editingAgent, setEditingAgent] = useState<AgentEditFormState | null>(
+    null,
+  );
+  const [editLoading, setEditLoading] = useState(false);
+  const [savingAgent, setSavingAgent] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const fetchAgents = useCallback(async () => {
     setLoading(true);
@@ -66,26 +116,85 @@ export default function AgentsPage() {
     }
   }, [page]);
 
-  useEffect(() => { void fetchAgents(); }, [fetchAgents]);
+  useEffect(() => {
+    void fetchAgents();
+  }, [fetchAgents]);
 
   // Pause / Resume / Audit via API
   async function handleAction(action: string, agentId: string) {
-    if (action === 'inspect') { openInspector('agent', agentId); return; }
-    if (action === 'audit') { openInspector('agent', agentId); return; }
-    const nextStatus = action === 'pause' ? 'PAUSED' : action === 'resume' ? 'ACTIVE' : null;
+    if (action === "inspect") {
+      openInspector("agent", agentId);
+      return;
+    }
+    if (action === "audit") {
+      openInspector("agent", agentId);
+      return;
+    }
+    if (action === "edit") {
+      setEditError(null);
+      setEditLoading(true);
+      try {
+        const res = await api.get(`/agents/${agentId}`);
+        const agent = res.data?.data ?? res.data ?? null;
+        if (!agent) return;
+
+        setEditingAgent({
+          id: agent.id,
+          name: agent.name ?? "",
+          description: agent.description ?? "",
+          model: agent.model?.name ?? agent.model ?? "",
+          systemPrompt: agent.systemPrompt ?? "",
+          instructions: agent.instructions ?? "",
+        });
+      } catch {
+        setEditError("Unable to load agent details.");
+      } finally {
+        setEditLoading(false);
+      }
+      return;
+    }
+    const nextStatus =
+      action === "pause" ? "PAUSED" : action === "resume" ? "ACTIVE" : null;
     if (!nextStatus) return;
     try {
       await api.patch(`/agents/${agentId}`, { status: nextStatus });
       setAgents((prev) =>
         prev.map((a) => (a.id === agentId ? { ...a, status: nextStatus } : a)),
       );
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
+  }
+
+  async function handleSaveAgentEdit() {
+    if (!editingAgent) return;
+
+    setSavingAgent(true);
+    setEditError(null);
+
+    try {
+      await api.patch(`/agents/${editingAgent.id}`, {
+        name: editingAgent.name.trim(),
+        description: editingAgent.description.trim() || undefined,
+        model: editingAgent.model.trim() || undefined,
+        systemPrompt: editingAgent.systemPrompt.trim() || undefined,
+        instructions: editingAgent.instructions.trim() || undefined,
+      });
+      setEditingAgent(null);
+      await fetchAgents();
+    } catch (error: any) {
+      setEditError(
+        error?.response?.data?.message ?? "Unable to save agent changes.",
+      );
+    } finally {
+      setSavingAgent(false);
+    }
   }
 
   // Filtered + searched agents
   const visible = agents.filter((a) => {
     const matchSearch = a.name.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'ALL' || a.status === statusFilter;
+    const matchStatus = statusFilter === "ALL" || a.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
@@ -108,7 +217,7 @@ export default function AgentsPage() {
             href="/agents/new"
             className="px-4 py-2 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 transition font-medium"
           >
-            + Deploy Agent
+            + Provision Agent
           </Link>
         </div>
 
@@ -130,13 +239,15 @@ export default function AgentsPage() {
                 onClick={() => setStatusFilter(s)}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
                   statusFilter === s
-                    ? 'bg-violet-600 text-white'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-overlay'
+                    ? "bg-violet-600 text-white"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-surface-overlay"
                 }`}
               >
                 {s}
-                {s !== 'ALL' && counts[s] ? (
-                  <span className={`ml-1 ${STATUS_COUNT_COLOR[s] ?? 'text-zinc-400'}`}>
+                {s !== "ALL" && counts[s] ? (
+                  <span
+                    className={`ml-1 ${STATUS_COUNT_COLOR[s] ?? "text-zinc-400"}`}
+                  >
                     {counts[s]}
                   </span>
                 ) : null}
@@ -146,17 +257,17 @@ export default function AgentsPage() {
 
           {/* View toggle */}
           <div className="flex rounded-lg border border-surface-border overflow-hidden">
-            {(['grid', 'list'] as ViewMode[]).map((mode) => (
+            {(["grid", "list"] as ViewMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
                 className={`px-3 py-1.5 text-xs transition ${
                   viewMode === mode
-                    ? 'bg-violet-600 text-white'
-                    : 'text-zinc-500 hover:text-zinc-200'
+                    ? "bg-violet-600 text-white"
+                    : "text-zinc-500 hover:text-zinc-200"
                 }`}
               >
-                {mode === 'grid' ? '⊞' : '≡'}
+                {mode === "grid" ? "⊞" : "≡"}
               </button>
             ))}
           </div>
@@ -164,20 +275,35 @@ export default function AgentsPage() {
 
         {/* ── Agent grid / list ── */}
         {loading ? (
-          <div className={`grid gap-3 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
+          <div
+            className={`grid gap-3 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"}`}
+          >
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-40 rounded-xl bg-surface-raised border border-surface-border animate-pulse" />
+              <div
+                key={i}
+                className="h-40 rounded-xl bg-surface-raised border border-surface-border animate-pulse"
+              />
             ))}
           </div>
         ) : visible.length === 0 ? (
           <div className="py-20 text-center text-zinc-500 text-sm">
-            {search || statusFilter !== 'ALL' ? 'No agents match your filters.' : (
-              <>No agents yet. <Link href="/agents/new" className="text-violet-400 underline">Deploy one</Link>.</>
+            {search || statusFilter !== "ALL" ? (
+              "No agents match your filters."
+            ) : (
+              <>
+                No agents yet.{" "}
+                <Link href="/agents/new" className="text-violet-400 underline">
+                  Provision one
+                </Link>
+                .
+              </>
             )}
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
-            <div className={`grid gap-3 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 max-w-3xl'}`}>
+            <div
+              className={`grid gap-3 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1 max-w-3xl"}`}
+            >
               {visible.map((agent) => (
                 <motion.div
                   key={agent.id}
@@ -193,16 +319,20 @@ export default function AgentsPage() {
                       name: agent.name,
                       type: agent.type as any,
                       status: agent.status as any,
+                      badges: getLineageBadges(agent),
                       department: agent.department?.name,
-                      model: agent.model?.name ?? 'GPT-4o',
-                      workload: Math.min(100, Math.round(((agent._count?.tasks ?? 0) / 10) * 100)),
+                      model: agent.model?.name ?? "GPT-4o",
+                      workload: Math.min(
+                        100,
+                        Math.round(((agent._count?.tasks ?? 0) / 10) * 100),
+                      ),
                       taskCount: agent._count?.tasks ?? 0,
                       successRate: 0,
                       budgetUsed: agent.budgetUsed ?? 0,
                       budgetTotal: agent.monthlyBudget ?? 100,
                       lastActiveAt: agent.updatedAt,
                     }}
-                    variant={viewMode === 'grid' ? 'full' : 'compact'}
+                    variant={viewMode === "grid" ? "full" : "compact"}
                     onAction={handleAction}
                   />
                 </motion.div>
@@ -215,7 +345,8 @@ export default function AgentsPage() {
         {total > 24 && (
           <div className="flex items-center justify-between pt-2">
             <span className="text-xs text-zinc-500">
-              Showing {(page - 1) * 24 + 1}–{Math.min(page * 24, total)} of {total}
+              Showing {(page - 1) * 24 + 1}–{Math.min(page * 24, total)} of{" "}
+              {total}
             </span>
             <div className="flex gap-2">
               <button
@@ -236,6 +367,155 @@ export default function AgentsPage() {
           </div>
         )}
       </div>
+
+      {(editingAgent || editLoading) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 px-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-surface-border bg-surface-raised p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-zinc-100">
+                  Edit Agent
+                </h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Update operational fields only. Tier lineage and assignments
+                  stay locked.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (savingAgent) return;
+                  setEditingAgent(null);
+                  setEditError(null);
+                }}
+                className="text-sm text-zinc-500 hover:text-zinc-200 transition"
+              >
+                Close
+              </button>
+            </div>
+
+            {editLoading || !editingAgent ? (
+              <div className="mt-6 space-y-3">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-11 rounded-xl bg-surface-overlay animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-6 space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 text-sm text-zinc-300">
+                    <span>Name</span>
+                    <input
+                      value={editingAgent.name}
+                      onChange={(e) =>
+                        setEditingAgent((current) =>
+                          current
+                            ? { ...current, name: e.target.value }
+                            : current,
+                        )
+                      }
+                      className="w-full rounded-xl border border-surface-border bg-surface-overlay px-3 py-2.5 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-zinc-300">
+                    <span>Model</span>
+                    <input
+                      value={editingAgent.model}
+                      onChange={(e) =>
+                        setEditingAgent((current) =>
+                          current
+                            ? { ...current, model: e.target.value }
+                            : current,
+                        )
+                      }
+                      className="w-full rounded-xl border border-surface-border bg-surface-overlay px-3 py-2.5 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none"
+                    />
+                  </label>
+                </div>
+
+                <label className="block space-y-2 text-sm text-zinc-300">
+                  <span>Description</span>
+                  <textarea
+                    value={editingAgent.description}
+                    onChange={(e) =>
+                      setEditingAgent((current) =>
+                        current
+                          ? { ...current, description: e.target.value }
+                          : current,
+                      )
+                    }
+                    rows={3}
+                    className="w-full rounded-xl border border-surface-border bg-surface-overlay px-3 py-2.5 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none"
+                  />
+                </label>
+
+                <label className="block space-y-2 text-sm text-zinc-300">
+                  <span>System Prompt</span>
+                  <textarea
+                    value={editingAgent.systemPrompt}
+                    onChange={(e) =>
+                      setEditingAgent((current) =>
+                        current
+                          ? { ...current, systemPrompt: e.target.value }
+                          : current,
+                      )
+                    }
+                    rows={4}
+                    className="w-full rounded-xl border border-surface-border bg-surface-overlay px-3 py-2.5 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none"
+                  />
+                </label>
+
+                <label className="block space-y-2 text-sm text-zinc-300">
+                  <span>Instructions</span>
+                  <textarea
+                    value={editingAgent.instructions}
+                    onChange={(e) =>
+                      setEditingAgent((current) =>
+                        current
+                          ? { ...current, instructions: e.target.value }
+                          : current,
+                      )
+                    }
+                    rows={4}
+                    className="w-full rounded-xl border border-surface-border bg-surface-overlay px-3 py-2.5 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none"
+                  />
+                </label>
+
+                {editError && (
+                  <p className="rounded-xl border border-status-risk/30 bg-status-risk/10 px-3 py-2 text-sm text-status-risk">
+                    {editError}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (savingAgent) return;
+                      setEditingAgent(null);
+                      setEditError(null);
+                    }}
+                    className="rounded-xl border border-surface-border px-4 py-2 text-sm text-zinc-300 hover:bg-surface-overlay transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingAgent || !editingAgent.name.trim()}
+                    onClick={() => void handleSaveAgentEdit()}
+                    className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 transition"
+                  >
+                    {savingAgent ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </TenantShell>
   );
 }

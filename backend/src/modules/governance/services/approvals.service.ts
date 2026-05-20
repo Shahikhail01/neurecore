@@ -56,9 +56,12 @@ export class ApprovalsService {
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, tenantId?: string | null) {
     const req = await this.prisma.approvalRequest.findFirst({
-      where: { id, tenantId },
+      where: {
+        id,
+        ...(tenantId ? { tenantId } : {}),
+      },
       include: {
         requestedBy: {
           select: { id: true, firstName: true, lastName: true, email: true },
@@ -139,7 +142,7 @@ export class ApprovalsService {
    * For now, history is synthesised from the stored timestamps on the record;
    * a proper audit-events table could be added in a future migration.
    */
-  async getHistory(id: string, tenantId: string) {
+  async getHistory(id: string, tenantId?: string | null) {
     const req = await this.findOne(id, tenantId);
 
     const events: Array<{ event: string; at: Date; actor?: string }> = [];

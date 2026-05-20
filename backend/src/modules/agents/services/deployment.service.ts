@@ -1,14 +1,9 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { EventsGateway } from '../../events/events.gateway';
+import { Injectable } from '@nestjs/common';
+import { TenantDeploymentService } from '../../tiers/services/tenant-deployment.service';
 import type {
   SpawnAgentFromTemplateDto,
   BulkDeployAgentsDto,
+  TierBootstrapDto,
 } from '../dto/deployment.dto';
 import type { DeployDeptTemplateDto } from '../dto/deployment.dto';
 
@@ -30,11 +25,8 @@ import type { DeployDeptTemplateDto } from '../dto/deployment.dto';
  */
 @Injectable()
 export class DeploymentService {
-  private readonly logger = new Logger(DeploymentService.name);
-
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly events: EventsGateway,
+    private readonly tenantDeploymentService: TenantDeploymentService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -46,66 +38,11 @@ export class DeploymentService {
     dto: SpawnAgentFromTemplateDto,
     actorId: string,
   ) {
-    // Resolve the platform template
-    const template = await this.prisma.agentTemplate.findFirst({
-      where: { id: templateId, isPublic: true, tenantId: null },
-    });
-    if (!template)
-      throw new NotFoundException(
-        `Platform agent template ${templateId} not found`,
-      );
-
-    // Verify tenant exists
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: dto.tenantId },
-      select: {
-        id: true,
-        tier: { select: { maxAgents: true } },
-        _count: { select: { agents: true } },
-      },
-    });
-    if (!tenant)
-      throw new NotFoundException(`Tenant ${dto.tenantId} not found`);
-    if (tenant._count.agents >= tenant.tier.maxAgents) {
-      throw new BadRequestException(
-        `Tenant has reached its agent limit of ${tenant.tier.maxAgents}. Upgrade tier before deploying more agents.`,
-      );
-    }
-
-    // Copy template fields → new Agent
-    const agent = await this.prisma.agent.create({
-      data: {
-        name: dto.name,
-        description: template.description,
-        type: template.type,
-        model: template.model,
-        systemPrompt: template.systemPrompt,
-        instructions: template.instructions,
-        permissions: (template.permissions ?? []) as never,
-        config: (template.config ?? {}) as never,
-        budgetPerDay: dto.budgetPerDay
-          ? (String(dto.budgetPerDay) as unknown as never)
-          : null,
-        isActive: true,
-        tenantId: dto.tenantId,
-        createdById: actorId,
-        templateId,
-        templateVersion: template.version,
-        departmentId: dto.departmentId ?? null,
-        // Store authority level inside config override
-        metadata: {
-          spawnedByAdmin: true,
-          authorityLevel: dto.authorityLevel ?? 'RECOMMENDATION',
-        } as never,
-      },
-    });
-
-    this.logger.log(
-      `Spawned agent "${agent.name}" (${agent.id}) for tenant ${dto.tenantId} from template ${templateId}`,
+    return this.tenantDeploymentService.spawnFromTemplate(
+      templateId,
+      dto,
+      actorId,
     );
-    this.events.emitAgentStatusUpdated(dto.tenantId, agent.id, 'IDLE');
-
-    return agent;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -117,76 +54,11 @@ export class DeploymentService {
     dto: BulkDeployAgentsDto,
     actorId: string,
   ) {
-    // Verify tenant
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: {
-        id: true,
-        tier: { select: { maxAgents: true } },
-        _count: { select: { agents: true } },
-      },
-    });
-    if (!tenant) throw new NotFoundException(`Tenant ${tenantId} not found`);
-
-    const slotsAvailable = tenant.tier.maxAgents - tenant._count.agents;
-    if (dto.agents.length > slotsAvailable) {
-      throw new BadRequestException(
-        `Deploying ${dto.agents.length} agents would exceed the tier limit of ${tenant.tier.maxAgents}. Available slots: ${slotsAvailable}.`,
-      );
-    }
-
-    // Resolve all template IDs in one query
-    const templateIds = [...new Set(dto.agents.map((a) => a.templateId))];
-    const templates = await this.prisma.agentTemplate.findMany({
-      where: { id: { in: templateIds }, isPublic: true, tenantId: null },
-    });
-    const templateMap = new Map(templates.map((t) => [t.id, t]));
-
-    // Validate all templates exist before touching the DB
-    for (const item of dto.agents) {
-      if (!templateMap.has(item.templateId)) {
-        throw new NotFoundException(
-          `Platform agent template ${item.templateId} not found`,
-        );
-      }
-    }
-
-    // Create all agents in one transaction → all-or-nothing
-    const created = await this.prisma.$transaction(
-      dto.agents.map((item) => {
-        const tmpl = templateMap.get(item.templateId)!;
-        return this.prisma.agent.create({
-          data: {
-            name: item.name,
-            description: tmpl.description,
-            type: tmpl.type,
-            model: tmpl.model,
-            systemPrompt: tmpl.systemPrompt,
-            instructions: tmpl.instructions,
-            permissions: (tmpl.permissions ?? []) as never,
-            config: (tmpl.config ?? {}) as never,
-            budgetPerDay: item.budgetPerDay
-              ? (String(item.budgetPerDay) as unknown as never)
-              : null,
-            isActive: true,
-            tenantId,
-            createdById: actorId,
-            templateId: item.templateId,
-            templateVersion: tmpl.version,
-            departmentId: item.departmentId ?? null,
-            metadata: {
-              spawnedByAdmin: true,
-              authorityLevel: item.authorityLevel ?? 'RECOMMENDATION',
-            } as never,
-          },
-        });
-      }),
+    return this.tenantDeploymentService.bulkDeployAgents(
+      tenantId,
+      dto,
+      actorId,
     );
-
-    this.logger.log(
-      `Bulk-deployed ${created.length} agents to tenant ${tenantId}`,
-    );
-    return { deployed: created.length, agents: created };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -199,180 +71,43 @@ export class DeploymentService {
     dto: DeployDeptTemplateDto,
     actorId: string,
   ) {
-    // Verify tenant
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: {
-        id: true,
-        tier: { select: { maxAgents: true } },
-        _count: { select: { agents: true } },
-      },
-    });
-    if (!tenant) throw new NotFoundException(`Tenant ${tenantId} not found`);
-
-    // Resolve template
-    const tmpl = await this.prisma.departmentTemplate.findUnique({
-      where: { id: dto.templateId },
-    });
-    if (!tmpl)
-      throw new NotFoundException(
-        `Department template ${dto.templateId} not found`,
-      );
-
-    const structure = tmpl.structure as Array<{
-      name: string;
-      description?: string;
-      headAgentType?: string;
-      parentName?: string;
-      agentTemplateNames?: string[];
-    }>;
-
-    // Build name → id map to resolve parentId references
-    const nameToId = new Map<string, string>();
-
-    // Sequential create (respects parent order)
-    const createdDepts: { id: string; name: string }[] = [];
-    for (const item of structure) {
-      const dept = await this.prisma.department.create({
-        data: {
-          name: item.name,
-          description: item.description,
-          status: 'ACTIVE',
-          tenantId,
-          parentId: item.parentName
-            ? (nameToId.get(item.parentName) ?? null)
-            : null,
-          metadata: {
-            fromTemplate: tmpl.id,
-            headAgentType: item.headAgentType,
-          } as never,
-        },
-      });
-      nameToId.set(item.name, dept.id);
-      createdDepts.push({ id: dept.id, name: dept.name });
-    }
-
-    this.logger.log(
-      `Deployed dept template "${tmpl.slug}" → ${createdDepts.length} departments for tenant ${tenantId}`,
+    return this.tenantDeploymentService.deployDeptTemplate(
+      tenantId,
+      dto,
+      actorId,
     );
+  }
 
-    // Optional: bootstrap head agents per department
-    let agentCount = 0;
-    if (dto.withAgents) {
-      const agentTemplates = await this.prisma.agentTemplate.findMany({
-        where: { isPublic: true, tenantId: null },
-      });
-
-      const templatesByName = new Map(
-        agentTemplates.map((t) => [t.name.trim().toLowerCase(), t]),
+  async previewTierBootstrap(tenantId: string, dto: TierBootstrapDto) {
+    const tenant =
+      await this.tenantDeploymentService['tenantPolicy'].assertTenantExists(
+        tenantId,
       );
-      const templatesByType = new Map<string, typeof agentTemplates>([
-        ['EXECUTIVE', agentTemplates.filter((t) => t.type === 'EXECUTIVE')],
-        ['CORE', agentTemplates.filter((t) => t.type === 'CORE')],
-        ['FUNCTIONAL', agentTemplates.filter((t) => t.type === 'FUNCTIONAL')],
-        ['META', agentTemplates.filter((t) => t.type === 'META')],
-      ]);
+    return this.tenantDeploymentService.previewTierBootstrap(
+      tenantId,
+      dto.tierId ?? tenant.tierId,
+    );
+  }
 
-      // Pre-check tenant agent limit before creating any agents
-      const desiredAgentCount = structure.reduce((sum, item) => {
-        const names = Array.isArray(item.agentTemplateNames)
-          ? item.agentTemplateNames
-          : [];
-        if (names.length > 0) return sum + names.length;
-        return item.headAgentType ? sum + 1 : sum;
-      }, 0);
-      const slotsAvailable = tenant.tier.maxAgents - tenant._count.agents;
-      if (desiredAgentCount > slotsAvailable) {
-        throw new BadRequestException(
-          `Deploying ${desiredAgentCount} agents would exceed the tenant agent limit. Available slots: ${slotsAvailable}.`,
-        );
-      }
-
-      for (const item of structure) {
-        const deptId = nameToId.get(item.name)!;
-
-        const explicitNames = Array.isArray(item.agentTemplateNames)
-          ? item.agentTemplateNames
-          : [];
-        if (explicitNames.length > 0) {
-          for (const roleName of explicitNames) {
-            const matchTemplate = templatesByName.get(
-              String(roleName).trim().toLowerCase(),
-            );
-            if (!matchTemplate) continue;
-
-            await this.prisma.agent.create({
-              data: {
-                name: matchTemplate.name,
-                description: matchTemplate.description,
-                type: matchTemplate.type,
-                model: matchTemplate.model,
-                systemPrompt: matchTemplate.systemPrompt,
-                instructions: matchTemplate.instructions,
-                permissions: (matchTemplate.permissions ?? []) as never,
-                config: (matchTemplate.config ?? {}) as never,
-                isActive: true,
-                tenantId,
-                createdById: actorId,
-                templateId: matchTemplate.id,
-                templateVersion: matchTemplate.version,
-                departmentId: deptId,
-                metadata: {
-                  spawnedByAdmin: true,
-                  authorityLevel: 'RECOMMENDATION',
-                  fromDeptTemplateId: tmpl.id,
-                  departmentName: item.name,
-                  roleTemplateName: matchTemplate.name,
-                } as never,
-              },
-            });
-            agentCount++;
-          }
-          continue;
-        }
-
-        // Back-compat: spawn a single "lead" agent using headAgentType
-        const leadType = item.headAgentType ? String(item.headAgentType) : null;
-        const candidates = leadType
-          ? (templatesByType.get(leadType) ?? [])
-          : [];
-        const matchTemplate =
-          candidates.find((t) => /lead/i.test(t.name)) ?? candidates[0] ?? null;
-        if (!matchTemplate) continue;
-
-        await this.prisma.agent.create({
-          data: {
-            name: `${item.name} Lead`,
-            description: matchTemplate.description,
-            type: matchTemplate.type,
-            model: matchTemplate.model,
-            systemPrompt: matchTemplate.systemPrompt,
-            instructions: matchTemplate.instructions,
-            permissions: (matchTemplate.permissions ?? []) as never,
-            config: (matchTemplate.config ?? {}) as never,
-            isActive: true,
-            tenantId,
-            createdById: actorId,
-            templateId: matchTemplate.id,
-            templateVersion: matchTemplate.version,
-            departmentId: deptId,
-            metadata: {
-              spawnedByAdmin: true,
-              authorityLevel: 'RECOMMENDATION',
-              fromDeptTemplateId: tmpl.id,
-              departmentName: item.name,
-              roleTemplateName: matchTemplate.name,
-            } as never,
-          },
-        });
-        agentCount++;
-      }
+  async bootstrapTenantTier(
+    tenantId: string,
+    dto: TierBootstrapDto,
+    actorId: string,
+  ) {
+    const tenant =
+      await this.tenantDeploymentService['tenantPolicy'].assertTenantExists(
+        tenantId,
+      );
+    const targetTierId = dto.tierId ?? tenant.tierId;
+    if (targetTierId !== tenant.tierId) {
+      throw new Error(
+        "Tier bootstrap can only run against the tenant's active tier. Apply the tier change first.",
+      );
     }
-
-    return {
-      departments: createdDepts.length,
-      agents: agentCount,
-      details: createdDepts,
-    };
+    return this.tenantDeploymentService.bootstrapTenantTier(
+      tenantId,
+      targetTierId,
+      actorId,
+    );
   }
 }

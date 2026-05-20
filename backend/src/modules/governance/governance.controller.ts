@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { GovernanceRulesService } from './services/governance-rules.service';
 import { ApprovalsService } from './services/approvals.service';
@@ -22,6 +23,7 @@ import { CreateApprovalDto, ReviewApprovalDto } from './dto/approval.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
 import type { ApprovalStatus } from '@prisma/client';
+import { isPlatformAdminRole } from '../../common/types/user-role.utils';
 
 // ─── Governance Rules ─────────────────────────────────────────────────────────
 
@@ -151,40 +153,111 @@ export class GovernanceAnomaliesController {
 export class ApprovalsController {
   constructor(private readonly approvalsService: ApprovalsService) {}
 
+  private isPlatformRole(user: JwtPayload): boolean {
+    return isPlatformAdminRole(user.role);
+  }
+
+  private resolveApprovalTenantId(
+    user: JwtPayload,
+    tenantId?: string,
+    scope?: string,
+  ): string | null {
+    if (this.isPlatformRole(user)) {
+      if (scope === 'platform') {
+        return null;
+      }
+
+      if (tenantId) {
+        return tenantId;
+      }
+
+      throw new BadRequestException(
+        'tenantId is required unless scope=platform',
+      );
+    }
+
+    if (!user.tenantId) {
+      throw new ForbiddenException('Tenant context required');
+    }
+
+    return user.tenantId;
+  }
+
+  private async resolveExistingApprovalTenantId(
+    user: JwtPayload,
+    approvalId: string,
+    tenantId?: string,
+    scope?: string,
+  ): Promise<string> {
+    if (!this.isPlatformRole(user)) {
+      if (!user.tenantId) {
+        throw new ForbiddenException('Tenant context required');
+      }
+
+      return user.tenantId;
+    }
+
+    if (tenantId) {
+      return tenantId;
+    }
+
+    if (scope === 'platform') {
+      const approval = await this.approvalsService.findOne(approvalId, null);
+      return approval.tenantId;
+    }
+
+    throw new BadRequestException('tenantId is required unless scope=platform');
+  }
+
   @Get()
   findAll(
     @CurrentUser() user: JwtPayload,
     @Query('status') status?: ApprovalStatus,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
+    @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
-      throw new ForbiddenException('Tenant context required');
-    }
-
-    return this.approvalsService.findAll(user.tenantId, {
-      status,
-      page: Number(page),
-      limit: Number(limit),
-    });
+    return this.approvalsService.findAll(
+      this.resolveApprovalTenantId(user, tenantId, scope),
+      {
+        status,
+        page: Number(page),
+        limit: Number(limit),
+      },
+    );
   }
 
   @Get('pending-count')
-  pendingCount(@CurrentUser() user: JwtPayload) {
-    if (!user.tenantId) {
-      if (user.role === 'SUPER_ADMIN')
-        return this.approvalsService.getPendingCountPlatform();
-      throw new ForbiddenException('Tenant context required');
+  pendingCount(
+    @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
+  ) {
+    const resolvedTenantId = this.resolveApprovalTenantId(
+      user,
+      tenantId,
+      scope,
+    );
+
+    if (resolvedTenantId === null) {
+      return this.approvalsService.getPendingCountPlatform();
     }
-    return this.approvalsService.getPendingCount(user.tenantId);
+
+    return this.approvalsService.getPendingCount(resolvedTenantId);
   }
 
   @Get(':id')
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    return this.approvalsService.findOne(id, user.tenantId!);
+    return this.approvalsService.findOne(
+      id,
+      this.resolveApprovalTenantId(user, tenantId, scope),
+    );
   }
 
   /** GET /approvals/:id/history — full lifecycle timeline of an approval request */
@@ -192,8 +265,13 @@ export class ApprovalsController {
   getHistory(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    return this.approvalsService.getHistory(id, user.tenantId!);
+    return this.approvalsService.getHistory(
+      id,
+      this.resolveApprovalTenantId(user, tenantId, scope),
+    );
   }
 
   @Post()
@@ -210,8 +288,13 @@ export class ApprovalsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReviewApprovalDto,
     @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    return this.approvalsService.review(id, user.tenantId!, user.sub, dto);
+    return this.resolveExistingApprovalTenantId(user, id, tenantId, scope).then(
+      (resolvedTenantId) =>
+        this.approvalsService.review(id, resolvedTenantId, user.sub, dto),
+    );
   }
 
   @Patch(':id/cancel')
@@ -219,7 +302,12 @@ export class ApprovalsController {
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: JwtPayload,
+    @Query('tenantId') tenantId?: string,
+    @Query('scope') scope?: string,
   ) {
-    return this.approvalsService.cancel(id, user.tenantId!, user.sub);
+    return this.resolveExistingApprovalTenantId(user, id, tenantId, scope).then(
+      (resolvedTenantId) =>
+        this.approvalsService.cancel(id, resolvedTenantId, user.sub),
+    );
   }
 }

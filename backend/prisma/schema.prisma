@@ -268,8 +268,11 @@ model Tier {
   allowAuditExport     Boolean @default(false)
 
   // Relations
-  tierAgentPools TierAgentPool[]
-  tenants       Tenant[]
+  tierAgentPools      TierAgentPool[]
+  tierDepartmentPools TierDepartmentPool[]
+  tenants             Tenant[]
+  deployedAgents      Agent[]              @relation("TierDeployedAgents")
+  deployedDepartments Department[]         @relation("TierDeployedDepartments")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -309,6 +312,36 @@ model TierAgentPool {
   @@unique([tierId, templateId])
   @@index([tierId])
   @@map("tier_agent_pools")
+}
+
+// ─── TierDepartmentPool (Phase 1: Department allocation per tier) ──────────
+
+model TierDepartmentPool {
+  id                   String             @id @default(uuid())
+  tierId               String
+  tier                 Tier               @relation(fields: [tierId], references: [id], onDelete: Cascade)
+  departmentTemplateId String
+  departmentTemplate   DepartmentTemplate @relation(fields: [departmentTemplateId], references: [id])
+
+  // Slot position in tier (1 = first available, 2 = second, etc.)
+  slot                 Int                @default(1)
+
+  // Slot type: 'FIXED' = tenant-locked (cannot remove), 'CHOICE' = tenant can add/remove
+  slotType             String             @default("CHOICE") // 'FIXED' | 'CHOICE'
+
+  // Whether tenant MUST have this department (true = fixed slot, false = choice slot)
+  isRequired           Boolean            @default(false)
+  isDefaultSelected    Boolean            @default(true)
+
+  createdAt            DateTime           @default(now())
+
+  // Departments created from this pool entry
+  departments          Department[]
+
+  @@unique([tierId, departmentTemplateId])
+  @@index([tierId])
+  @@index([departmentTemplateId])
+  @@map("tier_department_pools")
 }
 
 // ─── Tenant ────────────────────────────────────────────────────────────────
@@ -577,6 +610,10 @@ model Agent {
   // Tenant can toggle selected agents within their tier allocation
   isSelected      Boolean @default(true)
 
+  // Tier lineage for tenant-owned deployed instances
+  deployedFromTierId String?
+  deployedFromTier   Tier?   @relation("TierDeployedAgents", fields: [deployedFromTierId], references: [id])
+
   // Phase 2.1 — staging / deployment mode
   deploymentMode  DeploymentMode @default(PRODUCTION)
   stagingParentId String?
@@ -624,6 +661,7 @@ model Agent {
   @@index([type])
   @@index([departmentId])
   @@index([tierAgentPoolId])
+  @@index([deployedFromTierId])
   @@index([stagingParentId])
   @@index([supervisorId])
   @@map("agents")
@@ -816,13 +854,21 @@ model Department {
   headAgentId String?
   parentId    String?
   metadata    Json             @default("{}")
+  templateId  String?
+  tierDepartmentPoolId String?
+  deployedFromTierId   String?
+  isFixed     Boolean          @default(false)
+  isSelected  Boolean          @default(true)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  parent      Department?      @relation("DepartmentHierarchy", fields: [parentId], references: [id])
-  children    Department[]    @relation("DepartmentHierarchy")
-  agents      Agent[]         @relation("DepartmentAgents")
+  parent              Department?         @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children            Department[]        @relation("DepartmentHierarchy")
+  agents              Agent[]             @relation("DepartmentAgents")
+  template            DepartmentTemplate? @relation("DepartmentTemplateDeployments", fields: [templateId], references: [id], onDelete: SetNull)
+  tierDepartmentPool  TierDepartmentPool? @relation(fields: [tierDepartmentPoolId], references: [id], onDelete: SetNull)
+  deployedFromTier    Tier?               @relation("TierDeployedDepartments", fields: [deployedFromTierId], references: [id], onDelete: SetNull)
 
   // Phase 5 back-relations - Costs
   costRecords    CostRecord[]
@@ -840,6 +886,9 @@ model Department {
 
   @@index([tenantId])
   @@index([parentId])
+  @@index([templateId])
+  @@index([tierDepartmentPoolId])
+  @@index([deployedFromTierId])
   @@map("departments")
 }
 
@@ -857,6 +906,9 @@ model DepartmentTemplate {
   isPublic    Boolean @default(true)
   category    String  @default("general") // "startup" | "enterprise" | "ecommerce" | etc.
   tags        Json    @default("[]")
+
+  tierDepartmentPools TierDepartmentPool[]
+  deployedDepartments Department[]        @relation("DepartmentTemplateDeployments")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

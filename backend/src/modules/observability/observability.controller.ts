@@ -5,21 +5,25 @@ import {
   ForbiddenException,
   Header,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { ObservabilityService } from './services/observability.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
+import { isPlatformAdminRole } from '../../common/types/user-role.utils';
 
 @Controller({ path: 'observability', version: '1' })
 export class ObservabilityController {
   constructor(private readonly observabilityService: ObservabilityService) {}
 
+  private isPlatformRole(role?: string | null): boolean {
+    return isPlatformAdminRole(role);
+  }
+
   /** Tenant KPI summary */
   @Get('kpis')
   getTenantKpis(@CurrentUser() user: JwtPayload) {
-    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
-      user.role ?? '',
-    );
+    const isSuperAdmin = this.isPlatformRole(user.role);
     if (!user.tenantId && !isSuperAdmin)
       throw new ForbiddenException('Tenant context required');
     const tenantId = user.tenantId ?? null;
@@ -34,9 +38,7 @@ export class ObservabilityController {
     @Query('limit') limit = '20',
     @Query('agentId') agentId?: string,
   ) {
-    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
-      user.role ?? '',
-    );
+    const isSuperAdmin = this.isPlatformRole(user.role);
     if (!user.tenantId && !isSuperAdmin)
       throw new ForbiddenException('Tenant context required');
     const tenantId = user.tenantId ?? null;
@@ -56,9 +58,7 @@ export class ObservabilityController {
     @Query('to') to?: string,
     @Query('limit') limit = '100',
   ) {
-    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
-      user.role ?? '',
-    );
+    const isSuperAdmin = this.isPlatformRole(user.role);
     if (!user.tenantId && !isSuperAdmin)
       throw new ForbiddenException('Tenant context required');
     const tenantId = user.tenantId ?? null;
@@ -80,9 +80,7 @@ export class ObservabilityController {
     @Query('limit') limit = '20',
     @Query('agentId') agentId?: string,
   ) {
-    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
-      user.role ?? '',
-    );
+    const isSuperAdmin = this.isPlatformRole(user.role);
     if (!user.tenantId && !isSuperAdmin)
       throw new ForbiddenException('Tenant context required');
     const tenantId = user.tenantId ?? null;
@@ -102,9 +100,7 @@ export class ObservabilityController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    const isSuperAdmin = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(
-      user.role ?? '',
-    );
+    const isSuperAdmin = this.isPlatformRole(user.role);
     if (!user.tenantId && !isSuperAdmin)
       throw new ForbiddenException('Tenant context required');
     const tenantId = user.tenantId ?? null;
@@ -121,7 +117,7 @@ export class ObservabilityController {
   @Get('prometheus')
   @Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
   async getPrometheus(@CurrentUser() user: JwtPayload): Promise<string> {
-    const tenantId = ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(user.role ?? '')
+    const tenantId = this.isPlatformRole(user.role)
       ? undefined
       : (user.tenantId ?? undefined);
     return this.observabilityService.getPrometheusMetrics(tenantId);
@@ -129,7 +125,7 @@ export class ObservabilityController {
 
   /** Platform-wide summary — Super Admin only */
   @Get('platform')
-  @Roles('SUPER_ADMIN', 'PLATFORM_ADMIN')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.PLATFORM_ADMIN)
   getPlatformSummary() {
     return this.observabilityService.getPlatformSummary();
   }

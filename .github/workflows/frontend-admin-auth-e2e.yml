@@ -1,0 +1,102 @@
+name: Frontend Admin Auth E2E
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/frontend-admin-auth-e2e.yml
+      - backend/**
+      - frontend-admin/**
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - .github/workflows/frontend-admin-auth-e2e.yml
+      - backend/**
+      - frontend-admin/**
+  workflow_dispatch:
+
+jobs:
+  auth-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: neurecore_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d neurecore_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            backend/pnpm-lock.yaml
+            frontend-admin/pnpm-lock.yaml
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install frontend-admin dependencies
+        working-directory: frontend-admin
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        working-directory: frontend-admin
+        run: pnpm run playwright:install
+
+      - name: Type-check frontend-admin
+        working-directory: frontend-admin
+        run: pnpm run type-check
+
+      - name: Run frontend-admin auth e2e
+        working-directory: frontend-admin
+        env:
+          CI: "true"
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/neurecore_e2e?schema=public
+          DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@127.0.0.1:5432/neurecore_e2e?schema=public
+          REDIS_URL: redis://127.0.0.1:6379
+          JWT_SECRET: neurecore-auth-e2e-secret-min-32-chars
+          SUPERADMIN_EMAIL: noreply@neurecore.ai
+          SUPERADMIN_PASSWORD: Admin@2026!
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3000/api/v1
+        run: pnpm run test:e2e:auth
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-admin-auth-e2e-report
+          path: |
+            frontend-admin/playwright-report/
+            frontend-admin/test-results/

@@ -210,6 +210,11 @@ export class SettingsController {
     return { items: tiers };
   }
 
+  @Get('tiers/:id/usage')
+  async getTierUsage(@Param('id') id: string) {
+    return this.settingsService.getTierUsage(id);
+  }
+
   // ==================== EMAIL CONFIGS ====================
 
   @Get('email/configs')

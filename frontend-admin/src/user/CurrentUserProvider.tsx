@@ -6,8 +6,12 @@
 
 "use client";
 
-import React, { createContext, useContext, useEffect } from "react";
-import { AUTH_SESSION_CLEARED_EVENT } from "@/lib/auth-session";
+import React, { createContext, useContext, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import {
+  AUTH_SESSION_CLEARED_EVENT,
+  getStoredAccessToken,
+} from "@/lib/auth-session";
 import { useRequest, ReturnTypeOfUseRequest } from "../api-client";
 
 interface User {
@@ -49,6 +53,8 @@ interface CurrentUserProviderProps {
 export const CurrentUserProvider: React.FC<CurrentUserProviderProps> = ({
   children,
 }) => {
+  const pathname = usePathname();
+  const lastRequestKeyRef = useRef<string | null>(null);
   const result = useRequest(
     {
       url: "/auth/me",
@@ -56,13 +62,32 @@ export const CurrentUserProvider: React.FC<CurrentUserProviderProps> = ({
       skipAuth: true,
     },
     {
-      manual: false,
+      manual: true,
       cacheKey: "currentUser",
     },
   );
 
   useEffect(() => {
+    const token = getStoredAccessToken();
+
+    if (!token) {
+      lastRequestKeyRef.current = null;
+      result.mutate?.(null);
+      return;
+    }
+
+    const requestKey = `${pathname ?? ""}:${token}`;
+    if (lastRequestKeyRef.current === requestKey) {
+      return;
+    }
+
+    lastRequestKeyRef.current = requestKey;
+    void result.run?.();
+  }, [pathname, result.mutate, result.run]);
+
+  useEffect(() => {
     const handleSessionCleared = () => {
+      lastRequestKeyRef.current = null;
       result.mutate?.(null);
     };
 
@@ -109,7 +134,9 @@ export const useIsLoggedIn = (): boolean => {
  */
 export const useCurrentRoles = (): string[] => {
   const ctx = useCurrentUserContext();
-  return (extractCurrentUser(ctx?.data)?.roles || []).map((r: any) => r.name || r);
+  return (extractCurrentUser(ctx?.data)?.roles || []).map(
+    (r: any) => r.name || r,
+  );
 };
 
 /**

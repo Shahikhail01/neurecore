@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * BrainMapCanvas — Animated Platform Brain Visualization
@@ -13,18 +13,21 @@
  *  - Error glow on failed agents
  */
 
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { Graph } from '@visx/network';
-import api from '@/services/api';
-import { useInspectorStore } from '@/stores/inspectorStore';
-import { useBrainMapAnimations, type AgentAnimState } from '@/hooks/useBrainMapAnimations';
-import { unwrapArrayOrEmpty } from '@/services/unwrap';
+import { useEffect, useState, useRef, useCallback } from "react";
+import { Graph } from "@visx/network";
+import api from "@/services/api";
+import { useInspectorStore } from "@/stores/inspectorStore";
+import {
+  useBrainMapAnimations,
+  type AgentAnimState,
+} from "@/hooks/useBrainMapAnimations";
+import { unwrapArrayOrEmpty } from "@/services/unwrap";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface GraphNode {
   id: string;
   label: string;
-  type: 'tenant' | 'department' | 'agent';
+  type: "tenant" | "department" | "agent";
   status?: string;
   x: number;
   y: number;
@@ -38,32 +41,44 @@ interface GraphLink {
 }
 
 // Node colors by type
-const NODE_COLOR: Record<GraphNode['type'], string> = {
-  tenant:     '#6366f1',
-  department: '#8b5cf6',
-  agent:      '#06b6d4',
+const NODE_COLOR: Record<GraphNode["type"], string> = {
+  tenant: "#6366f1",
+  department: "#8b5cf6",
+  agent: "#06b6d4",
 };
 
-const NODE_RADIUS: Record<GraphNode['type'], number> = {
-  tenant:     22,
+const NODE_RADIUS: Record<GraphNode["type"], number> = {
+  tenant: 22,
   department: 16,
-  agent:      10,
+  agent: 10,
 };
 
 function agentStatusColor(status?: string): string {
   switch (status) {
-    case 'RUNNING': return '#22c55e';
-    case 'ERROR':   return '#ef4444';
-    case 'PAUSED':  return '#f59e0b';
-    case 'IDLE':    return '#71717a';
-    default:        return '#06b6d4';
+    case "RUNNING":
+      return "#22c55e";
+    case "ERROR":
+      return "#ef4444";
+    case "PAUSED":
+      return "#f59e0b";
+    case "IDLE":
+      return "#71717a";
+    default:
+      return "#06b6d4";
   }
 }
 
 // ─── Force-like layout ────────────────────────────────────────────────────────
 function buildGraph(
   tenants: { id: string; name: string }[],
-  agents: { id: string; name: string; status?: string; departmentId?: string; tenantId?: string; department?: { id: string; name: string; tenantId?: string } }[],
+  agents: {
+    id: string;
+    name: string;
+    status?: string;
+    departmentId?: string;
+    tenantId?: string;
+    department?: { id: string; name: string; tenantId?: string };
+  }[],
   width: number,
   height: number,
 ): { nodes: GraphNode[]; links: GraphLink[] } {
@@ -81,7 +96,7 @@ function buildGraph(
     const node: GraphNode = {
       id: t.id,
       label: t.name,
-      type: 'tenant',
+      type: "tenant",
       x: cx + tenantRadius * Math.cos(angle),
       y: cy + tenantRadius * Math.sin(angle),
       color: NODE_COLOR.tenant,
@@ -92,15 +107,27 @@ function buildGraph(
   });
 
   // Collect unique departments
-  const deptSet = new Map<string, { id: string; name: string; tenantId?: string }>();
+  const deptSet = new Map<
+    string,
+    { id: string; name: string; tenantId?: string }
+  >();
   for (const a of agents) {
-    if (a.department) deptSet.set(a.department.id, { ...a.department, tenantId: a.department.tenantId });
-    if (a.departmentId && !deptSet.has(a.departmentId)) deptSet.set(a.departmentId, { id: a.departmentId, name: 'Dept', tenantId: a.tenantId });
+    if (a.department)
+      deptSet.set(a.department.id, {
+        ...a.department,
+        tenantId: a.department.tenantId,
+      });
+    if (a.departmentId && !deptSet.has(a.departmentId))
+      deptSet.set(a.departmentId, {
+        id: a.departmentId,
+        name: "Dept",
+        tenantId: a.tenantId,
+      });
   }
 
   // Place departments near parent tenant
   Array.from(deptSet.values()).forEach((d, i) => {
-    const parentNode = nodeMap.get(d.tenantId ?? '');
+    const parentNode = nodeMap.get(d.tenantId ?? "");
     const px = parentNode?.x ?? cx;
     const py = parentNode?.y ?? cy;
     const angle = (i / Math.max(deptSet.size, 1)) * 2 * Math.PI;
@@ -108,7 +135,7 @@ function buildGraph(
     const node: GraphNode = {
       id: d.id,
       label: d.name,
-      type: 'department',
+      type: "department",
       x: px + r * Math.cos(angle),
       y: py + r * Math.sin(angle),
       color: NODE_COLOR.department,
@@ -121,7 +148,7 @@ function buildGraph(
 
   // Place agents near parent dept
   agents.slice(0, 60).forEach((a, i) => {
-    const parentId = a.departmentId ?? a.tenantId ?? '';
+    const parentId = a.departmentId ?? a.tenantId ?? "";
     const parentNode = nodeMap.get(parentId);
     const px = parentNode?.x ?? cx + (Math.random() - 0.5) * 300;
     const py = parentNode?.y ?? cy + (Math.random() - 0.5) * 300;
@@ -130,10 +157,13 @@ function buildGraph(
     const node: GraphNode = {
       id: a.id,
       label: a.name,
-      type: 'agent',
+      type: "agent",
       x: Math.max(20, Math.min(width - 20, px + r * Math.cos(angle))),
       y: Math.max(20, Math.min(height - 20, py + r * Math.sin(angle))),
-      color: a.status === 'RUNNING' || a.status === 'ACTIVE' ? '#22c55e' : NODE_COLOR.agent,
+      color:
+        a.status === "RUNNING" || a.status === "ACTIVE"
+          ? "#22c55e"
+          : NODE_COLOR.agent,
       r: NODE_RADIUS.agent,
     };
     nodes.push(node);
@@ -155,17 +185,24 @@ interface AgentNodeProps {
   onClick: () => void;
 }
 
-function AgentNode({ node, hovered, animState, onHover, onLeave, onClick }: AgentNodeProps) {
-  const isPulsing  = animState?.pulse    ?? false;
+function AgentNode({
+  node,
+  hovered,
+  animState,
+  onHover,
+  onLeave,
+  onClick,
+}: AgentNodeProps) {
+  const isPulsing = animState?.pulse ?? false;
   const isThinking = animState?.thinking ?? false;
-  const isError    = animState?.error    ?? false;
-  const r          = hovered ? node.r * 1.3 : node.r;
-  const fill       = isError ? '#ef4444' : node.color;
+  const isError = animState?.error ?? false;
+  const r = hovered ? node.r * 1.3 : node.r;
+  const fill = isError ? "#ef4444" : node.color;
 
   return (
     <g
       transform={`translate(${node.x},${node.y})`}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: "pointer" }}
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
       onClick={onClick}
@@ -178,7 +215,7 @@ function AgentNode({ node, hovered, animState, onHover, onLeave, onClick }: Agen
           stroke="#ef4444"
           strokeWidth={3}
           strokeOpacity={0.5}
-          style={{ animation: 'brainError 1.2s ease-in-out infinite' }}
+          style={{ animation: "brainError 1.2s ease-in-out infinite" }}
         />
       )}
 
@@ -191,7 +228,7 @@ function AgentNode({ node, hovered, animState, onHover, onLeave, onClick }: Agen
             stroke={fill}
             strokeWidth={1.5}
             strokeOpacity={0.6}
-            style={{ animation: 'brainPulse 1.4s ease-out infinite' }}
+            style={{ animation: "brainPulse 1.4s ease-out infinite" }}
           />
           <circle
             r={r + 4}
@@ -199,7 +236,7 @@ function AgentNode({ node, hovered, animState, onHover, onLeave, onClick }: Agen
             stroke={fill}
             strokeWidth={1}
             strokeOpacity={0.4}
-            style={{ animation: 'brainPulse 1.4s ease-out infinite 0.35s' }}
+            style={{ animation: "brainPulse 1.4s ease-out infinite 0.35s" }}
           />
         </>
       )}
@@ -209,9 +246,9 @@ function AgentNode({ node, hovered, animState, onHover, onLeave, onClick }: Agen
         r={r}
         fill={fill}
         fillOpacity={0.85}
-        stroke={hovered ? '#fff' : `${fill}88`}
+        stroke={hovered ? "#fff" : `${fill}88`}
         strokeWidth={hovered ? 2 : 1}
-        style={{ transition: 'r 0.15s, stroke-width 0.15s' }}
+        style={{ transition: "r 0.15s, stroke-width 0.15s" }}
       />
 
       {/* Thinking spinner */}
@@ -225,7 +262,10 @@ function AgentNode({ node, hovered, animState, onHover, onLeave, onClick }: Agen
           strokeWidth={1.5}
           strokeDasharray={`${r * 2} ${r * 1.5}`}
           strokeOpacity={0.8}
-          style={{ animation: 'brainSpin 0.9s linear infinite', transformOrigin: '0 0' }}
+          style={{
+            animation: "brainSpin 0.9s linear infinite",
+            transformOrigin: "0 0",
+          }}
         />
       )}
 
@@ -258,37 +298,52 @@ function GraphEdge({ link, animated }: GraphEdgeProps) {
       y1={link.source.y}
       x2={link.target.x}
       y2={link.target.y}
-      stroke={animated ? '#6366f1' : '#3f3f46'}
+      stroke={animated ? "#6366f1" : "#3f3f46"}
       strokeWidth={animated ? 1.5 : 1}
       strokeOpacity={animated ? 0.8 : 0.5}
-      strokeDasharray={animated ? '4 4' : undefined}
-      style={animated ? { animation: 'dashFlow 0.6s linear infinite' } : undefined}
+      strokeDasharray={animated ? "4 4" : undefined}
+      style={
+        animated ? { animation: "dashFlow 0.6s linear infinite" } : undefined
+      }
     />
   );
 }
 
 // ─── Canvas component ─────────────────────────────────────────────────────────
 export default function BrainMapCanvas() {
-  const containerRef  = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const openInspector = useInspectorStore((s) => s.openInspector);
 
-  const [size, setSize]       = useState({ width: 900, height: 600 });
-  const [graph, setGraph]     = useState<{ nodes: GraphNode[]; links: GraphLink[] }>({ nodes: [], links: [] });
+  const [size, setSize] = useState({ width: 900, height: 600 });
+  const [graph, setGraph] = useState<{
+    nodes: GraphNode[];
+    links: GraphLink[];
+  }>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [hideIdle, setHideIdle]   = useState(false);
+  const [hideIdle, setHideIdle] = useState(false);
 
   // Animation states managed by useBrainMapAnimations hook
-  const [animStates, setAnimStates] = useState<Map<string, AgentAnimState>>(new Map());
+  const [animStates, setAnimStates] = useState<Map<string, AgentAnimState>>(
+    new Map(),
+  );
 
-  const handleAnimUpdate = useCallback((agentId: string, patch: Partial<AgentAnimState>) => {
-    setAnimStates((prev) => {
-      const next = new Map(prev);
-      const current = next.get(agentId) ?? { pulse: false, thinking: false, error: false, flowEdges: [] };
-      next.set(agentId, { ...current, ...patch });
-      return next;
-    });
-  }, []);
+  const handleAnimUpdate = useCallback(
+    (agentId: string, patch: Partial<AgentAnimState>) => {
+      setAnimStates((prev) => {
+        const next = new Map(prev);
+        const current = next.get(agentId) ?? {
+          pulse: false,
+          thinking: false,
+          error: false,
+          flowEdges: [],
+        };
+        next.set(agentId, { ...current, ...patch });
+        return next;
+      });
+    },
+    [],
+  );
 
   useBrainMapAnimations(handleAnimUpdate);
 
@@ -309,8 +364,12 @@ export default function BrainMapCanvas() {
     setLoading(true);
     try {
       const [tenantRes, agentRes] = await Promise.all([
-        api.get<{ data: { data: { id: string; name: string }[] } }>('/tenants?limit=20'),
-        api.get<{ data: { data: unknown[] } }>('/agents?limit=60'),
+        api.get<{ data: { data: { id: string; name: string }[] } }>(
+          "/tenants?limit=20",
+        ),
+        api.get<{ data: { data: unknown[] } }>("/agents", {
+          params: { limit: 60, scope: "platform" },
+        }),
       ]);
       const tenants = unwrapArrayOrEmpty(tenantRes);
       const agents = unwrapArrayOrEmpty(agentRes);
@@ -322,16 +381,19 @@ export default function BrainMapCanvas() {
     }
   }, [size.width, size.height]);
 
-  useEffect(() => { void loadGraph(); }, [loadGraph]);
+  useEffect(() => {
+    void loadGraph();
+  }, [loadGraph]);
 
   // Derive visible graph (optionally hide idle agents)
   const visibleGraph = hideIdle
     ? {
-        nodes: graph.nodes.filter((n) => n.type !== 'agent' || n.color !== NODE_COLOR.agent),
+        nodes: graph.nodes.filter(
+          (n) => n.type !== "agent" || n.color !== NODE_COLOR.agent,
+        ),
         links: graph.links.filter(
           (l) =>
-            l.source.type !== 'agent' ||
-            l.source.color !== NODE_COLOR.agent,
+            l.source.type !== "agent" || l.source.color !== NODE_COLOR.agent,
         ),
       }
     : graph;
@@ -370,21 +432,33 @@ export default function BrainMapCanvas() {
         }
       `}</style>
 
-      <div ref={containerRef} className="w-full h-full relative brain-map-canvas">
+      <div
+        ref={containerRef}
+        className="w-full h-full relative brain-map-canvas"
+      >
         {/* Legend + controls */}
         <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-3 bg-surface-overlay/90 rounded-lg px-3 py-2 border border-surface-border">
           {Object.entries(NODE_COLOR).map(([type, color]) => (
             <div key={type} className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full" style={{ background: color }} />
+              <span
+                className="w-3 h-3 rounded-full"
+                style={{ background: color }}
+              />
               <span className="text-xs text-zinc-400 capitalize">{type}</span>
             </div>
           ))}
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ background: '#22c55e' }} />
+            <span
+              className="w-3 h-3 rounded-full"
+              style={{ background: "#22c55e" }}
+            />
             <span className="text-xs text-zinc-400">Active</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ background: '#ef4444' }} />
+            <span
+              className="w-3 h-3 rounded-full"
+              style={{ background: "#ef4444" }}
+            />
             <span className="text-xs text-zinc-400">Error</span>
           </div>
         </div>
@@ -395,11 +469,11 @@ export default function BrainMapCanvas() {
             onClick={() => setHideIdle((v) => !v)}
             className={`px-3 py-1.5 rounded-lg border text-xs transition ${
               hideIdle
-                ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
-                : 'border-surface-border bg-surface-overlay text-zinc-400 hover:text-zinc-200'
+                ? "border-indigo-500 bg-indigo-500/20 text-indigo-300"
+                : "border-surface-border bg-surface-overlay text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            {hideIdle ? 'Show all' : 'Hide idle'}
+            {hideIdle ? "Show all" : "Hide idle"}
           </button>
           <button
             onClick={() => void loadGraph()}
@@ -425,7 +499,7 @@ export default function BrainMapCanvas() {
                 <GraphEdge link={link} animated={isFlowEdge(link)} />
               )}
               nodeComponent={({ node }) =>
-                node.type === 'agent' ? (
+                node.type === "agent" ? (
                   <AgentNode
                     key={node.id}
                     node={node}
@@ -433,13 +507,13 @@ export default function BrainMapCanvas() {
                     animState={animStates.get(node.id)}
                     onHover={() => setHoveredId(node.id)}
                     onLeave={() => setHoveredId(null)}
-                    onClick={() => openInspector('agent', node.id)}
+                    onClick={() => openInspector("agent", node.id)}
                   />
                 ) : (
                   <g
                     key={node.id}
                     transform={`translate(${node.x},${node.y})`}
-                    style={{ cursor: 'default' }}
+                    style={{ cursor: "default" }}
                     onMouseEnter={() => setHoveredId(node.id)}
                     onMouseLeave={() => setHoveredId(null)}
                   >
@@ -447,15 +521,17 @@ export default function BrainMapCanvas() {
                       r={hoveredId === node.id ? node.r * 1.2 : node.r}
                       fill={node.color}
                       fillOpacity={0.85}
-                      stroke={hoveredId === node.id ? '#fff' : `${node.color}88`}
+                      stroke={
+                        hoveredId === node.id ? "#fff" : `${node.color}88`
+                      }
                       strokeWidth={hoveredId === node.id ? 2 : 1}
-                      style={{ transition: 'r 0.15s, stroke-width 0.15s' }}
+                      style={{ transition: "r 0.15s, stroke-width 0.15s" }}
                     />
                     <text
                       textAnchor="middle"
                       dy={node.r + 12}
                       fill="#d4d4d8"
-                      fontSize={node.type === 'tenant' ? 11 : 9}
+                      fontSize={node.type === "tenant" ? 11 : 9}
                       fontFamily="Inter, sans-serif"
                       pointerEvents="none"
                     >
