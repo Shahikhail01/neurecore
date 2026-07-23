@@ -27,9 +27,10 @@ import { PublicSocialApprovalAddon } from './addons/public-social-approval.addon
 import { AgricultureFoodApprovalAddon } from './addons/agriculture-food-approval.addon';
 import { DefaultApprovalAddon } from './addons/default-approval.addon';
 import { DeliverablesModule } from '../deliverables/deliverables.module';
+import { TiersModule } from '../tiers/tiers.module';
 
 @Module({
-  imports: [DeliverablesModule],
+  imports: [DeliverablesModule, TiersModule],
   controllers: [ApprovalChainsController],
   providers: [
     ApprovalChainsService,

@@ -97,6 +97,17 @@ export const tenantTemplatesService = {
     return res.data?.data ?? res.data;
   },
 
+  /**
+   * applyBaseline — copy the universal baseline (`industrySlug = null`)
+   * seeds into the tenant. Useful when a tenant has no industry set and
+   * the `/settings/templates` page would otherwise be empty.
+   * Idempotent: skips if a tenant-owned clone already exists.
+   */
+  async applyBaseline(): Promise<{ count: number }> {
+    const res = await api.post('/tenant-templates/apply-baseline', {});
+    return res.data?.data ?? res.data;
+  },
+
   async restoreFromSeed(id: string): Promise<TenantTemplate> {
     const res = await api.post(`/tenant-templates/${id}/restore-from-seed`);
     return res.data?.data ?? res.data;

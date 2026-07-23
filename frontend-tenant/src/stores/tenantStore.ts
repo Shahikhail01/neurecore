@@ -26,11 +26,22 @@
  * DIP: the consumer-facing selector `useTenantIndustryGroup()` hides the
  * store implementation, so future swaps to SWR / React Query / Context
  * API are a one-file change.
+ *
+ * Part 9 N9 (FIX-COMPREHENSIVE 2026-07-23 follow-up) —
+ * `useRailInvalidationOnIndustryChange()` applies the ONLY join point for
+ * rail-preferences cache invalidation when `industryGroup` changes (e.g. a
+ * SUPER_ADMIN re-assigns the tenant's industry via /admin or the onboarding
+ * wizard picks one). Per the industry release, hidden item ids differ
+ * per group (e.g. F&C has `loans`/`audits`, Healthcare has `patients`),
+ * so stale entries are silently dropped by the `merge()` defensively.
+ * The explicit reset prevents stale entries from leaking across.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { create } from 'zustand';
 import { tenantsService } from '@/services/tenants.service';
+
+const RAIL_INVALIDATION_STORAGE_KEY = 'neurecore-tenant-store.industryGroup.watermark';
 
 interface TenantState {
   /** The tenant's industry group slug (e.g. 'financial-compliance'). null while loading or if no industry set. */
@@ -131,4 +142,57 @@ export function useTenantIndustryGroup(): {
   }, [fetchTenant]);
 
   return { industryGroup, industry, loading };
+}
+
+/**
+ * useRailInvalidationOnIndustryChange — wires the `industryGroup` cache
+ * to the rail-preferences store. When the cached `industryGroup` differs
+ * from a persisted watermark, the rail-preferences store is reset so the
+ * user sees the canonical rail for the new group (not the empty/stale
+ * rail for the previous one).
+ *
+ * SRP: this hook only manages rail invalidation. It does NOT touch the
+ * tenant store or the rail preferences store business logic.
+ *
+ * Safe to call from anywhere — uses a ref + localStorage watermark so it
+ * doesn't re-bust on re-renders. The watermark is keyed per browser, not
+ * per tenantId, which means a SUPER_ADMIN switching tenants does NOT
+ * silently clear user preferences (the bug a naive `group-changed → reset`
+ * listener would cause — see tenantStore comments re: heuristics).
+ */
+export function useRailInvalidationOnIndustryChange(): void {
+  const industryGroup = useTenantStore((s) => s.industryGroup);
+  const lastWatermarkRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Wait for the first non-null value before we start comparing.
+    if (industryGroup == null) return;
+
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem(
+      RAIL_INVALIDATION_STORAGE_KEY,
+    );
+    if (stored === industryGroup) {
+      // Already in sync — nothing to do.
+      lastWatermarkRef.current = industryGroup;
+      return;
+    }
+
+    if (stored !== null && stored !== industryGroup) {
+      // Group genuinely changed in this session. Bust the rail prefs.
+      // Lazy import to avoid a circular dependency at module load.
+      void import('@/stores/railPreferencesStore').then(
+        ({ useRailPreferencesStore }) => {
+          useRailPreferencesStore.getState().reset();
+        },
+      );
+    }
+
+    // Persist the new watermark for the next page load.
+    window.localStorage.setItem(
+      RAIL_INVALIDATION_STORAGE_KEY,
+      industryGroup,
+    );
+    lastWatermarkRef.current = industryGroup;
+  }, [industryGroup]);
 }

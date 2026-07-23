@@ -1,7 +1,4 @@
-import {
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
 
 /**
  * TierLimitExceededException — 422 (Unprocessable Entity)

@@ -2,6 +2,10 @@
  * Approval Addon Interface
  *
  * Stage 2 Phase 2A: Industry-specific approval routing.
+ * FIX-COMPREHENSIVE 2026-07-23: Add TierGuardOutcome to surface which
+ * routes are blocked because of `Tier.maxApprovalStages` so the FE can
+ * render an actionable "Upgrade tier" CTA instead of silently omitting
+ * the rule.
  *
  * Each addon implements this interface to provide industry-specific
  * approval escalation chains. The base ApprovalChainsService delegates
@@ -55,6 +59,26 @@ export interface ApprovalAddon {
 
   /** Returns routes matching a specific event trigger. */
   getRoutesForEvent(tenantId: string, event: string): Promise<ApprovalRoute[]>;
+}
+
+/**
+ * FIX-COMPREHENSIVE 2026-07-23:
+ *
+ * `TierGuardOutcome` is the single source of truth for the cross-tier
+ * guard service to report a route as eligible/blocked. Blocked routes
+ * carry the *minimum tier slug* required so the FE can route the user
+ * directly to `/admin/tiers` for that target tier.
+ *
+ * `minTierSlug` resolution is an O(n) lookup against the tier catalog —
+ * the registry holds it once, lazily, on first use.
+ */
+export interface TierGuardOutcome {
+  eligible: ApprovalRoute[];
+  blocked: Array<ApprovalRoute & { reason: string; minTierSlug: string }>;
+  /** Effective tier the tenant is on. null when tenant has no tier row. */
+  currentTierSlug: string | null;
+  /** Numeric `maxApprovalStages` ceiling of the tenant's current tier. */
+  maxApprovalStages: number | null;
 }
 
 export const APPROVAL_ADDON = 'APPROVAL_ADDON';

@@ -22,9 +22,7 @@ import { CreateTenantTemplateDto } from './dto/create-tenant-template.dto';
 import { UpdateTenantTemplateDto } from './dto/update-tenant-template.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
-import {
-  TenantContextService,
-} from '../../common/context/tenant-context.service';
+import { TenantContextService } from '../../common/context/tenant-context.service';
 import type { TenantContext } from '../../common/context/tenant-context';
 import { PLATFORM_WILDCARD } from '../../common/guards/tenant-context.guard';
 
@@ -162,6 +160,25 @@ export class TenantTemplatesController {
       tenantId,
       industrySlug,
     );
+    return { count };
+  }
+
+  /**
+   * POST /tenant-templates/apply-baseline
+   *
+   * Copies the universal baseline (industrySlug=null) seeds into
+   * the tenant. Useful for tenants that created their account with
+   * no industry selected — they still get the 6 baseline templates
+   * (Customer Lifecycle, Agent Role, Routine, Report, Task, Department)
+   * so /settings/templates is never empty.
+   *
+   * Idempotent (skips if a tenant-owned clone already exists).
+   * Does not require a tenant `industry` because the baseline has none.
+   */
+  @Post('apply-baseline')
+  async applyBaseline(@CurrentUser() user: JwtPayload) {
+    const tenantId = this.currentTenantId(user);
+    const count = await this.seederService.seedForTenant(tenantId, '');
     return { count };
   }
 

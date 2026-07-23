@@ -120,7 +120,7 @@ import { getIndustryNavConfig } from '@/lib/industryNavigation';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 // Part 9 N3 — TenantStore replaces the per-component `tenantsService.getCurrent()`
 // call + local `tenantIndustryGroup` state. Single source of truth, single fetch.
-import { useTenantIndustryGroup } from '@/stores/tenantStore';
+import { useTenantIndustryGroup, useRailInvalidationOnIndustryChange } from '@/stores/tenantStore';
 
 /** Icon name → component lookup for industry extras (icons referenced by string). */
 const INDUSTRY_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -301,6 +301,7 @@ export function IconRail({ className = '' }: IconRailProps) {
   // regardless of how many components call it (store is idempotent +
   // TTL-guarded). Multiple consumers share the cached value.
   const { industryGroup: tenantIndustryGroup } = useTenantIndustryGroup();
+  useRailInvalidationOnIndustryChange();
   const user = useTenantAuth();
 
   const expanded = hovered || pinned;

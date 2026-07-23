@@ -88,6 +88,20 @@ export function TemplateList({ templateType }: TemplateListProps) {
     }
   };
 
+  const handleApplyBaseline = async () => {
+    setReseedLoading(true);
+    try {
+      await tenantTemplatesService.applyBaseline();
+      await fetchTemplates();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to apply baseline templates',
+      );
+    } finally {
+      setReseedLoading(false);
+    }
+  };
+
   const handleSaved = () => {
     setEditingId(null);
     setCreating(false);
@@ -120,6 +134,11 @@ export function TemplateList({ templateType }: TemplateListProps) {
             size="sm"
             onClick={handleReseed}
             disabled={reseedLoading || !tenantIndustry}
+            title={
+              tenantIndustry
+                ? `Restore industry-specific defaults for ${tenantIndustry}`
+                : 'Pick an industry first, or use Apply Baseline for universal defaults'
+            }
           >
             {reseedLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -127,6 +146,20 @@ export function TemplateList({ templateType }: TemplateListProps) {
               <RotateCcw className="w-4 h-4" />
             )}
             <span className="ml-1">Restore System Defaults</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleApplyBaseline}
+            disabled={reseedLoading}
+            title="Apply the universal baseline templates (works without an industry)"
+          >
+            {reseedLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RotateCcw className="w-4 h-4" />
+            )}
+            <span className="ml-1">Apply Baseline</span>
           </Button>
           <Button size="sm" onClick={() => setCreating(true)}>
             <Plus className="w-4 h-4" />
@@ -154,7 +187,8 @@ export function TemplateList({ templateType }: TemplateListProps) {
         <Card className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
           <p className="text-sm">No templates found for this type.</p>
           <p className="text-xs">
-            Click &ldquo;New&rdquo; to create one or &ldquo;Restore System Defaults&rdquo; to load from system seeds.
+            Click &ldquo;New&rdquo; to create one, &ldquo;Restore System Defaults&rdquo; to load
+            industry-specific seeds, or &ldquo;Apply Baseline&rdquo; for universal fallback.
           </p>
         </Card>
       ) : (

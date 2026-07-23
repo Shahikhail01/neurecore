@@ -98,7 +98,12 @@ export class ApprovalChainsController {
 
   /**
    * GET /approval-chains/industry-routes?industry=<slug>
+   *
    * Stage 2 Phase 2A: Resolve industry-specific approval routes.
+   * FIX-COMPREHENSIVE 2026-07-23: Response shape is `TierGuardOutcome`
+   * (eligible + blocked). Backwards-compatible: `count` is the number of
+   * eligible routes, `total` includes blocked. `blocked` carries the
+   * per-route `reason` + `minTierSlug` for the FE upgrade CTA.
    */
   @Get('industry-routes')
   async getIndustryRoutes(
@@ -106,8 +111,19 @@ export class ApprovalChainsController {
     @Query('industry') industrySlug: string,
   ) {
     const tenantId = requireTenantId(user);
-    const routes = await this.chainService.getIndustryRoutes(tenantId, industrySlug);
-    return { industrySlug, count: routes.length, routes };
+    const outcome = await this.chainService.getIndustryRoutes(
+      tenantId,
+      industrySlug,
+    );
+    return {
+      industrySlug,
+      eligible: outcome.eligible,
+      blocked: outcome.blocked,
+      count: outcome.eligible.length,
+      total: outcome.eligible.length + outcome.blocked.length,
+      currentTierSlug: outcome.currentTierSlug,
+      maxApprovalStages: outcome.maxApprovalStages,
+    };
   }
 }
 

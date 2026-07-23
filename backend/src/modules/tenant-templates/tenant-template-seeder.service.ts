@@ -9,11 +9,27 @@ export class TenantTemplateSeederService {
   constructor(private readonly prisma: PrismaService) {}
 
   async seedForTenant(tenantId: string, industrySlug: string): Promise<number> {
+    // Normalise empty-string or whitespace industry to null so the
+    // universal baseline (`industrySlug IS NULL`) seeds land too.
+    // Fixes the "tenant created without industry → /settings/templates
+    // shows No templates found" bug.
+    const normalisedIndustry =
+      typeof industrySlug === 'string' && industrySlug.trim().length > 0
+        ? industrySlug.trim()
+        : null;
+
     const seeds = await this.prisma.tenantTemplate.findMany({
       where: {
         tenantId: null,
         isActive: true,
-        OR: [{ industrySlug }, { industrySlug: null }],
+        ...(normalisedIndustry
+          ? {
+              OR: [
+                { industrySlug: normalisedIndustry },
+                { industrySlug: null },
+              ],
+            }
+          : { industrySlug: null }),
       },
     });
 
