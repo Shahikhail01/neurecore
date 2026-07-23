@@ -301,6 +301,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // If not in production, include original message for debugging
     if (!this.isProduction()) {
+      // Domain exceptions (e.g. TierLimitExceededException) embed a
+      // user-facing `error.message` in `getResponse()`. Prefer it over
+      // the raw exception.message so the dev wire matches production
+      // output for these structured payloads.
+      if (exception instanceof HttpException) {
+        const response = exception.getResponse();
+        if (
+          typeof response === 'object' &&
+          response !== null &&
+          !Array.isArray(response)
+        ) {
+          const nestedError = (response as Record<string, unknown>).error as
+            | { message?: string }
+            | undefined;
+          if (nestedError?.message) return nestedError.message;
+        }
+      }
       return originalMessage;
     }
 
@@ -330,6 +347,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       [ErrorCode.INSUFFICIENT_BALANCE]:
         'Insufficient balance for this operation.',
       [ErrorCode.PLAN_LIMIT_REACHED]: 'You have reached your plan limit.',
+      [ErrorCode.TIER_LIMIT_EXCEEDED]:
+        "This selection exceeds your plan's tier limits. Upgrade or pick a smaller option.",
       [ErrorCode.INTERNAL_ERROR]:
         'Something went wrong. Please try again later.',
       [ErrorCode.SERVICE_UNAVAILABLE]:
