@@ -149,16 +149,38 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
       let message: string;
       let details: Record<string, unknown> | undefined;
+      let code:
+        | ErrorCodeType
+        | undefined;
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const res = exceptionResponse as Record<string, unknown>;
-        message = Array.isArray(res.message)
-          ? 'Validation failed'
-          : ((res.message as string) ?? exception.message);
+        // SRP/OCP: domain exceptions can embed their own `error.code`
+        // (see TierLimitExceededException). When present we trust it
+        // over the generic status→code table so consumers can branch
+        // on `error.code === 'TIER_LIMIT_EXCEEDED'` rather than just
+        // `error.code === 'VALIDATION_ERROR'`. The status→code table
+        // remains the fallback for ad-hoc HttpException throw sites
+        // that pass raw `{ message, errors }` validation shapes.
+        const nestedError = res.error as
+          | { code?: string; details?: Record<string, unknown> }
+          | undefined;
+        if (nestedError?.code && typeof nestedError.code === 'string') {
+          code = nestedError.code as ErrorCodeType;
+          if (nestedError.details) {
+            details = nestedError.details;
+          }
+          message =
+            (res.message as string) ?? (exception.message ?? code);
+        } else {
+          message = Array.isArray(res.message)
+            ? 'Validation failed'
+            : ((res.message as string) ?? exception.message);
 
-        // Handle validation errors
-        if (Array.isArray(res.message)) {
-          details = { errors: res.message };
+          // Handle validation errors
+          if (Array.isArray(res.message)) {
+            details = { errors: res.message };
+          }
         }
       } else {
         message =
@@ -170,7 +192,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return {
         status: httpStatus,
         code:
-          GlobalExceptionFilter.STATUS_TO_ERROR_CODE[httpStatus] ||
+          code ??
+          GlobalExceptionFilter.STATUS_TO_ERROR_CODE[httpStatus] ??
           ErrorCode.INTERNAL_ERROR,
         message,
         details,
