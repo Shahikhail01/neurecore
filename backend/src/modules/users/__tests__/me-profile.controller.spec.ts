@@ -52,9 +52,10 @@ describe('MeProfileController', () => {
       });
 
       const result = await controller.get(user);
-      expect(result.phone).toBe('+1-555-1234');
-      expect(result.primaryDepartmentId).toBe('dept-X');
-      expect(result.notificationPrefs).toEqual({ digestCadence: 'daily' });
+      expect(result).not.toBeNull();
+      expect(result!.phone).toBe('+1-555-1234');
+      expect(result!.primaryDepartmentId).toBe('dept-X');
+      expect(result!.notificationPrefs).toEqual({ digestCadence: 'daily' });
     });
 
     it('returns null for unknown user', async () => {

@@ -144,7 +144,7 @@ export function IndustryGroupPicker({
 
       {showSubIndustries && selectedIndustry && (
         <p className="text-xs text-muted-foreground">
-          You can change this later under Tenant Settings.
+          Contact your platform administrator if your industry needs to change.
         </p>
       )}
     </div>

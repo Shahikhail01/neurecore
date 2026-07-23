@@ -67,7 +67,11 @@ export const onboardingService = {
   async saveCompanyAndLocale(payload: {
     name?: string;
     logoUrl?: string | null;
-    industry?: string;
+    /**
+     * `string` = set the tenant's industry slug; `null` = explicitly
+     * clear the industry (skip path); `undefined` = no change.
+     */
+    industry?: string | null;
     timezone?: string;
     currency?: string;
     locale?: string;

@@ -45,27 +45,45 @@ export function CompanyStep({
   const [companyName, setCompanyName] = useState(initialName);
   const [industry, setIndustry] = useState(initialIndustry);
   const [industries, setIndustries] = useState<IndustryOption[]>([]);
+  const [industriesLoading, setIndustriesLoading] = useState(!isReRun);
+  const [industriesError, setIndustriesError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Explicit "skip industry" acknowledgement. Industry is Super-Admin-only
+   * once set (INDUSTRY-GROUPS-CONCEPT.md §1.2 D7), so we must never let
+   * the picker fall through silently. The toggle surfaces the consequence
+   * (generic templates only) and forces the tenant to opt in.
+   */
+  const [skipIndustry, setSkipIndustry] = useState(false);
 
   // Fetch the canonical industry list (already grouped server-side).
   // NOTE: `GET /api/v1/industries/groups` returns `{slug, label, industrySlugs: string[]}`
   // (slugs only — no names/icons). Use `industriesService.listAllIndustries()` which
   // walks `/industries/by-group/:slug` for each group to get full Industry objects.
   useEffect(() => {
+    if (isReRun) return;
     let cancelled = false;
     void (async () => {
       try {
         const all = await industriesService.listAllIndustries();
-        if (!cancelled) setIndustries(all);
+        if (cancelled) return;
+        setIndustries(all);
+        if (all.length === 0) {
+          setIndustriesError('Industries are unavailable. Please reload this page.');
+        }
       } catch {
-        // Non-fatal — picker will just be empty
+        if (!cancelled) {
+          setIndustriesError('Industries are unavailable. Please reload this page.');
+        }
+      } finally {
+        if (!cancelled) setIndustriesLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isReRun]);
 
   const handleContinue = async () => {
     setError(null);
@@ -74,10 +92,18 @@ export function CompanyStep({
       // On re-run, omit `industry` so we never overwrite the Super-Admin
       // value. We still persist name + locale so the wizard can update
       // any incidental corrections the tenant makes.
-      await onboardingService.saveCompanyAndLocale({
+      //
+      // First-run: send `industry: null` only when the tenant
+      // explicitly ticked "Skip industry". Otherwise the backend keeps
+      // the tenant-industry null and downstream project-types +
+      // recommendations + industry dashboards fall back to generic.
+      const payload: { name: string; industry?: string | null } = {
         name: companyName,
-        ...(isReRun ? {} : { industry }),
-      });
+      };
+      if (!isReRun) {
+        payload.industry = skipIndustry ? null : industry;
+      }
+      await onboardingService.saveCompanyAndLocale(payload);
       onNext();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save');
@@ -136,9 +162,38 @@ export function CompanyStep({
           <Label>Industry</Label>
           <IndustryGroupPicker
             industries={industries}
-            value={industry}
-            onChange={setIndustry}
+            value={skipIndustry ? '' : industry}
+            onChange={(slug) => {
+              setSkipIndustry(false);
+              setIndustry(slug);
+            }}
           />
+          {industriesLoading && (
+            <p className="text-sm text-muted-foreground">Loading industries…</p>
+          )}
+          {industriesError && (
+            <p className="text-sm text-destructive" role="alert">
+              {industriesError}
+            </p>
+          )}
+          <label className="flex items-start gap-2 rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={skipIndustry}
+              onChange={(e) => setSkipIndustry(e.target.checked)}
+              data-testid="industry-skip-toggle"
+            />
+            <span>
+              <span className="font-medium text-foreground">
+                Skip industry for now
+              </span>
+              <br />
+              Without an industry you&apos;ll only see generic templates,
+              dashboards, and recommendations. Contact your platform admin
+              later to set it.
+            </span>
+          </label>
         </div>
       )}
       {error && (
@@ -149,7 +204,13 @@ export function CompanyStep({
       <div className="flex justify-end">
         <Button
           onClick={() => void handleContinue()}
-          disabled={!companyName.trim() || submitting}
+          disabled={
+            !companyName.trim() ||
+            (!isReRun &&
+              !skipIndustry &&
+              (!industry || industriesLoading || Boolean(industriesError))) ||
+            submitting
+          }
         >
           Continue <ArrowRight className="w-4 h-4 ml-1" />
         </Button>

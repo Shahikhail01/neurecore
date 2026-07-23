@@ -38,7 +38,10 @@ describe('OnboardingService — orchestrator', () => {
         // Part 9 N9 — headAgentId pinning in selectTemplate().
         update: jest.fn(),
       },
-      departmentTemplate: { findUnique: jest.fn() },
+      departmentTemplate: {
+        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       onboardingInvitation: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
       user: { findUnique: jest.fn(), create: jest.fn() },
     };
@@ -191,10 +194,18 @@ describe('OnboardingService — orchestrator', () => {
       });
       prismaMock.tenant.findUnique.mockResolvedValue({
         id: 'tenant-1', tierId: 't1',
-        tier: { maxDepartments: 5, maxAgents: 10, tierAgentPools: [] },
+        tier: { id: 't1', slug: 'basic', maxDepartments: 5, maxAgents: 10, tierAgentPools: [] },
       });
 
-      await expect(service.selectTemplate('tenant-1', 'big')).rejects.toThrow(/requires \d+ departments/);
+      // COMPREHENSIVE-FIX P0-B: should throw a typed TierLimitExceededException
+      // whose reason mentions the department overage. The exception's name
+      // is "TierLimitExceededException" and the user-facing message starts
+      // with the template slug.
+      await expect(service.selectTemplate('tenant-1', 'big')).rejects.toMatchObject({
+        name: 'TierLimitExceededException',
+        getStatus: expect.any(Function),
+      });
+      await expect(service.selectTemplate('tenant-1', 'big')).rejects.toThrow(/requires 20 departments/);
     });
 
     // Part 9 N9 — FIX-048 regression guard: agents MUST be round-robined

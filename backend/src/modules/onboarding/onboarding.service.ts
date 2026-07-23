@@ -8,6 +8,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { Prisma } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
@@ -22,6 +23,7 @@ import { DepartmentsService } from '../departments/services/departments.service'
 import { IndustryGroupsService } from '../industry/industry-groups.service';
 import { TierProvisioningService } from '../tiers/services/tier-provisioning.service';
 import { IndustryKnowledgeSeeder } from '../knowledge/services/industry-knowledge-seeder.service';
+import { TierLimitExceededException } from '../../common/errors/tier-limit-exceeded.exception';
 
 interface DeptTemplateStructureItem {
   name: string;
@@ -189,21 +191,41 @@ export class OnboardingService implements IOnboardingService {
     const structure =
       (template.structure as unknown as DeptTemplateStructureItem[]) ?? [];
     const projectedDeptCount = structure.length;
-    if (projectedDeptCount > tenant.tier.maxDepartments) {
-      throw new ForbiddenException(
-        `Template "${templateSlug}" requires ${projectedDeptCount} departments but tier "${tenant.tier.slug}" allows ${tenant.tier.maxDepartments}. Upgrade your tier or choose a smaller template.`,
-      );
-    }
 
     // Existing agents check — never silently exceed tier maxAgents
     const existingAgents = await this.prisma.agent.count({
       where: { tenantId, isSelected: true },
     });
     const projectedAgents = Math.max(1, Math.ceil(projectedDeptCount * 1.5));
-    if (existingAgents + projectedAgents > tenant.tier.maxAgents) {
-      throw new ForbiddenException(
-        `Template would exceed tier agent limit (${tenant.tier.maxAgents}). Deselect existing agents or upgrade.`,
+
+    if (
+      projectedDeptCount > tenant.tier.maxDepartments ||
+      existingAgents + projectedAgents > tenant.tier.maxAgents
+    ) {
+      const reason =
+        projectedDeptCount > tenant.tier.maxDepartments
+          ? `Template "${templateSlug}" requires ${projectedDeptCount} departments but tier "${tenant.tier.slug}" allows ${tenant.tier.maxDepartments}.`
+          : `Template "${templateSlug}" requires ${projectedAgents} agents but tier "${tenant.tier.slug}" only allows ${tenant.tier.maxAgents} (you have ${existingAgents} selected).`;
+      const suggestions = await this.findSmallerTemplateSuggestions(
+        tenantId,
+        templateSlug,
+        projectedDeptCount,
+        tenant.tier.maxDepartments,
       );
+      throw new TierLimitExceededException({
+        tier: {
+          id: tenant.tier.id,
+          slug: tenant.tier.slug,
+          maxDepartments: tenant.tier.maxDepartments,
+          maxAgents: tenant.tier.maxAgents,
+        },
+        projected: {
+          departments: projectedDeptCount,
+          agents: projectedAgents,
+        },
+        suggestions,
+        reason,
+      });
     }
 
     // ─── Expand template into Departments ─────────────────────────────────
@@ -540,5 +562,42 @@ export class OnboardingService implements IOnboardingService {
 
     this.logger.log(`Onboarding completed for tenant ${tenantId}`);
     return { completedAt };
+  }
+
+  /**
+   * Suggest up to 3 alternative department templates that would still
+   * fit within the tenant's tier capacity. SRP: read-only helper used
+   * solely by `selectTemplate()` when it raises a TierLimitExceededException.
+   */
+  private async findSmallerTemplateSuggestions(
+    tenantId: string,
+    rejectedSlug: string,
+    currentDeptCount: number,
+    maxDepartments: number,
+  ): Promise<string[]> {
+    try {
+      const alternatives = await this.prisma.departmentTemplate.findMany({
+        where: {
+          slug: { not: rejectedSlug },
+        },
+        take: 50,
+      });
+      const valid = alternatives.filter(
+        (t) => (t.structure as unknown as DeptTemplateStructureItem[] | null) !== null,
+      );
+      const sliced = valid.filter((t) => {
+        const structure =
+          (t.structure as unknown as DeptTemplateStructureItem[]) ?? [];
+        return (
+          structure.length <= maxDepartments &&
+          structure.length < currentDeptCount
+        );
+      });
+      return sliced.slice(0, 3).map((t) => t.slug);
+    } catch {
+      // Non-fatal — suggestions are advisory only.
+      void tenantId;
+      return [];
+    }
   }
 }

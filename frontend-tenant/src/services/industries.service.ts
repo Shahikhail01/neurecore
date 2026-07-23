@@ -53,37 +53,30 @@ export const industriesService = {
   async listAllIndustries(): Promise<IndustryOption[]> {
     const groups = await this.listGroups();
     const lists = await Promise.all(
-      groups.map((g) =>
-        api
-          .get(`/industries/by-group/${encodeURIComponent(g.slug)}`)
-          .then((r) => ((r.data?.data ?? []) as Array<{
+      groups.map(async (group) => {
+        try {
+          const response = await api.get(
+            `/industries/by-group/${encodeURIComponent(group.slug)}`,
+          );
+          const raw = (response.data?.data ?? []) as ReadonlyArray<{
             slug: string;
             name: string;
             icon?: string | null;
             description?: string | null;
-          }>))
-          .catch(() => [] as Array<{
-            slug: string;
-            name: string;
-            icon?: string | null;
-            description?: string | null;
-          }>),
-      ),
+          }>;
+          return raw.map<IndustryOption>((ind) => ({
+            slug: ind.slug,
+            name: ind.name,
+            icon: ind.icon ?? null,
+            industryGroup: group.slug,
+            groupSortOrder: group.sortOrder,
+          }));
+        } catch {
+          return [];
+        }
+      }),
     );
-    const out: IndustryOption[] = [];
-    for (let i = 0; i < groups.length; i++) {
-      const g = groups[i];
-      for (const ind of lists[i]) {
-        out.push({
-          slug: ind.slug,
-          name: ind.name,
-          icon: ind.icon ?? null,
-          industryGroup: g.slug,
-          groupSortOrder: g.sortOrder,
-        });
-      }
-    }
-    return out;
+    return lists.flat();
   },
 
   async getCapabilities(

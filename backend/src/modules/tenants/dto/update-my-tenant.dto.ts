@@ -11,6 +11,7 @@ import {
   IsEmail,
   IsUrl,
   IsObject,
+  ValidateIf,
   Min,
   Max,
   MinLength,
@@ -41,7 +42,20 @@ export class UpdateMyTenantDto {
 
   @IsOptional() @IsUrl() @MaxLength(500) website?: string;
 
-  @IsOptional() @IsString() @MaxLength(100) industry?: string;
+  /**
+   * Industry is optional. Tenant users may set it on first onboarding
+   * and cannot change it after that; the field is reserved so the
+   * service can persist an explicit `null` ("Skip industry" path).
+   *
+   * `industry: null` is rejected by class-validator if `@IsString` is
+   * applied — we use `@ValidateIf` so empty/null values pass through
+   * and reach the controller's typed exception layer where they reset
+   * Tenant.industryGroup to `null`.
+   */
+  @ValidateIf((_o, v) => v !== null && v !== undefined)
+  @IsString()
+  @MaxLength(100)
+  industry?: string | null;
 
   @IsOptional() @IsEnum(TenantSizeBucket) sizeBucket?: TenantSizeBucket;
 

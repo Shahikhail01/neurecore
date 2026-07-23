@@ -19,7 +19,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { Construction, ArrowLeft } from 'lucide-react';
+import { Construction, ArrowLeft, Info } from 'lucide-react';
 import Link from 'next/link';
 import {
   getIndustryNavConfig,
@@ -47,6 +47,19 @@ export function IndustryStubPage({
       >
         <ArrowLeft className="w-4 h-4" /> Back to Home
       </Link>
+      <div
+        role="note"
+        className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 text-xs text-amber-900"
+        data-testid="industry-stub-banner"
+      >
+        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>
+          <strong className="font-semibold">Placeholder page.</strong>{' '}
+          This route exists so the navigation link resolves; the
+          operational UI is not yet implemented. Contact your platform
+          admin for the production rollout schedule.
+        </span>
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -61,9 +74,15 @@ export function IndustryStubPage({
         <h1 className="text-xl font-semibold text-foreground">{title}</h1>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">{description}</p>
         <div className="inline-flex items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
-          <span>Industry Group: <strong className="text-foreground">{industryGroup}</strong></span>
+          <span>
+            Industry Group:{' '}
+            <strong className="text-foreground">{industryGroup}</strong>
+          </span>
           <span aria-hidden="true">·</span>
-          <span>Planned: <strong className="text-foreground">{plannedPhase}</strong></span>
+          <span>
+            Planned:{' '}
+            <strong className="text-foreground">{plannedPhase}</strong>
+          </span>
         </div>
       </motion.div>
     </div>

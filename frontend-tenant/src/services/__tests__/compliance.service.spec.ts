@@ -15,6 +15,12 @@ vi.mock('@/services/api', () => ({
 
 import { restClient } from '@/services/api';
 import complianceService from '@/services/compliance.service';
+import type { ApiResponse } from '@/types/api.types';
+
+const META = { timestamp: '2026-07-23T12:00:00Z', requestId: 'test-req-compliance' };
+function wrap<T>(data: T): ApiResponse<T> {
+  return { status: 'success', data, meta: META };
+}
 
 describe('complianceService', () => {
   beforeEach(() => {
@@ -22,24 +28,26 @@ describe('complianceService', () => {
   });
 
   it('get() returns the current acceptance state', async () => {
-    vi.mocked(restClient.get).mockResolvedValue({
-      data: {
+    vi.mocked(restClient.get).mockResolvedValue(
+      wrap({
         dataResidency: 'eu',
         retentionDays: 365,
         aupAcceptedAt: '2026-07-22T10:00:00Z',
         dpaAcceptedAt: null,
         aupRequiredBy: 'v2026.07',
         dpaRequiredBy: 'v2026.07',
-      },
-      status: 'success',
-    });
+      }),
+    );
     const r = await complianceService.get();
     expect(r.dataResidency).toBe('eu');
     expect(r.retentionDays).toBe(365);
   });
 
   it('get() returns defaults when response is missing', async () => {
-    vi.mocked(restClient.get).mockResolvedValue({ status: 'error' } as never);
+    vi.mocked(restClient.get).mockResolvedValue({
+      status: 'error',
+      meta: META,
+    });
     const r = await complianceService.get();
     expect(r.dataResidency).toBe('auto');
     expect(r.retentionDays).toBe(90);
@@ -47,28 +55,25 @@ describe('complianceService', () => {
   });
 
   it('acceptAup() posts to the AUP endpoint', async () => {
-    vi.mocked(restClient.post).mockResolvedValue({
-      data: { aupAcceptedAt: '2026-07-22T10:00:00Z' },
-      status: 'success',
-    });
-    const r = await complianceService.acceptAup();
+    vi.mocked(restClient.post).mockResolvedValue(
+      wrap({ aupAcceptedAt: '2026-07-22T10:00:00Z' }),
+    );
+    await complianceService.acceptAup();
     expect(restClient.post).toHaveBeenCalledWith('/compliance/acceptance/aup', {});
   });
 
   it('acceptDpa() posts to the DPA endpoint', async () => {
-    vi.mocked(restClient.post).mockResolvedValue({
-      data: { dpaAcceptedAt: '2026-07-22T10:05:00Z' },
-      status: 'success',
-    });
-    const r = await complianceService.acceptDpa();
+    vi.mocked(restClient.post).mockResolvedValue(
+      wrap({ dpaAcceptedAt: '2026-07-22T10:05:00Z' }),
+    );
+    await complianceService.acceptDpa();
     expect(restClient.post).toHaveBeenCalledWith('/compliance/acceptance/dpa', {});
   });
 
   it('setResidency() patches with the chosen region', async () => {
-    vi.mocked(restClient.patch).mockResolvedValue({
-      data: { dataResidency: 'eu' },
-      status: 'success',
-    });
+    vi.mocked(restClient.patch).mockResolvedValue(
+      wrap({ dataResidency: 'eu' }),
+    );
     await complianceService.setResidency('eu');
     expect(restClient.patch).toHaveBeenCalledWith('/compliance/acceptance/residency', {
       dataResidency: 'eu',
@@ -76,10 +81,9 @@ describe('complianceService', () => {
   });
 
   it('setRetention() patches with the chosen days (0 = indefinite)', async () => {
-    vi.mocked(restClient.patch).mockResolvedValue({
-      data: { retentionDays: 0 },
-      status: 'success',
-    });
+    vi.mocked(restClient.patch).mockResolvedValue(
+      wrap({ retentionDays: 0 }),
+    );
     await complianceService.setRetention(0);
     expect(restClient.patch).toHaveBeenCalledWith('/compliance/acceptance/retention', {
       retentionDays: 0,

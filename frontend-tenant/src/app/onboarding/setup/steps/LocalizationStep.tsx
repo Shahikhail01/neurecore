@@ -17,35 +17,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { onboardingService } from '@/services/onboarding.service';
-
-const COMMON_TIMEZONES = [
-  'UTC',
-  'America/New_York',
-  'America/Los_Angeles',
-  'America/Chicago',
-  'Europe/London',
-  'Europe/Berlin',
-  'Europe/Paris',
-  'Asia/Dubai',
-  'Asia/Karachi',
-  'Asia/Kolkata',
-  'Asia/Singapore',
-  'Asia/Tokyo',
-  'Australia/Sydney',
-];
-
-const COMMON_CURRENCIES = [
-  { code: 'USD', label: 'USD — US Dollar' },
-  { code: 'EUR', label: 'EUR — Euro' },
-  { code: 'GBP', label: 'GBP — British Pound' },
-  { code: 'PKR', label: 'PKR — Pakistani Rupee' },
-  { code: 'INR', label: 'INR — Indian Rupee' },
-  { code: 'AED', label: 'AED — UAE Dirham' },
-  { code: 'SGD', label: 'SGD — Singapore Dollar' },
-  { code: 'JPY', label: 'JPY — Japanese Yen' },
-  { code: 'AUD', label: 'AUD — Australian Dollar' },
-  { code: 'CAD', label: 'CAD — Canadian Dollar' },
-];
+import {
+  COMMON_TIMEZONES,
+  COMMON_CURRENCIES,
+} from '@/lib/locale-options';
 
 export interface LocalizationStepProps {
   initialTimezone: string;

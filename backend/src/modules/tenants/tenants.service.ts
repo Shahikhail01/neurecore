@@ -254,13 +254,22 @@ export class TenantsService {
     // owner updates Tenant.industry through their self-service settings.
     // Industry is a Super-Admin-only field per D7, but we still want the
     // denormalised column to track correctly for any future call path.
-    // FIX: Always derive industryGroup to prevent it from being lost when
-    // other fields (like locale) are updated without industry.
-    const industryForGroup = dto.industry ?? (await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { industry: true } }))?.industry;
+    //
+    // Explicit `industry === null` from the FE means "skip industry"
+    // and must clear the group column. An absent field (`undefined`)
+    // falls back to the tenant's persisted industry so PATCH /tenants/me
+    // with locale-only fields doesn't accidentally wipe the group.
+    let industryForGroup: string | null | undefined = dto.industry;
+    if (industryForGroup === undefined) {
+      const existing = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { industry: true },
+      });
+      industryForGroup = existing?.industry ?? null;
+    }
     if (industryForGroup) {
-      updateData.industryGroup = await this.industryGroups.resolveIndustryGroup(
-        industryForGroup,
-      );
+      updateData.industryGroup =
+        await this.industryGroups.resolveIndustryGroup(industryForGroup);
     } else {
       updateData.industryGroup = null;
     }

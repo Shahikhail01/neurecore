@@ -25,10 +25,30 @@ import { tiersService } from '@/services/tiers.service';
 import { TierChangeModal } from '../TierChangeModal';
 
 const TIERS = [
-  { id: 'tier-basic', slug: 'basic', name: 'Basic', tagline: 'Starter plan', monthlyPrice: 0, currency: 'USD', maxUsers: 3, maxAgents: 3, maxDepartments: 1, maxStorageGB: 1 },
-  { id: 'tier-business', slug: 'business', name: 'Business', tagline: 'Growing teams', monthlyPrice: 99, currency: 'USD', maxUsers: 10, maxAgents: 10, maxDepartments: 3, maxStorageGB: 10 },
-  { id: 'tier-pro', slug: 'professional', name: 'Professional', tagline: 'Scale operations', monthlyPrice: 299, currency: 'USD', maxUsers: 50, maxAgents: 50, maxDepartments: 10, maxStorageGB: 100 },
-  { id: 'tier-ent', slug: 'enterprise', name: 'Enterprise', tagline: 'Large org', monthlyPrice: 999, currency: 'USD', maxUsers: 9999, maxAgents: 9999, maxDepartments: 9999, maxStorageGB: 1000 },
+  {
+    id: 'tier-basic', slug: 'basic', name: 'Basic', tagline: 'Starter plan',
+    monthlyPrice: 0, yearlyPrice: 0, currency: 'USD',
+    maxUsers: 3, maxAgents: 3, maxDepartments: 1, maxStorageGB: 1,
+    maxApiCalls: 1_000, maxFileSizeMB: 10,
+  },
+  {
+    id: 'tier-business', slug: 'business', name: 'Business', tagline: 'Growing teams',
+    monthlyPrice: 99, yearlyPrice: 990, currency: 'USD',
+    maxUsers: 10, maxAgents: 10, maxDepartments: 3, maxStorageGB: 10,
+    maxApiCalls: 10_000, maxFileSizeMB: 50,
+  },
+  {
+    id: 'tier-pro', slug: 'professional', name: 'Professional', tagline: 'Scale operations',
+    monthlyPrice: 299, yearlyPrice: 2_990, currency: 'USD',
+    maxUsers: 50, maxAgents: 50, maxDepartments: 10, maxStorageGB: 100,
+    maxApiCalls: 100_000, maxFileSizeMB: 200,
+  },
+  {
+    id: 'tier-ent', slug: 'enterprise', name: 'Enterprise', tagline: 'Large org',
+    monthlyPrice: 999, yearlyPrice: 9_990, currency: 'USD',
+    maxUsers: 9999, maxAgents: 9999, maxDepartments: 9999, maxStorageGB: 1000,
+    maxApiCalls: 1_000_000, maxFileSizeMB: 1_000,
+  },
 ];
 
 const CURRENT_BASIC = TIERS[0];

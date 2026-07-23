@@ -26,8 +26,8 @@ describe('Phase 9 N6 — Tier.packages → Tier.packageAnchors rename', () => {
   // assignment is required because `Tier.packageAnchors` is part of the
   // generated type. If a future schema change drops the field or renames
   // it back to `packages`, this line fails to compile.
-  type PackageAnchorsField = Tier['packageAnchors'];
-  const sampleAnchors: PackageAnchorsField = [];
+  type PackageAnchorsField = Tier['packageAnchors' & keyof Tier];
+  const sampleAnchors: ReadonlyArray<unknown> = [];
 
   it('exposes packageAnchors on the generated Tier type (compile-time guarantee)', () => {
     // The line above is the real assertion — the test compiles only if
