@@ -9,6 +9,7 @@ export interface TenantSelf {
   slug: string;
   status: string;
   tierId: string;
+  tier?: { slug: string; name: string } | null;
   logoUrl: string | null;
   website: string | null;
   industry: string | null;

@@ -72,6 +72,12 @@ export class CreateProjectDto {
   priority?: (typeof PRIORITIES)[number];
 
   @IsOptional()
+  @IsIn(PROJECT_STATUSES as unknown as string[])
+  // FIX-PROJ-D1: accept status on create so the FE wizard's Status dropdown
+  // is honoured. Defaults to LEAD if absent.
+  status?: (typeof PROJECT_STATUSES)[number];
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   tags?: string[];

@@ -18,11 +18,11 @@ export interface DepartmentTemplate {
 }
 
 export const departmentTemplatesService = {
-  async list(): Promise<DepartmentTemplate[]> {
-    const res = await api.get('/department-templates');
-    // Backend returns PaginatedResponse<DepartmentTemplate>:
-    //   { status, data: { data: T[], total, page, limit, totalPages }, meta }
-    // Older unwrapped endpoints return T[] directly. Handle both.
+  async list(opts?: { industryGroup?: string; category?: string }): Promise<DepartmentTemplate[]> {
+    const params: Record<string, string> = {};
+    if (opts?.industryGroup) params.industryGroup = opts.industryGroup;
+    if (opts?.category) params.category = opts.category;
+    const res = await api.get('/department-templates', { params });
     const outer = res.data?.data ?? res.data;
     if (Array.isArray(outer)) return outer;
     if (Array.isArray(outer?.data)) return outer.data;

@@ -18,6 +18,22 @@ import {
   ACCESS_TOKEN_COOKIE,
 } from '../../common/auth/cookie-auth.service';
 
+const SOCKET_ALLOWED_ORIGINS = [
+  process.env.TENANT_FRONTEND_URL,
+  process.env.ADMIN_FRONTEND_URL,
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://127.0.0.1:3001',
+  'http://127.0.0.1:3002',
+  'https://hq.neurecore.com',
+  'https://cc.neurecore.com',
+].filter((v): v is string => Boolean(v));
+
+function socketOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true; // same-origin / no-origin (server-to-server, curl)
+  return SOCKET_ALLOWED_ORIGINS.includes(origin);
+}
+
 /**
  * EventsGateway — Phase 9 update (Auth Hardening).
  *
@@ -42,8 +58,25 @@ interface AuthedSocketData {
 
 type AuthedSocket = Socket & AuthedSocketData;
 @WebSocketGateway({
-  cors: { origin: '*', credentials: true },
+  cors: {
+    origin: (origin, callback) => {
+      if (socketOriginAllowed(origin)) return callback(null, true);
+      return callback(new Error(`Origin not allowed: ${origin}`), false);
+    },
+    credentials: true,
+  },
   namespace: '/',
+  // The default pingInterval (25s) is shorter than the 30s pingTimeout in
+  // OLS-fronted paths, which causes engine.io's polling POST to occasionally
+  // race the socket close and respond 400. We set engine.io options to give
+  // the polling transport a much longer heartbeat and tolerate the
+  // transparent OLS proxy without flaky handshake resets.
+  pingInterval: 60_000,
+  pingTimeout: 90_000,
+  maxHttpBufferSize: 1_048_576,
+  // allowEIO3 keeps backward compatibility with the legacy polling
+  // transport that the broker-proxy paths still emit.
+  allowEIO3: true,
 })
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -65,8 +98,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const token = this.extractSocketToken(client);
 
       if (!token) {
-        client.disconnect(true);
-        return;
+        // Phase 22 (2026-07-25): throw an auth error so the handshake
+        // returns 401 instead of 400 on subsequent POST polls. The
+        // browser-side socket client treats this as a reconnection
+        // trigger; we deliberately do NOT call disconnect(true) which
+        // would leave the OLS frontend forwarding POSTs that the
+        // engine.io layer would then reject with 400 for the same sid.
+        throw new Error('Authentication required');
       }
 
       const payload = this.jwt.verify<{
@@ -77,8 +115,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Check blacklist
       if (await this.redis.isTokenBlacklisted(payload.jti)) {
-        client.disconnect(true);
-        return;
+        throw new Error('Token revoked');
       }
 
       // Attach user data to socket
@@ -99,8 +136,14 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.userSockets.get(payload.sub)!.add(client.id);
 
       this.logger.debug(`Client connected: ${client.id} user=${payload.sub}`);
-    } catch {
-      this.logger.warn(`Rejected unauthenticated connection: ${client.id}`);
+    } catch (err) {
+      this.logger.warn(
+        `Rejected unauthenticated connection: ${client.id} reason=${(err as Error).message}`,
+      );
+      // Reject the handshake so engine.io emits a clean 'connect_error' to
+      // the client instead of leaving a half-open session that returns
+      // 400 on later POST polls.
+      client.emit('unauthorized', { reason: (err as Error).message });
       client.disconnect(true);
     }
   }

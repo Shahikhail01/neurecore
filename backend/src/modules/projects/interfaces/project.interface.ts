@@ -6,7 +6,8 @@
  * - Dependency Inversion: module depends on abstractions
  */
 
-export type { ProjectStatus } from '../common/project-lifecycle';
+import type { ProjectStatus } from '../common/project-lifecycle';
+export type { ProjectStatus };
 
 export type BudgetType = 'FIXED_FEE' | 'HOURLY' | 'RETAINER';
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
@@ -81,6 +82,14 @@ export interface CreateProjectInput {
   targetDate?: Date | string | null;
   startDate?: Date | string | null;
   priority?: Priority | null;
+  /**
+   * Initial status. FIX-PROJ-D1 (Round-3 verification): previously the
+   * repository hardcoded 'LEAD' and silently overwrote caller-supplied
+   * values, so the FE wizard's Status dropdown had no effect. Now the
+   * value is honoured. Default remains 'LEAD' so legacy callers without
+   * an explicit status are unaffected.
+   */
+  status?: ProjectStatus;
   tags?: string[];
   goalIds?: string[];
   metadata?: Record<string, unknown>;

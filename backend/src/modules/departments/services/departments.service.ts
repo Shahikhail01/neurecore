@@ -91,9 +91,29 @@ export class DepartmentsService {
     if (!this.templateRuntime) {
       return { created: 0, skipped: 0, departments: [] };
     }
+    let resolvedSlug = templateSlug;
+    if (!resolvedSlug) {
+      try {
+        const tenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { industry: true },
+        });
+        const map: Record<string, string> = {
+          'accounting-audit-services': 'accounting-firm-dept-structure',
+          'financial-services': 'financial-services-dept-structure',
+        };
+        if (tenant?.industry && map[tenant.industry]) {
+          resolvedSlug = map[tenant.industry];
+        }
+      } catch (err) {
+        this.logger.warn(
+          `autoCreateFromTemplate: tenant lookup failed for ${tenantId}: ${(err as Error).message}`,
+        );
+      }
+    }
     const tpl = await this.templateRuntime.resolveDepartmentTemplate(
       tenantId,
-      templateSlug,
+      resolvedSlug,
     );
     if (!tpl || tpl.departments.length === 0) {
       return { created: 0, skipped: 0, departments: [] };

@@ -143,6 +143,94 @@ export default function CustomerDetailPage() {
           </GlassPanel>
         </div>
 
+        {/*
+          FIX-CUST-D1 (Round-3 verification, 2026-07-24): surface the
+          industry-specific fields captured by CustomerForm. Persisted on
+          `billingInfo.industryFields` by the BE; we read them through
+          that path because Customer.industryFields is not surfaced by
+          the BE response today.
+        */}
+        {(() => {
+          const indFields =
+            (customer.billingInfo &&
+              (customer.billingInfo as Record<string, unknown>)['industryFields']) as
+              | Record<string, string | boolean | null>
+              | undefined;
+          if (!indFields || Object.keys(indFields).length === 0) return null;
+          return (
+            <GlassPanel className="p-4">
+              <h2 className="text-sm font-semibold text-zinc-300 mb-3">
+                Industry-specific details
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-zinc-300">
+                {Object.entries(indFields).map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex justify-between items-center border-b border-surface-border/40 pb-1"
+                  >
+                    <span className="text-xs text-zinc-500 capitalize">
+                      {key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()}
+                    </span>
+                    <span className="font-medium">
+                      {value === null || value === undefined || value === ''
+                        ? '—'
+                        : typeof value === 'boolean'
+                          ? value
+                            ? 'Yes'
+                            : 'No'
+                          : String(value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </GlassPanel>
+          );
+        })()}
+
+        {customer.financialSubType ||
+        customer.lifecycleStage ||
+        customer.kycStatus ||
+        customer.riskRating ||
+        customer.taxId ? (
+          <GlassPanel className="p-4">
+            <h2 className="text-sm font-semibold text-zinc-300 mb-3">
+              Financial & Compliance
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-zinc-300">
+              {customer.financialSubType && (
+                <div className="flex justify-between items-center border-b border-surface-border/40 pb-1">
+                  <span className="text-xs text-zinc-500">Sub-Type</span>
+                  <span className="font-medium">{customer.financialSubType}</span>
+                </div>
+              )}
+              {customer.lifecycleStage && (
+                <div className="flex justify-between items-center border-b border-surface-border/40 pb-1">
+                  <span className="text-xs text-zinc-500">Lifecycle</span>
+                  <span className="font-medium">{customer.lifecycleStage}</span>
+                </div>
+              )}
+              {customer.kycStatus && (
+                <div className="flex justify-between items-center border-b border-surface-border/40 pb-1">
+                  <span className="text-xs text-zinc-500">KYC Status</span>
+                  <span className="font-medium">{customer.kycStatus}</span>
+                </div>
+              )}
+              {customer.riskRating && (
+                <div className="flex justify-between items-center border-b border-surface-border/40 pb-1">
+                  <span className="text-xs text-zinc-500">Risk Rating</span>
+                  <span className="font-medium">{customer.riskRating}</span>
+                </div>
+              )}
+              {customer.taxId && (
+                <div className="flex justify-between items-center border-b border-surface-border/40 pb-1">
+                  <span className="text-xs text-zinc-500">Tax ID</span>
+                  <span className="font-medium">{customer.taxId}</span>
+                </div>
+              )}
+            </div>
+          </GlassPanel>
+        ) : null}
+
         <GlassPanel className="p-4">
           <h2 className="text-sm font-semibold text-zinc-300 mb-3">Contacts</h2>
           {contacts.length === 0 ? (

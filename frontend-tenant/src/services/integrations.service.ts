@@ -3,6 +3,7 @@ import { unwrapItem } from './unwrap';
 
 export interface IntegrationStatus {
   connected: boolean;
+  source?: 'tenant' | 'master';
   email?: string;
   scopes?: string[];
   expiresAt?: string;
@@ -13,6 +14,7 @@ export interface Integration {
   label: string;
   description: string;
   connected: boolean;
+  source?: 'tenant' | 'master';
   email?: string;
   scopes?: string[];
   expiresAt?: string;
@@ -143,9 +145,9 @@ class IntegrationsService {
     return unwrapItem(res) as IntegrationStatus;
   }
 
-  async getBrevoStatus(): Promise<{ connected: boolean }> {
+  async getBrevoStatus(): Promise<{ connected: boolean; source?: 'tenant' | 'master' }> {
     const res = await api.get(`/integrations/brevo/status?_t=${Date.now()}`);
-    return unwrapItem(res) as { connected: boolean };
+    return unwrapItem(res) as { connected: boolean; source?: 'tenant' | 'master' };
   }
 
   async initiateGoogleOAuth(
@@ -172,6 +174,19 @@ class IntegrationsService {
 
   async disconnectBrevo(): Promise<void> {
     await api.post('/integrations/brevo/disconnect');
+  }
+
+  async brevoTestSend(
+    payload: { to: string; subject?: string; htmlContent?: string },
+  ): Promise<{ success: boolean; messageId?: string; source?: string; error?: string }> {
+    const res = await api.post('/integrations/brevo/test-send', payload);
+    const data = (unwrapItem(res) as Record<string, unknown>) ?? {};
+    return {
+      success: data.success === true,
+      messageId: typeof data.messageId === 'string' ? data.messageId : undefined,
+      source: typeof data.source === 'string' ? data.source : undefined,
+      error: typeof data.error === 'string' ? data.error : undefined,
+    };
   }
 
   /**

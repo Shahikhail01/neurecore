@@ -10,6 +10,17 @@ import type {
   CreateDeptTemplateInput,
 } from './interfaces/department-template.interface';
 
+const INDUSTRY_GROUP_INDUSTRIES: Record<string, string[]> = {
+  healthcare: ['healthcare-life-sciences'],
+  'public-social': ['government-public-sector', 'education-research', 'nonprofit-international'],
+  'financial-compliance': ['accounting-audit-services', 'financial-services', 'insurance'],
+  'business-technology': ['technology-digital-services', 'professional-business-services'],
+  'industrial-infrastructure': ['manufacturing-industrial', 'construction-engineering-infrastructure', 'energy-utilities-natural-resources', 'logistics-transportation-supply-chain'],
+  'consumer-commerce': ['retail-commerce-consumer', 'media-communications-creative'],
+  'agriculture-food': ['agriculture-food-systems'],
+  other: ['special-purpose-organizations'],
+};
+
 /**
  * DepartmentTemplatesService
  *
@@ -26,14 +37,55 @@ export class DepartmentTemplatesService implements IDepartmentTemplateService {
 
   // ─── Query ──────────────────────────────────────────────────────────────────
 
-  async findAll(opts?: { category?: string; page?: number; limit?: number }) {
-    const { category, page = 1, limit = 20 } = opts ?? {};
-    const skip = (page - 1) * limit;
-    const where = {
+  async findAll(opts?: {
+    category?: string;
+    industryGroup?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { category, industryGroup, page = 1, limit = 20 } = opts ?? {};
+    const where: Record<string, unknown> = {
       isPublic: true,
-      ...(category && { category }),
     };
+    if (category) {
+      where.category = category;
+    }
 
+    if (industryGroup) {
+      const all = await this.prisma.departmentTemplate.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      });
+      const groupIndustries = INDUSTRY_GROUP_INDUSTRIES[industryGroup] ?? [];
+      const filterTags = [
+        industryGroup,
+        `industry:${industryGroup}`,
+        ...groupIndustries,
+        ...groupIndustries.map((i) => i.split('-')[0]),
+      ];
+      const filtered = all.filter((t) => {
+        const tags = Array.isArray(t.tags) ? (t.tags as string[]) : [];
+        if (t.category === industryGroup) return true;
+        for (const ind of groupIndustries) {
+          if (t.category === ind) return true;
+        }
+        for (const ftag of filterTags) {
+          if (tags.includes(ftag)) return true;
+        }
+        return false;
+      });
+      const total = filtered.length;
+      const skip = (page - 1) * limit;
+      return {
+        data: filtered.slice(skip, skip + limit),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
+
+    const skip = (page - 1) * limit;
     const [data, total] = await this.prisma.$transaction([
       this.prisma.departmentTemplate.findMany({
         where,

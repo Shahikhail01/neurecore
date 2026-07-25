@@ -41,7 +41,7 @@ export const INDUSTRY_GROUP_INDUSTRIES: Record<IndustryGroupSlug, string[]> = {
     'education-research',
     'nonprofit-international',
   ],
-  'financial-compliance': ['accounting-audit-services', 'financial-services'],
+  'financial-compliance': ['accounting-audit-services', 'financial-services', 'insurance'],
   'business-technology': [
     'professional-business-services',
     'technology-digital-services',

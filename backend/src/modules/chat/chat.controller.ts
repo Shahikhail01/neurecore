@@ -106,6 +106,27 @@ export class ChatController {
     });
   }
 
+  /**
+   * FIX-DEP-D6 (Round-3 verification, 2026-07-24): list the current
+   * tenant+user's chat conversations so the FE can render a sidebar of
+   * previous threads. Returns session metadata only; full message bodies
+   * are still loaded via /chat/history.
+   */
+  @Get('chat/conversations')
+  @HttpCode(HttpStatus.OK)
+  async conversations(
+    @Query('limit') limit: string | undefined,
+    @Req() req: AuthedRequest,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) return { data: [], total: 0 };
+    return this.chatHistory.listConversations({
+      tenantId,
+      userId: req.user?.sub,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
   /** Clear history for a conversation (or all messages for the user if no id) */
   @Delete('chat/history')
   @HttpCode(HttpStatus.OK)

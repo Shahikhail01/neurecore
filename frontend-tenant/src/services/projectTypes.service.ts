@@ -40,6 +40,7 @@ export interface ProjectType {
   id: string;
   tenantId: string | null;
   name: string;
+  slug: string | null;
   industry: string | null;
   isSystem: boolean;
   classification: ProjectTypeClassification | null;
@@ -65,10 +66,22 @@ export const projectTypesService = {
     search?: string;
     industry?: string;
     classification?: ProjectTypeClassification;
+    slugs?: string[];
     page?: number;
     limit?: number;
   }): Promise<{ items: ProjectType[]; total: number }> {
-    const res = await api.get('/project-types', { params: opts });
+    const params: Record<string, unknown> = { ...(opts ?? {}) };
+    if (opts?.slugs && opts.slugs.length > 0) {
+      // NestJS doesn't auto-array-stringify GET query params for class-validator
+      // @IsArray(); send the canonical `slugs=a&slugs=b` shape via paramsSerializer.
+      params.slugs = opts.slugs;
+    }
+    const res = await api.get('/project-types', {
+      params,
+      paramsSerializer: {
+        indexes: null,
+      },
+    });
     const { items, total } = unwrapList(res);
     return { items: items as ProjectType[], total: total ?? items.length };
   },

@@ -7,11 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, CheckCircle2 } from 'lucide-react';
+import { meService } from '@/services/me.service';
 import { useOnboardingChecklistStore } from '@/stores/onboardingChecklist.store';
-import meService from '@/services/me.service';
 import type { WizardSlug } from '@/lib/wizard/types';
-
-const TIMEZONES = ['UTC', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Europe/London', 'Europe/Berlin', 'Asia/Dubai', 'Asia/Karachi', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Tokyo'];
+import { COMMON_TIMEZONES } from '@/lib/locale-options';
 
 export function ProfileWizard({ slug }: { slug: WizardSlug }) {
   const [firstName, setFirstName] = useState('');
@@ -110,7 +109,7 @@ export function ProfileWizard({ slug }: { slug: WizardSlug }) {
               <Label htmlFor="tz">Personal timezone</Label>
               <Select value={personalTz} onValueChange={setPersonalTz}>
                 <SelectTrigger id="tz"><SelectValue /></SelectTrigger>
-                <SelectContent>{TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}</SelectContent>
+                <SelectContent>{COMMON_TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}

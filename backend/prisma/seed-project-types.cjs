@@ -87,32 +87,46 @@ function jsonEqual(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function slugify(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 async function upsertType(industry, t, existingType) {
   // existingType is preloaded by main() — null if not exists.
+  const desiredSlug = t.slug || slugify(t.name);
   let projectTypeId;
   if (!existingType) {
     const created = await prisma.projectType.create({
       data: {
         tenantId: null,
         name: t.name,
+        slug: desiredSlug,
         industry: industry.industry,
         isSystem: true,
         classification: t.classification,
       },
     });
     projectTypeId = created.id;
-    if (VERBOSE) console.log(`   + created ProjectType ${t.name}`);
+    if (VERBOSE) console.log(`   + created ProjectType ${t.name} (slug=${desiredSlug})`);
   } else {
     projectTypeId = existingType.id;
     if (
       existingType.classification !== t.classification ||
-      existingType.industry !== industry.industry
+      existingType.industry !== industry.industry ||
+      existingType.slug !== desiredSlug
     ) {
       await prisma.projectType.update({
         where: { id: projectTypeId },
-        data: { classification: t.classification, industry: industry.industry },
+        data: {
+          classification: t.classification,
+          industry: industry.industry,
+          slug: desiredSlug,
+        },
       });
-      if (VERBOSE) console.log(`   ~ updated ProjectType ${t.name}`);
+      if (VERBOSE) console.log(`   ~ updated ProjectType ${t.name} (slug=${desiredSlug})`);
     }
   }
 
@@ -182,7 +196,7 @@ async function main() {
   // Preload all existing system project types — saves another ~150 queries.
   const existingTypes = await prisma.projectType.findMany({
     where: { tenantId: null, isSystem: true },
-    select: { name: true, industry: true, id: true },
+    select: { name: true, industry: true, id: true, slug: true },
   });
   const existingByKey = new Map(existingTypes.map((t) => [`${t.industry}::${t.name}`, t]));
   console.log(`Found ${existingTypes.length} existing system project types`);

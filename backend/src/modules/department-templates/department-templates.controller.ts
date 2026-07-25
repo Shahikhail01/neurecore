@@ -42,11 +42,13 @@ export class DepartmentTemplatesController {
   @Get()
   findAll(
     @Query('category') category?: string,
+    @Query('industryGroup') industryGroup?: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
     return this.service.findAll({
       category,
+      industryGroup,
       page: Number(page),
       limit: Number(limit),
     });

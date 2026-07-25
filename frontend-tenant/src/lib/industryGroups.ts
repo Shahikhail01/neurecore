@@ -70,7 +70,7 @@ export type IndustryGroupSlug = (typeof INDUSTRY_GROUPS)[number]['slug'];
 export const INDUSTRY_GROUP_INDUSTRIES: Record<IndustryGroupSlug, string[]> = {
   'healthcare':                ['healthcare-life-sciences'],
   'public-social':             ['government-public-sector', 'education-research', 'nonprofit-international'],
-  'financial-compliance':      ['accounting-audit-services', 'financial-services'],
+  'financial-compliance':      ['accounting-audit-services', 'financial-services', 'insurance'],
   'business-technology':       ['professional-business-services', 'technology-digital-services'],
   'industrial-infrastructure': ['manufacturing-industrial', 'construction-engineering-infrastructure', 'energy-utilities-natural-resources', 'logistics-transportation-supply-chain'],
   'consumer-commerce':         ['retail-commerce-consumer', 'media-communications-creative'],

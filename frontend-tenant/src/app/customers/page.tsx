@@ -14,6 +14,7 @@ import { customersService } from '@/services/customers.service';
 import { tenantsService } from '@/services/tenants.service';
 import type { Customer } from '@/types/customers.types';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
+import { getIndustryNavConfig } from '@/lib/industryNavigation';
 
 export default function CustomersPage() {
   const user = useTenantAuth()!;
@@ -213,7 +214,9 @@ export default function CustomersPage() {
       <div className="px-6 py-6 flex flex-col gap-6 max-w-7xl mx-auto w-full">
         <header className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold text-zinc-100">Customers</h1>
+            <h1 className="text-2xl font-bold text-zinc-100">
+              {tenantGroup ? (getIndustryNavConfig(tenantGroup as any)?.customersLabel ?? 'Customers') : 'Customers'}
+            </h1>
             <p className="text-sm text-zinc-500 mt-1">
               Persistent client relationships — projects across time and departments roll up to these.
             </p>

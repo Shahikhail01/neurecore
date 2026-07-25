@@ -174,6 +174,68 @@ export class ChatHistoryService {
     }
   }
 
+  /**
+   * FIX-DEP-D6 (Round-3 verification, 2026-07-24): list the current
+   * tenant+user's chat conversations (sessions) so the FE chat panel can
+   * render a sidebar of previous threads. Returns a lightweight summary
+   * — id, conversationId, title, lastMessageAt, messageCount — sorted by
+   * lastMessageAt desc. Always tenant-scoped.
+   */
+  async listConversations(params: {
+    tenantId: string;
+    userId?: string;
+    limit?: number;
+  }): Promise<{
+    data: Array<{
+      id: string;
+      conversationId: string;
+      title: string | null;
+      lastMessageAt: string;
+      messageCount: number;
+    }>;
+    total: number;
+  }> {
+    const limit = Math.min(params.limit ?? 50, 200);
+    const where = {
+      tenantId: params.tenantId,
+      ...(params.userId ? { userId: params.userId } : {}),
+    };
+    try {
+      const [sessions, total] = await Promise.all([
+        this.prisma.chatSession.findMany({
+          where,
+          orderBy: { lastMessageAt: 'desc' },
+          take: limit,
+        }),
+        this.prisma.chatSession.count({ where }),
+      ]);
+      const ids = sessions.map((s) => s.id);
+      const counts = await this.prisma.chatMessage.groupBy({
+        by: ['sessionId'],
+        where: { sessionId: { in: ids } },
+        _count: { _all: true },
+      });
+      const countBySession = new Map(
+        counts.map((c) => [c.sessionId, c._count._all]),
+      );
+      return {
+        data: sessions.map((s) => ({
+          id: s.id,
+          conversationId: s.conversationId,
+          title: s.title,
+          lastMessageAt: s.lastMessageAt.toISOString(),
+          messageCount: countBySession.get(s.id) ?? 0,
+        })),
+        total,
+      };
+    } catch (err) {
+      this.logger.warn(
+        `[chat-history] listConversations failed: ${(err as Error).message}`,
+      );
+      return { data: [], total: 0 };
+    }
+  }
+
   async clearHistory(params: ClearHistoryParams): Promise<{ deleted: number }> {
     const where = {
       tenantId: params.tenantId,

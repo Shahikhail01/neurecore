@@ -31,7 +31,10 @@ import {
   ListProjectTypesDto,
 } from './dto/project-type.dto';
 import { PaginatedResponse } from '../../common/responses/paginated.response';
-import type { ProjectType, ProjectTypeVersion } from './interfaces/project-type.interface';
+import type {
+  ProjectType,
+  ProjectTypeVersion,
+} from './interfaces/project-type.interface';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
 
@@ -98,10 +101,7 @@ export class ProjectTypesController {
   // ─── Version endpoints ─────────────────────────────────────────────────────
 
   @Get(':id/versions')
-  async findVersions(
-    @CurrentUser() user: JwtPayload,
-    @Param('id') id: string,
-  ) {
+  async findVersions(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.projectTypesService.findVersionsByTypeId(id, user.tenantId);
   }
 

@@ -57,7 +57,25 @@ export class ChatService implements IChatService {
       const response = apiResponse.data;
 
       if (!response || !response.reply) {
-        throw new Error('Empty reply from chat backend');
+        // Empty backend reply → run the keyword fallback for the
+        // user's actual message (the original design that the chat
+        // tests assert). If the fallback also has nothing useful,
+        // surface the canonical offline copy.
+        const keyword = this.fallback.generate(request.message);
+        if (keyword.reply) {
+          return {
+            reply: keyword.reply,
+            conversationId: response?.conversationId ?? '',
+            tokens: { input: 0, output: 0 },
+            suggestions: keyword.suggestions ?? [],
+          };
+        }
+        return {
+          reply: "I'm currently offline. Please check your connection and try again.",
+          conversationId: response?.conversationId ?? '',
+          tokens: { input: 0, output: 0 },
+          suggestions: [],
+        };
       }
 
       // Backend does NOT return chartType/chartData/suggestions as top-level fields.
@@ -84,8 +102,23 @@ export class ChatService implements IChatService {
         suggestions,
       };
     } catch (err) {
-      // Network errors, parse errors, or unexpected exceptions
+      // Network errors, parse errors, or unexpected exceptions.
+      //
+      // If the user's message contains a recognisable keyword
+      // (e.g. "agent", "task", "revenue"), the keyword fallback can
+      // give a more useful reply than the generic classifier. The
+      // classifier remains the safety net for true errors that don't
+      // map to a keyword.
       const errorMessage = err instanceof Error ? err.message : String(err);
+      const keyword = this.fallback.generate(request.message);
+      if (keyword.reply && !keyword.reply.includes("I'm currently offline")) {
+        return {
+          reply: keyword.reply,
+          conversationId: '',
+          tokens: { input: 0, output: 0 },
+          suggestions: keyword.suggestions ?? [],
+        };
+      }
       return {
         reply: this.classifyError(errorMessage),
         conversationId: '',

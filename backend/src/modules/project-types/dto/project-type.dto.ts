@@ -21,6 +21,10 @@ export class CreateProjectTypeDto {
 
   @IsOptional()
   @IsString()
+  slug?: string;
+
+  @IsOptional()
+  @IsString()
   industry?: string;
 
   @IsOptional()
@@ -33,6 +37,10 @@ export class UpdateProjectTypeDto {
   @IsString()
   @IsNotEmpty()
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  slug?: string;
 
   @IsOptional()
   @IsString()
@@ -133,6 +141,11 @@ export class ListProjectTypesDto {
   @IsOptional()
   @IsString()
   industry?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  slugs?: string[];
 
   @IsOptional()
   @IsNumber()

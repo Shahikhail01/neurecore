@@ -54,14 +54,22 @@ export class ProjectTypeAllocatorService {
   ): Promise<AllocationResult> {
     const slug = (industry ?? '').trim();
     if (!slug) {
-      this.logger.debug(`Tenant ${tenantId} has no industry — skipping allocation`);
+      this.logger.debug(
+        `Tenant ${tenantId} has no industry — skipping allocation`,
+      );
       return { allocated: 0, skipped: 0 };
     }
 
     const sources = await this.prisma.projectType.findMany({
       where: { tenantId: null, isSystem: true, industry: slug },
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, industry: true, classification: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        industry: true,
+        classification: true,
+      },
     });
 
     if (sources.length === 0) {
@@ -103,6 +111,7 @@ export class ProjectTypeAllocatorService {
     source: {
       id: string;
       name: string;
+      slug: string | null;
       industry: string | null;
     },
     classification: ProjectTypeClassification | null,
@@ -112,6 +121,7 @@ export class ProjectTypeAllocatorService {
         data: {
           tenantId,
           name: source.name,
+          slug: source.slug ?? null,
           industry: source.industry ?? null,
           isSystem: false,
           classification,
@@ -152,8 +162,10 @@ export class ProjectTypeAllocatorService {
             projectTypeId: clone.id,
             version: 1,
             fieldSchema: (version.fieldSchema as Prisma.InputJsonValue) ?? [],
-            stageTemplate: (version.stageTemplate as Prisma.InputJsonValue) ?? [],
-            approvalTemplate: (version.approvalTemplate as Prisma.InputJsonValue) ?? [],
+            stageTemplate:
+              (version.stageTemplate as Prisma.InputJsonValue) ?? [],
+            approvalTemplate:
+              (version.approvalTemplate as Prisma.InputJsonValue) ?? [],
             goalTemplate: (version.goalTemplate as Prisma.InputJsonValue) ?? [],
             roleTemplate: (version.roleTemplate as Prisma.InputJsonValue) ?? [],
             informationRequirements:

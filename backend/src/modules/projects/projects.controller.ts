@@ -65,6 +65,9 @@ export class ProjectsController {
         budgetType: dto.budgetType,
         budgetAmount: dto.budgetAmount,
         budgetCurrency: dto.budgetCurrency,
+        // FIX-PROJ-D1: forward the caller-supplied status so the FE wizard's
+        // dropdown is honoured. Without this, the repo hardcoded 'LEAD'.
+        status: dto.status,
         priority: dto.priority,
         tags: dto.tags,
         goalIds: dto.goalIds,

@@ -11,6 +11,7 @@ import {
   ForbiddenException,
   Inject,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { TemplateType } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -91,10 +92,36 @@ export class TenantTemplatesController {
   @Get()
   async list(
     @CurrentUser() user: JwtPayload,
-    @Query('type') templateType?: TemplateType,
+    @Query('type') templateType?: string,
   ) {
+    // FIX-DEP-D3 (Round-3 verification, 2026-07-24): accept `type` as
+    // a raw string and validate it before handing it to Prisma. The
+    // previous typed `templateType?: TemplateType` parameter caused
+    // Nest's class-validator pass-through to forward the unparsed
+    // query value, which made Prisma throw on unknown values like
+    // `DEPARTMENT` and `APPROVAL_CHAIN` and surfaced as 500.
+    let resolvedType: TemplateType | undefined;
+    if (templateType !== undefined && templateType !== '') {
+      const allowed = new Set<string>([
+        'CUSTOMER_LIFECYCLE',
+        'AGENT_ROLE',
+        'ROUTINE',
+        'REPORT',
+        'TASK_TEMPLATE',
+        'DEPARTMENT_DEFAULT',
+        'APPROVAL_CHAIN',
+      ]);
+      if (!allowed.has(templateType)) {
+        throw new BadRequestException(
+          `Unknown templateType '${templateType}'. Allowed: ${Array.from(
+            allowed,
+          ).join(', ')}.`,
+        );
+      }
+      resolvedType = templateType as TemplateType;
+    }
     const tenantId = this.currentTenantId(user);
-    return this.templateService.list(tenantId, templateType);
+    return this.templateService.list(tenantId, resolvedType);
   }
 
   @Public()

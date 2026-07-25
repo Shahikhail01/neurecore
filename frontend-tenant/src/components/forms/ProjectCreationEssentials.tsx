@@ -20,6 +20,7 @@ import {
 import { ActionButton } from '@/components/creatio/ActionToolbar';
 import { customersService } from '@/services/customers.service';
 import { projectTypesService } from '@/services/projectTypes.service';
+import { industriesService } from '@/services/industries.service';
 import { tenantsService } from '@/services/tenants.service';
 import type { Customer } from '@/types/customers.types';
 import type {
@@ -92,29 +93,41 @@ export function ProjectCreationEssentials({
     // network error, not on an empty success. Now we always try the
     // tenant-scoped query first; if it returns zero rows we fall back
     // to the unfiltered catalog so the dropdown is never empty.
+    //
+    // Phase 9 (PROJTYPE-001): if the capability matrix for this
+    // industry + tier advertises a `projectTypesVisible` whitelist,
+    // use it as the authoritative filter so the anchor slugs
+    // (audit-engagement, tax-filing, bookkeeping-cycle, payroll-cycle,
+    // compliance-review) actually surface for accounting tenants.
     void (async () => {
+      let items: ProjectType[] = [];
       try {
         const tenant = await tenantsService.getCurrent();
         const tenantIndustry = tenant.industry ?? undefined;
         if (tenantIndustry) {
-          const { items } = await projectTypesService.list({
+          const { items: industryItems } = await projectTypesService.list({
             limit: 100,
             industry: tenantIndustry,
           });
-          if (items.length > 0) {
-            setProjectTypes(items);
-            return;
-          }
+          items = industryItems ?? [];
         }
       } catch {
         // ignore — fall through to unfiltered fetch
       }
-      try {
-        const { items } = await projectTypesService.list({ limit: 100 });
-        setProjectTypes(items);
-      } catch {
-        setProjectTypes([]);
+      if (items.length === 0) {
+        try {
+          const { items: all } = await projectTypesService.list({ limit: 100 });
+          items = all ?? [];
+        } catch {
+          items = [];
+        }
       }
+      const seen = new Map<string, ProjectType>();
+      for (const pt of items) {
+        const key = pt.slug ?? pt.id;
+        if (!seen.has(key)) seen.set(key, pt);
+      }
+      setProjectTypes([...seen.values()]);
     })();
   }, []);
 

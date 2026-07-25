@@ -67,10 +67,15 @@ export function PlanImpactPanel({ tierSlug, industrySlug }: PlanImpactPanelProps
     tenantsService
       .getCurrent()
       .then((t) => {
-        if (!cancelled) setEffectiveIndustry(t.industry ?? null);
+        // FIX-COMPREHENSIVE-R3 (2026-07-24): when the tenant has no
+        // industry yet (Skip-industry path or first-run), show the
+        // universal-baseline preview so the user can still see what
+        // their tier unlocks. The backend sentinel `__universal__`
+        // resolves to the `other` group capability row.
+        if (!cancelled) setEffectiveIndustry(t.industry ?? '__universal__');
       })
       .catch(() => {
-        if (!cancelled) setEffectiveIndustry(null);
+        if (!cancelled) setEffectiveIndustry('__universal__');
       });
     return () => {
       cancelled = true;
@@ -102,14 +107,6 @@ export function PlanImpactPanel({ tierSlug, industrySlug }: PlanImpactPanelProps
       cancelled = true;
     };
   }, [effectiveIndustry, tierSlug]);
-
-  if (!effectiveIndustry) {
-    return (
-      <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-        Plan impact appears once you&apos;ve selected an industry.
-      </div>
-    );
-  }
 
   if (loading && !capabilities) {
     return (
@@ -145,8 +142,15 @@ export function PlanImpactPanel({ tierSlug, industrySlug }: PlanImpactPanelProps
     >
       <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
         <Sparkles className="w-3.5 h-3.5 text-primary" />
-        Plan impact for {capabilities.industry.name} on {capabilities.tier}
+        {capabilities.universal
+          ? `Plan impact (universal baseline) on ${capabilities.tier}`
+          : `Plan impact for ${capabilities.industry.name} on ${capabilities.tier}`}
       </div>
+      {capabilities.universal && (
+        <p className="text-[11px] text-muted-foreground">
+          Showing the universal baseline. Pick an industry in the Company step to see industry-specific defaults.
+        </p>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <ImpactStat icon={Bot} label="Agents" value={formatLimit(c.maxAgents)} />
@@ -158,7 +162,7 @@ export function PlanImpactPanel({ tierSlug, industrySlug }: PlanImpactPanelProps
       {previewAgents.length > 0 && (
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-1.5">
-            Default agents for your industry
+            Default agents for your industry ({maxAgentAgents} in pool · {formatLimit(c.maxAgents)} tier cap)
           </div>
           <div className="flex flex-wrap gap-1.5">
             {previewAgents.map((slug) => (

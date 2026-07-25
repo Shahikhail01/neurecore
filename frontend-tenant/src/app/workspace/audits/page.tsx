@@ -1,7 +1,16 @@
 'use client';
 
-import { IndustryStubFromNav } from '@/components/industry/IndustryStubPage';
+import { IndustryWorkspacePage } from '@/components/industry/IndustryWorkspacePage';
 
 export default function AuditsPage() {
-  return <IndustryStubFromNav featureId="audits" industryGroup="financial-compliance" />;
+  return (
+    <IndustryWorkspacePage
+      config={{
+        featureId: 'audits',
+        title: 'Audits',
+        description: 'Active audit engagements, financial statement audits, internal audits, and compliance audits for the tenant.',
+        projectTypeSlugs: ['audit-engagement'],
+      }}
+    />
+  );
 }

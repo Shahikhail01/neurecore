@@ -15,6 +15,8 @@
  *   PATCH  /workflows/:id/activate — activate workflow
  *   POST   /workflows/:id/execute  — trigger execution
  *   GET    /workflows/:id/status    — execution summary
+ *   GET    /workflows/industry-templates?group=<industryGroup>&category=<category>
+ *     — Stage 2 Phase 2D: industry-specific workflow templates
  */
 
 import {
@@ -53,23 +55,6 @@ export class WorkflowsController {
     private readonly workflowsService: WorkflowsService,
     private readonly workflowTemplatesService: IndustryWorkflowTemplatesService,
   ) {}
-
-  /**
-   * GET /api/v1/workflows/industry-templates?group=<industryGroup>&category=<category>
-   * Returns workflow automation templates for a given industry group.
-   * Stage 2 Phase 2D: Per-industry automated workflow definitions.
-   */
-  @Get('industry-templates')
-  async getIndustryTemplates(
-    @Query('group') group?: string,
-    @Query('category') category?: string,
-  ) {
-    const effectiveGroup = group ?? 'other';
-    const templates = category
-      ? this.workflowTemplatesService.getByCategory(effectiveGroup, category)
-      : this.workflowTemplatesService.getTemplateList(effectiveGroup);
-    return { industryGroup: effectiveGroup, count: templates.length, templates };
-  }
 
   // ─── Read ────────────────────────────────────────────────────────────────
 
@@ -112,6 +97,24 @@ export class WorkflowsController {
   ): Promise<WorkflowExecutionSummaryDto> {
     if (!user.tenantId) throw new Error('Tenant ID required');
     return this.workflowsService.getStatus(id, user.tenantId);
+  }
+
+  /**
+   * GET /api/v1/workflows/templates/industry?group=<industryGroup>&category=<category>
+   * Stage 2 Phase 2D: Per-industry automated workflow definitions.
+   * Single-segment path (`templates/industry`) to avoid the `:id` param matcher
+   * that was previously shadowing the literal `industry-templates` segment.
+   */
+  @Get('templates/industry')
+  async getIndustryTemplates(
+    @Query('group') group?: string,
+    @Query('category') category?: string,
+  ) {
+    const effectiveGroup = group ?? 'other';
+    const templates = category
+      ? this.workflowTemplatesService.getByCategory(effectiveGroup, category)
+      : this.workflowTemplatesService.getTemplateList(effectiveGroup);
+    return { industryGroup: effectiveGroup, count: templates.length, templates };
   }
 
   // ─── Write ───────────────────────────────────────────────────────────────

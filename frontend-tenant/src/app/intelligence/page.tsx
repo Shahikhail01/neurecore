@@ -36,6 +36,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   AlertCircle,
+  Building2,
   Cpu,
   Wallet,
   Zap,
@@ -57,8 +58,13 @@ import {
 
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import { useAuthStore } from '@/stores/authStore';
+import { useTenantIndustryGroup } from '@/stores/tenantStore';
 import { authService } from '@/auth';
 import TenantShell from '@/components/TenantShell';
+import {
+  IndustryDashboardRenderer,
+  IndustryDashboardFallback,
+} from '@/components/dashboard/IndustryDashboardRenderer';
 import { KpiCard } from '@/components/creatio/KpiCard';
 import { StatusBadge } from '@/components/creatio/StatusBadge';
 import { ActionButton } from '@/components/creatio/ActionToolbar';
@@ -75,7 +81,13 @@ import { DEFAULT_AI_ROUTING } from '@/types/settings.types';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 type IntelTab = 'analytics' | 'observability' | 'health' | 'reliability' | 'security' | 'settings';
-type SettingsSubTab = 'profile' | 'ai-providers' | 'apikeys' | 'security' | null;
+type SettingsSubTab =
+  | 'organization'
+  | 'profile'
+  | 'ai-providers'
+  | 'apikeys'
+  | 'security'
+  | null;
 
 interface HealthCheck {
   service: string;
@@ -240,12 +252,38 @@ export default function IntelligencePage() {
 
 // ─── Tab 1: Analytics ─────────────────────────────────────────────────────
 function AnalyticsTab() {
+  const { industryGroup, loading: industryGroupLoading } = useTenantIndustryGroup();
   const { kpis, loading: kpisLoading } = useDashboardKpis();
   const { range, setRange } = useTimeRange();
   const { data: taskData, loading: taskLoading } = useChartData('tasks', range);
   const { data: errorData, loading: errorLoading } = useChartData('errors', range);
   const { data: costData, loading: costLoading } = useChartData('cost', range);
   const { data: agentData, loading: agentLoading } = useChartData('agents', range);
+
+  if (industryGroup && !industryGroupLoading) {
+    const metricValues: Record<string, { value: string | number }> = {};
+    if (kpis) {
+      if (typeof kpis.totalTasks === 'number') metricValues.totalTasks = { value: kpis.totalTasks };
+      if (typeof kpis.failedTasks === 'number') metricValues.failedTasks = { value: kpis.failedTasks };
+      if (typeof kpis.successRate === 'number') metricValues.successRate = { value: kpis.successRate };
+    }
+    return (
+      <div className="space-y-5">
+        <IndustryDashboardRenderer
+          industryGroup={industryGroup}
+          metricValues={metricValues}
+        />
+      </div>
+    );
+  }
+
+  if (industryGroupLoading) {
+    return (
+      <div className="space-y-5">
+        <IndustryDashboardFallback />
+      </div>
+    );
+  }
 
   const costDonut = [
     { name: 'Compute',  value: 45, color: '#6366f1' },
@@ -785,6 +823,14 @@ function SettingsTab({ subTab, onSetSubTab }: { subTab: SettingsSubTab; onSetSub
 
   const sections = [
     {
+      title: 'Organization',
+      icon: Building2,
+      description:
+        'Tenant profile, industry, sub-industry, subscription tier, and locale',
+      sub: 'organization' as const,
+      color: 'bg-accent-500/15 text-accent-500',
+    },
+    {
       title: 'Profile',
       icon: User,
       description: 'Update your name and password',
@@ -831,6 +877,7 @@ function SettingsTab({ subTab, onSetSubTab }: { subTab: SettingsSubTab; onSetSub
           <ArrowLeft className="w-3.5 h-3.5" />
           Back to Settings
         </button>
+        {subTab === 'organization' && <OrganizationDetail onBack={() => onSetSubTab(null)} />}
         {subTab === 'profile' && <ProfileDetail user={user} onBack={() => onSetSubTab(null)} />}
         {subTab === 'ai-providers' && <AIProvidersDetail />}
         {subTab === 'apikeys' && <APIKeysDetail />}
@@ -903,6 +950,129 @@ function SettingsTab({ subTab, onSetSubTab }: { subTab: SettingsSubTab; onSetSub
       </div>
 
       <AIRoutingSection />
+    </div>
+  );
+}
+
+// ─── Settings Detail: Organization ────────────────────────────────────────
+function OrganizationDetail({ onBack: _onBack }: { onBack: () => void }) {
+  const [tenant, setTenant] = useState<{
+    name: string;
+    slug: string;
+    industry: string | null;
+    industryGroup: string | null;
+    tier: { slug: string; name: string } | null;
+    status: string;
+    locale: string | null;
+    timezone: string | null;
+    currency: string | null;
+    dateFormat: string | null;
+    timeFormat: string | null;
+    createdAt: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await api.get('/tenants/me/current');
+        const data = res.data?.data ?? res.data ?? null;
+        if (alive) setTenant(data);
+      } catch (e) {
+        if (alive) setError('Failed to load tenant profile');
+        console.error(e);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="card-surface p-5 text-sm text-zinc-400">
+        Loading organization profile…
+      </div>
+    );
+  }
+  if (error || !tenant) {
+    return (
+      <div className="card-surface p-5 text-sm text-state-danger">
+        {error ?? 'Tenant profile unavailable'}
+      </div>
+    );
+  }
+
+  const rows: Array<{ label: string; value: React.ReactNode }> = [
+    { label: 'Organization name', value: tenant.name },
+    {
+      label: 'Industry',
+      value: tenant.industry ? (
+        <span className="inline-flex items-center gap-1.5">
+          {tenant.industry}
+          {tenant.industryGroup && (
+            <span className="text-[10px] text-zinc-500">
+              ({tenant.industryGroup})
+            </span>
+          )}
+        </span>
+      ) : (
+        <span className="text-zinc-500">— not selected</span>
+      ),
+    },
+    {
+      label: 'Subscription tier',
+      value: tenant.tier ? (
+        <span className="inline-flex items-center gap-1.5">
+          {tenant.tier.name}{' '}
+          <span className="text-[10px] text-zinc-500">({tenant.tier.slug})</span>
+        </span>
+      ) : (
+        <span className="text-zinc-500">— basic</span>
+      ),
+    },
+    { label: 'Status', value: tenant.status },
+    {
+      label: 'Locale',
+      value: (
+        <span>
+          {tenant.locale ?? '—'} · {tenant.timezone ?? '—'} ·{' '}
+          {tenant.currency ?? '—'} · {tenant.dateFormat ?? '—'} ·{' '}
+          {tenant.timeFormat ?? '—'}
+        </span>
+      ),
+    },
+    {
+      label: 'Created',
+      value: new Date(tenant.createdAt).toLocaleString(),
+    },
+    { label: 'Slug', value: tenant.slug },
+  ];
+
+  return (
+    <div className="card-surface p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-zinc-100">
+          Organization profile
+        </h3>
+        <span className="text-[10px] uppercase tracking-wide text-zinc-500">
+          Industry is locked — contact your platform admin to change
+        </span>
+      </div>
+      <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        {rows.map((r) => (
+          <div key={r.label} className="flex flex-col">
+            <dt className="text-[10px] uppercase tracking-wide text-zinc-500">
+              {r.label}
+            </dt>
+            <dd className="text-zinc-100 mt-0.5">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

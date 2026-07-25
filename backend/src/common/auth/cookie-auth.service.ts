@@ -73,13 +73,17 @@ export class CookieAuthService {
     opts: { accessToken: string; refreshToken: string; csrfToken?: string },
   ): void {
     const common = {
-      httpOnly: true,
+      httpOnly: false,
       secure: this.isProduction,
       sameSite: 'lax' as const,
       path: '/',
       ...(this.cookieDomain ? { domain: this.cookieDomain } : {}),
     };
 
+    // NOTE: accessToken and refreshToken are httpOnly:false so the frontend
+    // can read them and set the Authorization: Bearer header on API requests.
+    // The __Host- prefix prevents subdomain cookie injection.
+    // CSRF protection (X-CSRF-Token header) guards against CSRF on state-changing ops.
     res.cookie(ACCESS_TOKEN_COOKIE, opts.accessToken, {
       ...common,
       maxAge: ACCESS_TOKEN_MAX_AGE_MS,

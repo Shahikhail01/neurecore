@@ -15,6 +15,12 @@ export interface IndustryGroup {
 export interface CapabilityResponse {
   industry: { slug: string; name: string; industryGroup: string };
   tier: 'basic' | 'business' | 'professional' | 'enterprise';
+  /**
+   * FIX-COMPREHENSIVE-R3 (2026-07-24): true when the response is for
+   * the universal-baseline sentinel `__universal__` (Skip-industry path).
+   * Drives the PlanImpactPanel copy.
+   */
+  universal?: boolean;
   capabilities: {
     maxAgents: number;
     maxDepartments: number;

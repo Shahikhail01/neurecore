@@ -7,6 +7,26 @@ import axios from 'axios';
 import { tokenManager } from '@/core/infrastructure/auth/TokenManager';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1';
+const CSRF_COOKIE = '__Host-nc_csrf';
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const cookies = document.cookie ? document.cookie.split('; ') : [];
+  for (const raw of cookies) {
+    const eq = raw.indexOf('=');
+    if (eq < 0) continue;
+    const key = raw.slice(0, eq);
+    if (key === name) {
+      const v = raw.slice(eq + 1);
+      try {
+        return decodeURIComponent(v);
+      } catch {
+        return v;
+      }
+    }
+  }
+  return null;
+}
 
 export interface UploadLogoResult {
   url: string;
@@ -45,19 +65,25 @@ export const uploadsService = {
     const form = new FormData();
     form.append('file', file);
 
+    const csrf = readCookie(CSRF_COOKIE);
     const res = await axios.post<{ data: UploadLogoResult }>(
       `${API_URL}/uploads/logo`,
       form,
       {
-        headers: { ...authHeader(), 'Content-Type': 'multipart/form-data' },
+        headers: {
+          ...authHeader(),
+          'Content-Type': 'multipart/form-data',
+          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+        },
       },
     );
     return res.data.data;
   },
 
   async deleteLogo(key: string): Promise<void> {
+    const csrf = readCookie(CSRF_COOKIE);
     await axios.delete(`${API_URL}/uploads/logo/${encodeURIComponent(key)}`, {
-      headers: authHeader(),
+      headers: { ...authHeader(), ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
     });
   },
 
@@ -74,20 +100,26 @@ export const uploadsService = {
     const form = new FormData();
     form.append('file', file);
 
+    const csrf = readCookie(CSRF_COOKIE);
     const res = await axios.post<{ data: UploadLogoResult }>(
       `${API_URL}/uploads/agent-avatar`,
       form,
       {
-        headers: { ...authHeader(), 'Content-Type': 'multipart/form-data' },
+        headers: {
+          ...authHeader(),
+          'Content-Type': 'multipart/form-data',
+          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+        },
       },
     );
     return res.data.data;
   },
 
   async deleteAgentAvatar(key: string): Promise<void> {
+    const csrf = readCookie(CSRF_COOKIE);
     await axios.delete(
       `${API_URL}/uploads/agent-avatar/${encodeURIComponent(key)}`,
-      { headers: authHeader() },
+      { headers: { ...authHeader(), ...(csrf ? { 'X-CSRF-Token': csrf } : {}) } },
     );
   },
 };

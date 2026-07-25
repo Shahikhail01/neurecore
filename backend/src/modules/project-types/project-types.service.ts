@@ -12,7 +12,10 @@ import {
   Logger,
   Inject,
 } from '@nestjs/common';
-import { I_PROJECT_TYPE_REPOSITORY, type IProjectTypeRepository } from './interfaces/project-type.interface';
+import {
+  I_PROJECT_TYPE_REPOSITORY,
+  type IProjectTypeRepository,
+} from './interfaces/project-type.interface';
 import type {
   ProjectType,
   ProjectTypeVersion,
@@ -40,7 +43,10 @@ export class ProjectTypesService {
     return this.repo.createType(dto, tenantId);
   }
 
-  async findTypeById(id: string, tenantId: string | null): Promise<ProjectType> {
+  async findTypeById(
+    id: string,
+    tenantId: string | null,
+  ): Promise<ProjectType> {
     const found = await this.repo.findTypeById(id, tenantId);
     if (!found) throw new NotFoundException(`ProjectType ${id} not found`);
     return found;
@@ -73,14 +79,16 @@ export class ProjectTypesService {
     dto: CreateProjectTypeVersionInput,
   ): Promise<ProjectTypeVersion> {
     const pt = await this.repo.findTypeById(projectTypeId, tenantId);
-    if (!pt) throw new NotFoundException(`ProjectType ${projectTypeId} not found`);
+    if (!pt)
+      throw new NotFoundException(`ProjectType ${projectTypeId} not found`);
 
     return this.repo.createVersion(projectTypeId, dto);
   }
 
   async findVersionById(id: string): Promise<ProjectTypeVersion> {
     const found = await this.repo.findVersionById(id);
-    if (!found) throw new NotFoundException(`ProjectTypeVersion ${id} not found`);
+    if (!found)
+      throw new NotFoundException(`ProjectTypeVersion ${id} not found`);
     return found;
   }
 
@@ -89,7 +97,8 @@ export class ProjectTypesService {
     tenantId: string | null,
   ): Promise<ProjectTypeVersion[]> {
     const pt = await this.repo.findTypeById(projectTypeId, tenantId);
-    if (!pt) throw new NotFoundException(`ProjectType ${projectTypeId} not found`);
+    if (!pt)
+      throw new NotFoundException(`ProjectType ${projectTypeId} not found`);
     return this.repo.findVersionsByTypeId(projectTypeId);
   }
 
@@ -98,7 +107,8 @@ export class ProjectTypesService {
     tenantId: string | null,
   ): Promise<ProjectTypeVersion | null> {
     const pt = await this.repo.findTypeById(projectTypeId, tenantId);
-    if (!pt) throw new NotFoundException(`ProjectType ${projectTypeId} not found`);
+    if (!pt)
+      throw new NotFoundException(`ProjectType ${projectTypeId} not found`);
     return this.repo.getCurrentVersion(projectTypeId);
   }
 
@@ -118,12 +128,15 @@ export class ProjectTypesService {
       return;
     }
 
-    const values = customFieldValues as Record<string, unknown>;
+    const values = customFieldValues;
 
     for (const field of fieldSchema) {
       const value = values[field.key];
 
-      if (field.required && (value === undefined || value === null || value === '')) {
+      if (
+        field.required &&
+        (value === undefined || value === null || value === '')
+      ) {
         throw new BadRequestException(
           `Field "${field.label}" (${field.key}) is required`,
         );
@@ -159,7 +172,9 @@ export class ProjectTypesService {
               );
             }
             if (field.options) {
-              const invalid = (value as string[]).filter((v) => !field.options!.includes(v));
+              const invalid = (value as string[]).filter(
+                (v) => !field.options!.includes(v),
+              );
               if (invalid.length > 0) {
                 throw new BadRequestException(
                   `Field "${field.label}" contains invalid values: ${invalid.join(', ')}`,

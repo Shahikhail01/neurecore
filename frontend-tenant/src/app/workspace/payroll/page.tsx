@@ -1,7 +1,16 @@
 'use client';
 
-import { IndustryStubFromNav } from '@/components/industry/IndustryStubPage';
+import { IndustryWorkspacePage } from '@/components/industry/IndustryWorkspacePage';
 
 export default function PayrollPage() {
-  return <IndustryStubFromNav featureId="payroll" industryGroup="financial-compliance" />;
+  return (
+    <IndustryWorkspacePage
+      config={{
+        featureId: 'payroll',
+        title: 'Payroll',
+        description: 'Payroll cycles, payroll accounting, tax withholding, benefit accruals, and payroll journal entries.',
+        projectTypeSlugs: ['payroll-cycle'],
+      }}
+    />
+  );
 }

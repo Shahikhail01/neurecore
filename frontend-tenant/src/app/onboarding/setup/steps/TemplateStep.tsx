@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onboardingService } from '@/services/onboarding.service';
+import { tenantsService } from '@/services/tenants.service';
 import {
   departmentTemplatesService,
   type DepartmentTemplate,
@@ -37,19 +38,34 @@ export function TemplateStep({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    departmentTemplatesService
-      .list()
-      .then((list) => {
-        if (!cancelled) {
-          setTemplates(list);
-          setLoading(false);
-        }
+    let industryGroup: string | undefined;
+    tenantsService
+      .getCurrent()
+      .then((tenant) => {
+        const t = tenant as { industryGroup?: string; industry?: string };
+        industryGroup = t.industryGroup ?? undefined;
       })
-      .catch((e) => {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to load templates.');
-          setLoading(false);
-        }
+      .catch(() => {
+        industryGroup = undefined;
+      })
+      .finally(() => {
+        if (cancelled) return;
+        departmentTemplatesService
+          .list(industryGroup ? { industryGroup } : undefined)
+          .then((list) => {
+            if (!cancelled) {
+              setTemplates(list);
+              setLoading(false);
+            }
+          })
+          .catch((e) => {
+            if (!cancelled) {
+              setError(
+                e instanceof Error ? e.message : 'Failed to load templates.',
+              );
+              setLoading(false);
+            }
+          });
       });
     return () => {
       cancelled = true;

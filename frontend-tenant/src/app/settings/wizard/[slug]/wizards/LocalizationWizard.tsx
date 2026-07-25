@@ -9,28 +9,12 @@ import { Loader2, CheckCircle2 } from 'lucide-react';
 import { tenantsService } from '@/services/tenants.service';
 import { useOnboardingChecklistStore } from '@/stores/onboardingChecklist.store';
 import type { WizardSlug } from '@/lib/wizard/types';
-
-const TIMEZONES = [
-  'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-  'Europe/London', 'Europe/Berlin', 'Europe/Paris', 'Europe/Moscow',
-  'Asia/Dubai', 'Asia/Karachi', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Shanghai',
-  'Australia/Sydney', 'Pacific/Auckland',
-];
-
-const CURRENCIES = [
-  { code: 'USD', label: 'USD — US Dollar' },
-  { code: 'EUR', label: 'EUR — Euro' },
-  { code: 'GBP', label: 'GBP — British Pound' },
-  { code: 'PKR', label: 'PKR — Pakistani Rupee' },
-  { code: 'INR', label: 'INR — Indian Rupee' },
-  { code: 'AED', label: 'AED — UAE Dirham' },
-  { code: 'SGD', label: 'SGD — Singapore Dollar' },
-  { code: 'JPY', label: 'JPY — Japanese Yen' },
-  { code: 'AUD', label: 'AUD — Australian Dollar' },
-  { code: 'CAD', label: 'CAD — Canadian Dollar' },
-  { code: 'CHF', label: 'CHF — Swiss Franc' },
-  { code: 'CNY', label: 'CNY — Chinese Yuan' },
-];
+import {
+  COMMON_TIMEZONES,
+  COMMON_CURRENCIES,
+  COMMON_DATE_FORMATS,
+  COMMON_TIME_FORMATS,
+} from '@/lib/locale-options';
 
 const LOCALES = [
   { code: 'en-US', label: 'English (US)' },
@@ -41,6 +25,7 @@ const LOCALES = [
   { code: 'ur-PK', label: 'Urdu (Pakistan)' },
   { code: 'hi-IN', label: 'Hindi (India)' },
   { code: 'ar-AE', label: 'Arabic (UAE)' },
+  { code: 'id-ID', label: 'Indonesian (Indonesia)' },
   { code: 'zh-CN', label: 'Chinese (Simplified)' },
   { code: 'ja-JP', label: 'Japanese (Japan)' },
 ];
@@ -97,14 +82,14 @@ export function LocalizationWizard({ slug }: { slug: WizardSlug }) {
             <Label htmlFor="tz">Timezone</Label>
             <Select value={timezone} onValueChange={setTimezone}>
               <SelectTrigger id="tz"><SelectValue /></SelectTrigger>
-              <SelectContent>{TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}</SelectContent>
+              <SelectContent>{COMMON_TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="cur">Currency</Label>
             <Select value={currency} onValueChange={setCurrency}>
               <SelectTrigger id="cur"><SelectValue /></SelectTrigger>
-              <SelectContent>{CURRENCIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>)}</SelectContent>
+              <SelectContent>{COMMON_CURRENCIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
         </div>
@@ -121,10 +106,9 @@ export function LocalizationWizard({ slug }: { slug: WizardSlug }) {
             <Select value={dateFormat} onValueChange={setDateFormat}>
               <SelectTrigger id="df"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="short">Short (1/15/26)</SelectItem>
-                <SelectItem value="medium">Medium (Jan 15, 2026)</SelectItem>
-                <SelectItem value="long">Long (January 15, 2026)</SelectItem>
-                <SelectItem value="relative">Relative (2 days ago)</SelectItem>
+                {COMMON_DATE_FORMATS.map((f) => (
+                  <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -133,8 +117,9 @@ export function LocalizationWizard({ slug }: { slug: WizardSlug }) {
             <Select value={timeFormat} onValueChange={setTimeFormat}>
               <SelectTrigger id="tf"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="12h">12-hour (3:42 PM)</SelectItem>
-                <SelectItem value="24h">24-hour (15:42)</SelectItem>
+                {COMMON_TIME_FORMATS.map((f) => (
+                  <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

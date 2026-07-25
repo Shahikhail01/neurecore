@@ -11,7 +11,7 @@ import { IndustryComplianceService } from './industry-compliance.service';
 import type { ComplianceChecklist } from './interfaces/compliance.interface';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 
-@Controller('api/v1/compliance')
+@Controller({ path: 'compliance', version: '1' })
 export class ComplianceController {
   constructor(
     private readonly complianceService: IndustryComplianceService,

@@ -102,6 +102,30 @@ export class IndustriesController extends PoolController<
     @Param('slug') slug: string,
     @Query('tier') tierSlug: string,
   ) {
+    // FIX-COMPREHENSIVE-R3 (2026-07-24): PlanImpactPanel supports a
+    // "universal baseline" preview when the tenant has no industry
+    // picked yet (Skip-industry path). The sentinel `__universal__`
+    // resolves to the `default` industry group's capabilities which
+    // is what `seed-platform-templates.cjs` overlays for every tenant.
+    // PlanImpactPanel calls this with the sentinel before any industry
+    // is chosen so the user still sees a meaningful preview of what
+    // their tier unlocks.
+    if (slug === '__universal__') {
+      return {
+        industry: {
+          slug: '__universal__',
+          name: 'Universal baseline',
+          industryGroup: 'other',
+        },
+        tier: tierSlug,
+        capabilities: getCapabilityMatrix(
+          'other' as IndustryGroupSlug,
+          tierSlug as TierSlug,
+        ),
+        universal: true,
+      };
+    }
+
     const industry = await this.prisma.industry.findUnique({ where: { slug } });
     if (!industry) throw new NotFoundException(`Industry '${slug}' not found`);
     if (!industry.industryGroup) {

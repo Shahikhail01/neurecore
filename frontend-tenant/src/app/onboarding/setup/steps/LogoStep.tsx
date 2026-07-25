@@ -36,6 +36,27 @@ export function LogoStep({ initialLogoUrl, onNext, onBack }: LogoStepProps) {
     }
   };
 
+  const handleSkip = async () => {
+    // FIX-ONB-D1 (Round-3 verification): route the Skip path through the same
+    // persistence + state-update sequence as Continue. The previous
+    // implementation called onNext() directly, which fired refreshTenant()
+    // without first ensuring the PATCH /tenants/me call had succeeded.
+    // The CSRF cookie race + auth-cascade then produced a 401 burst on the
+    // immediately-following /tenants/me/current call and the SPA killed
+    // the session. Persisting first (even with logoUrl: null) reuses the
+    // existing CSRF cookie rotation done by saveCompanyAndLocale().
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onboardingService.saveCompanyAndLocale({ logoUrl: null });
+      onNext();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not advance to next step');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <Card className="p-6 space-y-4">
       <div>
@@ -57,7 +78,7 @@ export function LogoStep({ initialLogoUrl, onNext, onBack }: LogoStepProps) {
         </Button>
         <div className="flex gap-2">
           {!logoUrl && (
-            <Button variant="ghost" onClick={onNext} disabled={submitting}>
+            <Button variant="ghost" onClick={() => void handleSkip()} disabled={submitting}>
               <SkipForward className="w-4 h-4 mr-1" /> Skip for now
             </Button>
           )}

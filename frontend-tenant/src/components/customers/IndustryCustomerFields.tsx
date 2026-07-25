@@ -28,7 +28,7 @@ import { unwrapItem } from '@/services/unwrap';
 export interface CustomerFieldDef {
   key: string;
   label: string;
-  type: 'string' | 'enum' | 'date' | 'boolean' | 'encrypted';
+  type: 'string' | 'enum' | 'date' | 'month-day' | 'boolean' | 'encrypted';
   options?: string[];
   required: boolean;
   placeholder?: string;
@@ -121,6 +121,59 @@ function renderField(
           onChange={(e) => onChange(def.key, e.target.value)}
         />
       );
+
+    case 'month-day': {
+      // MM-DD only. Renders two number inputs and persists as MM-DD string.
+      const monthValue = String(currentValue).slice(0, 2);
+      const dayValue = String(currentValue).slice(3, 5);
+      const fieldKey = def.key;
+      const handleMonth = (m: string) => {
+        const mm = m.padStart(2, '0').slice(0, 2);
+        const next = `${mm}-${dayValue || '01'}`;
+        onChange(fieldKey, next);
+      };
+      const handleDay = (d: string) => {
+        const dd = d.padStart(2, '0').slice(0, 2);
+        const next = `${monthValue || '01'}-${dd}`;
+        onChange(fieldKey, next);
+      };
+      return (
+        <div key={def.key} className="space-y-2">
+          <label className="text-sm font-medium text-foreground">
+            {def.label}
+            {def.required && <span className="text-destructive ml-1">*</span>}
+          </label>
+          {def.hint && (
+            <p className="text-xs text-muted-foreground">{def.hint}</p>
+          )}
+          <div className="flex items-center gap-2">
+            <select
+              aria-label={`${def.label} — month`}
+              value={monthValue}
+              onChange={(e) => handleMonth(e.target.value)}
+              className="bg-surface-overlay border border-surface-border rounded-md px-3 py-2 text-sm text-zinc-100"
+            >
+              <option value="">Month</option>
+              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <span className="text-sm text-muted-foreground">/</span>
+            <select
+              aria-label={`${def.label} — day`}
+              value={dayValue}
+              onChange={(e) => handleDay(e.target.value)}
+              className="bg-surface-overlay border border-surface-border rounded-md px-3 py-2 text-sm text-zinc-100"
+            >
+              <option value="">Day</option>
+              {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      );
+    }
 
     case 'encrypted':
       return (

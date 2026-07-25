@@ -9,6 +9,7 @@ import { RoutineValidator } from './validators/routine.validator';
 import { ReportValidator } from './validators/report.validator';
 import { TaskValidator } from './validators/task.validator';
 import { DepartmentValidator } from './validators/department.validator';
+import { ApprovalChainValidator } from './validators/approval-chain.validator';
 import { VALIDATORS_TOKEN } from './validators/template-validator.interface';
 
 const VALIDATORS = [
@@ -18,6 +19,10 @@ const VALIDATORS = [
   ReportValidator,
   TaskValidator,
   DepartmentValidator,
+  // FIX-DEP-D3 (Round-3 verification, 2026-07-24): paired with the
+  // APPROVAL_CHAIN enum value added in migration
+  // 20260724_add_approval_chain_template_type.
+  ApprovalChainValidator,
 ];
 
 @Module({

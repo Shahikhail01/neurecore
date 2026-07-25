@@ -335,12 +335,17 @@ export class IntegrationsService {
 
   async getBrevoConnectionStatus(
     tenantId: string,
-  ): Promise<{ connected: boolean }> {
-    const connected = await this.credentialStore.exists(
+  ): Promise<{ connected: boolean; source?: 'tenant' | 'master' }> {
+    const tenantHas = await this.credentialStore.exists(
       tenantId,
       IntegrationProvider.BREVO,
     );
-    return { connected };
+    if (tenantHas) return { connected: true, source: 'tenant' };
+    const masterKey = this.config.get<string>('BREVO_MASTER_API_KEY');
+    if (masterKey && masterKey.length > 0) {
+      return { connected: true, source: 'master' };
+    }
+    return { connected: false };
   }
 
   async listIntegrations(tenantId: string): Promise<Record<string, unknown>> {

@@ -65,7 +65,12 @@ export class PrismaProjectRepository implements IProjectRepository {
         | Prisma.InputJsonValue
         | undefined,
       metadata: (data.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-      status: 'LEAD',
+      // FIX-PROJ-D1 (Round-3 verification): honour caller-supplied status
+      // instead of hardcoding 'LEAD'. Without this, the FE wizard's
+      // Status dropdown (Lead/Proposal/Won/Active/...) was silently
+      // overwritten on every create. Default stays LEAD so legacy
+      // callers without an explicit status are unaffected.
+      status: data.status ?? 'LEAD',
       derivedShape: data.derivedShape
         ? (data.derivedShape as Prisma.InputJsonValue)
         : Prisma.JsonNull,

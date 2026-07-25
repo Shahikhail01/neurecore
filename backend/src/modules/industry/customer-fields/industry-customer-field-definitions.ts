@@ -16,6 +16,7 @@ export type CustomerFieldType =
   | 'string'
   | 'enum'
   | 'date'
+  | 'month-day'
   | 'boolean'
   | 'encrypted';
 
@@ -115,9 +116,9 @@ export const INDUSTRY_CUSTOMER_FIELDS: Record<string, CustomerFieldDef[]> = {
     {
       key: 'fiscalYearEnd',
       label: 'Fiscal Year End',
-      type: 'date',
+      type: 'month-day',
       required: false,
-      hint: 'Month and day of fiscal year end',
+      hint: 'Month and day of fiscal year end (MM-DD)',
       appearance: { section: 'Financial', order: 1 },
     },
     {

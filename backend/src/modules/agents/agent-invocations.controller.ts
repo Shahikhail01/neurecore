@@ -31,8 +31,18 @@ import { AgentInvocationDto } from './dto/agent-invocation.dto';
  *
  * The `metadata.simulationId` field is the simulation tag used to scope
  * the persisted HermesMessage for the simulation overview.
+ *
+ * FIX-DEP-D2 (Round-3 verification, 2026-07-24): the original
+ * controller used `@Controller('v1/agents')` which, under the global
+ * API prefix `api`, became `api/v1/agents/...` correctly — but the
+ * sibling `agents.controller.ts` already registers GET `:id` on the
+ * same path, so Nest's route matcher was unable to bind
+ * `POST :id/invocations` to this controller (it fell through to
+ * the agents.controller and matched `:id` on the GET, returning 404
+ * for POST). Fix: pin the path explicitly to the agents resource and
+ * use a method that can't conflict with the sibling GET `:id`.
  */
-@Controller('v1/agents')
+@Controller({ path: 'agents', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AgentInvocationsController {
   constructor(private readonly service: AgentInvocationsService) {}

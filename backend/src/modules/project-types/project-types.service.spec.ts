@@ -196,6 +196,7 @@ describe('ProjectTypesService', () => {
       const pt: ProjectType = {
         id: 'pt_1',
         tenantId: 'tenant_1',
+        slug: 'tax-return',
         name: 'Tax Return',
         industry: 'accounting',
         isSystem: false,

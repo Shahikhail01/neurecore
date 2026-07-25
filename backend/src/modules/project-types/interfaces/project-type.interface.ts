@@ -62,6 +62,7 @@ export type ProjectType = {
   id: string;
   tenantId: string | null;
   name: string;
+  slug: string | null;
   industry: string | null;
   isSystem: boolean;
   classification: ProjectTypeClassification | null;
@@ -89,6 +90,7 @@ export type ProjectTypeWithVersions = ProjectType & {
 
 export type CreateProjectTypeInput = {
   name: string;
+  slug?: string;
   industry?: string;
   isSystem?: boolean;
   classification?: ProjectTypeClassification;
@@ -96,6 +98,7 @@ export type CreateProjectTypeInput = {
 
 export type UpdateProjectTypeInput = {
   name?: string;
+  slug?: string;
   industry?: string;
   classification?: ProjectTypeClassification | null;
 };
@@ -113,6 +116,7 @@ export interface ListProjectTypeOptions {
   search?: string;
   industry?: string;
   classification?: ProjectTypeClassification;
+  slugs?: string[];
   page?: number;
   limit?: number;
 }

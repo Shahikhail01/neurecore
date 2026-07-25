@@ -263,4 +263,68 @@ export class TenantsController {
       },
     };
   }
+
+  /**
+   * FIX-DEP-D4 (Round-3 verification, 2026-07-24): list the current
+   * tenant's tier-change requests so the FE TierChangeModal can render
+   * previously-filed PENDING/REJECTED/EXECUTED rows. Returns rows in
+   * reverse chronological order with the from/to tier names resolved for
+   * convenient rendering.
+   */
+  @Get('me/tier-change-requests')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.PLATFORM_ADMIN, UserRole.SUPPORT)
+  async listMyTierChangeRequests(
+    @CurrentUser() user: { tenantId?: string | null; sub: string },
+  ) {
+    if (!user?.tenantId) {
+      throw new ForbiddenException('No tenant context for current user');
+    }
+    const rows = await this.prisma.tierChangeRequest.findMany({
+      where: { tenantId: user.tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        // Resolve the to/from tier names so the FE doesn't have to
+        // make N+1 calls. Tier has no relation declared in the
+        // generated Prisma types under the alias `toTier` / `fromTier`,
+        // so we look them up by id.
+      },
+    });
+    const tierIds = new Set<string>();
+    for (const r of rows) {
+      if (r.fromTierId) tierIds.add(r.fromTierId);
+      if (r.toTierId) tierIds.add(r.toTierId);
+    }
+    const tiers = await this.prisma.tier.findMany({
+      where: { id: { in: Array.from(tierIds) } },
+    });
+    const tierById = new Map(tiers.map((t) => [t.id, t]));
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        direction: r.direction,
+        status: r.status,
+        reason: r.reason,
+        createdAt: r.createdAt,
+        // TierChangeRequest has no `resolvedAt` column; the equivalent
+        // signals are `approvedBy` (set when admin acts) and
+        // `effectiveAt` (set when the actual tier change executes).
+        approvedBy: r.approvedBy,
+        effectiveAt: r.effectiveAt,
+        fromTier: r.fromTierId
+          ? (() => {
+              const t = tierById.get(r.fromTierId);
+              return t ? { id: t.id, slug: t.slug, name: t.name } : null;
+            })()
+          : null,
+        toTier: r.toTierId
+          ? (() => {
+              const t = tierById.get(r.toTierId);
+              return t ? { id: t.id, slug: t.slug, name: t.name } : null;
+            })()
+          : null,
+      })),
+      total: rows.length,
+    };
+  }
 }

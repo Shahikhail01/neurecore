@@ -28,6 +28,16 @@ export interface Customer {
   primaryEmail?: string | null;
   primaryPhone?: string | null;
   billingInfo?: Record<string, unknown> | null;
+  /**
+   * FIX-CUST-D1 (Round-3 verification, 2026-07-24): industry-specific
+   * fields that the CustomerForm renders for the tenant's industry
+   * (e.g. Healthcare: hipaaConsent, emergencyContact, primaryPhysician,
+   * insuranceProvider, medicalRecordNumber). The BE persists these on
+   * `billingInfo.industryFields` and returns them as a separate field
+   * on Customer. Surfaced in the detail page so operators can verify
+   * the captured values without re-opening the edit modal.
+   */
+  industryFields?: Record<string, string | boolean | null> | null;
   status: CustomerStatus;
   tags: string[];
   createdAt: string;

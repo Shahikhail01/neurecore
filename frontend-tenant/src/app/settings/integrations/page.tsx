@@ -168,6 +168,18 @@ function BrevoIntegrationCard({
     isAtWarning: boolean;
     isAtLimit: boolean;
   } | null>(null);
+  const [testSendOpen, setTestSendOpen] = useState(false);
+  const [testSendTo, setTestSendTo] = useState('');
+  const [testSendSubject, setTestSendSubject] = useState('Neurecore Brevo test email');
+  const [testSendBody, setTestSendBody] = useState(
+    '<p>This is a test email from Neurecore. If you received it, Brevo is configured correctly.</p>',
+  );
+  const [testSendResult, setTestSendResult] = useState<{
+    success: boolean;
+    messageId?: string;
+    error?: string;
+  } | null>(null);
+  const [testSendLoading, setTestSendLoading] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -204,6 +216,34 @@ function BrevoIntegrationCard({
     }
   };
 
+  const handleSendTest = async () => {
+    if (!testSendTo.trim()) {
+      setTestSendResult({ success: false, error: 'Recipient email is required' });
+      return;
+    }
+    setTestSendLoading(true);
+    setTestSendResult(null);
+    try {
+      const res = await integrationsService.brevoTestSend({
+        to: testSendTo.trim(),
+        subject: testSendSubject.trim() || 'Neurecore Brevo test email',
+        htmlContent: testSendBody,
+      });
+      setTestSendResult({
+        success: !!res.success,
+        messageId: typeof res.messageId === 'string' ? res.messageId : undefined,
+        error: typeof res.error === 'string' ? res.error : undefined,
+      });
+    } catch (err) {
+      setTestSendResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Send failed',
+      });
+    } finally {
+      setTestSendLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!integration.connected) {
       setUsage(null);
@@ -228,26 +268,33 @@ function BrevoIntegrationCard({
               <p className="text-xs text-muted-foreground mt-0.5">Transactional &amp; bulk email relay</p>
             </div>
           </div>
-          <Badge variant={integration.connected ? 'default' : 'secondary'}>
-            {integration.connected ? (
-              <span className="flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Connected
-              </span>
-            ) : (
-              <span className="flex items-center gap-1">
-                <XCircle className="w-3 h-3" /> Not Connected
-              </span>
-            )}
-          </Badge>
-        </div>
+        <Badge variant={integration.connected ? 'default' : 'secondary'}>
+          {integration.connected ? (
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              {integration.source === 'master' ? 'Connected (Master Key)' : 'Connected'}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <XCircle className="w-3 h-3" /> Not Connected
+            </span>
+          )}
+        </Badge>
+      </div>
 
-        <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border/50">
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            <strong className="text-foreground">What this does:</strong> Brevo enables AI agents to send emails
-            on behalf of your organization. This includes project updates, notifications, alerts, and bulk
-            communications to stakeholders.
+      <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border/50">
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          <strong className="text-foreground">What this does:</strong> Brevo enables AI agents to send emails
+          on behalf of your organization. This includes project updates, notifications, alerts, and bulk
+          communications to stakeholders.
+        </p>
+        {integration.connected && integration.source === 'master' && (
+          <p className="text-xs text-amber-600 mt-2">
+            Currently using the platform fallback master key. Connect your own Brevo
+            API key below to use your own sender identity and quota.
           </p>
-        </div>
+        )}
+      </div>
 
         {toast && (
           <motion.div
@@ -304,7 +351,19 @@ function BrevoIntegrationCard({
               <ExternalLink className="w-3.5 h-3.5" />
               Setup Guide
             </Button>
-            
+
+            {integration.connected && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setTestSendOpen(true)}
+                className="gap-1.5"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Send Test Email
+              </Button>
+            )}
+
             {integration.connected && (
               <Button 
                 variant="destructive" 
@@ -320,6 +379,90 @@ function BrevoIntegrationCard({
           </div>
         </div>
       </Card>
+
+      <Dialog open={testSendOpen} onOpenChange={setTestSendOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-orange-500" />
+              Send test email via Brevo
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">
+              Confirms Brevo is configured end-to-end. The email is sent via the
+              tenant's Brevo account (or the platform master key fallback).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="test-to" className="text-sm">Recipient (to)</Label>
+              <Input
+                id="test-to"
+                type="email"
+                placeholder="you@example.com"
+                value={testSendTo}
+                onChange={(e) => setTestSendTo(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="test-subject" className="text-sm">Subject</Label>
+              <Input
+                id="test-subject"
+                value={testSendSubject}
+                onChange={(e) => setTestSendSubject(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="test-body" className="text-sm">HTML body</Label>
+              <textarea
+                id="test-body"
+                value={testSendBody}
+                onChange={(e) => setTestSendBody(e.target.value)}
+                className="w-full min-h-[100px] rounded-md border border-surface-border bg-surface-overlay px-3 py-2 text-sm"
+              />
+            </div>
+            {testSendResult && (
+              <div
+                className={`px-3 py-2 rounded-md text-xs flex items-start gap-2 ${
+                  testSendResult.success
+                    ? 'bg-green-500/15 border border-green-500/30 text-green-600'
+                    : 'bg-red-500/15 border border-red-500/30 text-red-600'
+                }`}
+              >
+                {testSendResult.success ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                ) : (
+                  <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                )}
+                <span className="break-all">
+                  {testSendResult.success
+                    ? `Sent. messageId=${testSendResult.messageId}`
+                    : `Failed: ${testSendResult.error}`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="secondary" onClick={() => setTestSendOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={handleSendTest} disabled={testSendLoading}>
+              {testSendLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4" />
+                  Send Test
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showSetupDialog} onOpenChange={setShowSetupDialog}>
         <DialogContent className="max-w-lg">

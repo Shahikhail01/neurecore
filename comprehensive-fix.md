@@ -2,6 +2,12 @@
 
 > **Goal:** Fix every reproducible defect from the 2026-07-23 browser verification on `hq.neurecore.com`, with 100 % SOLID principles, no new code duplication, and verifiable acceptance criteria. Backend changes are deployed to Contabo; frontend changes ship with the next `pnpm build` of `frontend-tenant`. The tenant created during verification (`arif.pratama.20260723.1655@example.com` / `PT Nusantara Audit Digital`) stays as the test account.
 
+> **Round-1 closure (commit `6957b10` + `261f157` + `c78ad25`, 2026-07-23 14:56 PKT):** P0 backend defects (500 on `/tenant-templates`, 403-on-tier-limit on `/onboarding/select-template`, filter nested-error-code), P1 frontend (industries service async, picker copy, Indonesia locales, CompanyStep skip toggle), P2 test fixtures, P3 workspace honesty (Stage 2 ✓ badges replaced with placeholders).
+>
+> **Round-2 closure (commit `e5ceb45`, 2026-07-23 15:55 PKT):** four items originally filed under §8 as "out-of-scope" were actually fixable in-session. Universal template baseline + `apply-baseline` endpoint; `useRailInvalidationOnIndustryChange` hook for stale rail preferences; cross-tier approval guard with new `TierGuardOutcome` shape + `evaluateAgainstTier` registry method; `pnpm` toolchain locally installed. See [fixes.md §FIX-COMPREHENSIVE-R2](memory-bank-new/fixes.md#fix-comprehensive-r2--universal-template-baseline--rail-invalidation--approval-cross-tier-guard-2026-07-23-1730-pkt) for the full audit trail.
+>
+> **This document is the issue-to-file mapping. Round-2 entries are marked ✅ DONE in §6/§7 below. The remaining open items are documented in [pending-tasks.md §1](memory-bank-new/pending-tasks.md#1-industry-release-hot-path-follow-ups-2026-07-23--kilo).**
+
 ---
 
 ## 0. Verified root causes (from live `pm2 logs` + Contabo probes)
@@ -99,10 +105,12 @@
 
 ### FE-P1-D — Industry-aware rail cache invalidation
 
-**File:** `frontend-tenant/src/lib/industryNavigation.ts` + `frontend-tenant/src/stores/tenantStore.ts` (audit only)
+**File:** `frontend-tenant/src/lib/industryNavigation.ts` + `frontend-tenant/src/stores/tenantStore.ts`
 **Issue:** Shared route IDs (`production`, `inventory`, `engagements`) can carry preferences across group changes. Product decision: clear rail preferences on industry change in the admin → tenant-app session start.
 **Fix:** On `tenants/me` response, compare `industryGroup` with the cached value; if changed, bust `railPreferencesStore`.
 **Acceptance:** Two-industry tenant reconciles rail preferences within the session.
+
+**✅ DONE (round-2):** new hook `useRailInvalidationOnIndustryChange()` in `tenantStore.ts:138-191` watches the cached `industryGroup`, persists a per-browser watermark in `localStorage['neurecore-tenant-store.industryGroup.watermark']`, and calls `useRailPreferencesStore.getState().reset()` when the cached value differs from the watermark. Hooked from `IconRail.tsx:124` (single mount point). Verified live: stale `{hiddenItems: ['loans']}` was reset to `[]` after DB-flipped industry from `financial-compliance` → `healthcare-life-sciences`.
 
 ---
 
@@ -177,12 +185,27 @@
 
 ---
 
-## 8. Out-of-scope (honest disclosures)
+## 8. Status after Round-2 (2026-07-23 16:00 PKT)
 
-- **E2E coverage** of all 8 industry groups + 4 tiers + 5 approval chains requires a dedicated QA tenant matrix and human approval flows. Not in this fix; added as a follow-up in `pending-tasks.md`.
-- **`MissionFeedAiPrioritizer` enum warnings** + **Upstash Redis unreachable** in `fixes.md`/`pending-tasks.md` are pre-existing and unrelated to this release; flagged for the next ops rotation.
-- **Approval chain depth per tier** was not validated in the browser; `IMP-2` chain doc has minor stage-name drift vs seed file. Deferred to `fixes.md IMP-2` follow-up.
-- **Compliance checklists** use hardcoded ratios; dashboards still show literal `—`. Needs a separate product task. Not in scope of "fix the broken bits".
+The previous revision of this section marked items A.1 (rail invalidation), A.2 (approval-chain depth per tier), A.6 (seed-for-null-industry) and B.1 (pnpm toolchain) as "out-of-scope" — that filing was wrong. Round-2 (commit `e5ceb45`) closed all four:
+
+- ✅ **Universal template baseline** — `backend/prisma/seed-platform-templates.cjs` adds 6 universal-baseline templates (`industrySlug = null`). `TenantTemplateSeeder.seedForTenant` now normalises empty-string `industrySlug` to `null` before the WHERE clause. New `POST /tenant-templates/apply-baseline` endpoint + `Apply Baseline` FE button. Verified live: my Indonesian demo tenant `7ecf36bf…` now has all 6 baselines seeded.
+- ✅ **Rail invalidation hook** — `useRailInvalidationOnIndustryChange` in `tenantStore.ts`, wired from `IconRail.tsx`. Per-browser `localStorage` watermark prevents stale `loans`/`audits`/etc. preferences from leaking across `industryGroup` re-assignments.
+- ✅ **Cross-tier approval guard** — `ApprovalAddonRegistry.evaluateAgainstTier` splits addon routes into eligible/blocked based on `Tier.maxApprovalStages`. `ApprovalChainsService.getIndustryRoutes` returns `TierGuardOutcome`. New unit spec covers 4 cases. Verified live: professional tier sees 3 of 4 financial-services routes eligible, the 4-stage `high-risk-client` blocked with `minTierSlug: 'enterprise'`.
+- ✅ **`pnpm` toolchain on developer workstation** — `corepack enabled`, `pnpm@9.15.9` activated via `corepack prepare`, PATH persisted in `~/.bashrc`. `pnpm install`, `pnpm exec tsc`, `pnpm exec jest`, `pnpm exec eslint` all run locally without substitution.
+
+### Genuine out-of-scope items (still pending — product decisions or pre-existing, NOT blocker defects)
+
+- **A.3 — Compliance score uses hardcoded constants.** `backend/src/modules/compliance/checklist-definitions.ts` uses literal `0.85` for AML/HIPAA training rates. Real aggregation is a product task; tracked in [pending-tasks.md §A.3](memory-bank-new/pending-tasks.md#1-industry-release-hot-path-follow-ups-2026-07-23--kilo).
+- **A.4 — Industry-aware dashboard widgets.** `IndustryDashboardRenderer` exists but `/intelligence` falls back to the generic renderer. F&C widgets are registered (`widgets.controller.ts`) but no `?industryGroup=` filter is wired into the list endpoint. Tracked in [pending-tasks.md §A.4](memory-bank-new/pending-tasks.md#1-industry-release-hot-path-follow-ups-2026-07-23--kilo).
+- **A.5 — PlanImpactPanel requires `industry` to be set.** Acceptable trade-off (first-run tenants without industry get no preview). Documented behaviour, not a defect.
+- **B.2 — Deploy script lockfile drift.** `scripts/deploy.sh` enforces `--frozen-lockfile` but `backend/package.json` includes `compression`/`lru-cache` added 2026-07-21 that the lockfile doesn't capture. The deploy sequence currently requires manually running `pnpm install --no-frozen-lockfile` on Contabo before `rebuild.sh`. `scripts/deploy.sh` should detect drift and pass the flag automatically. Tracked in [pending-tasks.md §B.2](memory-bank-new/pending-tasks.md#1-industry-release-hot-path-follow-ups-2026-07-23--kilo).
+- **B.3 — DRY timezone/currency lists in 2 other wizards.** `frontend-tenant/src/app/settings/wizard/[slug]/wizards/ProfileWizard.tsx:14` and `LocalizationWizard.tsx:16` still carry local duplicates. Tracked in [pending-tasks.md §B.3](memory-bank-new/pending-tasks.md#1-industry-release-hot-path-follow-ups-2026-07-23--kilo).
+- **B.4 — Source/JS drift detection.** `backend/dist/` exists in production but is not a CI artefact. The original root cause of the 500 was a TS source/JS drift in `tenant-templates.controller.ts`. Add `git diff --check` from `dist/` to `src/` as part of the deploy checklist. Tracked in [pending-tasks.md §B.4](memory-bank-new/pending-tasks.md#1-industry-release-hot-path-follow-ups-2026-07-23--kilo).
+- **C.1/C.2/C.3 — Test coverage gaps.** `TenantTemplatesController`, `GlobalExceptionFilter nested-error-code`, and `TierLimitExceededException` payload-shape unit tests are still missing. The cross-tier guard spec was added in round-2 (C.4 ✅).
+- **D.1 — `MissionFeedAiPrioritizer` enum warnings.** Pre-existing, unrelated to this release.
+- **D.2 — Upstash Redis unreachable.** Pre-existing; LRU cache masks latency since FIX-PERF-001.
+- **D.4 — 3 pre-existing frontend chat tests fail.** `KeywordFallbackReply.test.ts:17` expects `Agents page` text but production copy says `Employees page`. `ChatService.test.ts` (2 cases) reference the same old copy. Tests never updated when copy was renamed. Tracked in [pending-tasks.md §D.4](memory-bank-new/pending-tasks.md#1-industry-release-hot-path-follow-ups-2026-07-23--kilo).
 
 ---
 
@@ -191,5 +214,6 @@
 - Every P0 backend defect has a verified red→green curl + log diff.
 - Every P1 frontend defect has a manual browser trace + screenshot diff.
 - Every P2 fixture def has a green `pnpm type-check`.
+- Round-2 closures (universal baseline, rail invalidation, cross-tier approval guard, pnpm toolchain) have live verification evidence in [fixes.md §FIX-COMPREHENSIVE-R2](memory-bank-new/fixes.md#fix-comprehensive-r2--universal-template-baseline--rail-invalidation--approval-cross-tier-guard-2026-07-23-1730-pkt).
 - No new code duplicated from existing helpers; single sources of truth enforced.
 - No claim is "fixed" without reproducible evidence.

@@ -35,6 +35,7 @@ export class PrismaProjectTypeRepository implements IProjectTypeRepository {
     const created = await this.prisma.projectType.create({
       data: {
         name: data.name,
+        slug: data.slug ?? this.slugify(data.name),
         industry: data.industry ?? null,
         isSystem: data.isSystem ?? false,
         classification: data.classification ?? null,
@@ -76,6 +77,9 @@ export class PrismaProjectTypeRepository implements IProjectTypeRepository {
     if (options.classification) {
       where.classification = options.classification;
     }
+    if (options.slugs && options.slugs.length > 0) {
+      where.slug = { in: options.slugs };
+    }
 
     const page = options.page || 1;
     const limit = options.limit || 20;
@@ -90,9 +94,25 @@ export class PrismaProjectTypeRepository implements IProjectTypeRepository {
       this.prisma.projectType.count({ where }),
     ]);
 
+    // Deduplicate by (slug, industry): prefer tenant-scoped rows over system
+    // rows so a tenant with a private override does not see both copies.
+    const seen = new Map<string, (typeof items)[number]>();
+    for (const row of items) {
+      const key = `${row.slug}::${row.industry ?? ''}`;
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, row);
+        continue;
+      }
+      if (existing.tenantId == null && row.tenantId != null) {
+        seen.set(key, row);
+      }
+    }
+    const dedupedItems = Array.from(seen.values());
+
     return {
-      data: items.map((t) => this.mapToProjectType(t)),
-      total,
+      data: dedupedItems.map((t) => this.mapToProjectType(t)),
+      total: dedupedItems.length,
     };
   }
 
@@ -110,6 +130,7 @@ export class PrismaProjectTypeRepository implements IProjectTypeRepository {
 
     const updateData: Record<string, unknown> = {};
     if (data.name !== undefined) updateData.name = data.name;
+    if (data.slug !== undefined) updateData.slug = data.slug;
     if (data.industry !== undefined) updateData.industry = data.industry;
     if (data.classification !== undefined) {
       updateData.classification = data.classification;
@@ -208,6 +229,7 @@ export class PrismaProjectTypeRepository implements IProjectTypeRepository {
     id: string;
     tenantId: string | null;
     name: string;
+    slug: string | null;
     industry: string | null;
     isSystem: boolean;
     classification: ProjectType['classification'];
@@ -218,12 +240,20 @@ export class PrismaProjectTypeRepository implements IProjectTypeRepository {
       id: raw.id,
       tenantId: raw.tenantId,
       name: raw.name,
+      slug: raw.slug ?? null,
       industry: raw.industry,
       isSystem: raw.isSystem,
       classification: raw.classification,
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
     };
+  }
+
+  private slugify(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 
   private mapToVersion(raw: {
