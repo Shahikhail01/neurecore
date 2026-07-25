@@ -146,8 +146,8 @@ export const AgentOrchestrationBoardComponent: React.FC<AgentOrchestrationBoardP
                 <SummaryCard
                     label="Online"
                     value={summary.totalOnline}
-                    icon={<Zap className="w-5 h-5 text-emerald-500" />}
-                    bgColor="bg-emerald-50 dark:bg-emerald-950"
+                    icon={<Zap className="w-5 h-5 text-[color:var(--state-success)]" />}
+                    bgColor="bg-emerald-50 dark:bg-[color:var(--state-success)]"
                 />
                 <SummaryCard
                     label="Offline"
@@ -158,20 +158,20 @@ export const AgentOrchestrationBoardComponent: React.FC<AgentOrchestrationBoardP
                 <SummaryCard
                     label="Working"
                     value={summary.activelyWorking}
-                    icon={<Zap className="w-5 h-5 text-blue-500" />}
-                    bgColor="bg-blue-50 dark:bg-blue-950"
+                    icon={<Zap className="w-5 h-5 text-[color:var(--state-info)]" />}
+                    bgColor="bg-blue-50 dark:bg-[color:var(--state-info)]"
                 />
                 <SummaryCard
                     label="Idle"
                     value={summary.idle}
-                    icon={<Clock className="w-5 h-5 text-amber-500" />}
-                    bgColor="bg-amber-50 dark:bg-amber-950"
+                    icon={<Clock className="w-5 h-5 text-[color:var(--state-warning)]" />}
+                    bgColor="bg-amber-50 dark:bg-[color:var(--state-warning)]"
                 />
                 <SummaryCard
                     label="Standby"
                     value={summary.standby}
-                    icon={<AlertCircle className="w-5 h-5 text-violet-500" />}
-                    bgColor="bg-violet-50 dark:bg-violet-950"
+                    icon={<AlertCircle className="w-5 h-5 text-[color:var(--accent-400)]" />}
+                    bgColor="bg-violet-50 dark:bg-[color:var(--accent-500)]"
                 />
             </motion.div>
 
@@ -196,7 +196,7 @@ export const AgentOrchestrationBoardComponent: React.FC<AgentOrchestrationBoardP
                                     )
                                 }
                                 className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${filter === option.value
-                                        ? 'bg-blue-600 text-white'
+                                        ? 'bg-[color:var(--state-info)] text-white'
                                         : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700'
                                     }`}
                             >
@@ -216,7 +216,7 @@ export const AgentOrchestrationBoardComponent: React.FC<AgentOrchestrationBoardP
                         whileTap={{ scale: 0.9 }}
                         onClick={() => setViewMode('grid')}
                         className={`p-2 rounded transition-colors ${viewMode === 'grid'
-                                ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400'
+                                ? 'bg-white dark:bg-slate-800 text-[color:var(--state-info)] dark:text-[color:var(--state-info)]'
                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                             }`}
                     >
@@ -227,7 +227,7 @@ export const AgentOrchestrationBoardComponent: React.FC<AgentOrchestrationBoardP
                         whileTap={{ scale: 0.9 }}
                         onClick={() => setViewMode('list')}
                         className={`p-2 rounded transition-colors ${viewMode === 'list'
-                                ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400'
+                                ? 'bg-white dark:bg-slate-800 text-[color:var(--state-info)] dark:text-[color:var(--state-info)]'
                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                             }`}
                     >

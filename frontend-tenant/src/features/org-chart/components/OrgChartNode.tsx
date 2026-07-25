@@ -55,7 +55,7 @@ export function AgentNode({
       onClick={() => onSelect(node.id)}
       className={`group relative flex cursor-grab items-center gap-2.5 rounded-lg border px-3 py-2 transition-all
         ${isSelected
-          ? 'border-indigo-500/60 bg-indigo-950/40'
+          ? 'border-[color:var(--accent-500)]/60 bg-[color:var(--accent-500)]/40'
           : 'border-zinc-800/60 bg-zinc-900/40 hover:border-zinc-700 hover:bg-zinc-800/30'
         }
         ${isDragging ? 'opacity-40 scale-95' : ''}
@@ -68,7 +68,7 @@ export function AgentNode({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={node.avatarUrl} alt={node.name} className="h-7 w-7 rounded-full object-cover"/>
         ) : (
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-900/60 text-xs font-bold text-indigo-300">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[color:var(--accent-500)]/60 text-xs font-bold text-indigo-300">
             {node.name.slice(0, 2).toUpperCase()}
           </div>
         )}
@@ -141,7 +141,7 @@ export function DeptNode({
       onDrop={onDrop}
       className={`rounded-lg border transition-colors ${
         isDragOver
-          ? 'border-indigo-500/60 bg-indigo-950/20'
+          ? 'border-[color:var(--accent-500)]/60 bg-[color:var(--accent-500)]/20'
           : 'border-transparent'
       }`}
     >
@@ -162,7 +162,7 @@ export function DeptNode({
       </button>
 
       {isDragOver && (
-        <p className="pb-2 text-center text-[10px] text-indigo-400">Drop agent here</p>
+        <p className="pb-2 text-center text-[10px] text-[color:var(--accent-400)]">Drop agent here</p>
       )}
     </div>
   );

@@ -347,7 +347,7 @@ function SuccessBanner({
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-2"
+      className="rounded-lg border border-[color:var(--state-success)]/40 bg-[color:var(--state-success)]/10 p-4 space-y-2"
       data-testid="tier-change-success"
     >
       <div className="flex items-center gap-2 text-sm font-medium text-emerald-300">
@@ -368,7 +368,7 @@ function SuccessBanner({
       >
         Done
       </button>
-      <ArrowIcon className="absolute right-4 top-4 w-5 h-5 text-emerald-400/30" />
+      <ArrowIcon className="absolute right-4 top-4 w-5 h-5 text-[color:var(--state-success)]/30" />
     </motion.div>
   );
 }

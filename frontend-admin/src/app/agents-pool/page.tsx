@@ -46,9 +46,9 @@ const TYPE_FILTERS = [
 
 const TYPE_COLOR: Record<string, string> = {
   EXECUTIVE: 'bg-purple-900 text-purple-300',
-  CORE: 'bg-blue-900 text-blue-300',
-  FUNCTIONAL: 'bg-indigo-900 text-indigo-300',
-  META: 'bg-amber-900 text-amber-300',
+  CORE: 'bg-[color:var(--state-info)] text-blue-300',
+  FUNCTIONAL: 'bg-[color:var(--accent-500)] text-indigo-300',
+  META: 'bg-[color:var(--state-warning)] text-amber-300',
 };
 
 export default function AgentsPoolPage() {
@@ -163,7 +163,7 @@ export default function AgentsPoolPage() {
           {canEdit && (
             <button
               onClick={() => setCreating(true)}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+              className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
             >
               + New Agent Template
             </button>
@@ -188,7 +188,7 @@ export default function AgentsPoolPage() {
               onClick={() => setTypeFilter(t.value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                 typeFilter === t.value
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-[color:var(--accent-500)] text-white'
                   : 'border border-surface-border text-zinc-400 hover:text-zinc-200'
               }`}
             >
@@ -217,7 +217,7 @@ export default function AgentsPoolPage() {
                     exit={{ opacity: 0 }}
                     className={`rounded-xl border bg-surface-raised p-4 flex flex-col gap-3 transition ${
                       tpl.enabled
-                        ? 'border-surface-border hover:border-indigo-700/50'
+                        ? 'border-surface-border hover:border-[color:var(--accent-500)]/50'
                         : 'border-zinc-800/40 opacity-60'
                     }`}
                   >
@@ -248,31 +248,31 @@ export default function AgentsPoolPage() {
                       <div className="flex gap-2 mt-auto pt-2 border-t border-surface-border/50">
                         <button
                           onClick={() => openDeployModal(tpl)}
-                          className="flex-1 py-1.5 rounded-lg text-xs border border-indigo-500/40 text-indigo-300 hover:text-indigo-100 hover:border-indigo-400 transition"
+                          className="flex-1 py-1.5 rounded-lg text-xs border border-[color:var(--accent-500)]/40 text-indigo-300 hover:text-indigo-100 hover:border-indigo-400 transition"
                         >
                           Deploy
                         </button>
                         <button
                           onClick={() => toggleEnabled(tpl)}
-                          className="flex-1 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                          className="flex-1 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                         >
                           {tpl.enabled ? 'Disable' : 'Enable'}
                         </button>
                         <button
                           onClick={() => duplicate(tpl)}
-                          className="flex-1 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                          className="flex-1 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                         >
                           Duplicate
                         </button>
                         <button
                           onClick={() => setEditing(tpl)}
-                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => setDeleting(tpl)}
-                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-red-400 hover:border-red-700 transition"
+                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-[color:var(--state-danger)] hover:border-[color:var(--state-danger)] transition"
                         >
                           ✕
                         </button>
@@ -444,7 +444,7 @@ function AgentPoolFormModal({
                 <input
                   value={(form as AgentTemplate).name}
                   onChange={(e) => setForm((f) => ({ ...(f as object), name: e.target.value } as AgentTemplate))}
-                  className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
                 />
               </div>
               <div>
@@ -456,7 +456,7 @@ function AgentPoolFormModal({
                       (f) => ({ ...(f as object), type: e.target.value } as AgentTemplate),
                     )
                   }
-                  className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
                 >
                   {['CORE', 'FUNCTIONAL', 'EXECUTIVE', 'META'].map((t) => (
                     <option key={t} value={t}>
@@ -475,7 +475,7 @@ function AgentPoolFormModal({
                     setForm((f) => ({ ...(f as object), model: e.target.value } as AgentTemplate))
                   }
                   placeholder="gpt-4o-mini"
-                  className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
                 />
               </div>
               <div>
@@ -486,7 +486,7 @@ function AgentPoolFormModal({
                     setForm((f) => ({ ...(f as object), version: e.target.value } as AgentTemplate))
                   }
                   placeholder="1.0.0"
-                  className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
                 />
               </div>
             </div>
@@ -500,7 +500,7 @@ function AgentPoolFormModal({
                   )
                 }
                 rows={2}
-                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm resize-none focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm resize-none focus:outline-none focus:border-[color:var(--accent-500)]"
               />
             </div>
           </section>
@@ -517,7 +517,7 @@ function AgentPoolFormModal({
                   )
                 }
                 rows={4}
-                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-[color:var(--accent-500)]"
               />
             </div>
             <div>
@@ -530,7 +530,7 @@ function AgentPoolFormModal({
                   )
                 }
                 rows={2}
-                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm resize-none focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm resize-none focus:outline-none focus:border-[color:var(--accent-500)]"
               />
             </div>
           </section>
@@ -546,7 +546,7 @@ function AgentPoolFormModal({
                 onChange={(e) => setPermissionsText(e.target.value)}
                 rows={3}
                 placeholder={'tasks:read\nworkflows:execute'}
-                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-[color:var(--accent-500)]"
               />
             </div>
             <div>
@@ -555,13 +555,13 @@ function AgentPoolFormModal({
                 value={configText}
                 onChange={(e) => setConfigText(e.target.value)}
                 rows={4}
-                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-[color:var(--accent-500)]"
               />
             </div>
           </section>
 
           {error && (
-            <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+            <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
               {error}
             </div>
           )}
@@ -575,7 +575,7 @@ function AgentPoolFormModal({
             <button
               onClick={save}
               disabled={busy}
-              className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+              className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
             >
               {busy ? 'Saving…' : target ? 'Save Changes' : 'Create Agent'}
             </button>

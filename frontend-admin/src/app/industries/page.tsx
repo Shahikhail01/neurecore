@@ -78,7 +78,7 @@ export default function IndustriesPage() {
           {canEdit && (
             <button
               onClick={() => setCreating(true)}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+              className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
             >
               + New Industry
             </button>
@@ -110,7 +110,7 @@ export default function IndustriesPage() {
               canEdit && (
                 <button
                   onClick={() => setCreating(true)}
-                  className="text-indigo-400 hover:underline"
+                  className="text-[color:var(--accent-400)] hover:underline"
                 >
                   + New Industry
                 </button>
@@ -127,7 +127,7 @@ export default function IndustriesPage() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="rounded-xl border border-surface-border bg-surface-raised p-4 flex flex-col gap-3 hover:border-indigo-700/50 transition"
+                  className="rounded-xl border border-surface-border bg-surface-raised p-4 flex flex-col gap-3 hover:border-[color:var(--accent-500)]/50 transition"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -142,13 +142,13 @@ export default function IndustriesPage() {
                     <div className="flex gap-2 mt-auto pt-2 border-t border-surface-border/50">
                       <button
                         onClick={() => setEditing(ind)}
-                        className="flex-1 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                        className="flex-1 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setDeleting(ind)}
-                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-red-400 hover:border-red-700 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-[color:var(--state-danger)] hover:border-[color:var(--state-danger)] transition"
                       >
                         ✕
                       </button>
@@ -277,7 +277,7 @@ function IndustryFormModal({
               value={slug}
               onChange={(e) => setSlug(e.target.value.toLowerCase())}
               placeholder="healthcare"
-              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-[color:var(--accent-500)]"
             />
           </Field>
           <Field label="Name *">
@@ -285,7 +285,7 @@ function IndustryFormModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Healthcare"
-              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
             />
           </Field>
           <Field label="Description">
@@ -293,7 +293,7 @@ function IndustryFormModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm resize-none focus:outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm resize-none focus:outline-none focus:border-[color:var(--accent-500)]"
             />
           </Field>
           <Field label="Icon (lucide name)">
@@ -301,21 +301,21 @@ function IndustryFormModal({
               value={icon}
               onChange={(e) => setIcon(e.target.value)}
               placeholder="HeartPulse"
-              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-[color:var(--accent-500)]"
             />
           </Field>
           <Field label="Status">
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as 'ACTIVE' | 'ARCHIVED')}
-              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
             >
               <option value="ACTIVE">Active</option>
               <option value="ARCHIVED">Archived</option>
             </select>
           </Field>
           {error && (
-            <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+            <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
               {error}
             </div>
           )}
@@ -329,7 +329,7 @@ function IndustryFormModal({
             <button
               onClick={save}
               disabled={busy}
-              className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+              className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
             >
               {busy ? 'Saving…' : target ? 'Save Changes' : 'Create Industry'}
             </button>

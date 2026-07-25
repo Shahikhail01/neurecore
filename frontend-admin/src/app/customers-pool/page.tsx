@@ -112,7 +112,7 @@ export default function CustomersPoolPage() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="rounded-xl border border-surface-border bg-surface-raised p-4 flex flex-col gap-3 hover:border-indigo-700/50 transition"
+                    className="rounded-xl border border-surface-border bg-surface-raised p-4 flex flex-col gap-3 hover:border-[color:var(--accent-500)]/50 transition"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -146,13 +146,13 @@ export default function CustomersPoolPage() {
                           onClick={() =>
                             router.push(`/customers/${customer.id}`)
                           }
-                          className="flex-1 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                          className="flex-1 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                         >
                           View Details
                         </button>
                         <button
                           onClick={() => handleArchive(customer)}
-                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-red-400 hover:border-red-700 transition"
+                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-[color:var(--state-danger)] hover:border-[color:var(--state-danger)] transition"
                           disabled={customer.status === 'ARCHIVED'}
                         >
                           Archive

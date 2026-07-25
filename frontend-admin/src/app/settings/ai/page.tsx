@@ -232,7 +232,7 @@ export default function AISettingsPage() {
           </button>
           <button
             onClick={openCreate}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+            className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
           >
             + Add Provider
           </button>
@@ -240,7 +240,7 @@ export default function AISettingsPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-950 border border-red-800 p-3 text-sm text-red-300">
+        <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -279,14 +279,14 @@ export default function AISettingsPage() {
                             {provider.name}
                           </h3>
                           {provider.isDefault && (
-                            <span className="rounded-full bg-indigo-900 text-indigo-300 text-xs px-2 py-0.5">
+                            <span className="rounded-full bg-[color:var(--accent-500)] text-indigo-300 text-xs px-2 py-0.5">
                               Default
                             </span>
                           )}
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                               provider.isEnabled
-                                ? "bg-green-900 text-green-300"
+                                ? "bg-[color:var(--state-success)] text-green-300"
                                 : "bg-zinc-700 text-zinc-400"
                             }`}
                           >
@@ -327,7 +327,7 @@ export default function AISettingsPage() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                           provider.isEnabled
                             ? "bg-yellow-900 text-yellow-300 hover:bg-yellow-800"
-                            : "bg-green-900 text-green-300 hover:bg-green-800"
+                            : "bg-[color:var(--state-success)] text-green-300 hover:bg-green-800"
                         }`}
                       >
                         {provider.isEnabled ? "Disable" : "Enable"}
@@ -340,7 +340,7 @@ export default function AISettingsPage() {
                       </button>
                       <button
                         onClick={() => setDeleteTarget(provider)}
-                        className="px-3 py-1.5 rounded-lg text-xs text-red-400 hover:text-red-300 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs text-[color:var(--state-danger)] hover:text-red-300 transition"
                       >
                         Delete
                       </button>
@@ -354,8 +354,8 @@ export default function AISettingsPage() {
                       animate={{ opacity: 1, height: "auto" }}
                       className={`mt-3 p-2 rounded-lg text-sm ${
                         testResult.success
-                          ? "bg-green-950 border border-green-800 text-green-300"
-                          : "bg-red-950 border border-red-800 text-red-300"
+                          ? "bg-[color:var(--state-success)] border border-green-800 text-green-300"
+                          : "bg-[color:var(--state-danger)] border border-red-800 text-red-300"
                       }`}
                     >
                       {testResult.success
@@ -434,7 +434,7 @@ export default function AISettingsPage() {
                       }))
                     }
                     disabled={!!editProvider}
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
                   >
                     {Object.entries(PROVIDER_INFO).map(([key, info]) => (
                       <option key={key} value={key}>
@@ -454,7 +454,7 @@ export default function AISettingsPage() {
                     onChange={(e) =>
                       setFormData((f) => ({ ...f, name: e.target.value }))
                     }
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                     placeholder="My DeepSeek Provider"
                   />
                 </div>
@@ -475,7 +475,7 @@ export default function AISettingsPage() {
                     onChange={(e) =>
                       setFormData((f) => ({ ...f, apiKey: e.target.value }))
                     }
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                     placeholder={editProvider ? "••••••••••••" : "sk-..."}
                   />
                 </div>
@@ -494,7 +494,7 @@ export default function AISettingsPage() {
                         apiEndpoint: e.target.value,
                       }))
                     }
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                     placeholder="https://api.example.com/v1"
                   />
                 </div>
@@ -520,7 +520,7 @@ export default function AISettingsPage() {
                           },
                         }))
                       }
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                     />
                   </div>
                   <div>
@@ -539,13 +539,13 @@ export default function AISettingsPage() {
                           },
                         }))
                       }
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                     />
                   </div>
                 </div>
 
                 {saveError && (
-                  <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+                  <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
                     {saveError}
                   </div>
                 )}
@@ -560,7 +560,7 @@ export default function AISettingsPage() {
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+                    className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
                   >
                     {saving
                       ? "Saving..."
@@ -610,7 +610,7 @@ export default function AISettingsPage() {
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="flex-1 py-2 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm font-medium transition disabled:opacity-50"
+                  className="flex-1 py-2 rounded-lg bg-red-700 hover:bg-[color:var(--state-danger)] text-white text-sm font-medium transition disabled:opacity-50"
                 >
                   {deleting ? "Deleting..." : "Delete"}
                 </button>
@@ -702,7 +702,7 @@ function AIRoutingSection() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Routing'}
           </button>
@@ -719,7 +719,7 @@ function AIRoutingSection() {
             <select
               value={localRouting[key]}
               onChange={(e) => handleModelChange(key, e.target.value)}
-              className="rounded-lg border border-zinc-600 bg-zinc-700 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500 min-w-[200px]"
+              className="rounded-lg border border-zinc-600 bg-zinc-700 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)] min-w-[200px]"
             >
               {AVAILABLE_MODELS.map((model) => (
                 <option key={model.id} value={model.id}>

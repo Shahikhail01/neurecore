@@ -154,7 +154,7 @@ export default function DepartmentsPoolPage() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="rounded-xl border border-surface-border bg-surface-raised p-4 flex flex-col gap-3 hover:border-indigo-700/50 transition"
+                  className="rounded-xl border border-surface-border bg-surface-raised p-4 flex flex-col gap-3 hover:border-[color:var(--accent-500)]/50 transition"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -183,7 +183,7 @@ export default function DepartmentsPoolPage() {
                     <div className="flex gap-2 mt-auto pt-2 border-t border-surface-border/50">
                       <button
                         onClick={() => openDeployModal(tmpl)}
-                        className="flex-1 py-1.5 rounded-lg text-xs border border-indigo-500/40 text-indigo-300 hover:text-indigo-100 hover:border-indigo-400 transition"
+                        className="flex-1 py-1.5 rounded-lg text-xs border border-[color:var(--accent-500)]/40 text-indigo-300 hover:text-indigo-100 hover:border-indigo-400 transition"
                       >
                         Deploy Dept
                       </button>
@@ -195,7 +195,7 @@ export default function DepartmentsPoolPage() {
                       </a>
                       <button
                         onClick={() => setDeleting(tmpl)}
-                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-red-400 hover:border-red-700 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-[color:var(--state-danger)] hover:border-[color:var(--state-danger)] transition"
                       >
                         ✕
                       </button>

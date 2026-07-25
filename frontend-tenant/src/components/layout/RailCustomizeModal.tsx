@@ -201,7 +201,7 @@ export function RailCustomizeModal({ open, onClose, industryGroup }: RailCustomi
                           );
                         })}
                         {sectionHiddenBecauseAllItems && (
-                          <p className="text-[11px] text-amber-400 px-2 py-1">
+                          <p className="text-[11px] text-[color:var(--state-warning)] px-2 py-1">
                             All items hidden — section is effectively invisible.
                           </p>
                         )}

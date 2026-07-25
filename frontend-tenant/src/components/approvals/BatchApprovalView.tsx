@@ -116,7 +116,7 @@ export const BatchApprovalViewComponent: React.FC<BatchApprovalViewProps> = ({
                 className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4"
             >
                 <div className="flex items-center gap-3">
-                    <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <Zap className="w-5 h-5 text-[color:var(--state-info)] dark:text-[color:var(--state-info)]" />
                     <div>
                         <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
                             {totalPending} approvals pending
@@ -135,7 +135,7 @@ export const BatchApprovalViewComponent: React.FC<BatchApprovalViewProps> = ({
                 <>
                     <div>
                         <SectionHeader
-                            icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
+                            icon={<AlertTriangle className="w-5 h-5 text-[color:var(--state-danger)]" />}
                             title="Critical Approvals"
                             count={0}
                         />
@@ -145,7 +145,7 @@ export const BatchApprovalViewComponent: React.FC<BatchApprovalViewProps> = ({
                     </div>
                     <div>
                         <SectionHeader
-                            icon={<TrendingDown className="w-5 h-5 text-amber-500" />}
+                            icon={<TrendingDown className="w-5 h-5 text-[color:var(--state-warning)]" />}
                             title="Routine Approvals"
                             count={0}
                         />
@@ -160,7 +160,7 @@ export const BatchApprovalViewComponent: React.FC<BatchApprovalViewProps> = ({
                     {criticalCount > 0 && (
                         <div>
                             <SectionHeader
-                                icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
+                                icon={<AlertTriangle className="w-5 h-5 text-[color:var(--state-danger)]" />}
                                 title="🚨 Critical Approvals"
                                 count={criticalCount}
                             />
@@ -213,7 +213,7 @@ export const BatchApprovalViewComponent: React.FC<BatchApprovalViewProps> = ({
                     {routineCount > 0 && (
                         <div>
                             <SectionHeader
-                                icon={<TrendingDown className="w-5 h-5 text-amber-500" />}
+                                icon={<TrendingDown className="w-5 h-5 text-[color:var(--state-warning)]" />}
                                 title="Routine Approvals"
                                 count={routineCount}
                             />

@@ -7,6 +7,7 @@ import { authService } from '@/services/auth.service';
 import { routeAfterAuth } from '@/services/auth-redirect.service';
 import { useAuthStore } from '@/stores/authStore';
 import { PasswordInput } from '@/components/ui/password-input';
+import { PageShell, GlassPanel, GradientText } from '@neurecore/ui-visual';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -45,54 +46,58 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
-        <h1 className="mb-6 text-2xl font-bold">Create Account</h1>
-        {error && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>
-        )}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {(['firstName', 'lastName'] as const).map((field) => (
-            <label key={field} className="flex flex-col gap-1 text-sm font-medium capitalize">
-              {field === 'firstName' ? 'First Name' : 'Last Name'}
-              <input
-                type="text"
-                autoComplete={field === 'firstName' ? 'given-name' : 'family-name'}
-                required
-                value={form[field]}
-                onChange={update(field)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-blue-500"
+    <PageShell variant="auth">
+      <div className="flex items-center justify-center min-h-[calc(100vh-3rem)]">
+        <GlassPanel variant="auth" padding="lg" className="w-full max-w-md">
+          <h1 className="mb-6 text-2xl font-bold">
+            <GradientText>Create Account</GradientText>
+          </h1>
+          {error && (
+            <div className="mb-4 rounded-lg border border-[color:var(--state-danger)]/40 bg-[color:var(--state-danger)]/10 p-3 text-sm text-[color:var(--state-danger)]">{error}</div>
+          )}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {(['firstName', 'lastName'] as const).map((field) => (
+              <label key={field} className="flex flex-col gap-1 text-sm font-medium text-zinc-300 capitalize">
+                {field === 'firstName' ? 'First Name' : 'Last Name'}
+                <input
+                  type="text"
+                  autoComplete={field === 'firstName' ? 'given-name' : 'family-name'}
+                  required
+                  value={form[field]}
+                  onChange={update(field)}
+                  className="nv-surface-inline px-3 py-2 text-base text-zinc-100 outline-none focus:accent-ring"
+                />
+              </label>
+            ))}
+            <label className="flex flex-col gap-1 text-sm font-medium text-zinc-300">
+              Email
+              <input type="email" autoComplete="email" required value={form.email} onChange={update('email')}
+                className="nv-surface-inline px-3 py-2 text-base text-zinc-100 outline-none focus:accent-ring"
               />
             </label>
-          ))}
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Email
-            <input type="email" autoComplete="email" required value={form.email} onChange={update('email')}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </label>
-          <label htmlFor="password" className="flex flex-col gap-1 text-sm font-medium">
-            Password
-            <PasswordInput
-              id="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={form.password}
-              onChange={update('password')}
-            />
-          </label>
-          <button type="submit" disabled={loading}
-            className="mt-2 rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition"
-          >
-            {loading ? 'Creating account…' : 'Register'}
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-gray-500">
-          Already have an account?{' '}
-          <Link href="/login" className="text-blue-600 hover:underline">Sign in</Link>
-        </p>
+            <label htmlFor="password" className="flex flex-col gap-1 text-sm font-medium text-zinc-300">
+              Password
+              <PasswordInput
+                id="password"
+                autoComplete="new-password"
+                required
+                minLength={8}
+                value={form.password}
+                onChange={update('password')}
+              />
+            </label>
+            <button type="submit" disabled={loading}
+              className="nv-btn-accent mt-2"
+            >
+              {loading ? 'Creating account…' : 'Register'}
+            </button>
+          </form>
+          <p className="mt-4 text-center text-sm text-zinc-400">
+            Already have an account?{' '}
+            <Link href="/login" className="text-[color:var(--accent-400)] hover:underline">Sign in</Link>
+          </p>
+        </GlassPanel>
       </div>
-    </main>
+    </PageShell>
   );
 }

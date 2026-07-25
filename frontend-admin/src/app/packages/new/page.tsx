@@ -202,7 +202,7 @@ export default function NewPackagePage() {
             <div key={s} className="flex items-center gap-2">
               <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                  i <= stepIdx ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-500'
+                  i <= stepIdx ? 'bg-[color:var(--accent-500)] text-white' : 'bg-zinc-800 text-zinc-500'
                 }`}
               >
                 {i + 1}
@@ -229,7 +229,7 @@ export default function NewPackagePage() {
                     value={slug}
                     onChange={(e) => setSlug(e.target.value.toLowerCase())}
                     placeholder="healthcare-hospital-ops"
-                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm font-mono focus:outline-none focus:border-[color:var(--accent-500)]"
                   />
                 </Field>
                 <Field label="Name *">
@@ -237,7 +237,7 @@ export default function NewPackagePage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Hospital Operations Package"
-                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
                   />
                 </Field>
                 <Field label="Description">
@@ -245,7 +245,7 @@ export default function NewPackagePage() {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
-                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm resize-none focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm resize-none focus:outline-none focus:border-[color:var(--accent-500)]"
                   />
                 </Field>
               </>
@@ -258,7 +258,7 @@ export default function NewPackagePage() {
                   <select
                     value={industryId}
                     onChange={(e) => setIndustryId(e.target.value)}
-                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
                   >
                     <option value="">— choose industry —</option>
                     {industries.map((i) => (
@@ -272,7 +272,7 @@ export default function NewPackagePage() {
                   <select
                     value={tierId}
                     onChange={(e) => setTierId(e.target.value)}
-                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
                   >
                     <option value="">— choose tier —</option>
                     {tiers.map((t) => (
@@ -325,7 +325,7 @@ export default function NewPackagePage() {
                                   onClick={() => toggle(setFeatureIds, featureIds, f.id)}
                                   className={`text-xs px-2 py-0.5 rounded-full border transition ${
                                     selected
-                                      ? 'border-indigo-500 bg-indigo-600/20 text-indigo-200'
+                                      ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/20 text-indigo-200'
                                       : 'border-surface-border text-zinc-400 hover:text-zinc-200'
                                   }`}
                                 >
@@ -360,7 +360,7 @@ export default function NewPackagePage() {
             )}
 
             {error && (
-              <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+              <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
                 {error}
               </div>
             )}
@@ -380,7 +380,7 @@ export default function NewPackagePage() {
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+                  className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
                 >
                   Next →
                 </button>
@@ -389,7 +389,7 @@ export default function NewPackagePage() {
                   type="button"
                   onClick={submit}
                   disabled={busy}
-                  className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition disabled:opacity-50"
+                  className="flex-1 py-2 rounded-lg bg-[color:var(--state-success)] hover:bg-[color:var(--state-success)] text-white text-sm font-medium transition disabled:opacity-50"
                 >
                   {busy ? 'Creating…' : 'Create Package'}
                 </button>
@@ -444,7 +444,7 @@ function PickerGroup({
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder={`Filter ${title.toLowerCase()}…`}
-        className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition mb-2"
+        className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[color:var(--accent-500)] transition mb-2"
       />
       <div className="rounded-lg border border-surface-border bg-surface-overlay p-2 max-h-44 overflow-y-auto">
         {visible.length === 0 ? (

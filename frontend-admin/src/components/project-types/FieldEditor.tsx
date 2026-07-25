@@ -61,13 +61,13 @@ export function FieldEditor({
           onChange={(e) => onChange({ label: e.target.value })}
           placeholder="Field label"
           disabled={readOnly}
-          className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+          className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
         />
         <select
           value={field.type}
           onChange={(e) => onChange({ type: e.target.value as FieldType })}
           disabled={readOnly}
-          className="px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+          className="px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
         >
           {FIELD_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -89,7 +89,7 @@ export function FieldEditor({
           <button
             type="button"
             onClick={onRemove}
-            className="text-zinc-600 hover:text-red-400 transition"
+            className="text-zinc-600 hover:text-[color:var(--state-danger)] transition"
             aria-label="Remove field"
           >
             ✕
@@ -104,7 +104,7 @@ export function FieldEditor({
           }
           placeholder="field_key"
           disabled={readOnly}
-          className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-400 rounded border border-surface-border focus:outline-none focus:border-indigo-500 font-mono disabled:opacity-50"
+          className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-400 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] font-mono disabled:opacity-50"
         />
         {(field.type === 'SELECT' || field.type === 'MULTI_SELECT') && (
           <input
@@ -112,7 +112,7 @@ export function FieldEditor({
             onChange={(e) => handleOptionsChange(e.target.value)}
             placeholder="option1, option2, option3"
             disabled={readOnly}
-            className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-400 rounded border border-surface-border focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-400 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
           />
         )}
       </div>

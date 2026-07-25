@@ -288,7 +288,7 @@ export default function TierSettingsPage() {
           </button>
           <button
             onClick={openCreate}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+            className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
           >
             + Add Tier
           </button>
@@ -296,7 +296,7 @@ export default function TierSettingsPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-950 border border-red-800 p-3 text-sm text-red-300">
+        <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -332,7 +332,7 @@ export default function TierSettingsPage() {
                             {tier.name}
                           </h3>
                           {tier.isDefault && (
-                            <span className="rounded-full bg-indigo-900 text-indigo-300 text-xs px-2 py-0.5">
+                            <span className="rounded-full bg-[color:var(--accent-500)] text-indigo-300 text-xs px-2 py-0.5">
                               Default
                             </span>
                           )}
@@ -344,7 +344,7 @@ export default function TierSettingsPage() {
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                           tier.isActive
-                            ? "bg-green-900 text-green-300"
+                            ? "bg-[color:var(--state-success)] text-green-300"
                             : "bg-zinc-700 text-zinc-400"
                         }`}
                       >
@@ -409,7 +409,7 @@ export default function TierSettingsPage() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                           tier.isActive
                             ? "bg-yellow-900 text-yellow-300 hover:bg-yellow-800"
-                            : "bg-green-900 text-green-300 hover:bg-green-800"
+                            : "bg-[color:var(--state-success)] text-green-300 hover:bg-green-800"
                         }`}
                       >
                         {tier.isActive ? "Disable" : "Enable"}
@@ -422,7 +422,7 @@ export default function TierSettingsPage() {
                       </button>
                       <button
                         onClick={() => setDeleteTarget(tier)}
-                        className="px-3 py-1.5 rounded-lg text-xs text-red-400 hover:text-red-300 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs text-[color:var(--state-danger)] hover:text-red-300 transition"
                       >
                         Delete
                       </button>
@@ -466,7 +466,7 @@ export default function TierSettingsPage() {
                       onChange={(e) =>
                         setFormData((f) => ({ ...f, name: e.target.value }))
                       }
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                       placeholder="Enterprise"
                     />
                   </div>
@@ -487,7 +487,7 @@ export default function TierSettingsPage() {
                         }))
                       }
                       readOnly={!!editTier}
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
                       placeholder="tier-enterprise"
                     />
                   </div>
@@ -507,7 +507,7 @@ export default function TierSettingsPage() {
                       }))
                     }
                     rows={2}
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500 resize-none"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)] resize-none"
                     placeholder="Full-featured tier for large organizations"
                   />
                 </div>
@@ -530,7 +530,7 @@ export default function TierSettingsPage() {
                           },
                         }))
                       }
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                     />
                   </div>
                   <div>
@@ -549,7 +549,7 @@ export default function TierSettingsPage() {
                           },
                         }))
                       }
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                     />
                   </div>
                   <div>
@@ -564,7 +564,7 @@ export default function TierSettingsPage() {
                           pricing: { ...f.pricing, currency: e.target.value },
                         }))
                       }
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                     >
                       <option value="USD">USD</option>
                       <option value="EUR">EUR</option>
@@ -671,7 +671,7 @@ export default function TierSettingsPage() {
                           type="checkbox"
                           checked={feature.enabled}
                           onChange={() => toggleFeature(feature.id)}
-                          className="rounded border-zinc-600 bg-zinc-800 text-indigo-500 focus:ring-indigo-500"
+                          className="rounded border-zinc-600 bg-zinc-800 text-[color:var(--accent-400)] focus:ring-indigo-500"
                         />
                         <span className="text-sm text-zinc-300">
                           {feature.name}
@@ -685,7 +685,7 @@ export default function TierSettingsPage() {
                 </div>
 
                 {saveError && (
-                  <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+                  <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
                     {saveError}
                   </div>
                 )}
@@ -700,7 +700,7 @@ export default function TierSettingsPage() {
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+                    className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
                   >
                     {saving
                       ? "Saving..."
@@ -750,7 +750,7 @@ export default function TierSettingsPage() {
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="flex-1 py-2 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm font-medium transition disabled:opacity-50"
+                  className="flex-1 py-2 rounded-lg bg-red-700 hover:bg-[color:var(--state-danger)] text-white text-sm font-medium transition disabled:opacity-50"
                 >
                   {deleting ? "Deleting..." : "Delete"}
                 </button>

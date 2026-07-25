@@ -51,7 +51,7 @@ export function DeptCard({
         onDrop={onDrop}
         className={`w-64 shrink-0 rounded-2xl border-2 transition-all duration-200 ${color.dark.bg} ${
           isDragOver
-            ? 'border-indigo-500 bg-indigo-950/30 shadow-lg shadow-indigo-900/30'
+            ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/30 shadow-lg shadow-indigo-900/30'
             : `${color.dark.border}`
         }`}
       >
@@ -65,7 +65,7 @@ export function DeptCard({
             <div className="flex items-center gap-2 mt-0.5">
               <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${
                 status === 'ACTIVE'
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                  ? 'bg-[color:var(--state-success)]/10 text-[color:var(--state-success)] border-[color:var(--state-success)]/30'
                   : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/30'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-zinc-500'}`} />

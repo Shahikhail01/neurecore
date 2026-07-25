@@ -85,7 +85,7 @@ export default function ProjectTypesPage() {
           {canEdit && (
             <Link
               href="/project-types/new"
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+              className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
             >
               + New Project Type
             </Link>
@@ -110,7 +110,7 @@ export default function ProjectTypesPage() {
               onClick={() => setClassification(f.value)}
               className={`text-xs px-2 py-1 rounded-full border transition ${
                 classification === f.value
-                  ? 'border-indigo-500 bg-indigo-600/20 text-indigo-200'
+                  ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/20 text-indigo-200'
                   : 'border-surface-border text-zinc-400 hover:text-zinc-200'
               }`}
             >
@@ -135,7 +135,7 @@ export default function ProjectTypesPage() {
             }
             action={
               canEdit ? (
-                <Link href="/project-types/new" className="text-indigo-400 hover:underline">
+                <Link href="/project-types/new" className="text-[color:var(--accent-400)] hover:underline">
                   + New Project Type
                 </Link>
               ) : undefined
@@ -150,7 +150,7 @@ export default function ProjectTypesPage() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="rounded-xl border border-surface-border bg-surface-raised p-4 flex gap-4 items-start hover:border-indigo-700/50 transition"
+                  className="rounded-xl border border-surface-border bg-surface-raised p-4 flex gap-4 items-start hover:border-[color:var(--accent-500)]/50 transition"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
@@ -166,12 +166,12 @@ export default function ProjectTypesPage() {
                         )}
                         <div className="flex items-center gap-2 mt-1">
                           {pt.isSystem && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-400 border border-amber-800">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--state-warning)]/40 text-[color:var(--state-warning)] border border-amber-800">
                               SYSTEM
                             </span>
                           )}
                           {pt.classification && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/40 text-indigo-300 border border-indigo-800">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--accent-500)]/40 text-indigo-300 border border-indigo-800">
                               {pt.classification}
                             </span>
                           )}
@@ -187,14 +187,14 @@ export default function ProjectTypesPage() {
                     <div className="flex flex-col gap-2 shrink-0">
                       <Link
                         href={`/project-types/${pt.id}`}
-                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                       >
                         Manage
                       </Link>
                       {!pt.isSystem && (
                         <button
                           onClick={() => setDeleting(pt)}
-                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-red-400 hover:border-red-700 transition"
+                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-[color:var(--state-danger)] hover:border-[color:var(--state-danger)] transition"
                         >
                           ✕
                         </button>

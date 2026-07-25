@@ -46,6 +46,7 @@ import {
   Loader2,
 } from 'lucide-react';
 
+import { PageShell, PageHero } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import TenantShell from '@/components/TenantShell';
 import { AgentCard } from '@/components/agent-card/AgentCard';
@@ -146,13 +147,19 @@ export default function MarketplacePage() {
 
   return (
     <TenantShell user={user}>
+      <PageShell variant="default">
+        <PageHero
+          eyebrow="Operations"
+          title="Marketplace"
+          subtitle="Browse the AI agent library, manage your fleet, and connect external systems."
+        />
       <div className="max-w-7xl mx-auto space-y-5">
         {/* ── Page Header ──────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="flex items-center justify-between gap-4"
+          className="flex items-center justify-between gap-4 hidden"
         >
           <div>
             <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
@@ -218,6 +225,7 @@ export default function MarketplacePage() {
           </motion.div>
         </AnimatePresence>
       </div>
+      </PageShell>
     </TenantShell>
   );
 }
@@ -873,7 +881,7 @@ function PackagesTab({ user }: { user: NonNullable<ReturnType<typeof useTenantAu
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {features.map((f) => (
               <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-overlay border border-surface-border">
-                <span className={`w-1.5 h-1.5 rounded-full ${f.isEnabled ? 'bg-state-success' : 'bg-zinc-500'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${f.isEnabled ? 'bg-state-success' : 'bg-zinc-500/50'}`} />
                 <span className="text-xs text-zinc-300 truncate">{f.name}</span>
                 <span className="text-[10px] text-zinc-500 ml-auto">{f.category}</span>
               </div>

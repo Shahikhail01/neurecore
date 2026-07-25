@@ -17,6 +17,7 @@ import {
   Upload,
 } from 'lucide-react';
 
+import { PageShell, PageHero, GlassPanel } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import {
   integrationsService,
@@ -124,7 +125,11 @@ function SheetsContent() {
   }, [refresh]);
 
   return (
-    <div className="p-6 space-y-6">
+    <PageShell variant="default">
+      <PageHero
+        title="Google Sheets"
+        subtitle="Create, view, and edit spreadsheets connected to your tenant."
+      />
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <Link
@@ -134,7 +139,7 @@ function SheetsContent() {
             <ArrowLeft className="w-3 h-3" /> Integrations
           </Link>
           <h1 className="text-xl font-semibold mt-1 flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
+            <FileSpreadsheet className="w-5 h-5 text-[color:var(--state-success)]" />
             Google Sheets
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -160,8 +165,8 @@ function SheetsContent() {
       )}
 
       {connected === false && (
-        <Card className="p-6 text-center space-y-3">
-          <FileSpreadsheet className="w-10 h-10 mx-auto text-emerald-500" />
+        <GlassPanel variant="tile" padding="md" interactive className="p-6 text-center space-y-3">
+          <FileSpreadsheet className="w-10 h-10 mx-auto text-[color:var(--state-success)]" />
           <h2 className="text-base font-medium">Google Workspace not connected</h2>
           <p className="text-sm text-muted-foreground">
             Connect Google to create and manage spreadsheets for your tenant.
@@ -171,12 +176,12 @@ function SheetsContent() {
               <Button size="sm">Connect Google</Button>
             </Link>
           </div>
-        </Card>
+        </GlassPanel>
       )}
 
       {connected && view === 'list' && (
         <>
-          <Card className="p-3">
+          <GlassPanel variant="tile" padding="sm" className="p-3">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -210,7 +215,7 @@ function SheetsContent() {
                 </Button>
               )}
             </form>
-          </Card>
+          </GlassPanel>
 
           {loading ? (
             <div className="space-y-2">
@@ -219,11 +224,11 @@ function SheetsContent() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <Card className="p-6 text-center text-sm text-muted-foreground">
+            <GlassPanel variant="tile" padding="md" className="p-6 text-center text-sm text-muted-foreground">
               {activeQuery
                 ? 'No spreadsheets matched your search.'
                 : 'No spreadsheets found. Create one to get started.'}
-            </Card>
+            </GlassPanel>
           ) : (
             <div className="space-y-2">
               {items.map((item) => (
@@ -272,7 +277,7 @@ function SheetsContent() {
           }}
         />
       )}
-    </div>
+    </PageShell>
   );
 }
 
@@ -294,10 +299,10 @@ function SpreadsheetRow({ item, onOpen }: { item: ListItem; onOpen: () => void }
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
     >
-      <Card className="p-4 flex items-center justify-between gap-4 hover:border-emerald-500/30 transition cursor-pointer" onClick={onOpen}>
+      <GlassPanel variant="tile" padding="md" interactive className="p-4 flex items-center justify-between gap-4 hover:border-[color:var(--state-success)]/30 transition cursor-pointer" onClick={onOpen}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
+          <div className="w-10 h-10 rounded-lg bg-[color:var(--state-success)]/10 flex items-center justify-center flex-shrink-0">
+            <FileSpreadsheet className="w-5 h-5 text-[color:var(--state-success)]" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{item.title}</p>
@@ -318,7 +323,7 @@ function SpreadsheetRow({ item, onOpen }: { item: ListItem; onOpen: () => void }
             Open
           </Button>
         </div>
-      </Card>
+      </GlassPanel>
     </motion.div>
   );
 }
@@ -425,7 +430,7 @@ function SpreadSheetDetail({
       {loadingMeta ? (
         <Skeleton className="h-24 w-full" />
       ) : meta ? (
-        <Card className="p-3">
+        <GlassPanel variant="tile" padding="sm" className="p-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Label className="text-xs">Sheet</Label>
             <select
@@ -463,18 +468,18 @@ function SpreadSheetDetail({
               </>
             )}
           </div>
-        </Card>
+        </GlassPanel>
       ) : null}
 
       {!editing ? (
         loadingRange ? (
           <Skeleton className="h-40 w-full" />
         ) : values.length === 0 ? (
-          <Card className="p-6 text-center text-sm text-muted-foreground">
+          <GlassPanel variant="tile" padding="md" className="p-6 text-center text-sm text-muted-foreground">
             Empty range — try a wider range or switch sheet.
-          </Card>
+          </GlassPanel>
         ) : (
-          <Card className="p-0 overflow-x-auto">
+          <GlassPanel variant="tile" padding="none" className="p-0 overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <tbody>
                 {values.map((row, ri) => (
@@ -491,10 +496,10 @@ function SpreadSheetDetail({
                 ))}
               </tbody>
             </table>
-          </Card>
+          </GlassPanel>
         )
       ) : (
-        <Card className="p-3">
+        <GlassPanel variant="tile" padding="sm" className="p-3">
           <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -505,7 +510,7 @@ function SpreadSheetDetail({
           <p className="text-xs text-muted-foreground mt-2">
             Tab-separated rows; one row per line. Targets <code>{a1Range}</code>.
           </p>
-        </Card>
+        </GlassPanel>
       )}
     </div>
   );

@@ -144,7 +144,7 @@ export default function AdminBrevoEventsPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-sm text-rose-200">
+        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-[color:var(--visual-accent-rose-500)]/10 text-sm text-rose-200">
           {error}
         </div>
       )}

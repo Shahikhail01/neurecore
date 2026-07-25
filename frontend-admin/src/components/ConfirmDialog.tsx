@@ -18,11 +18,11 @@ interface ConfirmDialogProps {
 const STYLES: Record<Variant, { border: string; button: string }> = {
   danger: {
     border: 'border-red-800/40',
-    button: 'bg-red-700 hover:bg-red-600',
+    button: 'bg-red-700 hover:bg-[color:var(--state-danger)]',
   },
   warning: {
     border: 'border-amber-800/40',
-    button: 'bg-amber-700 hover:bg-amber-600',
+    button: 'bg-amber-700 hover:bg-[color:var(--state-warning)]',
   },
 };
 

@@ -40,15 +40,15 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 const STATUS_BADGE: Record<string, string> = {
-  ACTIVE: 'bg-green-900/70 text-green-300',
-  TRIAL: 'bg-blue-900/70 text-blue-300',
+  ACTIVE: 'bg-[color:var(--state-success)]/70 text-green-300',
+  TRIAL: 'bg-[color:var(--state-info)]/70 text-blue-300',
   SUSPENDED: 'bg-yellow-900/70 text-yellow-300',
-  CANCELLED: 'bg-red-900/70 text-red-300',
+  CANCELLED: 'bg-[color:var(--state-danger)]/70 text-red-300',
 };
 
 const AGENT_TYPE_BADGE: Record<string, string> = {
   EXECUTIVE: 'bg-purple-900/70 text-purple-300',
-  CORE: 'bg-indigo-900/70 text-indigo-300',
+  CORE: 'bg-[color:var(--accent-500)]/70 text-indigo-300',
   FUNCTIONAL: 'bg-teal-900/70 text-teal-300',
   META: 'bg-orange-900/70 text-orange-300',
 };
@@ -348,7 +348,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                 )}
                 {tenant.website && (
                   <a href={tenant.website} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2 mt-0.5 inline-block">
+                    className="text-xs text-[color:var(--accent-400)] hover:text-indigo-300 underline underline-offset-2 mt-0.5 inline-block">
                     {tenant.website.replace(/^https?:\/\//, '')}
                   </a>
                 )}
@@ -371,17 +371,17 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
           <div className="flex items-center justify-end gap-2">
             {tenant.status === 'SUSPENDED' ? (
               <button onClick={handleActivate} disabled={actionBusy}
-                className="px-3 py-1.5 rounded-lg border border-green-800/40 text-xs text-green-400 hover:bg-green-950/30 transition disabled:opacity-50">
+                className="px-3 py-1.5 rounded-lg border border-green-800/40 text-xs text-[color:var(--state-success)] hover:bg-[color:var(--state-success)]/30 transition disabled:opacity-50">
                 Activate
               </button>
             ) : (
               <button onClick={() => setSuspendOpen(true)} disabled={actionBusy}
-                className="px-3 py-1.5 rounded-lg border border-amber-800/40 text-xs text-amber-400 hover:bg-amber-950/30 transition disabled:opacity-50">
+                className="px-3 py-1.5 rounded-lg border border-amber-800/40 text-xs text-[color:var(--state-warning)] hover:bg-[color:var(--state-warning)]/30 transition disabled:opacity-50">
                 Suspend
               </button>
             )}
             <button onClick={() => setDeleteOpen(true)} disabled={actionBusy}
-              className="px-3 py-1.5 rounded-lg border border-red-800/40 text-xs text-red-400 hover:bg-red-950/30 transition disabled:opacity-50">
+              className="px-3 py-1.5 rounded-lg border border-red-800/40 text-xs text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger)]/30 transition disabled:opacity-50">
               Delete
             </button>
           </div>
@@ -393,7 +393,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-4 py-2 text-sm font-medium transition border-b-2 -mb-px ${
                 tab === t.id
-                  ? 'border-indigo-500 text-indigo-300'
+                  ? 'border-[color:var(--accent-500)] text-indigo-300'
                   : 'border-transparent text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -432,7 +432,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     <InfoCard label="Industry" value={tenant.industry ?? '—'} />
                     <a
                       href={`/tenants/${tenant.id}/industry`}
-                      className="absolute top-3 right-3 text-[10px] uppercase tracking-wider text-indigo-400 hover:text-indigo-300"
+                      className="absolute top-3 right-3 text-[10px] uppercase tracking-wider text-[color:var(--accent-400)] hover:text-indigo-300"
                     >
                       Change
                     </a>
@@ -502,7 +502,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
               {/* ── Section: Tier Details ── */}
               {tenant.tier && (
                 <Section title="Tier Details">
-                  <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-5">
+                  <div className="rounded-xl border border-[color:var(--accent-500)]/20 bg-[color:var(--accent-500)]/20 p-5">
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h3 className="text-lg font-semibold text-zinc-100">{tenant.tier.name}</h3>
@@ -533,7 +533,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       <TierStat label="File Size" value={tenant.tier.maxFileSizeMB ? `${tenant.tier.maxFileSizeMB} MB` : '—'} />
                       <TierStat label="Price" value={tenant.tier.monthlyPrice && Number(tenant.tier.monthlyPrice) > 0 ? `${tenant.tier.currency ?? '$'}${tenant.tier.monthlyPrice}/mo` : 'Free'} />
                     </div>
-                    <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-indigo-500/10">
+                    <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-[color:var(--accent-500)]/10">
                       <FeatureTag enabled={tenant.tier.allowCustomBranding} label="Custom Branding" />
                       <FeatureTag enabled={tenant.tier.allowApiAccess} label="API Access" />
                       <FeatureTag enabled={tenant.tier.allowSso} label="SSO" />
@@ -645,7 +645,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       Created <strong>{deptDeployResult.departments}</strong> departments
                       {deptDeployResult.agents > 0 && <> and <strong>{deptDeployResult.agents}</strong> agents</>}.
                       <button onClick={() => { setDeptDeployResult(null); setSelectedDeptTmpl(''); }}
-                        className="mt-3 text-xs text-indigo-400 hover:underline block">
+                        className="mt-3 text-xs text-[color:var(--accent-400)] hover:underline block">
                         Deploy another →
                       </button>
                     </SuccessBox>
@@ -654,7 +654,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       <div className="mb-3">
                         <label className="text-xs text-zinc-500 mb-1.5 block">Select Template</label>
                         <select value={selectedDeptTmpl} onChange={(e) => setSelectedDeptTmpl(e.target.value)}
-                          className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                          className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                         >
                           <option value="">— choose a template —</option>
                           {deptTemplates.map((t) => (
@@ -683,7 +683,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
 
                       <label className="flex items-center gap-3 cursor-pointer mb-4">
                         <div onClick={() => setWithAgents((v) => !v)}
-                          className={`relative w-9 h-5 rounded-full transition cursor-pointer ${withAgents ? 'bg-indigo-600' : 'bg-zinc-700'}`}>
+                          className={`relative w-9 h-5 rounded-full transition cursor-pointer ${withAgents ? 'bg-[color:var(--accent-500)]' : 'bg-zinc-700'}`}>
                           <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${withAgents ? 'translate-x-4' : 'translate-x-0.5'}`} />
                         </div>
                         <span className="text-sm text-zinc-300">Auto-create head agents</span>
@@ -692,7 +692,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       {deptDeployError && <ErrorBox>{deptDeployError}</ErrorBox>}
 
                       <button onClick={handleDeployDeptTemplate} disabled={!selectedDeptTmpl || deployingDept}
-                        className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+                        className="w-full py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
                       >
                         {deployingDept ? 'Deploying…' : 'Deploy Structure'}
                       </button>
@@ -706,7 +706,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     <SuccessBox>
                       <strong>{agentDeployResult}</strong> agent{agentDeployResult !== 1 ? 's' : ''} deployed.
                       <button onClick={() => setAgentDeployResult(null)}
-                        className="mt-3 text-xs text-indigo-400 hover:underline block">
+                        className="mt-3 text-xs text-[color:var(--accent-400)] hover:underline block">
                         Deploy more →
                       </button>
                     </SuccessBox>
@@ -715,7 +715,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       {/* Add agent from template */}
                       <div className="flex gap-2 mb-3">
                         <select value={addTemplateId} onChange={(e) => setAddTemplateId(e.target.value)}
-                          className="flex-1 rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                          className="flex-1 rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                         >
                           <option value="">— pick template to add —</option>
                           {agentTemplateList.map((t) => (
@@ -723,7 +723,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                           ))}
                         </select>
                         <button onClick={addAgentRow} disabled={!addTemplateId}
-                          className="px-4 py-2 rounded-lg bg-surface-raised border border-surface-border text-sm text-zinc-300 hover:text-indigo-300 hover:border-indigo-700 transition disabled:opacity-40"
+                          className="px-4 py-2 rounded-lg bg-surface-raised border border-surface-border text-sm text-zinc-300 hover:text-indigo-300 hover:border-[color:var(--accent-500)] transition disabled:opacity-40"
                         >
                           + Add
                         </button>
@@ -740,11 +740,11 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${AGENT_TYPE_BADGE[tmpl?.type ?? ''] ?? 'bg-zinc-800 text-zinc-400'}`}>
                                     {tmpl?.type ?? 'AGENT'}
                                   </span>
-                                  <button onClick={() => removeAgentRow(i)} className="text-zinc-600 hover:text-red-400 transition text-xs">✕</button>
+                                  <button onClick={() => removeAgentRow(i)} className="text-zinc-600 hover:text-[color:var(--state-danger)] transition text-xs">✕</button>
                                 </div>
                                 <input value={row.name}
                                   onChange={(e) => updateAgentRow(i, { name: e.target.value })}
-                                  className="w-full rounded border border-surface-border bg-surface text-zinc-200 text-sm px-2 py-1.5 focus:outline-none focus:border-indigo-500"
+                                  className="w-full rounded border border-surface-border bg-surface text-zinc-200 text-sm px-2 py-1.5 focus:outline-none focus:border-[color:var(--accent-500)]"
                                   placeholder="Agent display name"
                                 />
                                 <div className="grid grid-cols-2 gap-2">
@@ -752,14 +752,14 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                                     <label className="text-[10px] text-zinc-600 mb-0.5 block">Daily Budget ($)</label>
                                     <input type="number" value={row.budgetPerDay ?? 100}
                                       onChange={(e) => updateAgentRow(i, { budgetPerDay: Number(e.target.value) })}
-                                      className="w-full rounded border border-surface-border bg-surface text-zinc-300 text-sm px-2 py-1.5 focus:outline-none focus:border-indigo-500"
+                                      className="w-full rounded border border-surface-border bg-surface text-zinc-300 text-sm px-2 py-1.5 focus:outline-none focus:border-[color:var(--accent-500)]"
                                     />
                                   </div>
                                   <div>
                                     <label className="text-[10px] text-zinc-600 mb-0.5 block">Authority</label>
                                     <select value={row.authorityLevel ?? 'RECOMMEND'}
                                       onChange={(e) => updateAgentRow(i, { authorityLevel: e.target.value as BulkAgentDeployItem['authorityLevel'] })}
-                                      className="w-full rounded border border-surface-border bg-surface text-zinc-300 text-sm px-2 py-1.5 focus:outline-none focus:border-indigo-500"
+                                      className="w-full rounded border border-surface-border bg-surface text-zinc-300 text-sm px-2 py-1.5 focus:outline-none focus:border-[color:var(--accent-500)]"
                                     >
                                       <option value="AUTO">AUTO</option>
                                       <option value="RECOMMEND">RECOMMEND</option>
@@ -782,7 +782,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       {agentDeployError && <ErrorBox>{agentDeployError}</ErrorBox>}
 
                       <button onClick={handleBulkDeploy} disabled={agentRows.length === 0 || deployingAgents}
-                        className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50 mt-2"
+                        className="w-full py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50 mt-2"
                       >
                         {deployingAgents ? 'Deploying…' : `Deploy ${agentRows.length || ''} Agent${agentRows.length !== 1 ? 's' : ''}`}
                       </button>
@@ -796,12 +796,12 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                 {pkgDeployResult ? (
                   <SuccessBox>
                     Package <strong>{pkgDeployResult.package.name}</strong> deployed.
-                    <div className="text-xs mt-2 text-green-400">
+                    <div className="text-xs mt-2 text-[color:var(--state-success)]">
                       +{pkgDeployResult.departments.created} departments, +{pkgDeployResult.agents.created} agents
                       {pkgDeployResult.agents.skipped > 0 && <> ({pkgDeployResult.agents.skipped} skipped — idempotent)</>}
                     </div>
                     <button onClick={() => { setPkgDeployResult(null); setSelectedPackageId(''); setPkgPreview(null); }}
-                      className="mt-3 text-xs text-indigo-400 hover:underline block">
+                      className="mt-3 text-xs text-[color:var(--accent-400)] hover:underline block">
                       Deploy another →
                     </button>
                   </SuccessBox>
@@ -815,7 +815,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       <select
                         value={selectedPackageId}
                         onChange={(e) => { setSelectedPackageId(e.target.value); setPkgPreview(null); setPkgDeployError(null); }}
-                        className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                        className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                       >
                         <option value="">— choose a package —</option>
                         {packages.map((pkg) => (
@@ -833,7 +833,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     <div className="flex flex-wrap gap-4">
                       <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
                         <div onClick={() => setPkgWithAgents((v) => !v)}
-                          className={`relative w-8 h-4.5 rounded-full transition cursor-pointer ${pkgWithAgents ? 'bg-indigo-600' : 'bg-zinc-700'}`}
+                          className={`relative w-8 h-4.5 rounded-full transition cursor-pointer ${pkgWithAgents ? 'bg-[color:var(--accent-500)]' : 'bg-zinc-700'}`}
                           style={{ height: '18px' }}>
                           <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${pkgWithAgents ? 'translate-x-[16px]' : 'translate-x-0.5'}`}
                             style={{ width: '14px', height: '14px' }} />
@@ -842,7 +842,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
                         <div onClick={() => setPkgIdempotent((v) => !v)}
-                          className={`relative w-8 h-4.5 rounded-full transition cursor-pointer ${pkgIdempotent ? 'bg-indigo-600' : 'bg-zinc-700'}`}
+                          className={`relative w-8 h-4.5 rounded-full transition cursor-pointer ${pkgIdempotent ? 'bg-[color:var(--accent-500)]' : 'bg-zinc-700'}`}
                           style={{ height: '18px' }}>
                           <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${pkgIdempotent ? 'translate-x-[16px]' : 'translate-x-0.5'}`}
                             style={{ width: '14px', height: '14px' }} />
@@ -853,7 +853,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                         <label className="text-[10px] text-zinc-600 block mb-0.5">Authority</label>
                         <select value={pkgAuthority}
                           onChange={(e) => setPkgAuthority(e.target.value as typeof pkgAuthority)}
-                          className="rounded border border-surface-border bg-surface-overlay text-zinc-200 text-xs px-2 py-1 focus:outline-none focus:border-indigo-500"
+                          className="rounded border border-surface-border bg-surface-overlay text-zinc-200 text-xs px-2 py-1 focus:outline-none focus:border-[color:var(--accent-500)]"
                         >
                           <option value="AUTO">AUTO</option>
                           <option value="RECOMMEND">RECOMMEND</option>
@@ -864,7 +864,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
 
                     {/* Preview result */}
                     {pkgPreview && (
-                      <div className={`rounded-lg border px-4 py-3 text-sm ${pkgPreview.feasible ? 'bg-green-950/50 border-green-800/50' : 'bg-yellow-950/50 border-yellow-800/50'}`}>
+                      <div className={`rounded-lg border px-4 py-3 text-sm ${pkgPreview.feasible ? 'bg-[color:var(--state-success)]/50 border-green-800/50' : 'bg-yellow-950/50 border-yellow-800/50'}`}>
                         <div className="font-medium text-zinc-200 mb-2">
                           {pkgPreview.feasible ? '✅ Feasible' : '⚠️ Blocked'}
                         </div>
@@ -890,13 +890,13 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
 
                     <div className="flex gap-3">
                       <button onClick={handlePackagePreview} disabled={!selectedPackageId || pkgPreviewing}
-                        className="flex-1 py-2 rounded-lg border border-surface-border text-sm text-zinc-300 hover:text-indigo-300 hover:border-indigo-700 transition disabled:opacity-50"
+                        className="flex-1 py-2 rounded-lg border border-surface-border text-sm text-zinc-300 hover:text-indigo-300 hover:border-[color:var(--accent-500)] transition disabled:opacity-50"
                       >
                         {pkgPreviewing ? 'Checking…' : 'Preview'}
                       </button>
                       <button onClick={handlePackageDeploy}
                         disabled={!selectedPackageId || pkgDeploying || (pkgPreview !== null && !pkgPreview.feasible)}
-                        className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+                        className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
                       >
                         {pkgDeploying ? 'Deploying…' : 'Deploy Package'}
                       </button>
@@ -912,7 +912,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     Created <strong>{singleDeptResult.name}</strong>
                     {singleDeptResult.agents !== undefined && <> with {singleDeptResult.agents} agent(s)</>}.
                     <button onClick={() => { setSingleDeptResult(null); setSingleDeptTemplateId(''); }}
-                      className="mt-3 text-xs text-indigo-400 hover:underline block">
+                      className="mt-3 text-xs text-[color:var(--accent-400)] hover:underline block">
                       Deploy another →
                     </button>
                   </SuccessBox>
@@ -921,7 +921,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     <div className="flex-1 min-w-[200px]">
                       <label className="text-xs text-zinc-500 mb-1.5 block">Department Template</label>
                       <select value={singleDeptTemplateId} onChange={(e) => setSingleDeptTemplateId(e.target.value)}
-                        className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                        className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                       >
                         <option value="">— choose template —</option>
                         {deptTemplates.map((t) => (
@@ -935,12 +935,12 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       <label className="text-xs text-zinc-500 mb-1.5 block">Item Index</label>
                       <input type="number" value={singleDeptItemIndex} min={0}
                         onChange={(e) => setSingleDeptItemIndex(Math.max(0, Number(e.target.value)))}
-                        className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500"
+                        className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-[color:var(--accent-500)]"
                       />
                     </div>
                     <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
                       <div onClick={() => setSingleDeptWithAgent((v) => !v)}
-                        className={`relative w-8 cursor-pointer ${singleDeptWithAgent ? 'bg-indigo-600' : 'bg-zinc-700'}`}
+                        className={`relative w-8 cursor-pointer ${singleDeptWithAgent ? 'bg-[color:var(--accent-500)]' : 'bg-zinc-700'}`}
                         style={{ height: '18px', width: '32px', borderRadius: '9px' }}>
                         <div style={{ width: '14px', height: '14px', borderRadius: '7px' }}
                           className={`absolute top-0.5 bg-white shadow transition-transform ${singleDeptWithAgent ? 'translate-x-[16px]' : 'translate-x-0.5'}`} />
@@ -949,7 +949,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     </label>
                     {singleDeptError && <ErrorBox>{singleDeptError}</ErrorBox>}
                     <button onClick={handleDeploySingleDepartment} disabled={!singleDeptTemplateId || deployingSingleDept}
-                      className="py-2 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+                      className="py-2 px-4 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
                     >
                       {deployingSingleDept ? 'Deploying…' : 'Deploy'}
                     </button>
@@ -1027,7 +1027,7 @@ function InfoCard({ label, value, children, href }: {
   const content = children ?? (
     href ? (
       <a href={href} target="_blank" rel="noopener noreferrer"
-        className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2 truncate block">
+        className="text-[color:var(--accent-400)] hover:text-indigo-300 underline underline-offset-2 truncate block">
         {value}
       </a>
     ) : (
@@ -1072,7 +1072,7 @@ function Empty({ message, action, onAction }: { message: string; action: string;
   return (
     <div className="py-16 text-center text-zinc-500 text-sm">
       {message}{' '}
-      <button onClick={onAction} className="text-indigo-400 hover:underline">{action}</button>
+      <button onClick={onAction} className="text-[color:var(--accent-400)] hover:underline">{action}</button>
     </div>
   );
 }
@@ -1089,7 +1089,7 @@ function DeployCard({ title, subtitle, children }: { title: string; subtitle: st
 
 function SuccessBox({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg bg-green-950 border border-green-800 px-4 py-5 text-sm text-green-300 text-center">
+    <div className="rounded-lg bg-[color:var(--state-success)] border border-green-800 px-4 py-5 text-sm text-green-300 text-center">
       <div className="text-2xl mb-2">✓</div>
       {children}
     </div>
@@ -1098,6 +1098,6 @@ function SuccessBox({ children }: { children: React.ReactNode }) {
 
 function ErrorBox({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300 mb-3">{children}</div>
+    <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300 mb-3">{children}</div>
   );
 }

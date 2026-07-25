@@ -13,8 +13,8 @@ interface KpiCardProps {
 
 const TONE_CLASSES: Record<NonNullable<KpiCardProps["tone"]>, string> = {
   neutral: "border-zinc-700/50 text-zinc-100",
-  good: "border-emerald-500/30 text-emerald-300",
-  warn: "border-amber-500/30 text-amber-300",
+  good: "border-[color:var(--state-success)]/30 text-emerald-300",
+  warn: "border-[color:var(--state-warning)]/30 text-amber-300",
   bad: "border-rose-500/30 text-rose-300",
 };
 
@@ -50,11 +50,11 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   const map: Record<StatusBadgeProps["status"], { cls: string; label: string }> =
     {
       CONNECTED: {
-        cls: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
+        cls: "bg-[color:var(--state-success)]/10 text-emerald-300 border-[color:var(--state-success)]/20",
         label: "Connected",
       },
       MASTER: {
-        cls: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
+        cls: "bg-[color:var(--accent-500)]/10 text-indigo-300 border-[color:var(--accent-500)]/20",
         label: "Master key",
       },
       NOT_CONNECTED: {
@@ -79,16 +79,16 @@ interface EventTypeBadgeProps {
 
 export function EventTypeBadge({ type }: EventTypeBadgeProps) {
   const colors: Record<string, string> = {
-    DELIVERED: "bg-emerald-500/10 text-emerald-300",
-    OPEN: "bg-cyan-500/10 text-cyan-300",
-    CLICK: "bg-violet-500/10 text-violet-300",
-    BOUNCE_HARD: "bg-rose-500/10 text-rose-300",
-    BOUNCE_SOFT: "bg-amber-500/10 text-amber-300",
+    DELIVERED: "bg-[color:var(--state-success)]/10 text-emerald-300",
+    OPEN: "bg-[color:var(--visual-accent-cyan-500)]/10 text-cyan-300",
+    CLICK: "bg-[color:var(--accent-500)]/10 text-violet-300",
+    BOUNCE_HARD: "bg-[color:var(--visual-accent-rose-500)]/10 text-rose-300",
+    BOUNCE_SOFT: "bg-[color:var(--state-warning)]/10 text-amber-300",
     SPAM: "bg-rose-700/10 text-rose-200",
     UNSUBSCRIBE: "bg-zinc-700/50 text-zinc-300",
-    BLOCKED: "bg-rose-500/10 text-rose-300",
-    ERROR: "bg-rose-500/10 text-rose-300",
-    REQUEST: "bg-indigo-500/10 text-indigo-300",
+    BLOCKED: "bg-[color:var(--visual-accent-rose-500)]/10 text-rose-300",
+    ERROR: "bg-[color:var(--visual-accent-rose-500)]/10 text-rose-300",
+    REQUEST: "bg-[color:var(--accent-500)]/10 text-indigo-300",
   };
   return (
     <span
@@ -111,10 +111,10 @@ export function QuotaBar({ used, limit, warningAt = 240 }: QuotaBarProps) {
   const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
   const tone =
     used >= limit
-      ? "bg-rose-500"
+      ? "bg-[color:var(--visual-accent-rose-500)]"
       : used >= warningAt
-        ? "bg-amber-500"
-        : "bg-emerald-500";
+        ? "bg-[color:var(--state-warning)]"
+        : "bg-[color:var(--state-success)]";
   return (
     <div className="space-y-1">
       <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">

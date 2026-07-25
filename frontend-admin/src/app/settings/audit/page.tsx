@@ -10,9 +10,9 @@ import type {
 import { motion } from "framer-motion";
 
 const LEVEL_COLORS: Record<AuditLevel, string> = {
-  info: "bg-blue-900 text-blue-300",
+  info: "bg-[color:var(--state-info)] text-blue-300",
   warning: "bg-yellow-900 text-yellow-300",
-  error: "bg-red-900 text-red-300",
+  error: "bg-[color:var(--state-danger)] text-red-300",
   critical: "bg-purple-900 text-purple-300",
 };
 
@@ -108,7 +108,7 @@ export default function AuditLogsPage() {
           <div className="relative group">
             <button
               disabled={exporting}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+              className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
             >
               {exporting ? "Exporting..." : "Export"}
             </button>
@@ -137,7 +137,7 @@ export default function AuditLogsPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-950 border border-red-800 p-3 text-sm text-red-300">
+        <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -181,7 +181,7 @@ export default function AuditLogsPage() {
             onChange={(e) =>
               setFilters((f) => ({ ...f, search: e.target.value }))
             }
-            className="w-full max-w-sm rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+            className="w-full max-w-sm rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[color:var(--accent-500)]"
           />
         </div>
         <select
@@ -192,7 +192,7 @@ export default function AuditLogsPage() {
               level: e.target.value as AuditLevel | "",
             }))
           }
-          className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+          className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
         >
           <option value="">All Levels</option>
           {LEVELS.map((l) => (
@@ -209,7 +209,7 @@ export default function AuditLogsPage() {
               category: e.target.value as AuditCategory | "",
             }))
           }
-          className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+          className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
         >
           <option value="">All Categories</option>
           {CATEGORIES.map((c) => (
@@ -386,10 +386,10 @@ export default function AuditLogsPage() {
                         <div className="font-medium text-zinc-300">
                           {change.field}
                         </div>
-                        <div className="text-red-400 line-through">
+                        <div className="text-[color:var(--state-danger)] line-through">
                           {JSON.stringify(change.oldValue)}
                         </div>
-                        <div className="text-green-400">
+                        <div className="text-[color:var(--state-success)]">
                           → {JSON.stringify(change.newValue)}
                         </div>
                       </div>

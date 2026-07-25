@@ -6,9 +6,9 @@ const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
 
 const PRIORITY_STYLE: Record<string, string> = {
   LOW:      'border-zinc-600 text-zinc-400',
-  MEDIUM:   'border-indigo-500/60 text-indigo-300',
-  HIGH:     'border-amber-500/60 text-amber-300',
-  CRITICAL: 'border-red-500/60 text-red-300',
+  MEDIUM:   'border-[color:var(--accent-500)]/60 text-indigo-300',
+  HIGH:     'border-[color:var(--state-warning)]/60 text-amber-300',
+  CRITICAL: 'border-[color:var(--state-danger)]/60 text-red-300',
 };
 
 interface Props {

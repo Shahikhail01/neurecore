@@ -29,10 +29,10 @@ const SEVERITY_COLOR: Record<string, string> = {
 };
 
 const ACTION_COLOR: Record<string, string> = {
-  CREATE: 'bg-emerald-900 text-emerald-300',
-  UPDATE: 'bg-blue-900 text-blue-300',
-  DELETE: 'bg-red-900 text-red-300',
-  LOGIN:  'bg-indigo-900 text-indigo-300',
+  CREATE: 'bg-[color:var(--state-success)] text-emerald-300',
+  UPDATE: 'bg-[color:var(--state-info)] text-blue-300',
+  DELETE: 'bg-[color:var(--state-danger)] text-red-300',
+  LOGIN:  'bg-[color:var(--accent-500)] text-indigo-300',
   LOGOUT: 'bg-zinc-800 text-zinc-400',
 };
 
@@ -130,7 +130,7 @@ export default function AuditPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter by action, actor, or resource…"
-          className="w-full max-w-md rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
+          className="w-full max-w-md rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[color:var(--accent-500)] transition"
         />
 
         {/* ── Table ── */}

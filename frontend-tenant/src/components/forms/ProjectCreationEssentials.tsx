@@ -369,7 +369,7 @@ function CustomFieldInput({
         <div>
           <label className="block text-xs text-zinc-400 mb-1">
             {field.label}
-            {field.required ? <span className="text-red-400 ml-0.5">*</span> : null}
+            {field.required ? <span className="text-[color:var(--state-danger)] ml-0.5">*</span> : null}
           </label>
           <div className="flex flex-wrap gap-1.5">
             {(field.options ?? []).map((opt) => {
@@ -384,7 +384,7 @@ function CustomFieldInput({
                   }}
                   className={`text-xs px-2 py-0.5 rounded-full border transition ${
                     isSelected
-                      ? 'border-indigo-500 bg-indigo-600/20 text-indigo-200'
+                      ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/20 text-indigo-200'
                       : 'border-surface-border text-zinc-400 hover:text-zinc-200'
                   }`}
                 >

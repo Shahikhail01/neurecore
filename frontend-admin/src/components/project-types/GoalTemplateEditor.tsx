@@ -50,13 +50,13 @@ export function GoalTemplateEditor({
               onChange={(e) => update(idx, { title: e.target.value })}
               placeholder="Goal title"
               disabled={readOnly}
-              className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+              className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
             />
             {!readOnly && (
               <button
                 type="button"
                 onClick={() => remove(idx)}
-                className="text-zinc-600 hover:text-red-400 transition"
+                className="text-zinc-600 hover:text-[color:var(--state-danger)] transition"
                 aria-label="Remove goal"
               >
                 <span aria-hidden className="text-sm">×</span>
@@ -70,7 +70,7 @@ export function GoalTemplateEditor({
             }
             placeholder="Measurable criteria (optional)"
             disabled={readOnly}
-            className="w-full px-2 py-1 bg-surface text-xs text-zinc-400 rounded border border-surface-border focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            className="w-full px-2 py-1 bg-surface text-xs text-zinc-400 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
           />
         </div>
       ))}

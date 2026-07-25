@@ -30,7 +30,7 @@ function VariableSlider({
             {variable.adjusted}{variable.unit}
           </span>
           {delta !== 0 && (
-            <span className={`text-[10px] font-medium ${delta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <span className={`text-[10px] font-medium ${delta > 0 ? 'text-[color:var(--state-success)]' : 'text-[color:var(--state-danger)]'}`}>
               {delta > 0 ? '+' : ''}{delta}{variable.unit}
             </span>
           )}
@@ -49,7 +49,7 @@ function VariableSlider({
           className="w-full h-1.5 cursor-pointer appearance-none rounded-full bg-zinc-800
             [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4
             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
-            [&::-webkit-slider-thumb]:bg-indigo-500 [&::-webkit-slider-thumb]:cursor-pointer
+            [&::-webkit-slider-thumb]:bg-[color:var(--accent-500)] [&::-webkit-slider-thumb]:cursor-pointer
             [&::-webkit-slider-thumb]:transition-transform
             [&::-webkit-slider-thumb]:hover:scale-125"
           style={{
@@ -95,14 +95,14 @@ function OutcomeRow({ outcome }: { outcome: ScenarioOutcome }) {
           {outcome.baseline}<span className="ml-0.5 text-[10px]">{outcome.unit}</span>
         </span>
         <span className="text-zinc-600">→</span>
-        <span className={`text-sm font-semibold ${outcome.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+        <span className={`text-sm font-semibold ${outcome.isPositive ? 'text-[color:var(--state-success)]' : 'text-[color:var(--state-danger)]'}`}>
           {outcome.projected}<span className="ml-0.5 text-[10px]">{outcome.unit}</span>
         </span>
         {outcome.delta !== 0 && (
           <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
             outcome.isPositive
-              ? 'bg-emerald-950/40 text-emerald-400'
-              : 'bg-red-950/40 text-red-400'
+              ? 'bg-[color:var(--state-success)]/40 text-[color:var(--state-success)]'
+              : 'bg-[color:var(--state-danger)]/40 text-[color:var(--state-danger)]'
           }`}>
             {deltaPct > 0 ? '+' : ''}{deltaPct}%
           </span>
@@ -145,7 +145,7 @@ export function ScenarioSimulator() {
             onClick={() => loadTemplate(t.id)}
             className={`rounded-xl border p-4 text-left transition-all ${
               activeTemplate?.id === t.id
-                ? 'border-indigo-500/60 bg-indigo-950/30 ring-1 ring-indigo-500/30'
+                ? 'border-[color:var(--accent-500)]/60 bg-[color:var(--accent-500)]/30 ring-1 ring-indigo-500/30'
                 : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'
             }`}
           >
@@ -179,8 +179,8 @@ export function ScenarioSimulator() {
             <button
               onClick={simulate}
               disabled={isRunning}
-              className="mt-6 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white
-                hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              className="mt-6 w-full rounded-lg bg-[color:var(--accent-500)] py-2.5 text-sm font-medium text-white
+                hover:bg-[color:var(--accent-500)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
               {isRunning ? (
                 <span className="flex items-center justify-center gap-2">
@@ -221,8 +221,8 @@ export function ScenarioSimulator() {
                   <div className="flex items-center justify-between rounded-lg bg-zinc-800/60 px-3 py-2 mb-2">
                     <span className="text-xs text-zinc-400">Simulation Confidence</span>
                     <span className={`text-sm font-bold ${
-                      result.confidence >= 80 ? 'text-emerald-400' :
-                      result.confidence >= 60 ? 'text-amber-400' : 'text-red-400'
+                      result.confidence >= 80 ? 'text-[color:var(--state-success)]' :
+                      result.confidence >= 60 ? 'text-[color:var(--state-warning)]' : 'text-[color:var(--state-danger)]'
                     }`}>{result.confidence}%</span>
                   </div>
 

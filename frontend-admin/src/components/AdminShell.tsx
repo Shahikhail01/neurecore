@@ -13,6 +13,7 @@ import { UnifiedChatPanel } from "@/shared/components/chat/UnifiedChatPanel";
 import { chatService, slashCommands, jsonExtractor, adminChatConfig } from "@/core/services/chat/chat.factory";
 import { registerAdminCommands } from "@/services/register-commands";
 import { NAV_GROUPS, ALL_NAV_ITEMS } from "@/components/sidebar/navigation.config";
+import { PageShell } from "@neurecore/ui-visual";
 
 export default function AdminShell({
   user,
@@ -44,7 +45,7 @@ export default function AdminShell({
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside className="w-56 shrink-0 border-r border-surface-border flex flex-col bg-surface-raised">
         <div className="px-5 py-4 border-b border-surface-border">
-          <span className="text-sm font-bold tracking-widest text-indigo-400 uppercase">
+          <span className="text-sm font-bold tracking-widest text-[color:var(--accent-400)] uppercase">
             NeureCore
           </span>
           <div className="text-xs text-zinc-500 mt-0.5">Admin Console</div>
@@ -66,7 +67,7 @@ export default function AdminShell({
                     href={item.href}
                     className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
                       active
-                        ? "bg-indigo-600 text-white font-medium"
+                        ? "nv-btn-accent"
                         : "text-zinc-400 hover:bg-surface-overlay hover:text-white"
                     }`}
                   >
@@ -86,7 +87,7 @@ export default function AdminShell({
           <div className="text-xs text-zinc-500 truncate mb-2">
             {user.email}
           </div>
-          <span className="inline-block rounded-full bg-indigo-900 text-indigo-300 text-xs px-2 py-0.5 font-medium mb-3">
+          <span className="inline-block rounded-full bg-[color:var(--accent-500)]/20 text-[color:var(--accent-300)] text-xs px-2 py-0.5 font-medium mb-3">
             {user.role}
           </span>
           <button
@@ -101,7 +102,11 @@ export default function AdminShell({
       {/* ── Content column ───────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar title={pageTitle} />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main className="flex-1 overflow-auto">
+          <PageShell variant="compact" noAmbient>
+            {children}
+          </PageShell>
+        </main>
         <ActivityStream />
       </div>
 

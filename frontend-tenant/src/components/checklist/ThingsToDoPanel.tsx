@@ -71,7 +71,7 @@ export function ThingsToDoPanel() {
 
   if (allDone || visiblePending.length === 0) {
     return (
-      <Card className="w-full max-w-md border-green-500/30 bg-green-500/5">
+      <Card className="w-full max-w-md border-[color:var(--state-success)]/30 bg-[color:var(--state-success)]/5">
         <CardHeader>
           <CardTitle className="text-sm flex items-center gap-2">
             <span>✅</span> All caught up

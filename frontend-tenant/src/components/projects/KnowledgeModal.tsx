@@ -292,10 +292,10 @@ export function KnowledgeModal({
 
                   <div className="flex items-center gap-3 text-xs text-zinc-500">
                     <span className="flex items-center gap-1">
-                      <span className="text-green-400">▲ {d.votesFor}</span>
+                      <span className="text-[color:var(--state-success)]">▲ {d.votesFor}</span>
                     </span>
                     <span className="flex items-center gap-1">
-                      <span className="text-red-400">▼ {d.votesAgainst}</span>
+                      <span className="text-[color:var(--state-danger)]">▼ {d.votesAgainst}</span>
                     </span>
                     <span>— {d.abstentions} abstentions</span>
                     {d.decidedAt && (

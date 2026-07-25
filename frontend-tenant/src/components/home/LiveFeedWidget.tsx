@@ -61,7 +61,7 @@ export function LiveFeedWidget() {
   return (
     <GlassPanel className="p-6 h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4">
-        <Activity className="w-5 h-5 text-blue-400" />
+        <Activity className="w-5 h-5 text-[color:var(--state-info)]" />
         <h3 className="text-lg font-semibold text-white">Live Feed</h3>
         {loading && (
           <span className="text-xs text-zinc-500 ml-2">loading…</span>
@@ -69,7 +69,7 @@ export function LiveFeedWidget() {
       </div>
 
       {error ? (
-        <p className="text-xs text-red-400 mb-2">
+        <p className="text-xs text-[color:var(--state-danger)] mb-2">
           Failed to load activity feed.
         </p>
       ) : null}

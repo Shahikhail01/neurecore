@@ -47,7 +47,7 @@ export const AgentStatusWidgetComponent: React.FC<AgentStatusWidgetProps> = ({
                 <motion.div
                     animate={{ scale: [1, 1.1, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
-                    className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full"
+                    className="absolute top-1 right-1 w-2 h-2 bg-[color:var(--state-success)] rounded-full"
                 />
             )}
 

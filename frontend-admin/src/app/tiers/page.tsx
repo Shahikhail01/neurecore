@@ -66,7 +66,7 @@ export default function TiersPage() {
           {canEdit && (
             <button
               onClick={() => setCreating(true)}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+              className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
             >
               + New Tier
             </button>
@@ -139,7 +139,7 @@ function TierCard({ tier, canEdit, onEdit }: { tier: Tier; canEdit: boolean; onE
           <div className="flex items-center gap-2">
             <h3 className="text-base font-semibold text-zinc-100">{tier.name}</h3>
             {tier.isDefault && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/15 text-emerald-400">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-[color:var(--state-success)]/15 text-[color:var(--state-success)]">
                 Default
               </span>
             )}
@@ -157,7 +157,7 @@ function TierCard({ tier, canEdit, onEdit }: { tier: Tier; canEdit: boolean; onE
             <span className="text-xs text-zinc-500 font-normal">/mo</span>
           </div>
           {tier.trialDays && (
-            <p className="text-[10px] text-emerald-400">{tier.trialDays}-day trial</p>
+            <p className="text-[10px] text-[color:var(--state-success)]">{tier.trialDays}-day trial</p>
           )}
         </div>
       </div>
@@ -196,7 +196,7 @@ function LimitRow({ label, value }: { label: string; value: string | number }) {
 
 function FeatureChip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/15 text-indigo-300">
+    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[color:var(--accent-500)]/15 text-indigo-300">
       {children}
     </span>
   );
@@ -253,7 +253,7 @@ function TierEditModal({
         </div>
 
         {error && (
-          <div className="rounded-md bg-red-500/15 border border-red-500/30 text-red-300 text-sm px-3 py-2">
+          <div className="rounded-md bg-[color:var(--state-danger)]/15 border border-[color:var(--state-danger)]/30 text-red-300 text-sm px-3 py-2">
             {error}
           </div>
         )}
@@ -324,7 +324,7 @@ function TierEditModal({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium transition"
+            className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] disabled:opacity-50 text-white text-sm font-medium transition"
           >
             {saving ? 'Saving…' : isNew ? 'Create' : 'Save'}
           </button>

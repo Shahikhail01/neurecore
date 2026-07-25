@@ -198,7 +198,7 @@ export default function EditPackagePage() {
                               onClick={() => toggle(setFeatureIds, featureIds, f.id)}
                               className={`text-xs px-2 py-0.5 rounded-full border transition ${
                                 selected
-                                  ? 'border-indigo-500 bg-indigo-600/20 text-indigo-200'
+                                  ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/20 text-indigo-200'
                                   : 'border-surface-border text-zinc-400 hover:text-zinc-200'
                               }`}
                             >
@@ -214,7 +214,7 @@ export default function EditPackagePage() {
             </div>
 
             {error && (
-              <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+              <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
                 {error}
               </div>
             )}
@@ -230,7 +230,7 @@ export default function EditPackagePage() {
                 type="button"
                 onClick={save}
                 disabled={busy}
-                className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+                className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
               >
                 {busy ? 'Saving…' : 'Save Composition'}
               </button>
@@ -275,7 +275,7 @@ function PickerGroup({
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder={`Filter ${title.toLowerCase()}…`}
-        className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition mb-2"
+        className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[color:var(--accent-500)] transition mb-2"
       />
       <div className="rounded-lg border border-surface-border bg-surface-overlay p-2 max-h-44 overflow-y-auto">
         {visible.length === 0 ? (

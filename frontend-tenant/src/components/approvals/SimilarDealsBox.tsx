@@ -29,12 +29,12 @@ interface SimilarDealsBoxProps {
  */
 const getTrendIndicator = (rate: number): { icon: string; label: string; color: string } => {
     if (rate >= 0.7) {
-        return { icon: '📈', label: 'Strong track record', color: 'text-green-600' };
+        return { icon: '📈', label: 'Strong track record', color: 'text-[color:var(--state-success)]' };
     }
     if (rate >= 0.5) {
         return { icon: '➡', label: 'Mixed results', color: 'text-yellow-600' };
     }
-    return { icon: '📉', label: 'Weak track record', color: 'text-red-600' };
+    return { icon: '📉', label: 'Weak track record', color: 'text-[color:var(--state-danger)]' };
 };
 
 export const SimilarDealsBox: FC<SimilarDealsBoxProps> = ({ past, className }) => {
@@ -86,9 +86,9 @@ export const SimilarDealsBox: FC<SimilarDealsBoxProps> = ({ past, className }) =
                                 <div
                                     className={cn(
                                         'h-full transition-all',
-                                        past.approvalRate >= 0.7 && 'bg-green-500',
+                                        past.approvalRate >= 0.7 && 'bg-[color:var(--state-success)]',
                                         past.approvalRate >= 0.5 && past.approvalRate < 0.7 && 'bg-yellow-500',
-                                        past.approvalRate < 0.5 && 'bg-red-500',
+                                        past.approvalRate < 0.5 && 'bg-[color:var(--state-danger)]',
                                     )}
                                     style={{ width: `${percentage}%` }}
                                 />

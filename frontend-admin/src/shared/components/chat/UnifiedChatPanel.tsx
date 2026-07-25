@@ -120,10 +120,10 @@ export function UnifiedChatPanel({
 
               {/* Error banner */}
               {error && (
-                <div className="px-3 py-1.5 mx-3 mb-1 rounded-lg border border-red-700/40 bg-red-950/30">
+                <div className="px-3 py-1.5 mx-3 mb-1 rounded-lg border border-[color:var(--state-danger)]/40 bg-[color:var(--state-danger)]/30">
                   <button
                     onClick={() => setError(null)}
-                    className="text-[10px] text-red-400 hover:text-red-300 transition w-full text-left"
+                    className="text-[10px] text-[color:var(--state-danger)] hover:text-red-300 transition w-full text-left"
                   >
                     ✕ {error}
                   </button>

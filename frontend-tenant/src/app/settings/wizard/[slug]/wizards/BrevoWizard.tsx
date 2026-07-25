@@ -135,7 +135,7 @@ export function BrevoWizard({ slug }: { slug: WizardSlug }) {
     return (
       <WizardShell title="Brevo Email">
         <div className="text-center space-y-3 py-4">
-          <CheckCircle2 className="w-10 h-10 mx-auto text-green-500" />
+          <CheckCircle2 className="w-10 h-10 mx-auto text-[color:var(--state-success)]" />
           <p className="text-sm text-muted-foreground">Brevo email configured.</p>
         </div>
       </WizardShell>
@@ -155,7 +155,7 @@ export function BrevoWizard({ slug }: { slug: WizardSlug }) {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Send className="w-5 h-5 text-blue-500" />
+                    <Send className="w-5 h-5 text-[color:var(--state-info)]" />
                     <h3 className="font-semibold text-sm">Brevo Transactional Email</h3>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -228,7 +228,7 @@ export function BrevoWizard({ slug }: { slug: WizardSlug }) {
                       Save sender identity
                     </Button>
                     {savedSenderEmail && (
-                      <span className="text-xs text-green-600 flex items-center gap-1">
+                      <span className="text-xs text-[color:var(--state-success)] flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />
                         Saved as {savedSenderEmail}
                       </span>

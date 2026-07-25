@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { PageShell, PageHero, GlassPanel } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import TenantShell from '@/components/TenantShell';
 import { KpiCard } from '@/components/creatio/KpiCard';
@@ -49,12 +50,14 @@ export default function MemberDetailPage() {
   if (!m) {
     return (
       <TenantShell user={user}>
-        <div className="max-w-5xl mx-auto card-surface p-12 text-center">
-          <p className="text-zinc-300 font-medium">Member not found</p>
-          <Link href="/departments" className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-medium">
-            <ArrowLeft className="w-3 h-3" /> Back to Departments
-          </Link>
-        </div>
+        <PageShell variant="default">
+          <GlassPanel variant="panel" padding="lg" className="text-center">
+            <p className="text-zinc-300 font-medium">Member not found</p>
+            <Link href="/departments" className="nv-btn-accent inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg text-xs font-medium">
+              <ArrowLeft className="w-3 h-3" /> Back to Departments
+            </Link>
+          </GlassPanel>
+        </PageShell>
       </TenantShell>
     );
   }
@@ -68,9 +71,9 @@ export default function MemberDetailPage() {
           <ArrowLeft className="w-3 h-3" /> Departments
         </Link>
 
-        <section className="card-surface p-6">
+        <GlassPanel variant="panel" padding="lg" className="p-6">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-accent-500/15 text-accent-500 flex items-center justify-center text-2xl font-semibold shrink-0">
+            <div className="w-16 h-16 rounded-full bg-[color:var(--accent-500)]/15 text-[color:var(--accent-500)] flex items-center justify-center text-2xl font-semibold shrink-0">
               {(m.firstName?.[0] ?? m.email[0]).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
@@ -82,7 +85,7 @@ export default function MemberDetailPage() {
               </div>
             </div>
           </div>
-        </section>
+        </GlassPanel>
 
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="Role" value={m.role} color="strategy" />

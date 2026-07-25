@@ -154,7 +154,7 @@ export default function ReactFlowBuilder({ workflow, onSave }: Props) {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-4 py-1.5 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition disabled:opacity-50"
+          className="px-4 py-1.5 rounded-lg bg-[color:var(--accent-500)] text-white text-sm font-medium hover:bg-violet-700 transition disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>

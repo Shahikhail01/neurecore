@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PageHero, GlassPanel } from '@neurecore/ui-visual';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { AgentCard } from '@/components/agent-card/AgentCard';
@@ -74,20 +75,17 @@ export default function AdminAgentFleetPage() {
 
   return (
     <AdminShell user={user}>
+      <PageHero
+        title="Employee Fleet"
+        subtitle={`${total} employees across all tenants`}
+      />
       <div className="max-w-7xl mx-auto space-y-5">
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-100">Employee Fleet</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">{total} employees across all tenants</p>
-          </div>
           <button
             onClick={() => void fetchAgents()}
             className="px-3 py-1.5 rounded-lg border border-surface-border text-xs text-zinc-400 hover:text-zinc-200 transition"
           >
             Refresh
           </button>
-        </div>
 
         {/* ── Toolbar ── */}
         <div className="flex flex-wrap items-center gap-3">
@@ -95,7 +93,7 @@ export default function AdminAgentFleetPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search employees or tenants…"
-            className="flex-1 min-w-48 rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
+            className="flex-1 min-w-48 rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[color:var(--accent-500)] transition"
           />
           <div className="flex gap-1 flex-wrap">
             {STATUS_FILTERS.map((s) => (
@@ -103,7 +101,7 @@ export default function AdminAgentFleetPage() {
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
-                  statusFilter === s ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-overlay'
+                  statusFilter === s ? 'bg-[color:var(--accent-500)] text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-overlay'
                 }`}
               >
                 {s}
@@ -116,7 +114,7 @@ export default function AdminAgentFleetPage() {
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`px-3 py-1.5 text-xs transition ${viewMode === mode ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:text-zinc-200'}`}
+                className={`px-3 py-1.5 text-xs transition ${viewMode === mode ? 'bg-[color:var(--accent-500)] text-white' : 'text-zinc-500 hover:text-zinc-200'}`}
               >
                 {mode === 'grid' ? '⊞' : '≡'}
               </button>

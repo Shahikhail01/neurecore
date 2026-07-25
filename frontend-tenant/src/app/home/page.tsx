@@ -9,6 +9,10 @@
  * Chat is provided by the unified UnifiedChatPanel (mounted by TenantShell).
  * This page only triggers external sends via the chat store (HomeHero prompt).
  *
+ * Visual chrome is composed from @neurecore/ui-visual primitives
+ * (PageShell, GlassPanel, AmbientBackdrop). Every page in the monorepo
+ * follows the same composition — this file is the conformance proof.
+ *
  * Layout:
  *   ┌─ IconRail (in TenantShell) ─┬─ Centre ────────────────────┬─ Right rail ──┐
  *   │                             │  Hero (date/greeting/AI)    │  Live Feed    │
@@ -33,7 +37,7 @@ import { HomeHero } from '@/components/home/HomeHero';
 import { HomeKpiStrip } from '@/components/home/HomeKpiStrip';
 import { HomeNetworkStatus } from '@/components/home/HomeNetworkStatus';
 import { RightPanel } from '@/components/home/RightPanel';
-import { GlassPanel } from '@/components/home/GlassPanel';
+import { PageShell, GlassPanel } from '@neurecore/ui-visual';
 import { useChatStore } from '@/core/services/chat/chat.factory';
 
 export default function HomePage() {
@@ -98,21 +102,6 @@ export default function HomePage() {
     return m;
   }, [agents]);
 
-  const getBackgroundClass = () => {
-    switch (backgroundStyle) {
-      case 'gradient-blue':
-        return 'bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950';
-      case 'gradient-purple':
-        return 'bg-gradient-to-br from-purple-950 via-slate-900 to-slate-950';
-      case 'gradient-dark':
-        return 'bg-gradient-to-br from-slate-900 via-slate-950 to-slate-950';
-      case 'solid-dark':
-        return 'bg-slate-950';
-      default:
-        return 'bg-gradient-to-br from-slate-900 via-slate-950 to-slate-950';
-    }
-  };
-
   // Route HomeHero prompt through the unified chat (mounted in TenantShell).
   const requestExternalSend = useChatStore((s) => s.requestExternalSend);
   const handleSend = (message: string) => {
@@ -121,7 +110,7 @@ export default function HomePage() {
 
   if (!hasHydrated || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-950 flex items-center justify-center">
+      <div className="nv-page nv-hero-gradient flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-zinc-500">Loading workspace...</p>
@@ -130,20 +119,21 @@ export default function HomePage() {
     );
   }
 
+  // Visual chrome composed entirely from the @neurecore/ui-visual package.
+  // backgroundStyle is still read for back-compat (settings store) but the
+  // hero gradient is now provided by PageShell; the per-style override is
+  // intentionally ignored to enforce a single visual contract globally.
+  void backgroundStyle;
+
   return (
     <TenantShell user={user}>
-      <div className={`min-h-screen ${getBackgroundClass()} relative overflow-hidden`}>
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl opacity-20" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl opacity-20" />
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 space-y-6">
-          <GlassPanel className="p-6 max-w-2xl mx-auto">
+      <PageShell variant="default" noAmbient>
+        <div className="flex flex-col gap-6">
+          <GlassPanel variant="hero" padding="lg" className="max-w-2xl mx-auto w-full">
             <HomeHero tenant={null} onSend={handleSend} />
           </GlassPanel>
 
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto w-full">
             <HomeKpiStrip
               monthCost={monthCost}
               pendingApprovals={pendingApprovals}
@@ -152,7 +142,7 @@ export default function HomePage() {
           </div>
 
           {summaryError && (
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-2xl mx-auto w-full">
               <HomeNetworkStatus
                 errors={[{ key: 'summary', message: summaryError }]}
                 onRetry={() => void fetchSummary()}
@@ -165,7 +155,7 @@ export default function HomePage() {
             <RightPanel />
           </div>
         </div>
-      </div>
+      </PageShell>
     </TenantShell>
   );
 }

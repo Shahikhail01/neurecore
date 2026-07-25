@@ -92,7 +92,7 @@ export default function SettingsLayout({
                   href={tab.href}
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition ${
                     isActive
-                      ? "border-indigo-500 text-indigo-400"
+                      ? "border-[color:var(--accent-500)] text-[color:var(--accent-400)]"
                       : "border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-700"
                   }`}
                 >

@@ -94,8 +94,8 @@ export const ApprovalSignalDisplay: FC<ApprovalSignalDisplayProps> = ({
                             <div
                                 className={cn(
                                     'h-full',
-                                    signal.type === SignalType.POSITIVE && 'bg-green-500',
-                                    signal.type === SignalType.NEGATIVE && 'bg-red-500',
+                                    signal.type === SignalType.POSITIVE && 'bg-[color:var(--state-success)]',
+                                    signal.type === SignalType.NEGATIVE && 'bg-[color:var(--state-danger)]',
                                     signal.type === SignalType.UNKNOWN && 'bg-gray-500',
                                 )}
                                 style={{ width: `${signal.weight}%` }}

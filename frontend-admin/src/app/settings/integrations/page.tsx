@@ -120,7 +120,7 @@ export default function AdminIntegrationsPage() {
   return (
     <div className="p-6 space-y-6">
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-400">
+        <div className="bg-[color:var(--state-danger)]/10 border border-[color:var(--state-danger)]/20 rounded-lg p-3 text-sm text-[color:var(--state-danger)]">
           {error}
           <button
             onClick={() => setError(null)}
@@ -131,7 +131,7 @@ export default function AdminIntegrationsPage() {
         </div>
       )}
       {successMessage && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-sm text-green-400">
+        <div className="bg-[color:var(--state-success)]/10 border border-[color:var(--state-success)]/20 rounded-lg p-3 text-sm text-[color:var(--state-success)]">
           {successMessage}
           <button
             onClick={() => setSuccessMessage(null)}
@@ -219,7 +219,7 @@ export default function AdminIntegrationsPage() {
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                        tenant.connected ? "bg-green-500" : "bg-zinc-600"
+                        tenant.connected ? "bg-[color:var(--state-success)]" : "bg-zinc-600"
                       }`}
                     />
                     <div className="min-w-0">
@@ -262,7 +262,7 @@ export default function AdminIntegrationsPage() {
                     <span
                       className={`text-xs px-2 py-0.5 rounded ${
                         tenant.connected
-                          ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                          ? "bg-[color:var(--state-success)]/10 text-[color:var(--state-success)] border border-[color:var(--state-success)]/20"
                           : "bg-zinc-700/50 text-zinc-500 border border-zinc-700/50"
                       }`}
                     >
@@ -273,7 +273,7 @@ export default function AdminIntegrationsPage() {
                       <button
                         onClick={() => handleRevoke(tenant)}
                         disabled={revokingTenantId === tenant.tenantId}
-                        className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        className="text-xs px-2 py-1 rounded bg-[color:var(--state-danger)]/10 text-[color:var(--state-danger)] border border-[color:var(--state-danger)]/20 hover:bg-[color:var(--state-danger)]/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
                         title="Phase 3 (G7) admin override — audited"
                       >
                         {revokingTenantId === tenant.tenantId

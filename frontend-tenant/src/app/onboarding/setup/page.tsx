@@ -17,6 +17,7 @@ import { useTenantAuth } from '@/hooks/useTenantAuth';
 import { tenantsService, type TenantSelf } from '@/services/tenants.service';
 import { onboardingService } from '@/services/onboarding.service';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageShell, PageHero, GlassPanel, GradientText } from '@neurecore/ui-visual';
 import { CompanyStep } from './steps/CompanyStep';
 import { LogoStep } from './steps/LogoStep';
 import { LocalizationStep } from './steps/LocalizationStep';
@@ -100,138 +101,142 @@ export default function OnboardingSetupPage() {
 
   if (!user) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <Skeleton className="h-12 w-full" />
-      </div>
+      <PageShell variant="default">
+        <GlassPanel variant="panel" padding="md">
+          <Skeleton className="h-12 w-full" />
+        </GlassPanel>
+      </PageShell>
     );
   }
 
   if (loading) {
     return (
-      <div className="p-6 max-w-3xl mx-auto space-y-4">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
+      <PageShell variant="default">
+        <GlassPanel variant="panel" padding="md" className="space-y-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </GlassPanel>
+      </PageShell>
     );
   }
 
   const currentIndex = STEPS.findIndex((s) => s.id === step);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary" /> Welcome to NeureCore
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Let us set up your organization in a few quick steps. The rest can
-          wait — find optional items under Things to do on your home page.
-        </p>
-      </div>
+    <PageShell variant="default">
+      <PageHero
+        eyebrow={<><Sparkles className="w-3.5 h-3.5 inline mr-1" /> Setup</>}
+        title="Welcome to NeureCore"
+        subtitle="Let us set up your organization in a few quick steps. The rest can wait — find optional items under Things to do on your home page."
+      />
 
-      <ol className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
-        {STEPS.map((s, i) => {
-          const isComplete = i < currentIndex;
-          const isCurrent = i === currentIndex;
-          return (
-            <li key={s.id} className="flex items-center gap-2 flex-shrink-0">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
-                  isComplete
-                    ? 'bg-green-500 text-white'
-                    : isCurrent
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {isComplete ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
-              </div>
-              <span
-                className={`text-xs ${isCurrent ? 'font-medium' : 'text-muted-foreground'}`}
-              >
-                {s.label}
-              </span>
-              {i < STEPS.length - 1 && (
-                <ArrowRight className="w-3 h-3 text-muted-foreground mx-1" />
-              )}
-            </li>
-          );
-        })}
-      </ol>
+      <GlassPanel variant="panel" padding="md">
+        <ol className="flex items-center gap-2 overflow-x-auto pb-2">
+          {STEPS.map((s, i) => {
+            const isComplete = i < currentIndex;
+            const isCurrent = i === currentIndex;
+            return (
+              <li key={s.id} className="flex items-center gap-2 flex-shrink-0">
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
+                    isComplete
+                      ? 'bg-[color:var(--state-success)] text-white'
+                      : isCurrent
+                        ? 'nv-btn-accent !p-0 !w-7 !h-7'
+                        : 'nv-surface-inline !w-7 !h-7 !rounded-full text-zinc-500'
+                  }`}
+                >
+                  {isComplete ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+                </div>
+                <span
+                  className={`text-xs ${isCurrent ? 'font-medium text-zinc-100' : 'text-zinc-500'}`}
+                >
+                  {s.label}
+                </span>
+                {i < STEPS.length - 1 && (
+                  <ArrowRight className="w-3 h-3 text-zinc-500 mx-1" />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </GlassPanel>
 
       {error && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive mb-4">
+        <GlassPanel variant="panel" padding="md" className="border border-[color:var(--state-danger)]/40 text-[color:var(--state-danger)]">
           {error}
-        </div>
+        </GlassPanel>
       )}
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.15 }}
-        >
-          {step === 'company' && (
-            <CompanyStep
-              initialName={tenant?.name ?? ''}
-              initialIndustry={tenant?.industry ?? ''}
-              isReRun={isReRun}
-              onNext={() => {
-                void refreshTenant();
-                setStep('logo');
-              }}
-            />
-          )}
-          {step === 'logo' && (
-            <LogoStep
-              initialLogoUrl={tenant?.logoUrl ?? null}
-              onNext={() => {
-                void refreshTenant();
-                setStep('localization');
-              }}
-              onBack={() => setStep('company')}
-            />
-          )}
-          {step === 'localization' && (
-            <LocalizationStep
-              initialTimezone={tenant?.timezone ?? 'UTC'}
-              initialCurrency={tenant?.currency ?? 'USD'}
-              onNext={() => {
-                void refreshTenant();
-                setStep('plan');
-              }}
-              onBack={() => setStep('logo')}
-            />
-          )}
-          {step === 'plan' && (
-            <PlanStep
-              initialTierId={tenant?.tierId ?? null}
-              onNext={() => {
-                void refreshTenant();
-                setStep('template');
-              }}
-              onBack={() => setStep('localization')}
-            />
-          )}
-          {step === 'template' && (
-            <TemplateStep
-              initialSlug={null}
-              onNext={() => setStep('integrations')}
-              onSkip={() => setStep('integrations')}
-              onBack={() => setStep('plan')}
-            />
-          )}
-          {step === 'integrations' && (
-            <IntegrationsStep
-              onNext={() => setStep('complete')}
-              onBack={() => setStep('template')}
-            />
-          )}
-          {step === 'complete' && <CompleteStep />}
-        </motion.div>
-      </AnimatePresence>
-    </div>
+      <GlassPanel variant="panel" padding="lg">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15 }}
+          >
+            {step === 'company' && (
+              <CompanyStep
+                initialName={tenant?.name ?? ''}
+                initialIndustry={tenant?.industry ?? ''}
+                isReRun={isReRun}
+                onNext={() => {
+                  void refreshTenant();
+                  setStep('logo');
+                }}
+              />
+            )}
+            {step === 'logo' && (
+              <LogoStep
+                initialLogoUrl={tenant?.logoUrl ?? null}
+                onNext={() => {
+                  void refreshTenant();
+                  setStep('localization');
+                }}
+                onBack={() => setStep('company')}
+              />
+            )}
+            {step === 'localization' && (
+              <LocalizationStep
+                initialTimezone={tenant?.timezone ?? 'UTC'}
+                initialCurrency={tenant?.currency ?? 'USD'}
+                onNext={() => {
+                  void refreshTenant();
+                  setStep('plan');
+                }}
+                onBack={() => setStep('logo')}
+              />
+            )}
+            {step === 'plan' && (
+              <PlanStep
+                initialTierId={tenant?.tierId ?? null}
+                onNext={() => {
+                  void refreshTenant();
+                  setStep('template');
+                }}
+                onBack={() => setStep('localization')}
+              />
+            )}
+            {step === 'template' && (
+              <TemplateStep
+                initialSlug={null}
+                onNext={() => setStep('integrations')}
+                onSkip={() => setStep('integrations')}
+                onBack={() => setStep('plan')}
+              />
+            )}
+            {step === 'integrations' && (
+              <IntegrationsStep
+                onNext={() => setStep('complete')}
+                onBack={() => setStep('template')}
+              />
+            )}
+            {step === 'complete' && <CompleteStep />}
+          </motion.div>
+        </AnimatePresence>
+      </GlassPanel>
+    </PageShell>
   );
 }

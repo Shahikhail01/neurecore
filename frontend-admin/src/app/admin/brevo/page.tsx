@@ -39,7 +39,7 @@ export default function AdminBrevoOverviewPage() {
   if (error && !stats) {
     return (
       <AdminBrevoShell>
-        <div className="p-4 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-200 text-sm">
+        <div className="p-4 rounded-lg border border-rose-500/30 bg-[color:var(--visual-accent-rose-500)]/10 text-rose-200 text-sm">
           {error}
           <button
             onClick={() => void refresh()}
@@ -68,7 +68,7 @@ export default function AdminBrevoOverviewPage() {
   return (
     <AdminBrevoShell>
       {error && (
-        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-sm text-rose-200">
+        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-[color:var(--visual-accent-rose-500)]/10 text-sm text-rose-200">
           {error}
         </div>
       )}
@@ -159,7 +159,7 @@ export default function AdminBrevoOverviewPage() {
           </div>
           <Link
             href="/admin/brevo/suppressions"
-            className="text-xs px-3 py-1.5 rounded border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20"
+            className="text-xs px-3 py-1.5 rounded border border-[color:var(--accent-500)]/30 bg-[color:var(--accent-500)]/10 text-indigo-300 hover:bg-[color:var(--accent-500)]/20"
           >
             Manage suppressions →
           </Link>
@@ -175,7 +175,7 @@ export default function AdminBrevoOverviewPage() {
             </h2>
             <Link
               href="/admin/brevo/tenants"
-              className="text-xs text-indigo-400 hover:underline"
+              className="text-xs text-[color:var(--accent-400)] hover:underline"
             >
               View tenants →
             </Link>
@@ -234,7 +234,7 @@ export default function AdminBrevoOverviewPage() {
             </div>
             <button
               onClick={() => void refresh()}
-              className="text-xs text-indigo-400 hover:underline"
+              className="text-xs text-[color:var(--accent-400)] hover:underline"
             >
               Re-probe
             </button>
@@ -243,8 +243,8 @@ export default function AdminBrevoOverviewPage() {
             <span
               className={`px-2 py-0.5 rounded border ${
                 health.ok
-                  ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-                  : "bg-rose-500/10 text-rose-300 border-rose-500/20"
+                  ? "bg-[color:var(--state-success)]/10 text-emerald-300 border-[color:var(--state-success)]/20"
+                  : "bg-[color:var(--visual-accent-rose-500)]/10 text-rose-300 border-rose-500/20"
               }`}
             >
               {health.ok ? "Healthy" : "Unhealthy"}
@@ -287,7 +287,7 @@ export default function AdminBrevoOverviewPage() {
           </h2>
           <Link
             href="/admin/brevo/tenants"
-            className="text-xs text-indigo-400 hover:underline"
+            className="text-xs text-[color:var(--accent-400)] hover:underline"
           >
             All tenants →
           </Link>
@@ -336,7 +336,7 @@ export default function AdminBrevoOverviewPage() {
           </h2>
           <Link
             href="/admin/brevo/events"
-            className="text-xs text-indigo-400 hover:underline"
+            className="text-xs text-[color:var(--accent-400)] hover:underline"
           >
             Open explorer →
           </Link>

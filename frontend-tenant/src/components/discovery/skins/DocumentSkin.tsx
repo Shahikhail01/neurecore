@@ -36,7 +36,7 @@ export function DocumentSkin({
       <div>
         <label className="block text-sm text-zinc-200 font-medium">
           {question.label}
-          {question.required ? <span className="text-rose-400 ml-0.5">*</span> : null}
+          {question.required ? <span className="text-[color:var(--visual-accent-rose-400)] ml-0.5">*</span> : null}
         </label>
         {question.helpText ? (
           <p className="mt-0.5 text-xs text-zinc-500">{question.helpText}</p>
@@ -46,7 +46,7 @@ export function DocumentSkin({
         Upload a source document
         <input
           type="file"
-          className="mt-1 block w-full text-xs text-zinc-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer"
+          className="mt-1 block w-full text-xs text-zinc-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-[color:var(--accent-500)] file:text-white file:cursor-pointer"
           disabled={disabled}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           data-testid="document-skin-input"
@@ -62,7 +62,7 @@ export function DocumentSkin({
           disabled={submitting || disabled || !file}
           onClick={() => onSubmit(file?.name ?? null)}
           data-testid="document-skin-submit"
-          className="text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="text-sm px-3 py-1.5 rounded bg-[color:var(--accent-500)] text-white hover:bg-[color:var(--accent-500)] disabled:opacity-50"
         >
           {submitting ? 'Saving…' : 'Use document as source'}
         </button>

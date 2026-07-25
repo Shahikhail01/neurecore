@@ -18,6 +18,7 @@ import {
   Sheet,
 } from 'lucide-react';
 
+import { PageShell, PageHero, GlassPanel } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import { integrationsService, type IntegrationsList, type Integration } from '@/services/integrations.service';
 import { Card } from '@/components/ui/card';
@@ -53,10 +54,10 @@ function GoogleIntegrationCard({
   const hasSheets = scopes.some((s) => s.includes('spreadsheets'));
 
   return (
-    <Card className="p-5">
+    <GlassPanel variant="tile" padding="md" interactive className="p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-red-500 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-lg bg-[color:var(--visual-glow-blue)] flex items-center justify-center flex-shrink-0">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -141,7 +142,7 @@ function GoogleIntegrationCard({
           </Button>
         )}
       </div>
-    </Card>
+    </GlassPanel>
   );
 }
 
@@ -257,10 +258,10 @@ function BrevoIntegrationCard({
 
   return (
     <>
-      <Card className="p-5">
+      <GlassPanel variant="tile" padding="md" interactive className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-[color:var(--visual-glow-amber)] flex items-center justify-center flex-shrink-0">
               <Mail className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -289,7 +290,7 @@ function BrevoIntegrationCard({
           communications to stakeholders.
         </p>
         {integration.connected && integration.source === 'master' && (
-          <p className="text-xs text-amber-600 mt-2">
+          <p className="text-xs text-[color:var(--state-warning)] mt-2">
             Currently using the platform fallback master key. Connect your own Brevo
             API key below to use your own sender identity and quota.
           </p>
@@ -302,8 +303,8 @@ function BrevoIntegrationCard({
             animate={{ opacity: 1, y: 0 }}
             className={`mt-3 px-3 py-2 rounded-lg text-xs flex items-center gap-2 ${
               toast.type === 'success'
-                ? 'bg-green-500/15 border border-green-500/30 text-green-600'
-                : 'bg-red-500/15 border border-red-500/30 text-red-600'
+                ? 'border border-[color:var(--state-success)]/40 bg-[color:var(--state-success)]/10 text-[color:var(--state-success)]'
+                : 'border border-[color:var(--state-danger)]/40 bg-[color:var(--state-danger)]/10 text-[color:var(--state-danger)]'
             }`}
           >
             {toast.type === 'success' ? (
@@ -378,13 +379,13 @@ function BrevoIntegrationCard({
             )}
           </div>
         </div>
-      </Card>
+      </GlassPanel>
 
       <Dialog open={testSendOpen} onOpenChange={setTestSendOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Mail className="w-5 h-5 text-orange-500" />
+              <Mail className="w-5 h-5 text-[color:var(--visual-glow-amber)]" />
               Send test email via Brevo
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed">
@@ -425,8 +426,8 @@ function BrevoIntegrationCard({
               <div
                 className={`px-3 py-2 rounded-md text-xs flex items-start gap-2 ${
                   testSendResult.success
-                    ? 'bg-green-500/15 border border-green-500/30 text-green-600'
-                    : 'bg-red-500/15 border border-red-500/30 text-red-600'
+                    ? 'border border-[color:var(--state-success)]/40 bg-[color:var(--state-success)]/10 text-[color:var(--state-success)]'
+                    : 'border border-[color:var(--state-danger)]/40 bg-[color:var(--state-danger)]/10 text-[color:var(--state-danger)]'
                 }`}
               >
                 {testSendResult.success ? (
@@ -468,7 +469,7 @@ function BrevoIntegrationCard({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Mail className="w-5 h-5 text-orange-500" />
+              <Mail className="w-5 h-5 text-[color:var(--visual-glow-amber)]" />
               Connect Brevo Email
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed">
@@ -478,8 +479,8 @@ function BrevoIntegrationCard({
 
           <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
             <div className="space-y-3">
-              <div className="flex gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">1</div>
+              <div className="flex gap-3 p-3 border border-[color:var(--state-info)]/30 bg-[color:var(--state-info)]/10 rounded-lg">
+                <div className="w-6 h-6 rounded-full bg-[color:var(--accent-500)] text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">1</div>
                 <div>
                   <p className="text-sm font-medium">Create Brevo Account</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -490,8 +491,8 @@ function BrevoIntegrationCard({
                 </div>
               </div>
 
-              <div className="flex gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">2</div>
+              <div className="flex gap-3 p-3 border border-[color:var(--state-info)]/30 bg-[color:var(--state-info)]/10 rounded-lg">
+                <div className="w-6 h-6 rounded-full bg-[color:var(--accent-500)] text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">2</div>
                 <div>
                   <p className="text-sm font-medium">Get Your API Key</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -508,8 +509,8 @@ function BrevoIntegrationCard({
                 </div>
               </div>
 
-              <div className="flex gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">3</div>
+              <div className="flex gap-3 p-3 border border-[color:var(--state-info)]/30 bg-[color:var(--state-info)]/10 rounded-lg">
+                <div className="w-6 h-6 rounded-full bg-[color:var(--accent-500)] text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">3</div>
                 <div>
                   <p className="text-sm font-medium">Verify Your Sending Domain</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -519,8 +520,8 @@ function BrevoIntegrationCard({
                 </div>
               </div>
 
-              <div className="flex gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">4</div>
+              <div className="flex gap-3 p-3 border border-[color:var(--state-info)]/30 bg-[color:var(--state-info)]/10 rounded-lg">
+                <div className="w-6 h-6 rounded-full bg-[color:var(--accent-500)] text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">4</div>
                 <div>
                   <p className="text-sm font-medium">Create a Sender Identity</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -533,8 +534,8 @@ function BrevoIntegrationCard({
                 </div>
               </div>
 
-              <div className="flex gap-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <div className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">5</div>
+              <div className="flex gap-3 p-3 border border-[color:var(--state-success)]/30 bg-[color:var(--state-success)]/10 rounded-lg">
+                <div className="w-6 h-6 rounded-full bg-[color:var(--state-success)] text-white text-xs flex items-center justify-center flex-shrink-0 font-semibold mt-0.5">5</div>
                 <div>
                   <p className="text-sm font-medium">Paste API Key Below</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -596,7 +597,7 @@ function BrevoIntegrationCard({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Mail className="w-5 h-5 text-orange-500" />
+              <Mail className="w-5 h-5 text-[color:var(--visual-glow-amber)]" />
               Brevo Setup Guide
             </DialogTitle>
             <DialogDescription className="text-sm">
@@ -608,7 +609,7 @@ function BrevoIntegrationCard({
             <div className="space-y-3">
               <div className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 font-medium">
-                  <div className="w-5 h-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center">1</div>
+                  <div className="w-5 h-5 rounded-full bg-[color:var(--visual-glow-amber)] text-white text-xs flex items-center justify-center">1</div>
                   Create Brevo Account
                 </div>
                 <p className="text-xs text-muted-foreground pl-7">
@@ -620,7 +621,7 @@ function BrevoIntegrationCard({
 
               <div className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 font-medium">
-                  <div className="w-5 h-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center">2</div>
+                  <div className="w-5 h-5 rounded-full bg-[color:var(--visual-glow-amber)] text-white text-xs flex items-center justify-center">2</div>
                   Get Your API Key
                 </div>
                 <p className="text-xs text-muted-foreground pl-7">
@@ -639,7 +640,7 @@ function BrevoIntegrationCard({
 
               <div className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 font-medium">
-                  <div className="w-5 h-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center">3</div>
+                  <div className="w-5 h-5 rounded-full bg-[color:var(--visual-glow-amber)] text-white text-xs flex items-center justify-center">3</div>
                   Verify Your Sending Domain
                 </div>
                 <p className="text-xs text-muted-foreground pl-7">
@@ -654,7 +655,7 @@ function BrevoIntegrationCard({
 
               <div className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 font-medium">
-                  <div className="w-5 h-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center">4</div>
+                  <div className="w-5 h-5 rounded-full bg-[color:var(--visual-glow-amber)] text-white text-xs flex items-center justify-center">4</div>
                   Create Sender Identity
                 </div>
                 <p className="text-xs text-muted-foreground pl-7">
@@ -669,7 +670,7 @@ function BrevoIntegrationCard({
 
               <div className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 font-medium">
-                  <div className="w-5 h-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center">5</div>
+                  <div className="w-5 h-5 rounded-full bg-[color:var(--visual-glow-amber)] text-white text-xs flex items-center justify-center">5</div>
                   Connect to Platform
                 </div>
                 <p className="text-xs text-muted-foreground pl-7">
@@ -678,9 +679,9 @@ function BrevoIntegrationCard({
                 </p>
               </div>
 
-              <div className="border rounded-lg p-3 bg-amber-500/10 border-amber-500/20 space-y-2">
-                <div className="flex items-center gap-2 font-medium text-amber-600">
-                  <div className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center">!</div>
+              <div className="border rounded-lg p-3 border border-[color:var(--state-warning)]/30 bg-[color:var(--state-warning)]/10 space-y-2">
+                <div className="flex items-center gap-2 font-medium text-[color:var(--state-warning)]">
+                  <div className="w-5 h-5 rounded-full bg-[color:var(--state-warning)] text-white text-xs flex items-center justify-center">!</div>
                   Important Notes
                 </div>
                 <ul className="text-xs text-muted-foreground pl-7 list-disc space-y-1">
@@ -704,10 +705,10 @@ function BrevoIntegrationCard({
 
 function SlackIntegrationCard() {
   return (
-    <Card className="p-5 opacity-60">
+    <GlassPanel variant="tile" padding="md" interactive className="p-5 opacity-60">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-[#4A154B] flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-lg bg-[color:var(--visual-glow-rose)] flex items-center justify-center flex-shrink-0">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
               <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 17.688 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM17.688 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 17.688 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 18.956a2.528 2.528 0 0 1-2.523-2.522 2.526 2.526 0 0 1 2.52-2.522h6.313A2.527 2.527 0 0 1 24 17.688a2.528 2.528 0 0 1-2.522 2.523h-6.313z" />
             </svg>
@@ -724,16 +725,16 @@ function SlackIntegrationCard() {
           Notify Me
         </Button>
       </div>
-    </Card>
+    </GlassPanel>
   );
 }
 
 function MicrosoftIntegrationCard() {
   return (
-    <Card className="p-5 opacity-60">
+    <GlassPanel variant="tile" padding="md" interactive className="p-5 opacity-60">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-lg bg-[color:var(--visual-glow-blue)] flex items-center justify-center flex-shrink-0">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
               <path d="M11.4 0H0v11.4h11.4V0zM24 0H12.6v11.4H24V0zM11.4 12.6H0V24h11.4V12.6zM24 12.6H12.6V24H24V12.6z" />
             </svg>
@@ -750,7 +751,7 @@ function MicrosoftIntegrationCard() {
           Notify Me
         </Button>
       </div>
-    </Card>
+    </GlassPanel>
   );
 }
 
@@ -888,13 +889,12 @@ function IntegrationsContent() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Integrations</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Connect external services to power your AI agents.
-        </p>
-      </div>
+    <PageShell variant="default">
+      <PageHero
+        eyebrow="Settings"
+        title="Integrations"
+        subtitle="Connect external services to power your AI agents."
+      />
 
       {error && (
         <motion.div
@@ -916,7 +916,7 @@ function IntegrationsContent() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-sm text-green-500 flex items-center gap-2"
+          className="border border-[color:var(--state-success)]/30 bg-[color:var(--state-success)]/10 rounded-lg p-3 text-sm text-[color:var(--state-success)] flex items-center gap-2"
         >
           <CheckCircle2 className="w-4 h-4" />
           {successMessage}
@@ -981,6 +981,6 @@ function IntegrationsContent() {
           <MicrosoftIntegrationCard />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -56,7 +56,7 @@ export default function QuestionPackDetailPage() {
         {loading ? (
           <div className="text-sm text-zinc-500">Loading…</div>
         ) : error ? (
-          <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+          <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
             {error}
           </div>
         ) : pack ? (
@@ -91,7 +91,7 @@ export default function QuestionPackDetailPage() {
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm text-zinc-100 font-medium">
                       {q.label}
-                      {q.required ? <span className="text-rose-400 ml-0.5">*</span> : null}
+                      {q.required ? <span className="text-[color:var(--visual-accent-rose-400)] ml-0.5">*</span> : null}
                     </span>
                     <span className="text-[10px] font-mono text-zinc-500">
                       {q.id} · {q.type}

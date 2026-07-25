@@ -68,7 +68,7 @@ export function StatsWidget() {
                     <BarChart3 className="w-5 h-5 text-purple-400" />
                     <h3 className="text-lg font-semibold text-white">Performance</h3>
                 </div>
-                <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
+                <div className="flex items-center gap-1 text-[color:var(--state-success)] text-sm font-medium">
                     <TrendingUp className="w-4 h-4" />
                     {trend}
                 </div>

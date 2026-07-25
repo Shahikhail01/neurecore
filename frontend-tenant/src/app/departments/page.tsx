@@ -39,6 +39,7 @@ import {
   Repeat,
 } from 'lucide-react';
 
+import { PageShell, PageHero } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import TenantShell from '@/components/TenantShell';
 import { KpiCard } from '@/components/creatio/KpiCard';
@@ -142,12 +143,19 @@ export default function DepartmentsRosterPage() {
 
   return (
     <TenantShell user={user}>
+      <PageShell variant="default">
+        <PageHero
+          eyebrow="Organization"
+          title="Departments"
+          subtitle="Manage your organization structure, view the hierarchy, and deploy templates."
+        />
       <div className="max-w-7xl mx-auto space-y-5">
         {/* ── Page Header ──────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
+          className="hidden"
         >
           <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-status-strategy/15 text-status-strategy flex items-center justify-center">
@@ -200,6 +208,7 @@ export default function DepartmentsRosterPage() {
           </motion.div>
         </AnimatePresence>
       </div>
+      </PageShell>
     </TenantShell>
   );
 }
@@ -398,7 +407,7 @@ function DepartmentsTab() {
                               agent.status === 'ACTIVE' || agent.status === 'RUNNING' ? 'bg-state-success' :
                               agent.status === 'ERROR' ? 'bg-state-danger' :
                               agent.status === 'PAUSED' ? 'bg-state-warning' :
-                              'bg-zinc-500'
+                              'bg-zinc-500/50'
                             }`} />
                             <span className="text-zinc-300 truncate flex-1">{agent.name}</span>
                             <span className="text-[10px] text-zinc-500">{agent.status}</span>

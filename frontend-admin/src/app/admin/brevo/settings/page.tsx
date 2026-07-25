@@ -23,7 +23,7 @@ export default function AdminBrevoSettingsPage() {
   return (
     <AdminBrevoShell subtitle="Display of platform-level Brevo configuration. Sensitive values are never returned over the wire; only presence + status are shown.">
       {error && (
-        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-sm text-rose-200">
+        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-[color:var(--visual-accent-rose-500)]/10 text-sm text-rose-200">
           {error}
         </div>
       )}
@@ -114,7 +114,7 @@ export default function AdminBrevoSettingsPage() {
             </div>
             <button
               onClick={() => void refresh()}
-              className="text-xs text-indigo-400 hover:underline"
+              className="text-xs text-[color:var(--accent-400)] hover:underline"
             >
               Re-probe
             </button>
@@ -139,7 +139,7 @@ export default function AdminBrevoSettingsPage() {
                 ))}
             </dl>
           ) : (
-            <div className="mt-3 p-3 rounded border border-rose-500/30 bg-rose-500/10 text-xs text-rose-200">
+            <div className="mt-3 p-3 rounded border border-rose-500/30 bg-[color:var(--visual-accent-rose-500)]/10 text-xs text-rose-200">
               {health.error ?? "Brevo account unreachable"}
             </div>
           )}

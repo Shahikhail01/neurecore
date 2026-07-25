@@ -76,8 +76,8 @@ export function AutomationStatusBanner({ projectId, onComplete }: AutomationBann
 
     return (
       <div className="rounded-lg border border-green-200 bg-green-50 p-3 flex items-center gap-2">
-        <span className="text-green-600 text-sm font-medium">✅ AI workforce ready</span>
-        <span className="text-green-500 text-xs">
+        <span className="text-[color:var(--state-success)] text-sm font-medium">✅ AI workforce ready</span>
+        <span className="text-[color:var(--state-success)] text-xs">
           {String(agents)} agents · {String(goals)} goals · {String(tasks)} tasks{cos ? ' · CoS assigned' : ''}
         </span>
       </div>
@@ -87,8 +87,8 @@ export function AutomationStatusBanner({ projectId, onComplete }: AutomationBann
   if (status === 'FAILED') {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2">
-        <span className="text-red-600 text-sm font-medium">❌ AI setup incomplete</span>
-        <span className="text-red-500 text-xs">
+        <span className="text-[color:var(--state-danger)] text-sm font-medium">❌ AI setup incomplete</span>
+        <span className="text-[color:var(--state-danger)] text-xs">
           {(result?.['errors'] as string[])?.[0] ?? 'Automation failed. Trigger manually from project settings.'}
         </span>
       </div>
@@ -97,9 +97,9 @@ export function AutomationStatusBanner({ projectId, onComplete }: AutomationBann
 
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 flex items-center gap-2">
-      <span className="animate-spin text-blue-600">⚙️</span>
-      <span className="text-blue-600 text-sm font-medium">AI is setting up your project...</span>
-      <span className="text-blue-500 text-xs">spawning agents, creating goals, planning tasks</span>
+      <span className="animate-spin text-[color:var(--state-info)]">⚙️</span>
+      <span className="text-[color:var(--state-info)] text-sm font-medium">AI is setting up your project...</span>
+      <span className="text-[color:var(--state-info)] text-xs">spawning agents, creating goals, planning tasks</span>
     </div>
   );
 }

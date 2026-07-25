@@ -76,7 +76,7 @@ export function CompleteStep() {
   if (completed) {
     return (
       <Card className="p-8 text-center space-y-4">
-        <CheckCircle2 className="w-14 h-14 mx-auto text-green-500" />
+        <CheckCircle2 className="w-14 h-14 mx-auto text-[color:var(--state-success)]" />
         <h2 className="text-xl font-semibold">Welcome to NeureCore!</h2>
         <p className="text-sm text-muted-foreground">Redirecting to your portal...</p>
       </Card>
@@ -86,7 +86,7 @@ export function CompleteStep() {
   return (
     <Card className="p-6 space-y-4">
       <div className="text-center space-y-2">
-        <CheckCircle2 className="w-12 h-12 mx-auto text-green-500" />
+        <CheckCircle2 className="w-12 h-12 mx-auto text-[color:var(--state-success)]" />
         <h2 className="text-xl font-semibold">Almost there!</h2>
         <p className="text-sm text-muted-foreground">
           Your workspace is set up. Complete these remaining steps from your

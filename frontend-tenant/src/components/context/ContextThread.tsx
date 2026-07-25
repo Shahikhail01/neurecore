@@ -87,7 +87,7 @@ const ContextThreadComponent: FC<ContextThreadProps> = ({
                     className="flex flex-col items-start"
                 >
                     <div className="flex items-center gap-1.5 mb-1">
-                        <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <Users className="w-4 h-4 text-[color:var(--state-info)] dark:text-[color:var(--state-info)]" />
                         <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Departments</span>
                     </div>
                     <span className="text-base font-bold text-gray-900 dark:text-white">
@@ -103,7 +103,7 @@ const ContextThreadComponent: FC<ContextThreadProps> = ({
                     className="flex flex-col items-start"
                 >
                     <div className="flex items-center gap-1.5 mb-1">
-                        <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <TrendingUp className="w-4 h-4 text-[color:var(--state-success)] dark:text-[color:var(--state-success)]" />
                         <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Progress</span>
                     </div>
                     <span className="text-base font-bold text-gray-900 dark:text-white">

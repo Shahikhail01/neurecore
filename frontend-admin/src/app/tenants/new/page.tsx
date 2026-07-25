@@ -66,7 +66,7 @@ export default function NewTenantPage() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-950 border border-red-800 p-3 text-sm text-red-300">
+          <div className="mb-4 rounded-lg bg-[color:var(--state-danger)] border border-red-800 p-3 text-sm text-red-300">
             {error}
           </div>
         )}
@@ -75,7 +75,7 @@ export default function NewTenantPage() {
           <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-6 space-y-4">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
-                Company Name <span className="text-red-400">*</span>
+                Company Name <span className="text-[color:var(--state-danger)]">*</span>
               </label>
               <input
                 id="name"
@@ -90,7 +90,7 @@ export default function NewTenantPage() {
 
             <div>
               <label htmlFor="slug" className="block text-sm font-medium text-gray-300 mb-1">
-                Slug <span className="text-red-400">*</span>
+                Slug <span className="text-[color:var(--state-danger)]">*</span>
               </label>
               <input
                 id="slug"
@@ -162,7 +162,7 @@ export default function NewTenantPage() {
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium transition"
+              className="px-6 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] disabled:opacity-50 text-white text-sm font-medium transition"
             >
               {loading ? 'Creating…' : 'Create Tenant'}
             </button>

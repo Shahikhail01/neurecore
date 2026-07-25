@@ -54,11 +54,11 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
     secondary:
         'bg-surface-overlay hover:bg-surface-border text-zinc-100 border border-surface-border',
     danger:
-        'bg-state-danger hover:bg-red-600 active:bg-red-700 text-white border border-transparent shadow-sm',
+        'bg-state-danger hover:bg-[color:var(--state-danger)] active:bg-red-700 text-white border border-transparent shadow-sm',
     success:
-        'bg-state-success hover:bg-green-600 active:bg-green-700 text-white border border-transparent shadow-sm',
+        'bg-state-success hover:bg-[color:var(--state-success)] active:bg-green-700 text-white border border-transparent shadow-sm',
     warning:
-        'bg-state-warning hover:bg-amber-600 active:bg-amber-700 text-white border border-transparent shadow-sm',
+        'bg-state-warning hover:bg-[color:var(--state-warning)] active:bg-amber-700 text-white border border-transparent shadow-sm',
     ghost:
         'bg-transparent hover:bg-surface-overlay text-zinc-300 hover:text-zinc-100 border border-transparent',
     outline:

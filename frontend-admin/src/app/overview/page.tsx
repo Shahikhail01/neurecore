@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { PageHero, GlassPanel } from '@neurecore/ui-visual';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { KpiTile } from '@/components/kpi/KpiTile';
@@ -25,14 +26,14 @@ interface TenantRow {
 }
 
 const QUICK_LINKS = [
-  { label: 'Tenants', href: '/tenants', icon: '⬟', color: 'border-indigo-700/40 hover:border-indigo-500/60' },
-  { label: 'Users', href: '/users', icon: '◫', color: 'border-blue-700/40 hover:border-blue-500/60' },
-  { label: 'Employee Fleet', href: '/agents', icon: '◈', color: 'border-violet-700/40 hover:border-violet-500/60' },
-  { label: 'Models', href: '/models', icon: '⬡', color: 'border-cyan-700/40 hover:border-cyan-500/60' },
-  { label: 'Monitoring', href: '/monitoring', icon: '◻', color: 'border-emerald-700/40 hover:border-emerald-500/60' },
-  { label: 'Security', href: '/security', icon: '◌', color: 'border-amber-700/40 hover:border-amber-500/60' },
-  { label: 'Billing', href: '/billing', icon: '⬡', color: 'border-green-700/40 hover:border-green-500/60' },
-  { label: 'Brain Map', href: '/brain', icon: '◈', color: 'border-purple-700/40 hover:border-purple-500/60' },
+  { label: 'Tenants', href: '/tenants', icon: '⬟', color: 'border-[color:var(--accent-500)]/40 hover:border-[color:var(--accent-500)]/60' },
+  { label: 'Users', href: '/users', icon: '◫', color: 'border-[color:var(--state-info)]/40 hover:border-[color:var(--state-info)]/60' },
+  { label: 'Employee Fleet', href: '/agents', icon: '◈', color: 'border border-[color:var(--accent-500)]/40 hover:border-[color:var(--accent-500)]/60' },
+  { label: 'Models', href: '/models', icon: '⬡', color: 'border border-[color:var(--state-info)]/40 hover:border-[color:var(--state-info)]/60' },
+  { label: 'Monitoring', href: '/monitoring', icon: '◻', color: 'border border-[color:var(--state-success)]/40 hover:border-[color:var(--state-success)]/60' },
+  { label: 'Security', href: '/security', icon: '◌', color: 'border border-[color:var(--state-warning)]/40 hover:border-[color:var(--state-warning)]/60' },
+  { label: 'Billing', href: '/billing', icon: '⬡', color: 'border border-[color:var(--state-success)]/40 hover:border-[color:var(--state-success)]/60' },
+  { label: 'Brain Map', href: '/brain', icon: '◈', color: 'border border-[color:var(--accent-500)]/40 hover:border-[color:var(--accent-500)]/60' },
 ];
 
 const RANGE_OPTIONS = [
@@ -75,12 +76,11 @@ export default function OverviewPage() {
 
   return (
     <AdminShell user={user}>
+      <PageHero
+        title="Platform Overview"
+        subtitle="Mission control for the NeureCore platform"
+      />
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* ── Header ── */}
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-100">Platform Overview</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">Mission control for the NeureCore platform</p>
-        </div>
 
         {/* ── KPI tiles ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -114,14 +114,14 @@ export default function OverviewPage() {
                   <button
                     key={opt.value}
                     onClick={() => setRange(opt.value)}
-                    className={`px-2.5 py-1 rounded-md text-xs transition ${range === opt.value ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`px-2.5 py-1 rounded-md text-xs transition ${range === opt.value ? 'bg-[color:var(--accent-500)] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     {opt.label}
                   </button>
                 ))}
               </div>
             </div>
-            <AreaChart data={taskData} dataKey="value" xKey="timestamp" color="#6366f1" loading={taskLoading} height={180} />
+            <AreaChart data={taskData} dataKey="value" xKey="timestamp" color="var(--accent-500)" loading={taskLoading} height={180} />
           </div>
 
           <div className="rounded-xl border border-surface-border bg-surface-raised p-4">
@@ -134,7 +134,7 @@ export default function OverviewPage() {
         <div className="rounded-xl border border-surface-border bg-surface-raised">
           <div className="px-4 py-3 border-b border-surface-border flex items-center justify-between">
             <h3 className="text-sm font-semibold text-zinc-200">Tenants</h3>
-            <Link href="/tenants" className="text-xs text-indigo-400 hover:text-indigo-300 transition">
+            <Link href="/tenants" className="text-xs text-[color:var(--accent-400)] hover:text-[color:var(--accent-300)] transition">
               View all →
             </Link>
           </div>
@@ -159,13 +159,13 @@ export default function OverviewPage() {
                     className="border-t border-surface-border hover:bg-surface-overlay transition"
                   >
                     <td className="px-4 py-2.5 text-sm">
-                      <Link href={`/tenants/${t.id}`} className="text-zinc-200 hover:text-indigo-400 transition">
+                      <Link href={`/tenants/${t.id}`} className="text-zinc-200 hover:text-[color:var(--accent-400)] transition">
                         {t.name}
                       </Link>
                     </td>
                     <td className="px-4 py-2.5">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        t.status === 'ACTIVE' ? 'bg-emerald-900 text-emerald-300' : 'bg-zinc-800 text-zinc-400'
+                        t.status === 'ACTIVE' ? 'border border-[color:var(--state-success)]/40 bg-[color:var(--state-success)]/10 text-[color:var(--state-success)]' : 'bg-white/5 text-zinc-400'
                       }`}>
                         {t.status}
                       </span>

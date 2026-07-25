@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, AuthError } from "@/auth";
 import { routeAfterAuth } from "@/services/auth-redirect.service";
 import { PasswordInput } from "@/components/ui/password-input";
+import { PageShell, GlassPanel, GlassModal } from "@neurecore/ui-visual";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
@@ -173,7 +174,7 @@ function LoginForm({ resetSuccess }: { resetSuccess?: boolean }) {
 
   return (
     <>
-    <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
+    <GlassPanel variant="auth" padding="lg" className="w-full max-w-md">
         <div className="flex justify-center mb-6">
           <img src="/logo.png" alt="NeureCore" className="h-10 w-auto object-contain" />
         </div>
@@ -182,25 +183,25 @@ function LoginForm({ resetSuccess }: { resetSuccess?: boolean }) {
           <GoogleSignInButton onError={handleGoogleError} />
         </div>
         {resetSuccess && !error && (
-          <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+          <div className="mb-4 rounded-lg border border-[color:var(--state-success)]/40 bg-[color:var(--state-success)]/10 p-3 text-sm text-[color:var(--state-success)]">
             Password reset successful. You can now sign in.
           </div>
         )}
         {error && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+          <div className="mb-4 rounded-lg border border-[color:var(--state-danger)]/40 bg-[color:var(--state-danger)]/10 p-3 text-sm text-[color:var(--state-danger)]">
             {error}
           </div>
         )}
         <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200" />
+            <div className="w-full border-t border-white/10" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-gray-400">Or continue with email</span>
+            <span className="nv-surface-inline px-2 text-zinc-400">Or continue with email</span>
           </div>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium">
+          <label className="flex flex-col gap-1 text-sm font-medium text-zinc-300">
             Email
               <input
               type="email"
@@ -208,15 +209,15 @@ function LoginForm({ resetSuccess }: { resetSuccess?: boolean }) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-blue-500"
+              className="nv-surface-inline px-3 py-2 text-base text-zinc-100 outline-none focus:accent-ring placeholder:text-zinc-500"
             />
           </label>
-          <div className="flex flex-col gap-1 text-sm font-medium">
+          <div className="flex flex-col gap-1 text-sm font-medium text-zinc-300">
             <div className="flex items-center justify-between">
               <label htmlFor="password">Password</label>
               <Link
                 href="/forgot-password"
-                className="text-xs font-normal text-blue-600 hover:underline"
+                className="text-xs font-normal text-[color:var(--accent-400)] hover:underline"
               >
                 Forgot password?
               </Link>
@@ -233,57 +234,57 @@ function LoginForm({ resetSuccess }: { resetSuccess?: boolean }) {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition"
+            className="nv-btn-accent mt-2"
           >
             {loading ? "Signing in…" : "Sign In"}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-500">
+        <p className="mt-4 text-center text-sm text-zinc-400">
           No account?{" "}
-          <Link href="/register" className="text-blue-600 hover:underline">
+          <Link href="/register" className="text-[color:var(--accent-400)] hover:underline">
             Register
           </Link>
         </p>
-        <p className="mt-2 text-center text-xs text-gray-400">
+        <p className="mt-2 text-center text-xs text-zinc-500">
           By signing in, you agree to our{" "}
-          <Link href="/terms" className="text-gray-500 hover:underline">
+          <Link href="/terms" className="text-zinc-400 hover:underline">
             Terms of Service
           </Link>{' '}
           and{' '}
-          <Link href="/privacy" className="text-gray-500 hover:underline">
+          <Link href="/privacy" className="text-zinc-400 hover:underline">
             Privacy Policy
           </Link>
         </p>
-      </div>
+      </GlassPanel>
 
-      {linkPrompt && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
-            <h2 className="text-lg font-semibold">Account already exists</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              An account with <strong>{linkPrompt.email}</strong> already exists
-              but is not linked to Google sign-in. How would you like to proceed?
-            </p>
-            <div className="mt-5 flex gap-2 justify-end">
-              <button
-                onClick={() => setLinkPrompt(null)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
-              >
-                Use different Google account
-              </button>
-              <button
-                onClick={() => {
-                  setLinkPrompt(null);
-                  window.dispatchEvent(new Event('neurecore:google-link-account'));
-                }}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
-              >
-                Link this Google account
-              </button>
-            </div>
-          </div>
+      <GlassModal
+        open={!!linkPrompt}
+        onClose={() => setLinkPrompt(null)}
+        title="Account already exists"
+        size="sm"
+      >
+        <p className="text-sm text-zinc-400">
+          An account with <strong className="text-zinc-100">{linkPrompt?.email}</strong> already
+          exists but is not linked to Google sign-in. How would you like to proceed?
+        </p>
+        <div className="mt-5 flex gap-2 justify-end">
+          <button
+            onClick={() => setLinkPrompt(null)}
+            className="nv-surface-inline px-4 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:text-zinc-100"
+          >
+            Use different Google account
+          </button>
+          <button
+            onClick={() => {
+              setLinkPrompt(null);
+              window.dispatchEvent(new Event('neurecore:google-link-account'));
+            }}
+            className="nv-btn-accent"
+          >
+            Link this Google account
+          </button>
         </div>
-      )}
+      </GlassModal>
     </>
   );
 }
@@ -295,10 +296,12 @@ function LoginPageInner() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <Suspense fallback={<LoginForm />}>
-        <LoginPageInner />
-      </Suspense>
-    </main>
+    <PageShell variant="auth">
+      <div className="flex items-center justify-center min-h-[calc(100vh-3rem)]">
+        <Suspense fallback={<LoginForm />}>
+          <LoginPageInner />
+        </Suspense>
+      </div>
+    </PageShell>
   );
 }

@@ -30,9 +30,9 @@ const DecisionBadge: React.FC<{
     icon: React.ReactNode;
 }> = ({ decision, label, icon }) => {
     const colors = {
-        approve: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
-        reject: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-        review: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+        approve: 'bg-emerald-100 text-emerald-700 dark:bg-[color:var(--state-success)] dark:text-emerald-300',
+        reject: 'bg-red-100 text-red-700 dark:bg-[color:var(--state-danger)] dark:text-red-300',
+        review: 'bg-amber-100 text-amber-700 dark:bg-[color:var(--state-warning)] dark:text-amber-300',
     };
 
     return (
@@ -178,8 +178,8 @@ export const LearningFeedbackModalComponent: React.FC<
                                     </p>
                                     <div className="grid grid-cols-2 gap-3">
                                         {/* AI Recommendation */}
-                                        <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                                            <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-2">
+                                        <div className="p-3 bg-blue-50 dark:bg-[color:var(--state-info)] rounded-lg border border-blue-200 dark:border-blue-800">
+                                            <p className="text-xs text-[color:var(--state-info)] dark:text-[color:var(--state-info)] font-semibold mb-2">
                                                 AI Recommended
                                             </p>
                                             <DecisionBadge
@@ -204,8 +204,8 @@ export const LearningFeedbackModalComponent: React.FC<
                                         </div>
 
                                         {/* Your Decision */}
-                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mb-2">
+                                        <div className="p-3 bg-emerald-50 dark:bg-[color:var(--state-success)] rounded-lg border border-emerald-200 dark:border-emerald-800">
+                                            <p className="text-xs text-[color:var(--state-success)] dark:text-[color:var(--state-success)] font-semibold mb-2">
                                                 You Chose
                                             </p>
                                             <DecisionBadge
@@ -229,7 +229,7 @@ export const LearningFeedbackModalComponent: React.FC<
                                         <motion.div
                                             initial={{ opacity: 0, y: -10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            className="p-2 bg-amber-50 dark:bg-amber-950 rounded border border-amber-200 dark:border-amber-800"
+                                            className="p-2 bg-amber-50 dark:bg-[color:var(--state-warning)] rounded border border-amber-200 dark:border-amber-800"
                                         >
                                             <p className="text-xs text-amber-700 dark:text-amber-300">
                                                 <span className="font-semibold">
@@ -254,7 +254,7 @@ export const LearningFeedbackModalComponent: React.FC<
                                                 whileTap={{ scale: 0.95 }}
                                                 onClick={() => setFocusedReason(reason)}
                                                 className={`px-2.5 py-1.5 text-xs rounded-md font-medium transition-colors ${focusedReason === reason
-                                                        ? 'bg-blue-600 text-white'
+                                                        ? 'bg-[color:var(--state-info)] text-white'
                                                         : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700'
                                                     }`}
                                             >
@@ -296,7 +296,7 @@ export const LearningFeedbackModalComponent: React.FC<
                                     whileTap={{ scale: 0.98 }}
                                     onClick={handleSubmit}
                                     disabled={isSubmitting}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-[color:var(--state-info)] text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
                                 >
                                     {isSubmitting ? (
                                         <>

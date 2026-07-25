@@ -15,6 +15,7 @@
 
 import { useState, useMemo } from 'react';
 import { ChevronRight, Search, Check } from 'lucide-react';
+import { GlassPanel } from '@neurecore/ui-visual';
 import {
   INDUSTRY_GROUPS,
   INDUSTRY_GROUP_INDUSTRIES,
@@ -87,9 +88,9 @@ export function IndustryGroupPicker({
         />
       </div>
 
-      <div className="rounded-lg border border-input overflow-hidden divide-y divide-border bg-background">
+      <GlassPanel variant="panel" padding="none" className="overflow-hidden divide-y divide-white/10">
         {filteredGroups.length === 0 && (
-          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+          <div className="px-4 py-6 text-center text-sm text-zinc-400">
             No industries match "{search}"
           </div>
         )}
@@ -101,22 +102,22 @@ export function IndustryGroupPicker({
               <button
                 type="button"
                 onClick={() => setOpenGroup(isOpen ? null : group.slug)}
-                className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-accent/50 transition"
+                className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-white/5 transition"
               >
                 <div>
-                  <div className="text-sm font-medium text-foreground">{group.label}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
+                  <div className="text-sm font-medium text-zinc-100">{group.label}</div>
+                  <div className="text-xs text-zinc-500 mt-0.5">
                     {group.description} · {items.length} {items.length === 1 ? 'industry' : 'industries'}
                   </div>
                 </div>
                 <ChevronRight
-                  className={`w-4 h-4 text-muted-foreground transition-transform ${
+                  className={`w-4 h-4 text-zinc-500 transition-transform ${
                     isOpen ? 'rotate-90' : ''
                   }`}
                 />
               </button>
               {isOpen && items.length > 0 && (
-                <div className="bg-muted/30 px-2 py-2 space-y-1">
+                <div className="bg-white/5 px-2 py-2 space-y-1">
                   {items.map((ind) => {
                     const isSelected = value === ind.slug;
                     return (
@@ -126,8 +127,8 @@ export function IndustryGroupPicker({
                         onClick={() => onChange(ind.slug)}
                         className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-left transition ${
                           isSelected
-                            ? 'bg-primary/10 text-primary ring-1 ring-primary/30'
-                            : 'hover:bg-accent/60 text-foreground'
+                            ? 'bg-[color:var(--accent-500)]/15 text-[color:var(--accent-400)] ring-1 ring-[color:var(--accent-500)]/30'
+                            : 'hover:bg-white/10 text-zinc-100'
                         }`}
                       >
                         <span className="text-sm">{ind.name}</span>
@@ -140,7 +141,7 @@ export function IndustryGroupPicker({
             </div>
           );
         })}
-      </div>
+      </GlassPanel>
 
       {showSubIndustries && selectedIndustry && (
         <p className="text-xs text-muted-foreground">

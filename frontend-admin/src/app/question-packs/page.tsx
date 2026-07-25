@@ -75,7 +75,7 @@ export default function QuestionPacksPage() {
           {canEdit && (
             <Link
               href="/question-packs/new"
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+              className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
             >
               + New Question Pack
             </Link>
@@ -134,7 +134,7 @@ export default function QuestionPacksPage() {
                     <span className="ml-2 text-xs text-zinc-500 font-mono">{pack.key}</span>
                     <div className="flex items-center gap-2 mt-1">
                       {pack.isSystem ? (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-400 border border-amber-800">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--state-warning)]/40 text-[color:var(--state-warning)] border border-amber-800">
                           SYSTEM
                         </span>
                       ) : null}
@@ -151,7 +151,7 @@ export default function QuestionPacksPage() {
                     <div className="flex flex-col gap-2 shrink-0">
                       <Link
                         href={`/question-packs/${pack.id}/edit`}
-                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                       >
                         Edit
                       </Link>
@@ -159,7 +159,7 @@ export default function QuestionPacksPage() {
                         <button
                           type="button"
                           onClick={() => setDeleting(pack)}
-                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-red-400 hover:border-red-700 transition"
+                          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-[color:var(--state-danger)] hover:border-[color:var(--state-danger)] transition"
                         >
                           ✕
                         </button>

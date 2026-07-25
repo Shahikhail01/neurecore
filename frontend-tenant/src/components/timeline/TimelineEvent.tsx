@@ -49,13 +49,13 @@ interface TimelineEventCardProps {
 const getEventIcon = (type: TimelineEventType): ReactNode => {
     const iconClass = 'w-5 h-5';
     const iconMap: Record<TimelineEventType, ReactNode> = {
-        APPROVAL_NEEDED: <AlertCircle className={cn(iconClass, 'text-red-500')} />,
-        ACTION_TAKEN: <CheckCircle2 className={cn(iconClass, 'text-green-500')} />,
+        APPROVAL_NEEDED: <AlertCircle className={cn(iconClass, 'text-[color:var(--state-danger)]')} />,
+        ACTION_TAKEN: <CheckCircle2 className={cn(iconClass, 'text-[color:var(--state-success)]')} />,
         OPPORTUNITY: <Star className={cn(iconClass, 'text-yellow-500')} />,
-        FYI: <Info className={cn(iconClass, 'text-blue-500')} />,
+        FYI: <Info className={cn(iconClass, 'text-[color:var(--state-info)]')} />,
         BLOCKER: <AlertTriangle className={cn(iconClass, 'text-orange-500')} />,
         MILESTONE: <Trophy className={cn(iconClass, 'text-purple-500')} />,
-        ALERT: <Flag className={cn(iconClass, 'text-red-600')} />,
+        ALERT: <Flag className={cn(iconClass, 'text-[color:var(--state-danger)]')} />,
     };
 
     return iconMap[type];

@@ -78,7 +78,7 @@ export function ApprovalTemplateEditor({
               value={step.approverRole}
               onChange={(e) => update(idx, { approverRole: e.target.value })}
               disabled={readOnly}
-              className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+              className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
             >
               {APPROVER_ROLES.map((r) => (
                 <option key={r} value={r}>
@@ -92,7 +92,7 @@ export function ApprovalTemplateEditor({
                 update(idx, { approvalType: e.target.value as ApprovalStep['approvalType'] })
               }
               disabled={readOnly}
-              className="px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+              className="px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
             >
               <option value="INTERNAL">INTERNAL</option>
               <option value="CLIENT_FACING">CLIENT_FACING</option>
@@ -102,7 +102,7 @@ export function ApprovalTemplateEditor({
               <button
                 type="button"
                 onClick={() => remove(idx)}
-                className="text-zinc-600 hover:text-red-400 transition"
+                className="text-zinc-600 hover:text-[color:var(--state-danger)] transition"
                 aria-label="Remove step"
               >
                 <span aria-hidden className="text-sm">×</span>
@@ -121,7 +121,7 @@ export function ApprovalTemplateEditor({
                   onClick={() => toggleRisk(idx, tier)}
                   className={`text-[10px] px-2 py-0.5 rounded border transition ${
                     active
-                      ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
+                      ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/10 text-indigo-300'
                       : 'border-surface-border text-zinc-500 hover:text-zinc-300'
                   } disabled:opacity-50`}
                 >

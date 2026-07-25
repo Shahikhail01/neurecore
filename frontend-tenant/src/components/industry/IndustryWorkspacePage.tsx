@@ -16,9 +16,15 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Plus, ArrowLeft, Briefcase, Building2, Calendar, AlertCircle, Loader2 } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  PageShell,
+  PageHero,
+  GlassPanel,
+  StatTile,
+  StatRow,
+} from '@neurecore/ui-visual';
 import { projectsService, type Project, type ProjectStatus } from '@/services/projects.service';
 import { tenantsService } from '@/services/tenants.service';
 import { projectTypesService } from '@/services/projectTypes.service';
@@ -109,81 +115,89 @@ export function IndustryWorkspacePage({ config }: { config: IndustryWorkspaceCon
   ];
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div>
-        <Link
-          href="/home"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Home
-        </Link>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold">{config.title}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{config.description}</p>
+    <PageShell variant="default">
+      <PageHero
+        eyebrow={
+          <span className="inline-flex items-center gap-1">
+            <Link href="/home" className="inline-flex items-center gap-1 hover:text-zinc-300">
+              <ArrowLeft className="w-3.5 h-3.5" /> Home
+            </Link>
+          </span>
+        }
+        title={config.title}
+        subtitle={
+          <>
+            {config.description}
             {tenant?.industry && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Industry: <strong className="text-foreground">{tenant.industry}</strong>
-              </p>
+              <span className="block mt-1 text-xs text-zinc-500">
+                Industry: <strong className="text-zinc-300">{tenant.industry}</strong>
+              </span>
             )}
-          </div>
+          </>
+        }
+        actions={
           <Link href="/projects/new">
-            <Button>
+            <Button className="nv-btn-accent">
               <Plus className="w-4 h-4 mr-1" /> New Project
             </Button>
           </Link>
-        </div>
-      </div>
+        }
+      />
 
       {kpis.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {kpis.map((k) => (
-            <Card key={k.label} className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">{k.label}</p>
-              <p className="text-2xl font-bold mt-1">{k.value}</p>
-            </Card>
+        <StatRow>
+          {kpis.map((k, i) => (
+            <StatTile
+              key={k.label}
+              label={k.label}
+              value={k.value as React.ReactNode}
+              accent={(['violet', 'cyan', 'emerald', 'amber'] as const)[i % 4]}
+              loading={loading}
+            />
           ))}
-        </div>
+        </StatRow>
       )}
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <label className="text-xs text-muted-foreground">Status:</label>
-        {(['ALL', ...STATUS_OPTIONS] as Array<ProjectStatus | 'ALL'>).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition border ${
-              statusFilter === s
-                ? 'border-primary bg-primary/10 text-foreground'
-                : 'border-border bg-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      <GlassPanel variant="panel" padding="md">
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="text-xs text-zinc-400">Status:</label>
+          {(['ALL', ...STATUS_OPTIONS] as Array<ProjectStatus | 'ALL'>).map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition border ${
+                statusFilter === s
+                  ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/15 text-zinc-100'
+                  : 'border-white/10 bg-transparent text-zinc-400 hover:text-zinc-100'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </GlassPanel>
 
       {loading ? (
-        <Card className="p-8 text-center flex items-center justify-center gap-2">
+        <GlassPanel variant="panel" padding="lg" className="text-center flex items-center justify-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading {config.title.toLowerCase()} projects...
-        </Card>
+        </GlassPanel>
       ) : error ? (
-        <Card className="p-6 border-destructive/30 bg-destructive/5 text-sm text-destructive flex items-start gap-2">
+        <GlassPanel variant="panel" padding="md" className="border border-[color:var(--state-danger)]/40 text-sm text-[color:var(--state-danger)] flex items-start gap-2">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error}</span>
-        </Card>
+        </GlassPanel>
       ) : filteredProjects.length === 0 ? (
-        <Card className="p-8 text-center">
-          <Briefcase className="w-10 h-10 mx-auto text-muted-foreground/40" />
-          <p className="mt-3 text-sm text-muted-foreground">
+        <GlassPanel variant="panel" padding="lg" className="text-center">
+          <Briefcase className="w-10 h-10 mx-auto text-zinc-500" />
+          <p className="mt-3 text-sm text-zinc-400">
             No {config.title.toLowerCase()} projects yet.
           </p>
           <Link href="/projects/new">
-            <Button className="mt-4">
+            <Button className="nv-btn-accent mt-4">
               <Plus className="w-4 h-4 mr-1" /> Create the first one
             </Button>
           </Link>
-        </Card>
+        </GlassPanel>
       ) : (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
@@ -193,19 +207,19 @@ export function IndustryWorkspacePage({ config }: { config: IndustryWorkspaceCon
         >
           {filteredProjects.map((p) => (
             <Link key={p.id} href={`/projects/${p.id}`}>
-              <Card className="p-4 hover:border-primary/40 transition cursor-pointer">
+              <GlassPanel variant="tile" padding="md" interactive className="block">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold truncate">{p.name}</h3>
+                    <h3 className="font-semibold truncate text-zinc-100">{p.name}</h3>
                     {p.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
                         {p.description}
                       </p>
                     )}
                   </div>
                   <Badge variant="outline">{p.status}</Badge>
                 </div>
-                <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-3 mt-3 text-xs text-zinc-400">
                   {p.customer?.name && (
                     <span className="inline-flex items-center gap-1">
                       <Building2 className="w-3 h-3" /> {p.customer.name}
@@ -218,11 +232,12 @@ export function IndustryWorkspacePage({ config }: { config: IndustryWorkspaceCon
                   )}
                   {p.priority && <Badge variant="secondary">{p.priority}</Badge>}
                 </div>
-              </Card>
+              </GlassPanel>
             </Link>
           ))}
         </motion.div>
       )}
-    </div>
+
+      </PageShell>
   );
 }

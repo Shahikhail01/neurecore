@@ -56,7 +56,7 @@ export default function ThreadInboxPanel() {
   }
 
   const statusColor = (status: string) =>
-    status === 'ACTIVE' ? 'bg-emerald-500' : status === 'CLOSED' ? 'bg-rose-500' : 'bg-zinc-500';
+    status === 'ACTIVE' ? 'bg-[color:var(--state-success)]' : status === 'CLOSED' ? 'bg-[color:var(--visual-accent-rose-500)]' : 'bg-zinc-500';
 
   return (
     <div className="flex h-full min-h-[500px] gap-0 border border-surface-border rounded-xl overflow-hidden bg-surface">
@@ -67,7 +67,7 @@ export default function ThreadInboxPanel() {
             <Hash className="w-4 h-4 text-zinc-400" />
             <span className="text-sm font-semibold text-zinc-100">Threads</span>
             {unreadCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-600 text-white font-medium">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[color:var(--accent-500)] text-white font-medium">
                 {unreadCount}
               </span>
             )}
@@ -90,7 +90,7 @@ export default function ThreadInboxPanel() {
           )}
 
           {error && (
-            <div className="flex items-center justify-center py-8 gap-2 text-rose-400">
+            <div className="flex items-center justify-center py-8 gap-2 text-[color:var(--visual-accent-rose-400)]">
               <AlertCircle className="w-4 h-4" />
               <span className="text-xs">{error}</span>
             </div>

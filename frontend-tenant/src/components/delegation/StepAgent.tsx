@@ -49,7 +49,7 @@ export function StepAgent({ form, patch }: Props) {
         onClick={() => select(null)}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm transition ${
           form.agentId === null
-            ? 'border-violet-500 bg-violet-500/10 text-violet-200'
+            ? 'border-violet-500 bg-[color:var(--accent-500)]/10 text-violet-200'
             : 'border-surface-border text-zinc-400 hover:border-zinc-600 hover:bg-surface-overlay'
         }`}
       >
@@ -66,7 +66,7 @@ export function StepAgent({ form, patch }: Props) {
             onClick={() => select(agent)}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm transition ${
               selected
-                ? 'border-violet-500 bg-violet-500/10 text-violet-200'
+                ? 'border-violet-500 bg-[color:var(--accent-500)]/10 text-violet-200'
                 : 'border-surface-border text-zinc-300 hover:border-zinc-600 hover:bg-surface-overlay'
             }`}
           >

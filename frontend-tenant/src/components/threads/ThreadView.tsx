@@ -101,7 +101,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
         {onClose && (
           <button
             onClick={onClose}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition"
+            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-zinc-500 hover:text-[color:var(--visual-accent-rose-400)] hover:bg-[color:var(--visual-accent-rose-500)]/10 transition"
             title="Close thread"
           >
             <Archive className="w-3 h-3" />
@@ -120,7 +120,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
         )}
 
         {error && !loading && (
-          <div className="text-center py-8 text-rose-400 text-xs">{error}</div>
+          <div className="text-center py-8 text-[color:var(--visual-accent-rose-400)] text-xs">{error}</div>
         )}
 
         {!loading && !error && messages.length === 0 && (
@@ -146,7 +146,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
                     msg.role === 'HERMES'
-                      ? 'bg-indigo-500/20 text-indigo-300'
+                      ? 'bg-[color:var(--accent-500)]/20 text-indigo-300'
                       : 'bg-zinc-700 text-zinc-400'
                   }`}
                 >
@@ -171,7 +171,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
                 <div
                   className={`rounded-xl px-3 py-2 text-sm leading-relaxed ${
                     isUser
-                      ? 'bg-indigo-600/30 text-zinc-100 rounded-br-sm'
+                      ? 'bg-[color:var(--accent-500)]/30 text-zinc-100 rounded-br-sm'
                       : 'bg-surface-raised text-zinc-200 rounded-bl-sm'
                   }`}
                 >
@@ -180,7 +180,7 @@ export default function ThreadView({ threadId, onClose }: ThreadViewProps) {
               </div>
 
               {isUser && !isConsecutive && (
-                <div className="w-6 h-6 rounded-full bg-indigo-600/30 flex items-center justify-center shrink-0 mt-0.5 text-indigo-300">
+                <div className="w-6 h-6 rounded-full bg-[color:var(--accent-500)]/30 flex items-center justify-center shrink-0 mt-0.5 text-indigo-300">
                   {roleIcon(msg.role)}
                 </div>
               )}

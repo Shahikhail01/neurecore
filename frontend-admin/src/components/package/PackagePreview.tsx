@@ -57,7 +57,7 @@ export function PackagePreview({
       {(missing.departments.length > 0 ||
         missing.agents.length > 0 ||
         missing.features.length > 0) && (
-        <div className="rounded-lg bg-red-950/50 border border-red-800/60 p-2 text-xs text-red-200">
+        <div className="rounded-lg bg-[color:var(--state-danger)]/50 border border-red-800/60 p-2 text-xs text-red-200">
           {missing.departments.length + missing.agents.length + missing.features.length}{' '}
           references won't resolve
         </div>

@@ -92,7 +92,7 @@ export default function CostSummaryPage() {
           </button>
         </div>
         {error ? (
-          <div className="rounded-md border border-red-800 bg-red-950/30 px-3 py-2 text-sm text-red-300">
+          <div className="rounded-md border border-red-800 bg-[color:var(--state-danger)]/30 px-3 py-2 text-sm text-red-300">
             {error}
           </div>
         ) : null}

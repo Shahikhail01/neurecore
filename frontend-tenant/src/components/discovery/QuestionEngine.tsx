@@ -60,7 +60,7 @@ export function QuestionEngine({
   }
   if (error) {
     return (
-      <div className="text-xs text-rose-400" data-testid="question-engine-error">
+      <div className="text-xs text-[color:var(--visual-accent-rose-400)]" data-testid="question-engine-error">
         {error}
       </div>
     );
@@ -73,7 +73,7 @@ export function QuestionEngine({
           <button
             type="button"
             onClick={onComplete}
-            className="text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-500"
+            className="text-sm px-3 py-1.5 rounded bg-[color:var(--accent-500)] text-white hover:bg-[color:var(--accent-500)]"
           >
             Continue
           </button>

@@ -106,10 +106,10 @@ export function ApprovalsModal({
                             <span
                               className={`text-[10px] px-1.5 py-0.5 rounded border ${
                                 d.riskTier === 'HIGH'
-                                  ? 'border-red-500/30 text-red-400'
+                                  ? 'border-[color:var(--state-danger)]/30 text-[color:var(--state-danger)]'
                                   : d.riskTier === 'MEDIUM'
                                     ? 'border-yellow-500/30 text-yellow-400'
-                                    : 'border-green-500/30 text-green-400'
+                                    : 'border-[color:var(--state-success)]/30 text-[color:var(--state-success)]'
                               }`}
                             >
                               {d.riskTier}
@@ -122,7 +122,7 @@ export function ApprovalsModal({
                         <ActionButton
                           variant="ghost"
                           size="sm"
-                          icon={<CheckSquare className="w-3.5 h-3.5 text-green-400" />}
+                          icon={<CheckSquare className="w-3.5 h-3.5 text-[color:var(--state-success)]" />}
                           onClick={() => handleApprove(d.id, d.taskId)}
                         >
                           Approve
@@ -130,7 +130,7 @@ export function ApprovalsModal({
                         <ActionButton
                           variant="ghost"
                           size="sm"
-                          icon={<XSquare className="w-3.5 h-3.5 text-red-400" />}
+                          icon={<XSquare className="w-3.5 h-3.5 text-[color:var(--state-danger)]" />}
                           onClick={() => handleReject(d.id, d.taskId)}
                         >
                           Reject
@@ -163,9 +163,9 @@ export function ApprovalsModal({
                             key={step.id}
                             className={`flex items-center gap-1 text-xs px-2 py-1 rounded border ${
                               step.status === 'APPROVED'
-                                ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                                ? 'border-[color:var(--state-success)]/30 bg-[color:var(--state-success)]/10 text-[color:var(--state-success)]'
                                 : step.status === 'REJECTED'
-                                  ? 'border-red-500/30 bg-red-500/10 text-red-400'
+                                  ? 'border-[color:var(--state-danger)]/30 bg-[color:var(--state-danger)]/10 text-[color:var(--state-danger)]'
                                   : 'border-surface-border text-zinc-400'
                             }`}
                           >

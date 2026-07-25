@@ -7,7 +7,7 @@ export default function HomePage() {
       <p className="text-gray-400 text-lg">Super Admin Control Plane</p>
       <Link
         href="/login"
-        className="rounded-lg bg-indigo-600 px-6 py-3 text-white font-medium hover:bg-indigo-700 transition"
+        className="rounded-lg bg-[color:var(--accent-500)] px-6 py-3 text-white font-medium hover:bg-indigo-700 transition"
       >
         Sign In
       </Link>

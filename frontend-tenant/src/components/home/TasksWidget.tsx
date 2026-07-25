@@ -21,7 +21,7 @@ export function TasksWidget() {
         <GlassPanel className="p-6 h-full flex flex-col">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                    <CheckSquare className="w-5 h-5 text-green-400" />
+                    <CheckSquare className="w-5 h-5 text-[color:var(--state-success)]" />
                     <h3 className="text-lg font-semibold text-white">Tasks</h3>
                 </div>
                 {completedCount > 0 && (

@@ -24,7 +24,7 @@ interface SystemMetric {
 function StatusDot({ status }: { status: 'ok' | 'degraded' | 'down' }) {
   if (status === 'ok') return <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />;
   if (status === 'degraded') return <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />;
-  return <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />;
+  return <span className="inline-block w-2 h-2 rounded-full bg-[color:var(--state-danger)] animate-pulse" />;
 }
 
 const STATIC_HEALTH: HealthCheck[] = [
@@ -90,9 +90,9 @@ export default function AdminInfrastructurePage() {
 
         {/* Overall Status Banner */}
         <div className={`rounded-xl border p-4 flex items-center gap-3 ${
-          overallStatus === 'ok' ? 'border-emerald-800 bg-emerald-950' :
-          overallStatus === 'degraded' ? 'border-amber-800 bg-amber-950' :
-          'border-red-800 bg-red-950'
+          overallStatus === 'ok' ? 'border-emerald-800 bg-[color:var(--state-success)]' :
+          overallStatus === 'degraded' ? 'border-amber-800 bg-[color:var(--state-warning)]' :
+          'border-red-800 bg-[color:var(--state-danger)]'
         }`}>
           <StatusDot status={overallStatus} />
           <div>
@@ -118,12 +118,12 @@ export default function AdminInfrastructurePage() {
                   <StatusDot status={h.status} />
                 </div>
                 {h.latencyMs !== undefined && (
-                  <div className="text-xs text-gray-500 mb-1">Latency: <span className="text-emerald-400">{h.latencyMs}ms</span></div>
+                  <div className="text-xs text-gray-500 mb-1">Latency: <span className="text-[color:var(--state-success)]">{h.latencyMs}ms</span></div>
                 )}
                 {h.detail && <div className="text-xs text-gray-600">{h.detail}</div>}
                 <div className={`mt-2 text-xs font-medium ${
-                  h.status === 'ok' ? 'text-emerald-400' :
-                  h.status === 'degraded' ? 'text-amber-400' : 'text-red-400'
+                  h.status === 'ok' ? 'text-[color:var(--state-success)]' :
+                  h.status === 'degraded' ? 'text-[color:var(--state-warning)]' : 'text-[color:var(--state-danger)]'
                 }`}>
                   {h.status === 'ok' ? '● Healthy' :
                    h.status === 'degraded' ? '● Degraded' : '● Down'}

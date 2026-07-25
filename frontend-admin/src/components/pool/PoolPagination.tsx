@@ -47,7 +47,7 @@ export function PoolPagination({
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
-          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed transition"
+          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] disabled:opacity-30 disabled:cursor-not-allowed transition"
         >
           ‹ Prev
         </button>
@@ -62,8 +62,8 @@ export function PoolPagination({
               onClick={() => onPageChange(p as number)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                 p === page
-                  ? 'bg-indigo-600 text-white'
-                  : 'border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500'
+                  ? 'bg-[color:var(--accent-500)] text-white'
+                  : 'border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)]'
               }`}
             >
               {p}
@@ -73,7 +73,7 @@ export function PoolPagination({
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
-          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed transition"
+          className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] disabled:opacity-30 disabled:cursor-not-allowed transition"
         >
           Next ›
         </button>

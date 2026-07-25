@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { PageShell, PageHero, GlassPanel } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import { integrationsService } from '@/services/integrations.service';
 import { Card } from '@/components/ui/card';
@@ -116,15 +117,17 @@ function ManageGoogleContent() {
   const hasSheets = scopes.some((s) => s.includes('spreadsheets'));
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <div className="flex items-center gap-3">
-        <Link href="/settings/integrations">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="w-4 h-4 mr-1" /> Back
-          </Button>
-        </Link>
-        <h1 className="text-xl font-semibold">Google Workspace</h1>
-      </div>
+    <PageShell variant="default">
+      <PageHero
+        title="Google Workspace"
+        actions={
+          <Link href="/settings/integrations">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="w-4 h-4 mr-1" /> Back
+            </Button>
+          </Link>
+        }
+      />
 
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">
@@ -133,7 +136,7 @@ function ManageGoogleContent() {
         </div>
       )}
 
-      <Card className="p-5">
+      <GlassPanel variant="tile" padding="md" interactive className="p-5">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm text-muted-foreground">Connected account</div>
@@ -151,9 +154,9 @@ function ManageGoogleContent() {
             )}
           </Badge>
         </div>
-      </Card>
+      </GlassPanel>
 
-      <Card className="p-5 space-y-3">
+      <GlassPanel variant="tile" padding="md" interactive className="p-5 space-y-3">
         <div>
           <h2 className="font-semibold text-sm">Granted scopes</h2>
           <p className="text-xs text-muted-foreground mt-1">
@@ -166,10 +169,10 @@ function ManageGoogleContent() {
           <ScopeRow granted={hasCalendar} icon={<Calendar className="w-4 h-4" />} label="Google Calendar" description="Read, write events" />
           <ScopeRow granted={hasSheets} icon={<Sheet className="w-4 h-4" />} label="Google Sheets" description="Read, write spreadsheets" />
         </div>
-      </Card>
+      </GlassPanel>
 
       {status?.connected && (
-        <Card className="p-5 space-y-3">
+        <GlassPanel variant="tile" padding="md" interactive className="p-5 space-y-3">
           <div>
             <h2 className="font-semibold text-sm">Open Google apps</h2>
             <p className="text-xs text-muted-foreground mt-1">
@@ -179,9 +182,9 @@ function ManageGoogleContent() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <Link href="/settings/integrations/sheets">
-              <div className="border border-border rounded-md p-3 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition cursor-pointer flex items-center justify-between gap-3">
+              <div className="border border-border rounded-md p-3 hover:border-[color:var(--state-success)]/40 hover:bg-[color:var(--state-success)]/5 transition cursor-pointer flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <FileSpreadsheet className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                  <FileSpreadsheet className="w-5 h-5 text-[color:var(--state-success)] flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Google Sheets</p>
                     <p className="text-xs text-muted-foreground">Browse, create, edit</p>
@@ -191,9 +194,9 @@ function ManageGoogleContent() {
               </div>
             </Link>
             <Link href="/settings/integrations/calendar">
-              <div className="border border-border rounded-md p-3 hover:border-blue-500/40 hover:bg-blue-500/5 transition cursor-pointer flex items-center justify-between gap-3">
+              <div className="border border-border rounded-md p-3 hover:border-[color:var(--state-info)]/40 hover:bg-[color:var(--state-info)]/5 transition cursor-pointer flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Calendar className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                  <Calendar className="w-5 h-5 text-[color:var(--state-info)] flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Google Calendar</p>
                     <p className="text-xs text-muted-foreground">Browse, schedule, invite</p>
@@ -203,9 +206,9 @@ function ManageGoogleContent() {
               </div>
             </Link>
             <a href="https://docs.google.com/document/u/0/" target="_blank" rel="noopener noreferrer">
-              <div className="border border-border rounded-md p-3 hover:border-blue-400/40 hover:bg-blue-400/5 transition cursor-pointer flex items-center justify-between gap-3">
+              <div className="border border-border rounded-md p-3 hover:border-[color:var(--state-info)]/40 hover:bg-[color:var(--state-info)]/5 transition cursor-pointer flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                  <FileText className="w-5 h-5 text-[color:var(--state-info)] flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Google Docs</p>
                     <p className="text-xs text-muted-foreground">Create & edit documents</p>
@@ -215,9 +218,9 @@ function ManageGoogleContent() {
               </div>
             </a>
             <a href="https://docs.google.com/presentation/u/0/" target="_blank" rel="noopener noreferrer">
-              <div className="border border-border rounded-md p-3 hover:border-yellow-500/40 hover:bg-yellow-500/5 transition cursor-pointer flex items-center justify-between gap-3">
+              <div className="border border-border rounded-md p-3 hover:border-[color:var(--state-warning)]/40 hover:bg-[color:var(--state-warning)]/5 transition cursor-pointer flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Presentation className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                  <Presentation className="w-5 h-5 text-[color:var(--state-warning)] flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Google Slides</p>
                     <p className="text-xs text-muted-foreground">Create & edit presentations</p>
@@ -227,10 +230,10 @@ function ManageGoogleContent() {
               </div>
             </a>
           </div>
-        </Card>
+        </GlassPanel>
       )}
 
-      <Card className="p-5 space-y-3">
+      <GlassPanel variant="tile" padding="md" interactive className="p-5 space-y-3">
         <div>
           <h2 className="font-semibold text-sm">Connected Drive folders</h2>
           <p className="text-xs text-muted-foreground mt-1">
@@ -252,9 +255,9 @@ function ManageGoogleContent() {
             )}
           </div>
         )}
-      </Card>
+      </GlassPanel>
 
-      <Card className="p-5 border-destructive/40">
+      <GlassPanel variant="tile" padding="md" interactive className="p-5 border border-[color:var(--state-danger)]/40">
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
           <div className="flex-1">
@@ -274,7 +277,7 @@ function ManageGoogleContent() {
             </Button>
           </div>
         </div>
-      </Card>
+      </GlassPanel>
 
       <Dialog open={confirmDisconnect} onOpenChange={setConfirmDisconnect}>
         <DialogContent>
@@ -295,7 +298,7 @@ function ManageGoogleContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }
 

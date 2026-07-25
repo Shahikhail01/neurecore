@@ -32,7 +32,7 @@ export function PoolToolbar({
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder={searchPlaceholder}
-        className="flex-1 min-w-56 rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
+        className="flex-1 min-w-56 rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[color:var(--accent-500)] transition"
       />
       {filters && filters.length > 0 && onFilterChange && (
         <div className="flex gap-1 flex-wrap">
@@ -42,7 +42,7 @@ export function PoolToolbar({
               onClick={() => onFilterChange(f.value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition capitalize ${
                 activeFilter === f.value
-                  ? "bg-indigo-600 text-white"
+                  ? "bg-[color:var(--accent-500)] text-white"
                   : "border border-surface-border text-zinc-400 hover:text-zinc-200"
               }`}
             >

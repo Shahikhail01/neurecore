@@ -63,7 +63,7 @@ export function OrgWizard({ slug }: { slug: WizardSlug }) {
     return (
       <WizardShell title="Org Placement">
         <div className="text-center space-y-3 py-4">
-          <CheckCircle2 className="w-10 h-10 mx-auto text-green-500" />
+          <CheckCircle2 className="w-10 h-10 mx-auto text-[color:var(--state-success)]" />
           <p className="text-sm text-muted-foreground">Org placement saved.</p>
         </div>
       </WizardShell>

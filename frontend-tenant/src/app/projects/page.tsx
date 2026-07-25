@@ -23,9 +23,9 @@ const PIPELINE_COLUMNS: { status: ProjectStatus; label: string }[] = [
 
 const PRIORITY_COLORS: Record<string, string> = {
   LOW: 'text-zinc-400',
-  MEDIUM: 'text-blue-400',
-  HIGH: 'text-amber-400',
-  URGENT: 'text-red-400',
+  MEDIUM: 'text-[color:var(--state-info)]',
+  HIGH: 'text-[color:var(--state-warning)]',
+  URGENT: 'text-[color:var(--state-danger)]',
 };
 
 function priorityLabel(p: string): string {

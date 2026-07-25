@@ -115,10 +115,10 @@ export function HomeHero({ tenant, onSend, isSending = false }: HomeHeroProps) {
       <div className="max-w-5xl mx-auto flex flex-col items-center text-center">
         {/* Live date + time pill (Creatio clock badge style). */}
         <div className="inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface-raised/70 backdrop-blur-sm px-3 py-1.5 text-xs text-zinc-400 mb-5">
-          <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" aria-hidden />
+          <span className="w-2 h-2 rounded-full bg-[color:var(--state-success)] shrink-0" aria-hidden />
           <span suppressHydrationWarning className="font-medium text-zinc-300">{currentWeekday(tz)}</span>
           <span aria-hidden className="text-zinc-600">·</span>
-          <time suppressHydrationWarning className="font-mono font-bold text-cyan-400 tabular-nums">
+          <time suppressHydrationWarning className="font-mono font-bold text-[color:var(--visual-accent-cyan-400)] tabular-nums">
             {currentTime(tz)}
           </time>
           <span aria-hidden className="text-zinc-600">—</span>

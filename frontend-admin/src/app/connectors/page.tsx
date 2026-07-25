@@ -64,7 +64,7 @@ export default function ConnectorsPage() {
               ))}
             </select>
             <button
-              className="rounded-md bg-indigo-600 text-white text-sm px-3 py-2 disabled:opacity-50"
+              className="rounded-md bg-[color:var(--accent-500)] text-white text-sm px-3 py-2 disabled:opacity-50"
               disabled={!canCreate}
               onClick={async () => {
                 await connectorsService.registerConnector({ name: name.trim(), provider });

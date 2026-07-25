@@ -12,24 +12,24 @@ export interface DeptColorPair {
 
 const PALETTE: DeptColorPair[] = [
   {
-    dark:  { bg: 'bg-blue-950/90',    border: 'border-blue-700/60',   text: 'text-blue-300',   icon: 'text-blue-400' },
-    light: { bg: 'bg-blue-900/50',    border: 'border-blue-700/40',   text: 'text-blue-200',   accent: 'text-blue-400' },
+    dark:  { bg: 'bg-[color:var(--state-info)]/90',    border: 'border-[color:var(--state-info)]/60',   text: 'text-blue-300',   icon: 'text-[color:var(--state-info)]' },
+    light: { bg: 'bg-[color:var(--state-info)]/50',    border: 'border-[color:var(--state-info)]/40',   text: 'text-blue-200',   accent: 'text-[color:var(--state-info)]' },
   },
   {
-    dark:  { bg: 'bg-indigo-950/90',  border: 'border-indigo-700/60', text: 'text-indigo-300', icon: 'text-indigo-400' },
-    light: { bg: 'bg-indigo-900/50',  border: 'border-indigo-700/40', text: 'text-indigo-200', accent: 'text-indigo-400' },
+    dark:  { bg: 'bg-[color:var(--accent-500)]/90',  border: 'border-[color:var(--accent-500)]/60', text: 'text-indigo-300', icon: 'text-[color:var(--accent-400)]' },
+    light: { bg: 'bg-[color:var(--accent-500)]/50',  border: 'border-[color:var(--accent-500)]/40', text: 'text-indigo-200', accent: 'text-[color:var(--accent-400)]' },
   },
   {
-    dark:  { bg: 'bg-emerald-950/90', border: 'border-emerald-700/60', text: 'text-emerald-300', icon: 'text-emerald-400' },
-    light: { bg: 'bg-emerald-900/50', border: 'border-emerald-700/40', text: 'text-emerald-200', accent: 'text-emerald-400' },
+    dark:  { bg: 'bg-[color:var(--state-success)]/90', border: 'border-[color:var(--state-success)]/60', text: 'text-emerald-300', icon: 'text-[color:var(--state-success)]' },
+    light: { bg: 'bg-[color:var(--state-success)]/50', border: 'border-[color:var(--state-success)]/40', text: 'text-emerald-200', accent: 'text-[color:var(--state-success)]' },
   },
   {
-    dark:  { bg: 'bg-rose-950/90',    border: 'border-rose-700/60',   text: 'text-rose-300',   icon: 'text-rose-400' },
-    light: { bg: 'bg-rose-900/50',    border: 'border-rose-700/40',   text: 'text-rose-200',   accent: 'text-rose-400' },
+    dark:  { bg: 'bg-[color:var(--visual-accent-rose-500)]/90',    border: 'border-rose-700/60',   text: 'text-rose-300',   icon: 'text-[color:var(--visual-accent-rose-400)]' },
+    light: { bg: 'bg-[color:var(--visual-accent-rose-500)]/50',    border: 'border-rose-700/40',   text: 'text-rose-200',   accent: 'text-[color:var(--visual-accent-rose-400)]' },
   },
   {
-    dark:  { bg: 'bg-amber-950/90',   border: 'border-amber-700/60',  text: 'text-amber-300',  icon: 'text-amber-400' },
-    light: { bg: 'bg-amber-900/50',   border: 'border-amber-700/40',  text: 'text-amber-200',  accent: 'text-amber-400' },
+    dark:  { bg: 'bg-[color:var(--state-warning)]/90',   border: 'border-[color:var(--state-warning)]/60',  text: 'text-amber-300',  icon: 'text-[color:var(--state-warning)]' },
+    light: { bg: 'bg-[color:var(--state-warning)]/50',   border: 'border-[color:var(--state-warning)]/40',  text: 'text-amber-200',  accent: 'text-[color:var(--state-warning)]' },
   },
   {
     dark:  { bg: 'bg-sky-950/90',     border: 'border-sky-700/60',    text: 'text-sky-300',    icon: 'text-sky-400' },
@@ -48,8 +48,8 @@ const PALETTE: DeptColorPair[] = [
     light: { bg: 'bg-orange-900/50',  border: 'border-orange-700/40', text: 'text-orange-200', accent: 'text-orange-400' },
   },
   {
-    dark:  { bg: 'bg-cyan-950/90',    border: 'border-cyan-700/60',   text: 'text-cyan-300',   icon: 'text-cyan-400' },
-    light: { bg: 'bg-cyan-900/50',    border: 'border-cyan-700/40',   text: 'text-cyan-200',   accent: 'text-cyan-400' },
+    dark:  { bg: 'bg-[color:var(--visual-accent-cyan-500)]/90',    border: 'border-cyan-700/60',   text: 'text-cyan-300',   icon: 'text-[color:var(--visual-accent-cyan-400)]' },
+    light: { bg: 'bg-[color:var(--visual-accent-cyan-500)]/50',    border: 'border-cyan-700/40',   text: 'text-cyan-200',   accent: 'text-[color:var(--visual-accent-cyan-400)]' },
   },
   {
     dark:  { bg: 'bg-pink-950/90',    border: 'border-pink-700/60',   text: 'text-pink-300',   icon: 'text-pink-400' },

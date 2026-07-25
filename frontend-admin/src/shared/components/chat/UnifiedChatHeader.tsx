@@ -18,7 +18,7 @@ export function UnifiedChatHeader({
   onClear,
   onClose,
 }: UnifiedChatHeaderProps) {
-  const badgeBg = badgeColor === 'indigo' ? 'bg-violet-900 text-violet-300' : 'bg-zinc-800 text-zinc-300';
+  const badgeBg = badgeColor === 'indigo' ? 'bg-[color:var(--accent-500)] text-violet-300' : 'bg-zinc-800 text-zinc-300';
 
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border shrink-0">

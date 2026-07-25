@@ -27,7 +27,7 @@ function MiniChart({ data }: { data: Array<{ label: string; value: number }> }) 
       {items.map((d, i) => (
         <div key={i} className="flex flex-col items-center flex-1 min-w-0">
           <div
-            className="w-full rounded-t bg-violet-500/70 transition-all"
+            className="w-full rounded-t bg-[color:var(--accent-500)]/70 transition-all"
             style={{ height: `${Math.max((d.value / max) * 100, 4)}%` }}
           />
           <span className="text-[8px] text-zinc-500 mt-0.5 truncate w-full text-center">
@@ -176,7 +176,7 @@ export function UnifiedChatMessage({ message, onSuggestionSelect, sending }: Uni
       >
         {/* Avatar label */}
         {isAssistant && (
-          <div className="text-[10px] text-violet-400 mb-1 font-medium">✦ HeadQuarter AI</div>
+          <div className="text-[10px] text-[color:var(--accent-400)] mb-1 font-medium">✦ HeadQuarter AI</div>
         )}
 
         {/* Markdown content */}

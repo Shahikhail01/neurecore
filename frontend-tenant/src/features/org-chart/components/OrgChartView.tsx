@@ -30,13 +30,13 @@ function TenantCard({ node }: { node: OrgNode }) {
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center"
     >
-      <div className="w-72 rounded-2xl border-2 border-amber-500/40 bg-gradient-to-b from-amber-950/60 to-zinc-900/80 px-6 py-4 text-center shadow-xl shadow-amber-900/20">
+      <div className="w-72 rounded-2xl border-2 border-[color:var(--state-warning)]/40 bg-gradient-to-b from-amber-950/60 to-zinc-900/80 px-6 py-4 text-center shadow-xl shadow-amber-900/20">
         {/* Avatar/logo area */}
-        <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/20 ring-2 ring-amber-500/40">
-          <Briefcase className="w-7 h-7 text-amber-400" />
+        <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-[color:var(--state-warning)]/20 ring-2 ring-amber-500/40">
+          <Briefcase className="w-7 h-7 text-[color:var(--state-warning)]" />
         </div>
         <h2 className="text-base font-bold text-zinc-100">{node.name}</h2>
-        <p className="mt-0.5 text-xs text-amber-400/80 font-medium">Chairman / Organization</p>
+        <p className="mt-0.5 text-xs text-[color:var(--state-warning)]/80 font-medium">Chairman / Organization</p>
         <div className="mt-3 flex items-center justify-center gap-4">
           <div className="flex items-center gap-1.5 text-xs text-zinc-400">
             <Building2 className="w-3.5 h-3.5 text-zinc-600" />

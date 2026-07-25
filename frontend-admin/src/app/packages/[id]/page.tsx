@@ -74,7 +74,7 @@ export default function PackageDetailPage() {
         {loading ? (
           <div className="h-32 rounded-xl bg-surface-raised border border-surface-border animate-pulse" />
         ) : error ? (
-          <div className="rounded-lg bg-red-950 border border-red-800 px-4 py-3 text-sm text-red-200">
+          <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         ) : pkg ? (
@@ -95,7 +95,7 @@ export default function PackageDetailPage() {
                 <div className="flex gap-2 mt-4 pt-4 border-t border-surface-border/50">
                   <Link
                     href={`/packages/${pkg.id}/edit`}
-                    className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                    className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                   >
                     Edit Composition
                   </Link>
@@ -103,7 +103,7 @@ export default function PackageDetailPage() {
                     <button
                       onClick={() => setStatus('PUBLISHED')}
                       disabled={busy}
-                      className="px-3 py-1.5 rounded-lg text-xs bg-emerald-700 hover:bg-emerald-600 text-white font-medium transition disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-lg text-xs bg-emerald-700 hover:bg-[color:var(--state-success)] text-white font-medium transition disabled:opacity-50"
                     >
                       Publish
                     </button>

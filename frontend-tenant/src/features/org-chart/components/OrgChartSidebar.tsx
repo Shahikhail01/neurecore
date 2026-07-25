@@ -102,7 +102,7 @@ export function OrgChartSidebar({ isOpen, onClose }: OrgChartSidebarProps) {
                 placeholder="Search agents or departments…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-7 pr-3 text-xs text-zinc-200 placeholder-zinc-600 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-7 pr-3 text-xs text-zinc-200 placeholder-zinc-600 focus:border-[color:var(--accent-500)] focus:outline-none focus:ring-1 focus:ring-indigo-600"
               />
             </div>
           </div>
@@ -208,7 +208,7 @@ export function OrgChartSidebar({ isOpen, onClose }: OrgChartSidebarProps) {
                 </button>
                 <button
                   onClick={confirmMoveAction}
-                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm text-white hover:bg-indigo-500 transition-colors"
+                  className="rounded-lg bg-[color:var(--accent-500)] px-4 py-1.5 text-sm text-white hover:bg-[color:var(--accent-500)] transition-colors"
                 >
                   Confirm
                 </button>

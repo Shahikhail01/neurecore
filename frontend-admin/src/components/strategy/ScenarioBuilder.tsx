@@ -91,7 +91,7 @@ export function ScenarioBuilder({ onRun, loading }: Props) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-1.5 w-full bg-surface-overlay border border-surface-border rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500 transition"
+          className="mt-1.5 w-full bg-surface-overlay border border-surface-border rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[color:var(--accent-500)] transition"
         />
       </div>
 
@@ -134,7 +134,7 @@ export function ScenarioBuilder({ onRun, loading }: Props) {
               onClick={() => set('forecastMonths', m)}
               className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition ${
                 params.forecastMonths === m
-                  ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                  ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/20 text-indigo-300'
                   : 'border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-zinc-600'
               }`}
             >
@@ -148,7 +148,7 @@ export function ScenarioBuilder({ onRun, loading }: Props) {
       <button
         onClick={() => onRun(params, name)}
         disabled={loading}
-        className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-sm font-semibold text-white transition"
+        className="w-full py-2.5 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] disabled:opacity-40 text-sm font-semibold text-white transition"
       >
         {loading ? 'Computing…' : 'Run Forecast'}
       </button>

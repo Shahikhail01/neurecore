@@ -130,7 +130,7 @@ export function IntegrationsStep({ onNext, onBack }: IntegrationsStepProps) {
             )}
             <div className="mt-3">
               {googleStatus?.connected ? (
-                <p className="text-xs text-green-600 flex items-center gap-1">
+                <p className="text-xs text-[color:var(--state-success)] flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" /> Connected
                 </p>
               ) : (
@@ -173,7 +173,7 @@ export function IntegrationsStep({ onNext, onBack }: IntegrationsStepProps) {
               </div>
             )}
             {brevoConnected && (
-              <p className="mt-3 text-xs text-green-600 flex items-center gap-1">
+              <p className="mt-3 text-xs text-[color:var(--state-success)] flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> Connected
               </p>
             )}

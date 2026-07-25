@@ -37,6 +37,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 
+import { PageShell, PageHero } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import TenantShell from '@/components/TenantShell';
 import { KpiCard } from '@/components/creatio/KpiCard';
@@ -102,12 +103,19 @@ export default function FinancePage() {
 
   return (
     <TenantShell user={user}>
+      <PageShell variant="default">
+        <PageHero
+          eyebrow="Operations"
+          title="Finance"
+          subtitle="Cost tracking, invoices, expenses, budgets, and billing — all in one place."
+        />
       <div className="max-w-7xl mx-auto space-y-5">
         {/* ── Page Header ──────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
+                    className="hidden"
         >
           <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-state-warning/15 text-state-warning flex items-center justify-center">
@@ -161,6 +169,7 @@ export default function FinancePage() {
           </motion.div>
         </AnimatePresence>
       </div>
+      </PageShell>
     </TenantShell>
   );
 }
@@ -262,7 +271,7 @@ function OverviewTab() {
             data={[]}
             dataKey="value"
             xKey="timestamp"
-            color="#f59e0b"
+            color="var(--state-warning)"
             loading={loading}
             height={200}
           />
@@ -866,7 +875,7 @@ function ChartCard({ title, icon, children }: { title: string; icon: React.React
 }
 
 function nameColor(name: string, index = 0): string {
-  const palette = ['#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#10b981'];
+  const palette = ['var(--visual-glow-violet)', 'var(--state-info)', 'var(--state-success)', 'var(--state-warning)', 'var(--state-danger)', 'var(--visual-glow-cyan)', 'var(--visual-glow-violet)', 'var(--visual-glow-emerald)'];
   if (!name) return palette[index % palette.length];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;

@@ -225,7 +225,7 @@ export default function FeatureFlagsAdminPage() {
           <div className="text-sm font-medium text-zinc-100">
             {flag.label}
             {flag.highRisk && (
-              <span className="ml-2 text-[10px] text-amber-400 font-semibold">
+              <span className="ml-2 text-[10px] text-[color:var(--state-warning)] font-semibold">
                 HIGH RISK
               </span>
             )}
@@ -243,9 +243,9 @@ export default function FeatureFlagsAdminPage() {
           disabled={saving}
           className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
             value === true
-              ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300'
+              ? 'bg-[color:var(--state-success)]/20 border-[color:var(--state-success)] text-emerald-300'
               : value === false
-                ? 'bg-rose-600/20 border-rose-500 text-rose-300'
+                ? 'bg-[color:var(--visual-accent-rose-500)]/20 border-rose-500 text-rose-300'
                 : 'border-surface-border text-zinc-400 hover:text-zinc-200'
           } ${saving ? 'opacity-50' : ''}`}
         >
@@ -304,7 +304,7 @@ export default function FeatureFlagsAdminPage() {
             <select
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value)}
-              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
             >
               <option value="">— Select a tenant —</option>
               {tenants.map((t) => (

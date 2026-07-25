@@ -98,12 +98,12 @@ export default function EditQuestionPackPage() {
             <div className="rounded-xl border border-surface-border bg-surface-raised p-5 space-y-4">
               <div>
                 <label className="block text-xs text-zinc-400 mb-1.5">
-                  Name <span className="text-red-400">*</span>
+                  Name <span className="text-[color:var(--state-danger)]">*</span>
                 </label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)]"
                 />
               </div>
               <div>
@@ -112,7 +112,7 @@ export default function EditQuestionPackPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)]"
                 />
               </div>
               <div>
@@ -145,7 +145,7 @@ export default function EditQuestionPackPage() {
                 />
               </div>
               {error ? (
-                <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+                <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
                   {error}
                 </div>
               ) : null}
@@ -160,7 +160,7 @@ export default function EditQuestionPackPage() {
                   type="button"
                   onClick={save}
                   disabled={busy || !canEdit || !name.trim()}
-                  className="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
                   data-testid="pack-edit-save"
                 >
                   {busy ? 'Saving…' : 'Save changes'}

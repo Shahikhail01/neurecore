@@ -70,8 +70,8 @@ export function DelegationForm() {
             <div key={s.id} className="flex items-center flex-1 last:flex-none">
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition ${
-                  done    ? 'bg-violet-600 text-white'  :
-                  current ? 'bg-violet-500/20 border-2 border-violet-500 text-violet-300' :
+                  done    ? 'bg-[color:var(--accent-500)] text-white'  :
+                  current ? 'bg-[color:var(--accent-500)]/20 border-2 border-violet-500 text-violet-300' :
                             'bg-surface-overlay border border-surface-border text-zinc-500'
                 }`}
               >
@@ -80,7 +80,7 @@ export function DelegationForm() {
               {i < DELEGATION_STEPS.length - 1 && (
                 <div
                   className={`h-px flex-1 mx-1 transition ${
-                    done ? 'bg-violet-600' : 'bg-surface-border'
+                    done ? 'bg-[color:var(--accent-500)]' : 'bg-surface-border'
                   }`}
                 />
               )}
@@ -124,7 +124,7 @@ export function DelegationForm() {
           <button
             onClick={next}
             disabled={!canAdvance}
-            className="flex-1 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-sm font-semibold text-white transition"
+            className="flex-1 py-2.5 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] disabled:opacity-40 text-sm font-semibold text-white transition"
           >
             Continue
           </button>
@@ -132,7 +132,7 @@ export function DelegationForm() {
           <button
             onClick={submit}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-sm font-semibold text-white transition"
+            className="flex-1 py-2.5 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] disabled:opacity-40 text-sm font-semibold text-white transition"
           >
             {loading ? 'Delegating…' : 'Delegate Task'}
           </button>

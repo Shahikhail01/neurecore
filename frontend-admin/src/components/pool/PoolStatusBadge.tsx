@@ -11,13 +11,13 @@
 type Tone = "active" | "draft" | "published" | "archived" | "neutral" | "enabled" | "disabled";
 
 const TONE_CLASSES: Record<Tone, string> = {
-  active: "bg-emerald-900 text-emerald-300",
-  published: "bg-emerald-900 text-emerald-300",
-  enabled: "bg-emerald-900 text-emerald-300",
+  active: "bg-[color:var(--state-success)] text-emerald-300",
+  published: "bg-[color:var(--state-success)] text-emerald-300",
+  enabled: "bg-[color:var(--state-success)] text-emerald-300",
   draft: "bg-zinc-800 text-zinc-300",
   archived: "bg-zinc-900 text-zinc-500",
   neutral: "bg-zinc-800 text-zinc-300",
-  disabled: "bg-red-900 text-red-300",
+  disabled: "bg-[color:var(--state-danger)] text-red-300",
 };
 
 function toneFor(status: string | undefined | null): Tone {

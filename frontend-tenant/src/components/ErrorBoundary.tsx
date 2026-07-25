@@ -78,7 +78,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-lg">
             <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full">
               <svg
-                className="w-8 h-8 text-red-600"
+                className="w-8 h-8 text-[color:var(--state-danger)]"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -107,7 +107,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <summary className="cursor-pointer text-gray-700 font-medium">
                   Error Details
                 </summary>
-                <pre className="mt-2 overflow-auto text-xs text-red-600">
+                <pre className="mt-2 overflow-auto text-xs text-[color:var(--state-danger)]">
                   {this.state.error?.stack}
                   {"\n"}
                   {this.state.errorInfo?.componentStack}
@@ -118,7 +118,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => window.location.reload()}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                className="flex-1 px-4 py-2 bg-[color:var(--state-info)] text-white rounded hover:bg-blue-700 transition-colors"
               >
                 Reload Page
               </button>

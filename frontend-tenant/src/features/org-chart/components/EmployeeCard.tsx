@@ -81,7 +81,7 @@ export function EmployeeCard({
       onMouseLeave={() => setHovered(false)}
       className={`group relative flex w-full min-w-0 cursor-grab items-center gap-3 rounded-xl border px-3 py-2.5 transition-all
         ${isSelected
-          ? `border-indigo-500/60 ${deptColor.bg} shadow-lg ${deptColor.border}`
+          ? `border-[color:var(--accent-500)]/60 ${deptColor.bg} shadow-lg ${deptColor.border}`
           : `border-zinc-800/60 ${deptColor.bg} hover:border-zinc-700`
         }
         ${isDragging ? 'opacity-40 scale-95' : ''}
@@ -122,7 +122,7 @@ export function EmployeeCard({
             </span>
           )}
           {successRate > 0 && (
-            <span className={`text-[10px] shrink-0 ${successRate >= 80 ? 'text-emerald-500' : successRate >= 50 ? 'text-amber-500' : 'text-red-400'}`}>
+            <span className={`text-[10px] shrink-0 ${successRate >= 80 ? 'text-[color:var(--state-success)]' : successRate >= 50 ? 'text-[color:var(--state-warning)]' : 'text-[color:var(--state-danger)]'}`}>
               · {successRate}%
             </span>
           )}
@@ -150,7 +150,7 @@ export function EmployeeCard({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={node.avatarUrl} alt={node.name} className="h-8 w-8 rounded-full object-cover" />
             ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-900/60 text-xs font-bold text-indigo-300">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--accent-500)]/60 text-xs font-bold text-indigo-300">
                 {node.name.slice(0, 2).toUpperCase()}
               </div>
             )}
@@ -163,7 +163,7 @@ export function EmployeeCard({
             <p>Status: <span className="text-zinc-200">{node.status}</span></p>
             <p>Joined: <span className="text-zinc-200">{formatDate(joinedAt)}</span></p>
             <p>Tasks: <span className="text-zinc-200">{tasksCompleted} completed</span></p>
-            <p>Success rate: <span className={`font-medium ${successRate >= 80 ? 'text-emerald-400' : 'text-zinc-200'}`}>{successRate}%</span></p>
+            <p>Success rate: <span className={`font-medium ${successRate >= 80 ? 'text-[color:var(--state-success)]' : 'text-zinc-200'}`}>{successRate}%</span></p>
           </div>
         </div>
       )}

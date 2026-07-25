@@ -56,6 +56,7 @@ import {
   Check,
 } from 'lucide-react';
 
+import { PageShell, PageHero } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { useTenantIndustryGroup } from '@/stores/tenantStore';
@@ -186,12 +187,19 @@ export default function IntelligencePage() {
 
   return (
     <TenantShell user={user}>
+      <PageShell variant="default">
+        <PageHero
+          eyebrow="Operations"
+          title="Intelligence"
+          subtitle="Analytics, observability, health, reliability, and security — all in one place."
+        />
       <div className="max-w-7xl mx-auto space-y-5">
         {/* ── Page Header ──────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
+          className="hidden"
         >
           <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-status-strategy/15 text-status-strategy flex items-center justify-center">
@@ -246,6 +254,7 @@ export default function IntelligencePage() {
           </motion.div>
         </AnimatePresence>
       </div>
+      </PageShell>
     </TenantShell>
   );
 }
@@ -286,10 +295,10 @@ function AnalyticsTab() {
   }
 
   const costDonut = [
-    { name: 'Compute',  value: 45, color: '#6366f1' },
-    { name: 'Storage',  value: 20, color: '#8b5cf6' },
-    { name: 'API Calls', value: 30, color: '#06b6d4' },
-    { name: 'Other',    value: 5,  color: '#3f3f46' },
+    { name: 'Compute',  value: 45, color: 'var(--accent-500)' },
+    { name: 'Storage',  value: 20, color: 'var(--visual-glow-violet)' },
+    { name: 'API Calls', value: 30, color: 'var(--visual-glow-cyan)' },
+    { name: 'Other',    value: 5,  color: 'var(--visual-glow-cyan)' },
   ];
 
   return (
@@ -328,16 +337,16 @@ function AnalyticsTab() {
       {/* Charts grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="Task Volume" icon={<Activity className="w-4 h-4 text-status-ops" />}>
-          <AreaChart data={taskData} dataKey="value" xKey="timestamp" color="#8b5cf6" loading={taskLoading} height={200} />
+          <AreaChart data={taskData} dataKey="value" xKey="timestamp" color="var(--visual-glow-violet)" loading={taskLoading} height={200} />
         </ChartCard>
         <ChartCard title="Error Rate" icon={<AlertTriangle className="w-4 h-4 text-state-danger" />}>
-          <AreaChart data={errorData} dataKey="value" xKey="timestamp" color="#ef4444" loading={errorLoading} height={200} />
+          <AreaChart data={errorData} dataKey="value" xKey="timestamp" color="var(--state-danger)" loading={errorLoading} height={200} />
         </ChartCard>
         <ChartCard title="Cost Trend (USD)" icon={<Wallet className="w-4 h-4 text-state-success" />}>
-          <LineChartComponent data={costData} dataKey="value" xKey="timestamp" color="#22c55e" loading={costLoading} height={200} />
+          <LineChartComponent data={costData} dataKey="value" xKey="timestamp" color="var(--state-success)" loading={costLoading} height={200} />
         </ChartCard>
         <ChartCard title="Active Employees" icon={<Cpu className="w-4 h-4 text-status-strategy" />}>
-          <LineChartComponent data={agentData} dataKey="value" xKey="timestamp" color="#06b6d4" loading={agentLoading} height={200} />
+          <LineChartComponent data={agentData} dataKey="value" xKey="timestamp" color="var(--visual-glow-cyan)" loading={agentLoading} height={200} />
         </ChartCard>
       </div>
 
@@ -349,11 +358,11 @@ function AnalyticsTab() {
         <ChartCard title="Evaluation Quality" icon={<CheckCircle2 className="w-4 h-4 text-state-profit" />}>
           <BarChart
             data={[
-              { label: '0–50%', value: 5, color: '#ef4444' },
-              { label: '50–70%', value: 12, color: '#f59e0b' },
-              { label: '70–85%', value: 38, color: '#3b82f6' },
-              { label: '85–95%', value: 62, color: '#22c55e' },
-              { label: '95–100%', value: 28, color: '#10b981' },
+              { label: '0–50%', value: 5, color: 'var(--state-danger)' },
+              { label: '50–70%', value: 12, color: 'var(--state-warning)' },
+              { label: '70–85%', value: 38, color: 'var(--state-info)' },
+              { label: '85–95%', value: 62, color: 'var(--state-success)' },
+              { label: '95–100%', value: 28, color: 'var(--visual-glow-emerald)' },
             ]}
             dataKey="value"
             xKey="label"
@@ -434,10 +443,10 @@ function ObservabilityTab() {
       {/* Latency + request charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="P95 Latency (ms)" icon={<Zap className="w-4 h-4 text-status-ops" />}>
-          <LineChartComponent data={latencyData} dataKey="value" xKey="timestamp" color="#3b82f6" loading={latencyLoading} height={200} />
+          <LineChartComponent data={latencyData} dataKey="value" xKey="timestamp" color="var(--state-info)" loading={latencyLoading} height={200} />
         </ChartCard>
         <ChartCard title="Requests / minute" icon={<Activity className="w-4 h-4 text-state-success" />}>
-          <AreaChart data={requestData} dataKey="value" xKey="timestamp" color="#22c55e" loading={requestLoading} height={200} />
+          <AreaChart data={requestData} dataKey="value" xKey="timestamp" color="var(--state-success)" loading={requestLoading} height={200} />
         </ChartCard>
       </div>
 
@@ -1138,7 +1147,7 @@ function ProfileDetail({ user, onBack }: { user: ReturnType<typeof useTenantAuth
       <h2 className="text-base font-semibold text-zinc-100">Profile Settings</h2>
 
       {toast && (
-        <div className={`px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}`}>
+        <div className={`px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-[color:var(--state-success)]/15 text-[color:var(--state-success)]' : 'bg-[color:var(--state-danger)]/15 text-[color:var(--state-danger)]'}`}>
           {toast.message}
         </div>
       )}
@@ -1338,7 +1347,7 @@ function AIProvidersDetail() {
       </div>
 
       {toast && (
-        <div className={`px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}`}>
+        <div className={`px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-[color:var(--state-success)]/15 text-[color:var(--state-success)]' : 'bg-[color:var(--state-danger)]/15 text-[color:var(--state-danger)]'}`}>
           {toast.message}
         </div>
       )}
@@ -1433,7 +1442,7 @@ function AIProvidersDetail() {
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   onClick={() => handleToggle(p.id, p.isEnabled)}
-                  className={`px-2 py-1 rounded text-xs transition ${p.isEnabled ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50' : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600'}`}
+                  className={`px-2 py-1 rounded text-xs transition ${p.isEnabled ? 'bg-[color:var(--state-success)]/15 text-[color:var(--state-success)] hover:bg-[color:var(--state-success)]/15' : 'nv-surface-inline text-zinc-400 hover:bg-white/10'}`}
                 >
                   {p.isEnabled ? 'Enabled' : 'Disabled'}
                 </button>
@@ -1448,7 +1457,7 @@ function AIProvidersDetail() {
                 <button
                   onClick={() => handleDelete(p.id)}
                   disabled={deleting === p.id}
-                  className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-900/20 transition disabled:opacity-50"
+                  className="p-1.5 rounded text-zinc-500 hover:text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger)]/10 transition disabled:opacity-50"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -1482,7 +1491,7 @@ function APIKeysDetail() {
       </p>
 
       {toast && (
-        <div className={`px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}`}>
+        <div className={`px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-[color:var(--state-success)]/15 text-[color:var(--state-success)]' : 'bg-[color:var(--state-danger)]/15 text-[color:var(--state-danger)]'}`}>
           {toast.message}
         </div>
       )}
@@ -1511,9 +1520,9 @@ function APIKeysDetail() {
               </div>
               <button
                 onClick={() => handleCopy(item.value, item.label)}
-                className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 transition shrink-0"
+                className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:nv-surface-inline transition shrink-0"
               >
-                {copied === item.label ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied === item.label ? <Check className="w-3.5 h-3.5 text-[color:var(--state-success)]" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
             </div>
           ))}
@@ -1572,7 +1581,7 @@ function SecuritySettingsDetail() {
             <Shield className="w-4 h-4 text-state-info" />
             <span className="text-sm font-medium text-zinc-200">CSRF Protection</span>
           </div>
-          <p className={`text-xs font-medium ${securityStatus?.csrf ? 'text-green-400' : 'text-red-400'}`}>
+          <p className={`text-xs font-medium ${securityStatus?.csrf ? 'text-[color:var(--state-success)]' : 'text-[color:var(--state-danger)]'}`}>
             {securityStatus?.csrf ? 'Enabled' : 'Disabled'}
           </p>
         </div>
@@ -1581,7 +1590,7 @@ function SecuritySettingsDetail() {
             <ShieldAlert className="w-4 h-4 text-state-warning" />
             <span className="text-sm font-medium text-zinc-200">Helmet Headers</span>
           </div>
-          <p className={`text-xs font-medium ${securityStatus?.helmet ? 'text-green-400' : 'text-red-400'}`}>
+          <p className={`text-xs font-medium ${securityStatus?.helmet ? 'text-[color:var(--state-success)]' : 'text-[color:var(--state-danger)]'}`}>
             {securityStatus?.helmet ? 'Enabled' : 'Disabled'}
           </p>
         </div>
@@ -1590,7 +1599,7 @@ function SecuritySettingsDetail() {
             <Zap className="w-4 h-4 text-accent-400" />
             <span className="text-sm font-medium text-zinc-200">Rate Limiting</span>
           </div>
-          <p className={`text-xs font-medium ${securityStatus?.rateLimit ? 'text-green-400' : 'text-red-400'}`}>
+          <p className={`text-xs font-medium ${securityStatus?.rateLimit ? 'text-[color:var(--state-success)]' : 'text-[color:var(--state-danger)]'}`}>
             {securityStatus?.rateLimit ? 'Enabled' : 'Disabled'}
           </p>
         </div>
@@ -1731,14 +1740,14 @@ function AIRoutingSection() {
         <div className="flex gap-2">
           <button
             onClick={handleReset}
-            className="px-3 py-1.5 rounded-lg border border-zinc-600 text-xs text-zinc-300 hover:bg-zinc-700 transition"
+            className="px-3 py-1.5 rounded-lg border border-zinc-600 text-xs text-zinc-300 hover:nv-surface-inline transition"
           >
             Reset
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg nv-btn-accent hover: text-white text-xs font-medium transition disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save'}
           </button>
@@ -1746,7 +1755,7 @@ function AIRoutingSection() {
       </div>
 
       {toast && (
-        <div className={`mb-3 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}`}>
+        <div className={`mb-3 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-[color:var(--state-success)]/15 text-[color:var(--state-success)]' : 'bg-[color:var(--state-danger)]/15 text-[color:var(--state-danger)]'}`}>
           {toast.message}
         </div>
       )}
@@ -1761,7 +1770,7 @@ function AIRoutingSection() {
             <select
               value={routing[key]}
               onChange={(e) => handleModelChange(key, e.target.value)}
-              className="rounded-lg border border-zinc-600 bg-zinc-700 px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500 min-w-[160px]"
+              className="rounded-lg border border-zinc-600 nv-surface-inline px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)] min-w-[160px]"
             >
               {AVAILABLE_MODELS.map((model) => (
                 <option key={model.id} value={model.id}>

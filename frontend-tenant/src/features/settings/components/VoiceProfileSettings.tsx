@@ -57,7 +57,7 @@ export function VoiceProfileSettings() {
             key={profile.id}
             className={`rounded-lg border p-3 transition-colors ${
               profile.id === activeId
-                ? 'border-indigo-500/50 bg-indigo-950/20'
+                ? 'border-[color:var(--accent-500)]/50 bg-[color:var(--accent-500)]/20'
                 : 'border-zinc-800 bg-zinc-900/40'
             }`}
           >
@@ -77,13 +77,13 @@ export function VoiceProfileSettings() {
                 {profile.id !== activeId && (
                   <button
                     onClick={() => setActive(profile.id)}
-                    className="rounded px-2 py-1 text-xs text-indigo-400 hover:bg-indigo-950/40 transition-colors"
+                    className="rounded px-2 py-1 text-xs text-[color:var(--accent-400)] hover:bg-[color:var(--accent-500)]/40 transition-colors"
                   >
                     Activate
                   </button>
                 )}
                 {profile.id === activeId && (
-                  <span className="rounded bg-indigo-900/40 px-2 py-0.5 text-[10px] text-indigo-300 ring-1 ring-indigo-700/40">
+                  <span className="rounded bg-[color:var(--accent-500)]/40 px-2 py-0.5 text-[10px] text-indigo-300 ring-1 ring-indigo-700/40">
                     Active
                   </span>
                 )}
@@ -96,7 +96,7 @@ export function VoiceProfileSettings() {
                 {!profile.isDefault && (
                   <button
                     onClick={() => deleteProfile(profile.id)}
-                    className="rounded px-2 py-1 text-xs text-red-400 hover:bg-red-950/20 transition-colors"
+                    className="rounded px-2 py-1 text-xs text-[color:var(--state-danger)] hover:bg-[color:var(--state-danger)]/20 transition-colors"
                   >
                     Delete
                   </button>
@@ -120,7 +120,7 @@ export function VoiceProfileSettings() {
                       <select
                         value={profile.language}
                         onChange={(e) => updateLanguage(profile.id, e.target.value as LanguageCode)}
-                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 focus:border-indigo-600 focus:outline-none"
+                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 focus:border-[color:var(--accent-500)] focus:outline-none"
                       >
                         {SUPPORTED_LANGUAGES.map((l) => (
                           <option key={l.code} value={l.code}>{l.label}</option>
@@ -142,7 +142,7 @@ export function VoiceProfileSettings() {
                               </span>
                               <button
                                 onClick={() => removeCustomPhrase(profile.id, i)}
-                                className="text-[10px] text-red-400 hover:text-red-300"
+                                className="text-[10px] text-[color:var(--state-danger)] hover:text-red-300"
                               >
                                 ✕
                               </button>
@@ -160,12 +160,12 @@ export function VoiceProfileSettings() {
                           placeholder="Spoken phrase…"
                           value={newPhrase}
                           onChange={(e) => setNewPhrase(e.target.value)}
-                          className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 placeholder-zinc-600 focus:border-indigo-600 focus:outline-none"
+                          className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 placeholder-zinc-600 focus:border-[color:var(--accent-500)] focus:outline-none"
                         />
                         <select
                           value={newPhraseAction}
                           onChange={(e) => setNewPhraseAction(e.target.value as VoiceCommandAction)}
-                          className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-indigo-600 focus:outline-none"
+                          className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-[color:var(--accent-500)] focus:outline-none"
                         >
                           {COMMAND_ACTIONS.map((a) => (
                             <option key={a.value} value={a.value}>{a.label}</option>
@@ -177,7 +177,7 @@ export function VoiceProfileSettings() {
                             addCustomPhrase(profile.id, newPhrase.trim(), newPhraseAction);
                             setNewPhrase('');
                           }}
-                          className="rounded bg-indigo-700 px-3 py-1 text-xs text-white hover:bg-indigo-600 transition-colors"
+                          className="rounded bg-indigo-700 px-3 py-1 text-xs text-white hover:bg-[color:var(--accent-500)] transition-colors"
                         >
                           Add
                         </button>
@@ -200,12 +200,12 @@ export function VoiceProfileSettings() {
             placeholder="Profile name…"
             value={newProfileName}
             onChange={(e) => setNewProfileName(e.target.value)}
-            className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:border-indigo-600 focus:outline-none"
+            className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:border-[color:var(--accent-500)] focus:outline-none"
           />
           <select
             value={newProfileLang}
             onChange={(e) => setNewProfileLang(e.target.value as LanguageCode)}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 focus:border-indigo-600 focus:outline-none"
+            className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 focus:border-[color:var(--accent-500)] focus:outline-none"
           >
             {SUPPORTED_LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>{l.label}</option>

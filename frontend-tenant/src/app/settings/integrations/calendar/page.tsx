@@ -17,6 +17,7 @@ import {
   Users,
 } from 'lucide-react';
 
+import { PageShell, PageHero, GlassPanel } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import {
   integrationsService,
@@ -124,7 +125,11 @@ function CalendarContent() {
   const grouped = useMemo(() => groupByDay(events), [events]);
 
   return (
-    <div className="p-6 space-y-6">
+    <PageShell variant="default">
+      <PageHero
+        title="Google Calendar"
+        subtitle="Browse upcoming events, schedule meetings, and manage attendees."
+      />
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <Link
@@ -134,7 +139,7 @@ function CalendarContent() {
             <ArrowLeft className="w-3 h-3" /> Integrations
           </Link>
           <h1 className="text-xl font-semibold mt-1 flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-blue-500" />
+            <CalendarIcon className="w-5 h-5 text-[color:var(--state-info)]" />
             Google Calendar
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -176,8 +181,8 @@ function CalendarContent() {
       )}
 
       {connected === false && (
-        <Card className="p-6 text-center space-y-3">
-          <CalendarIcon className="w-10 h-10 mx-auto text-blue-500" />
+        <GlassPanel variant="tile" padding="md" interactive className="p-6 text-center space-y-3">
+          <CalendarIcon className="w-10 h-10 mx-auto text-[color:var(--state-info)]" />
           <h2 className="text-base font-medium">Google Workspace not connected</h2>
           <p className="text-sm text-muted-foreground">
             Connect Google to view and schedule calendar events.
@@ -187,12 +192,12 @@ function CalendarContent() {
               <Button size="sm">Connect Google</Button>
             </Link>
           </div>
-        </Card>
+        </GlassPanel>
       )}
 
       {connected && (
         <>
-          <Card className="p-3">
+          <GlassPanel variant="tile" padding="sm" className="p-3">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -226,7 +231,7 @@ function CalendarContent() {
                 </Button>
               )}
             </form>
-          </Card>
+          </GlassPanel>
 
           {loading ? (
             <div className="space-y-2">
@@ -235,11 +240,11 @@ function CalendarContent() {
               ))}
             </div>
           ) : events.length === 0 ? (
-            <Card className="p-6 text-center text-sm text-muted-foreground">
+            <GlassPanel variant="tile" padding="md" className="p-6 text-center text-sm text-muted-foreground">
               {activeQuery
                 ? 'No events matched your search.'
                 : 'No upcoming events in this calendar. Click New event to schedule one.'}
-            </Card>
+            </GlassPanel>
           ) : (
             <div className="space-y-4">
               {grouped.map(({ dayKey, label, items }) => (
@@ -278,7 +283,7 @@ function CalendarContent() {
           onError={setError}
         />
       )}
-    </div>
+    </PageShell>
   );
 }
 
@@ -319,10 +324,10 @@ function EventRow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
     >
-      <Card className="p-4">
+      <GlassPanel variant="tile" padding="md" interactive className="p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3 min-w-0">
-            <div className="w-1.5 h-12 rounded-full bg-blue-500/60 flex-shrink-0" />
+            <div className="w-1.5 h-12 rounded-full bg-[color:var(--state-info)]/60 flex-shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">{event.summary}</p>
               <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
@@ -371,7 +376,7 @@ function EventRow({
             </Button>
           </div>
         </div>
-      </Card>
+      </GlassPanel>
     </motion.div>
   );
 }

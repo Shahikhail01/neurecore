@@ -120,7 +120,7 @@ export default function ProjectTypePacksPage() {
         </div>
 
         {error ? (
-          <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+          <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
             {error}
           </div>
         ) : null}
@@ -130,7 +130,7 @@ export default function ProjectTypePacksPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search packs…"
-          className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-indigo-500"
+          className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)]"
           data-testid="pack-search"
         />
 
@@ -154,8 +154,8 @@ export default function ProjectTypePacksPage() {
                     onClick={() => toggle(pack.id)}
                     className={`w-full text-left rounded-xl border p-4 flex items-start gap-3 transition ${
                       isSelected
-                        ? 'border-indigo-500 bg-indigo-600/10'
-                        : 'border-surface-border bg-surface-raised hover:border-indigo-700/40'
+                        ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/10'
+                        : 'border-surface-border bg-surface-raised hover:border-[color:var(--accent-500)]/40'
                     } ${!canEdit ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                     data-testid={`pack-row-${pack.key}`}
                   >
@@ -167,7 +167,7 @@ export default function ProjectTypePacksPage() {
                         <span className="text-sm font-medium text-zinc-100">{pack.name}</span>
                         <span className="text-[10px] font-mono text-zinc-500">{pack.key}</span>
                         {pack.isSystem ? (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-400 border border-amber-800">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--state-warning)]/40 text-[color:var(--state-warning)] border border-amber-800">
                             SYSTEM
                           </span>
                         ) : null}
@@ -182,7 +182,7 @@ export default function ProjectTypePacksPage() {
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full border ${
                         isSelected
-                          ? 'border-indigo-500 bg-indigo-600/30 text-indigo-100'
+                          ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/30 text-indigo-100'
                           : 'border-surface-border text-zinc-500'
                       }`}
                     >
@@ -211,7 +211,7 @@ export default function ProjectTypePacksPage() {
               onClick={save}
               disabled={saving || !canEdit}
               data-testid="save-packs"
-              className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+              className="px-4 py-2 rounded bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save & Continue'}
             </button>

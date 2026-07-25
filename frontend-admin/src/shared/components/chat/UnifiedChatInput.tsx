@@ -104,7 +104,7 @@ export function UnifiedChatInput({
         <button
           onClick={submit}
           disabled={disabled || !value.trim()}
-          className="shrink-0 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white px-3 py-2 text-xs transition"
+          className="shrink-0 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] disabled:opacity-40 text-white px-3 py-2 text-xs transition"
           data-testid="chat-submit"
         >
           {disabled ? '…' : '↵'}

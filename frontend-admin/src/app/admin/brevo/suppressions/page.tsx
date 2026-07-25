@@ -14,11 +14,11 @@ import { BREVO_SUPPRESSION_REASONS } from "@/types/adminBrevo.types";
 const PAGE_SIZE = 50;
 
 const REASON_BADGE: Record<BrevoSuppressionReason, string> = {
-  BOUNCE_HARD: "bg-rose-500/10 text-rose-300 border-rose-500/30",
+  BOUNCE_HARD: "bg-[color:var(--visual-accent-rose-500)]/10 text-rose-300 border-rose-500/30",
   UNSUBSCRIBE: "bg-zinc-700/50 text-zinc-300 border-zinc-700/50",
-  ADMIN_BLOCK: "bg-violet-500/10 text-violet-300 border-violet-500/30",
+  ADMIN_BLOCK: "bg-[color:var(--accent-500)]/10 text-violet-300 border-violet-500/30",
   SPAM_COMPLAINT: "bg-rose-700/10 text-rose-200 border-rose-700/30",
-  MANUAL: "bg-indigo-500/10 text-indigo-300 border-indigo-500/30",
+  MANUAL: "bg-[color:var(--accent-500)]/10 text-indigo-300 border-[color:var(--accent-500)]/30",
 };
 
 export default function AdminBrevoSuppressionsPage() {
@@ -219,14 +219,14 @@ export default function AdminBrevoSuppressionsPage() {
         </div>
         <button
           onClick={() => setAddOpen(true)}
-          className="ml-auto px-4 py-2 text-sm rounded-lg bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 hover:bg-indigo-500/30"
+          className="ml-auto px-4 py-2 text-sm rounded-lg bg-[color:var(--accent-500)]/20 text-indigo-200 border border-[color:var(--accent-500)]/30 hover:bg-[color:var(--accent-500)]/30"
         >
           + Add suppression
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-sm text-rose-200">
+        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-[color:var(--visual-accent-rose-500)]/10 text-sm text-rose-200">
           {error}
         </div>
       )}
@@ -298,7 +298,7 @@ export default function AdminBrevoSuppressionsPage() {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => handleRemove(row.id, row.email)}
-                      className="text-xs px-2 py-1 rounded bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20"
+                      className="text-xs px-2 py-1 rounded bg-[color:var(--visual-accent-rose-500)]/10 text-rose-300 border border-rose-500/30 hover:bg-[color:var(--visual-accent-rose-500)]/20"
                     >
                       Remove
                     </button>
@@ -407,7 +407,7 @@ export default function AdminBrevoSuppressionsPage() {
               <button
                 onClick={() => void handleAdd()}
                 disabled={saving}
-                className="ml-auto px-4 py-2 text-xs rounded bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 disabled:opacity-50"
+                className="ml-auto px-4 py-2 text-xs rounded bg-[color:var(--accent-500)]/20 text-indigo-200 border border-[color:var(--accent-500)]/30 disabled:opacity-50"
               >
                 {saving ? "Adding…" : "Add"}
               </button>
@@ -433,9 +433,9 @@ function Ribbon({
     tone === "bad"
       ? "border-rose-500/30"
       : tone === "warn"
-        ? "border-amber-500/30"
+        ? "border-[color:var(--state-warning)]/30"
         : tone === "good"
-          ? "border-emerald-500/30"
+          ? "border-[color:var(--state-success)]/30"
           : "border-zinc-700/50";
   return (
     <div className={`rounded-lg border bg-zinc-900/40 p-3 ${cls}`}>

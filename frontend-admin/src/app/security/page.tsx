@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { PageHero, GlassPanel } from '@neurecore/ui-visual';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { KpiTile } from '@/components/kpi/KpiTile';
@@ -28,10 +29,10 @@ interface AnomalyRow {
 type Tab = 'policies' | 'anomalies';
 
 const SEVERITY_BADGE: Record<string, string> = {
-  CRITICAL: 'bg-red-900 text-red-300',
-  HIGH:     'bg-orange-900 text-orange-300',
-  MEDIUM:   'bg-amber-900 text-amber-300',
-  LOW:      'bg-zinc-800 text-zinc-400',
+  CRITICAL: 'border border-[color:var(--state-danger)]/40 bg-[color:var(--state-danger)]/10 text-[color:var(--state-danger)]',
+  HIGH:     'border border-[color:var(--state-warning)]/40 bg-[color:var(--state-warning)]/10 text-[color:var(--state-warning)]',
+  MEDIUM:   'border border-[color:var(--state-warning)]/40 bg-[color:var(--state-warning)]/10 text-[color:var(--state-warning)]',
+  LOW:      'bg-white/5 text-zinc-400',
 };
 
 const TABS: { id: Tab; label: string }[] = [
@@ -70,17 +71,14 @@ export default function SecurityPage() {
 
   return (
     <AdminShell user={user}>
+      <PageHero
+        title="Security"
+        subtitle="Governance, compliance and anomaly detection"
+      />
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-100">Security</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">Governance, compliance and anomaly detection</p>
-          </div>
           <button onClick={() => void fetchData()} className="px-3 py-1.5 rounded-lg border border-surface-border text-xs text-zinc-400 hover:text-zinc-200 transition">
             Refresh
           </button>
-        </div>
 
         {/* ── KPI tiles ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -98,7 +96,7 @@ export default function SecurityPage() {
               onClick={() => setTab(t.id)}
               className={`px-4 py-2.5 text-sm font-medium transition border-b-2 -mb-px ${
                 tab === t.id
-                  ? 'border-indigo-500 text-zinc-100'
+                  ? 'border-[color:var(--accent-500)] text-zinc-100'
                   : 'border-transparent text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -120,7 +118,7 @@ export default function SecurityPage() {
                 header: 'Mode',
                 accessor: (row) => (
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    row.enforcement === 'ENFORCE' ? 'bg-indigo-900 text-indigo-300' : 'bg-zinc-800 text-zinc-400'
+                    row.enforcement === 'ENFORCE' ? 'bg-[color:var(--accent-500)]/15 text-[color:var(--accent-300)]' : 'bg-white/5 text-zinc-400'
                   }`}>
                     {row.enforcement}
                   </span>
@@ -143,7 +141,7 @@ export default function SecurityPage() {
                 key: 'severity',
                 header: 'Severity',
                 accessor: (row) => (
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SEVERITY_BADGE[row.severity] ?? 'bg-zinc-800 text-zinc-400'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SEVERITY_BADGE[row.severity] ?? 'bg-white/5 text-zinc-400'}`}>
                     {row.severity}
                   </span>
                 ),

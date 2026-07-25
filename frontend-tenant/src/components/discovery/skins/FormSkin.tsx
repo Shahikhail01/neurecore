@@ -45,20 +45,20 @@ export function FormSkin({ question, existingValue, onSubmit, submitting, disabl
       <div>
         <label className="block text-sm text-zinc-200 font-medium">
           {question.label}
-          {question.required ? <span className="text-rose-400 ml-0.5">*</span> : null}
+          {question.required ? <span className="text-[color:var(--visual-accent-rose-400)] ml-0.5">*</span> : null}
         </label>
         {question.helpText ? (
           <p className="mt-0.5 text-xs text-zinc-500">{question.helpText}</p>
         ) : null}
       </div>
       <FieldControl question={question} value={value} onChange={setValue} disabled={disabled} />
-      {localError ? <p className="text-xs text-rose-400">{localError}</p> : null}
+      {localError ? <p className="text-xs text-[color:var(--visual-accent-rose-400)]">{localError}</p> : null}
       <div className="flex justify-end">
         <button
           type="submit"
           disabled={submitting || disabled}
           data-testid="form-skin-submit"
-          className="text-sm px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="text-sm px-3 py-1.5 rounded bg-[color:var(--accent-500)] text-white hover:bg-[color:var(--accent-500)] disabled:opacity-50"
         >
           {submitting ? 'Saving…' : 'Save answer'}
         </button>
@@ -79,7 +79,7 @@ function FieldControl({
   disabled?: boolean;
 }) {
   const baseInput =
-    'w-full text-sm rounded border border-surface-border bg-surface-base px-2 py-1.5 text-zinc-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50';
+    'w-full text-sm rounded border border-surface-border bg-surface-base px-2 py-1.5 text-zinc-100 focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50';
   switch (question.type) {
     case 'TEXT':
       return (
@@ -164,7 +164,7 @@ function FieldControl({
                 }}
                 className={`text-xs px-2 py-0.5 rounded-full border transition disabled:opacity-50 ${
                   selected
-                    ? 'border-indigo-500 bg-indigo-600/20 text-indigo-200'
+                    ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/20 text-indigo-200'
                     : 'border-surface-border text-zinc-400 hover:text-zinc-200'
                 }`}
               >

@@ -35,7 +35,7 @@ const VARIANT_CLASS: Record<ActionVariant, string> = {
   secondary:
     'bg-surface-overlay hover:bg-surface-border text-zinc-100 border border-surface-border',
   danger:
-    'bg-state-danger hover:bg-red-600 active:bg-red-700 text-white border border-transparent shadow-creatio-sm',
+    'bg-state-danger hover:bg-[color:var(--state-danger)] active:bg-red-700 text-white border border-transparent shadow-creatio-sm',
   ghost:
     'bg-transparent hover:bg-surface-overlay text-zinc-300 hover:text-zinc-100 border border-transparent',
   outline:

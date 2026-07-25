@@ -46,7 +46,7 @@ export function StepAuthority({ form, patch }: Props) {
             onClick={() => patch({ authority: opt.value })}
             className={`w-full flex items-start gap-3 p-4 rounded-xl border text-left transition ${
               selected
-                ? 'border-violet-500 bg-violet-500/10'
+                ? 'border-violet-500 bg-[color:var(--accent-500)]/10'
                 : 'border-surface-border hover:border-zinc-600 hover:bg-surface-overlay'
             }`}
           >
@@ -59,7 +59,7 @@ export function StepAuthority({ form, patch }: Props) {
             </div>
             <span
               className={`ml-auto mt-1 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                selected ? 'border-violet-500 bg-violet-500' : 'border-zinc-600'
+                selected ? 'border-violet-500 bg-[color:var(--accent-500)]' : 'border-zinc-600'
               }`}
             >
               {selected && <span className="w-2 h-2 rounded-full bg-white" />}

@@ -35,6 +35,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 
+import { PageShell, PageHero, GlassPanel } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import TenantShell from '@/components/TenantShell';
 import { KpiCard } from '@/components/creatio/KpiCard';
@@ -159,6 +160,60 @@ export default function DepartmentWorkspacePage() {
     [workflows, deptId],
   );
 
+  const runningAgents = useMemo(
+    () => deptAgents.filter((a) => (a as { status?: string }).status === 'RUNNING').length,
+    [deptAgents],
+  );
+  const completedTasks = useMemo(
+    () => deptTasks.filter((t) => (t as { status?: string }).status === 'COMPLETED').length,
+    [deptTasks],
+  );
+  const failedTasks = useMemo(
+    () => deptTasks.filter((t) => (t as { status?: string }).status === 'FAILED').length,
+    [deptTasks],
+  );
+  const activeWorkflows = useMemo(
+    () => deptWorkflows.filter((w) => (w as { status?: string }).status === 'ACTIVE').length,
+    [deptWorkflows],
+  );
+  const taskStatusDonut = useMemo(
+    () => {
+      const groups = new Map<string, number>();
+      for (const t of deptTasks) {
+        const status = ((t as { status?: string }).status ?? 'UNKNOWN') as string;
+        groups.set(status, (groups.get(status) ?? 0) + 1);
+      }
+      const palette = [
+        'var(--visual-glow-violet)',
+        'var(--visual-glow-cyan)',
+        'var(--visual-glow-amber)',
+        'var(--visual-glow-emerald)',
+        'var(--visual-glow-rose)',
+        'var(--visual-glow-blue)',
+      ];
+      return Array.from(groups.entries()).map(([name, value], i) => ({
+        name,
+        value,
+        color: palette[i % palette.length],
+      }));
+    },
+    [deptTasks],
+  );
+
+  const tabButton = (
+    kind: 'task' | 'workflow' | 'routine' | 'project' | 'goal',
+    label: string,
+  ) => (
+    <ActionButton
+      variant="primary"
+      size="sm"
+      icon={<Plus className="w-3.5 h-3.5" />}
+      onClick={() => setModal(kind)}
+    >
+      {label}
+    </ActionButton>
+  );
+
   const fetchMembers = useCallback(async () => {
     setMembersLoading(true);
     try {
@@ -212,52 +267,26 @@ export default function DepartmentWorkspacePage() {
   if (!dept) {
     return (
       <TenantShell user={user}>
-        <div className="max-w-7xl mx-auto">
-          <div className="card-surface p-12 text-center">
-            <Building2 className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+        <PageShell variant="default">
+          <GlassPanel variant="panel" padding="lg" className="max-w-2xl mx-auto text-center">
+            <Building2 className="w-10 h-10 text-zinc-500 mx-auto mb-3" />
             <p className="text-sm text-zinc-300 font-medium">Department not found</p>
             <p className="text-xs text-zinc-500 mt-1 mb-4">
               The department ID {deptId} does not exist or you don't have access.
             </p>
-            <Link
-              href="/departments"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-medium transition"
-            >
+            <Link href="/departments" className="nv-btn-accent inline-flex items-center gap-2">
               <ArrowLeft className="w-3 h-3" />
               Back to Departments
             </Link>
-          </div>
-        </div>
+          </GlassPanel>
+        </PageShell>
       </TenantShell>
     );
   }
 
-  // ── Derived ──────────────────────────────────────────────────────────
-  const runningAgents = deptAgents.filter((a) => a.status === 'ACTIVE' || a.status === 'RUNNING').length;
-  const completedTasks = deptTasks.filter((t) => t.status === 'COMPLETED').length;
-  const failedTasks = deptTasks.filter((t) => t.status === 'FAILED').length;
-  const activeWorkflows = deptWorkflows.filter((w) => w.isActive).length;
-
-  const taskStatusDonut = [
-    { name: 'Completed', value: completedTasks, color: '#22c55e' },
-    { name: 'Running',   value: deptTasks.filter((t) => t.status === 'RUNNING' || t.status === 'IN_PROGRESS').length, color: '#3b82f6' },
-    { name: 'Pending',   value: deptTasks.filter((t) => t.status === 'PENDING').length, color: '#a855f7' },
-    { name: 'Failed',    value: failedTasks, color: '#ef4444' },
-  ].filter((s) => s.value > 0);
-
-  const tabButton = (id: 'task' | 'workflow' | 'routine' | 'project' | 'goal', label: string) => (
-    <ActionButton
-      variant="primary"
-      size="sm"
-      icon={<Plus className="w-3.5 h-3.5" />}
-      onClick={() => setModal(id)}
-    >
-      {label}
-    </ActionButton>
-  );
-
   return (
     <TenantShell user={user}>
+      <PageShell variant="default">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* ── Breadcrumb ─────────────────────────────────────────── */}
         <div className="flex items-center gap-2 text-xs text-zinc-500">
@@ -527,6 +556,7 @@ export default function DepartmentWorkspacePage() {
           }}
         />
       </Modal>
+      </PageShell>
     </TenantShell>
   );
 }
@@ -682,7 +712,7 @@ function OverviewTab(props: {
             data={[]}
             dataKey="value"
             xKey="timestamp"
-            color="#8b5cf6"
+            color="var(--visual-glow-violet)"
             loading={false}
             height={180}
           />
@@ -696,7 +726,7 @@ function OverviewTab(props: {
             data={
               props.taskStatusDonut.length > 0
                 ? props.taskStatusDonut
-                : [{ name: 'No data', value: 1, color: '#3f3f46' }]
+                : [{ name: 'No data', value: 1, color: 'var(--visual-glow-cyan)' }]
             }
             nameKey="name"
             valueKey="value"
@@ -805,9 +835,9 @@ function TasksTab({ deptTasks, onInspect }: { deptTasks: unknown[]; onInspect: (
 
   const columns = [
     { id: 'PENDING', label: 'Pending', color: 'border-zinc-700' },
-    { id: 'RUNNING', label: 'Running', color: 'border-blue-700' },
-    { id: 'COMPLETED', label: 'Completed', color: 'border-emerald-700' },
-    { id: 'FAILED', label: 'Failed', color: 'border-red-700' },
+    { id: 'RUNNING', label: 'Running', color: 'border-[color:var(--state-info)]' },
+    { id: 'COMPLETED', label: 'Completed', color: 'border-[color:var(--state-success)]' },
+    { id: 'FAILED', label: 'Failed', color: 'border-[color:var(--state-danger)]' },
   ] as const;
 
   return (

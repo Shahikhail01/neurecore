@@ -30,10 +30,10 @@ interface ConfidenceScoreProps {
  * 0-30: Red, 30-60: Yellow, 60-85: Blue, 85-100: Green
  */
 const getConfidenceColor = (score: number): string => {
-    if (score >= 85) return 'text-green-600';
-    if (score >= 60) return 'text-blue-600';
+    if (score >= 85) return 'text-[color:var(--state-success)]';
+    if (score >= 60) return 'text-[color:var(--state-info)]';
     if (score >= 30) return 'text-yellow-600';
-    return 'text-red-600';
+    return 'text-[color:var(--state-danger)]';
 };
 
 /**

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { PageHero, GlassPanel } from '@neurecore/ui-visual';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { KpiTile } from '@/components/kpi/KpiTile';
@@ -20,7 +21,7 @@ const RANGE_OPTIONS = [
   { label: '30 d', value: '30d' as const },
 ];
 
-const PLAN_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e'];
+const PLAN_COLORS = ['var(--accent-500)', 'var(--visual-glow-violet)', 'var(--visual-glow-cyan)', 'var(--state-success)'];
 
 export default function BillingPage() {
   const user = useAdminAuth();
@@ -72,26 +73,24 @@ export default function BillingPage() {
 
   return (
     <AdminShell user={user}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-100">Billing</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">Platform revenue and cost analytics</p>
-          </div>
+      <PageHero
+        title="Billing"
+        subtitle="Platform revenue and cost analytics"
+        actions={
           <div className="flex gap-1">
             {RANGE_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setRange(opt.value)}
-                className={`px-2.5 py-1 rounded-md text-xs transition ${range === opt.value ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                className={`px-2.5 py-1 rounded-md text-xs transition ${range === opt.value ? 'bg-[color:var(--accent-500)] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
               >
                 {opt.label}
               </button>
             ))}
           </div>
-        </div>
-
+        }
+      />
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* ── KPI tiles ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiTile
@@ -124,7 +123,7 @@ export default function BillingPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 rounded-xl border border-surface-border bg-surface-raised p-4">
             <h3 className="text-sm font-semibold text-zinc-200 mb-4">Cost Trend</h3>
-            <AreaChart data={costData} dataKey="value" xKey="timestamp" color="#22c55e" loading={costLoading} height={200} />
+            <AreaChart data={costData} dataKey="value" xKey="timestamp" color="var(--state-success)" loading={costLoading} height={200} />
           </div>
           <div className="rounded-xl border border-surface-border bg-surface-raised p-4">
             <h3 className="text-sm font-semibold text-zinc-200 mb-4">Plan Distribution</h3>

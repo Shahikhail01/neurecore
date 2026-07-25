@@ -67,13 +67,13 @@ const TIER_PRESENTATION: Record<
   },
   business: {
     rank: 1,
-    bgClass: 'bg-blue-500/15 border-blue-500/30',
+    bgClass: 'bg-[color:var(--state-info)]/15 border-[color:var(--state-info)]/30',
     textClass: 'text-blue-300',
     label: 'Business',
   },
   professional: {
     rank: 2,
-    bgClass: 'bg-violet-500/15 border-violet-500/30',
+    bgClass: 'bg-[color:var(--accent-500)]/15 border-violet-500/30',
     textClass: 'text-violet-300',
     label: 'Professional',
   },
@@ -110,7 +110,7 @@ export function TierBadge({ tier, onClick, compact = false }: TierBadgeProps) {
       <span className="truncate">{tier.name ?? presentation.label}</span>
       {isTrial && (
         <span
-          className="ml-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[9px] px-1.5 py-px font-semibold uppercase tracking-wide"
+          className="ml-0.5 rounded-full bg-[color:var(--state-warning)]/20 text-amber-300 text-[9px] px-1.5 py-px font-semibold uppercase tracking-wide"
           title={`${tier.trialDays}-day trial`}
         >
           Trial · {tier.trialDays}d

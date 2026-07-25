@@ -10,9 +10,9 @@ import type { BriefingSection }    from '@/core/services/interfaces/IDailyBriefi
 
 // ─── Severity color map ───────────────────────────────────────────────────────
 const SEVERITY_STYLES: Record<string, string> = {
-  positive: 'border-emerald-500/40 bg-emerald-950/30',
-  negative: 'border-red-500/40 bg-red-950/30',
-  warning:  'border-amber-500/40 bg-amber-950/30',
+  positive: 'border-[color:var(--state-success)]/40 bg-[color:var(--state-success)]/30',
+  negative: 'border-[color:var(--state-danger)]/40 bg-[color:var(--state-danger)]/30',
+  warning:  'border-[color:var(--state-warning)]/40 bg-[color:var(--state-warning)]/30',
   neutral:  'border-zinc-700/40 bg-zinc-900/40',
 };
 
@@ -23,8 +23,8 @@ const TREND_ICON: Record<string, string> = {
 };
 
 const TREND_COLOR: Record<string, string> = {
-  up:   'text-emerald-400',
-  down: 'text-red-400',
+  up:   'text-[color:var(--state-success)]',
+  down: 'text-[color:var(--state-danger)]',
   flat: 'text-zinc-400',
 };
 
@@ -154,7 +154,7 @@ export function DailyBriefingModal({ isOpen, onClose }: DailyBriefingModalProps)
                     title={isNarrating ? 'Stop narration' : 'Read aloud'}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                       isNarrating
-                        ? 'bg-indigo-900/60 text-indigo-300 ring-1 ring-indigo-500'
+                        ? 'bg-[color:var(--accent-500)]/60 text-indigo-300 ring-1 ring-indigo-500'
                         : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
                     }`}
                   >
@@ -190,7 +190,7 @@ export function DailyBriefingModal({ isOpen, onClose }: DailyBriefingModalProps)
               )}
 
               {error && (
-                <div className="rounded-lg border border-red-500/30 bg-red-950/20 p-4 text-sm text-red-400">
+                <div className="rounded-lg border border-[color:var(--state-danger)]/30 bg-[color:var(--state-danger)]/20 p-4 text-sm text-[color:var(--state-danger)]">
                   {error}
                 </div>
               )}
@@ -242,7 +242,7 @@ export function DailyBriefingButton({ onClick }: DailyBriefingButtonProps) {
     <button
       onClick={onClick}
       title="Open Daily Briefing"
-      className="flex items-center gap-2 rounded-lg bg-indigo-900/40 px-3 py-1.5 text-xs font-medium text-indigo-300 ring-1 ring-indigo-700/50 hover:bg-indigo-900/70 transition-colors"
+      className="flex items-center gap-2 rounded-lg bg-[color:var(--accent-500)]/40 px-3 py-1.5 text-xs font-medium text-indigo-300 ring-1 ring-indigo-700/50 hover:bg-[color:var(--accent-500)]/70 transition-colors"
     >
       <span>☀️</span>
       <span>Daily Briefing</span>

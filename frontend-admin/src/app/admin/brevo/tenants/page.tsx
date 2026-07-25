@@ -85,7 +85,7 @@ export default function AdminBrevoTenantsPage() {
   return (
     <AdminBrevoShell subtitle="Per-tenant Brevo credentials, daily quota, and per-tenant sender identity.">
       {error && (
-        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-sm text-rose-200">
+        <div className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-[color:var(--visual-accent-rose-500)]/10 text-sm text-rose-200">
           {error}
         </div>
       )}
@@ -113,7 +113,7 @@ export default function AdminBrevoTenantsPage() {
               onClick={() => setFilter(opt.id)}
               className={`px-3 py-1.5 text-xs rounded border ${
                 filter === opt.id
-                  ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40"
+                  ? "bg-[color:var(--accent-500)]/20 text-indigo-300 border-[color:var(--accent-500)]/40"
                   : "bg-zinc-900/40 text-zinc-400 border-zinc-800 hover:text-zinc-200"
               }`}
             >
@@ -227,12 +227,12 @@ export default function AdminBrevoTenantsPage() {
                       <div className="flex items-center gap-2">
                         <StatusBadge status={t.status} />
                         {t.isAtLimit && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--visual-accent-rose-500)]/15 text-rose-300 border border-rose-500/30 font-mono">
                             AT LIMIT
                           </span>
                         )}
                         {!t.isAtLimit && t.isAtWarning && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--state-warning)]/15 text-amber-300 border border-[color:var(--state-warning)]/30 font-mono">
                             WARNING
                           </span>
                         )}
@@ -290,7 +290,7 @@ export default function AdminBrevoTenantsPage() {
                           <button
                             onClick={() => handleResetQuota(t)}
                             disabled={isBusy}
-                            className="text-xs px-2 py-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-xs px-2 py-1 rounded bg-[color:var(--state-warning)]/10 text-amber-300 border border-[color:var(--state-warning)]/30 hover:bg-[color:var(--state-warning)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Zero today's counter (UTC)"
                           >
                             {isBusy ? "…" : "Reset quota"}
@@ -301,7 +301,7 @@ export default function AdminBrevoTenantsPage() {
                           <button
                             onClick={() => handleDisconnect(t)}
                             disabled={isBusy}
-                            className="text-xs px-2 py-1 rounded bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-xs px-2 py-1 rounded bg-[color:var(--visual-accent-rose-500)]/10 text-rose-300 border border-rose-500/30 hover:bg-[color:var(--visual-accent-rose-500)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Clear Brevo credential + sender identity"
                           >
                             {isBusy ? "…" : "Disconnect"}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { PageHero, GlassPanel } from '@neurecore/ui-visual';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import api from '@/services/api';
@@ -20,12 +21,12 @@ interface User {
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  SUPER_ADMIN: 'bg-purple-900 text-purple-300',
-  PLATFORM_ADMIN: 'bg-indigo-900 text-indigo-300',
-  OWNER: 'bg-blue-900 text-blue-300',
-  ADMIN: 'bg-cyan-900 text-cyan-300',
-  USER: 'bg-gray-800 text-gray-300',
-  SUPPORT: 'bg-green-900 text-green-300',
+  SUPER_ADMIN: 'border border-[color:var(--accent-500)]/40 bg-[color:var(--accent-500)]/10 text-[color:var(--accent-300)]',
+  PLATFORM_ADMIN: 'bg-[color:var(--accent-500)]/15 text-[color:var(--accent-300)]',
+  OWNER: 'border border-[color:var(--state-info)]/40 bg-[color:var(--state-info)]/10 text-[color:var(--state-info)]',
+  ADMIN: 'border border-[color:var(--state-info)]/40 bg-[color:var(--state-info)]/10 text-[color:var(--state-info)]',
+  USER: 'border border-[color:var(--accent-500)]/30 bg-white/5 text-zinc-300',
+  SUPPORT: 'border border-[color:var(--state-success)]/40 bg-[color:var(--state-success)]/10 text-[color:var(--state-success)]',
 };
 
 export default function UsersPage() {
@@ -58,10 +59,12 @@ export default function UsersPage() {
 
   return (
     <AdminShell user={user}>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Users</h1>
-        <span className="text-sm text-gray-400">{total} total</span>
-      </div>
+      <PageHero
+        title="Users"
+        subtitle="Platform users across all tenants"
+        actions={<span className="text-sm text-zinc-400">{total} total</span>}
+      />
+      <div className="max-w-7xl mx-auto">
 
       <div className="mb-4">
         <input
@@ -69,15 +72,15 @@ export default function UsersPage() {
           placeholder="Search users…"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-full max-w-sm rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full max-w-sm rounded-lg border border border-[color:var(--accent-500)]/30 bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-500)]"
         />
       </div>
 
-      {error && <div className="mb-4 rounded-lg bg-red-950 border border-red-800 p-3 text-sm text-red-300">{error}</div>}
+      {error && <div className="mb-4 rounded-lg bg-[color:var(--state-danger)]/10 border border border-[color:var(--state-danger)]/40 p-3 text-sm text-[color:var(--state-danger)]">{error}</div>}
 
-      <div className="rounded-xl border border-gray-800 overflow-hidden">
+      <div className="rounded-xl border border border-[color:var(--accent-500)]/30 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-900 text-gray-400 text-xs uppercase tracking-wider">
+          <thead className="bg-white/5 text-zinc-400 text-xs uppercase tracking-wider">
             <tr>
               <th className="px-4 py-3 text-left">Name</th>
               <th className="px-4 py-3 text-left">Email</th>
@@ -87,27 +90,27 @@ export default function UsersPage() {
               <th className="px-4 py-3 text-left">Joined</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-800">
+          <tbody className="divide-y divide-y divide-[color:var(--accent-500)]/20">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-zinc-500">Loading…</td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No users found</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-zinc-500">No users found</td></tr>
             ) : users.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-900 transition">
+              <tr key={u.id} className="hover:bg-white/5 transition">
                 <td className="px-4 py-3 font-medium">{u.firstName} {u.lastName}</td>
-                <td className="px-4 py-3 text-gray-400">{u.email}</td>
+                <td className="px-4 py-3 text-zinc-400">{u.email}</td>
                 <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role] ?? 'bg-gray-800 text-gray-300'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role] ?? 'border border-[color:var(--accent-500)]/30 bg-white/5 text-zinc-300'}`}>
                     {u.role}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${u.isActive ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${u.isActive ? 'border border-[color:var(--state-success)]/40 bg-[color:var(--state-success)]/10 text-[color:var(--state-success)]' : 'border border-[color:var(--state-danger)]/40 bg-[color:var(--state-danger)]/10 text-[color:var(--state-danger)]'}`}>
                     {u.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-400 truncate max-w-[140px]">{u.tenantId ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-400">{new Date(u.createdAt).toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-zinc-400 truncate max-w-[140px]">{u.tenantId ?? '—'}</td>
+                <td className="px-4 py-3 text-zinc-400">{new Date(u.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}
           </tbody>
@@ -117,16 +120,17 @@ export default function UsersPage() {
       {total > limit && (
         <div className="mt-4 flex items-center gap-2 justify-end">
           <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-            className="rounded px-3 py-1.5 text-sm border border-gray-700 disabled:opacity-40 hover:bg-gray-800 transition">
+            className="rounded px-3 py-1.5 text-sm border border border-[color:var(--accent-500)]/30 disabled:opacity-40 hover:bg-white/5 transition">
             Previous
           </button>
-          <span className="text-sm text-gray-400">Page {page} of {Math.ceil(total / limit)}</span>
+          <span className="text-sm text-zinc-400">Page {page} of {Math.ceil(total / limit)}</span>
           <button onClick={() => setPage((p) => p + 1)} disabled={page * limit >= total}
-            className="rounded px-3 py-1.5 text-sm border border-gray-700 disabled:opacity-40 hover:bg-gray-800 transition">
+            className="rounded px-3 py-1.5 text-sm border border border-[color:var(--accent-500)]/30 disabled:opacity-40 hover:bg-white/5 transition">
             Next
           </button>
         </div>
       )}
+      </div>
     </AdminShell>
   );
 }

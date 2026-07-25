@@ -46,6 +46,7 @@ import {
   Hash,
 } from 'lucide-react';
 
+import { PageShell, PageHero } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import TenantShell from '@/components/TenantShell';
 import { KpiCard } from '@/components/creatio/KpiCard';
@@ -167,13 +168,19 @@ export default function ServiceDeskPage() {
 
   return (
     <TenantShell user={user}>
+      <PageShell variant="default">
+        <PageHero
+          eyebrow="Operations"
+          title="Service Desk"
+          subtitle="Inbox, approvals, audit log, and live activity — everything that needs your attention."
+        />
       <div className="max-w-7xl mx-auto space-y-5">
         {/* ── Page Header ──────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="flex items-center justify-between gap-4"
+          className="flex items-center justify-between gap-4 hidden"
         >
           <div>
             <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
@@ -229,6 +236,7 @@ export default function ServiceDeskPage() {
           </motion.div>
         </AnimatePresence>
       </div>
+      </PageShell>
     </TenantShell>
   );
 }
@@ -721,7 +729,7 @@ function ActivityTab() {
                 log.status === 'COMPLETED' ? 'bg-state-success' :
                 log.status === 'FAILED' ? 'bg-state-danger' :
                 log.status === 'RUNNING' ? 'bg-state-info animate-pulse' :
-                'bg-zinc-500'
+                'bg-zinc-500/50'
               }`} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-200 truncate">

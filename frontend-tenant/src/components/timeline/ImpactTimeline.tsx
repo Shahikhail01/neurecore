@@ -156,7 +156,7 @@ export const ImpactTimeline: FC<ImpactTimelineProps> = ({
                 >
                     {impactStats.CRITICAL > 0 && (
                         <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                            <div className="w-2 h-2 rounded-full bg-[color:var(--state-danger)]" />
                             <span>{impactStats.CRITICAL} Critical</span>
                         </div>
                     )}

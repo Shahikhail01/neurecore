@@ -83,12 +83,12 @@ export function StepParameters({ form, patch }: Props) {
             {form.tags.map((tag) => (
               <span
                 key={tag}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-[11px] text-violet-300"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[color:var(--accent-500)]/20 border border-violet-500/40 text-[11px] text-violet-300"
               >
                 {tag}
                 <button
                   onClick={() => removeTag(tag)}
-                  className="text-violet-400 hover:text-status-risk transition"
+                  className="text-[color:var(--accent-400)] hover:text-status-risk transition"
                 >
                   ×
                 </button>

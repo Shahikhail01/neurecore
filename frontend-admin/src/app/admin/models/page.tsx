@@ -130,7 +130,7 @@ export default function AdminModelsPage() {
         </div>
 
         {error ? (
-          <div className="rounded-md border border-red-800 bg-red-950/30 px-3 py-2 text-sm text-red-300">
+          <div className="rounded-md border border-red-800 bg-[color:var(--state-danger)]/30 px-3 py-2 text-sm text-red-300">
             {error}
           </div>
         ) : null}
@@ -143,7 +143,7 @@ export default function AdminModelsPage() {
                 onClick={() => setTab(t)}
                 className={`px-4 py-2 text-sm border-b-2 ${
                   tab === t
-                    ? 'border-blue-500 text-zinc-100'
+                    ? 'border-[color:var(--state-info)] text-zinc-100'
                     : 'border-transparent text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -232,7 +232,7 @@ function ProvidersTab({
       <div className="flex justify-end">
         <button
           onClick={() => setShowNew((v) => !v)}
-          className="px-3 py-1 text-sm rounded bg-blue-600 hover:bg-blue-500 text-white"
+          className="px-3 py-1 text-sm rounded bg-[color:var(--state-info)] hover:bg-[color:var(--state-info)] text-white"
         >
           {showNew ? 'Cancel' : 'New provider'}
         </button>
@@ -274,7 +274,7 @@ function ProvidersTab({
           <button
             onClick={create}
             disabled={busy || !draft.slug || !draft.name || !draft.apiBaseUrl || !draft.apiKeyEnv}
-            className="col-span-2 px-3 py-1.5 text-sm rounded bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
+            className="col-span-2 px-3 py-1.5 text-sm rounded bg-[color:var(--state-success)] hover:bg-[color:var(--state-success)] text-white disabled:opacity-50"
           >
             {busy ? 'Creating…' : 'Create provider'}
           </button>
@@ -524,7 +524,7 @@ function OverridesTab({
         <button
           onClick={submit}
           disabled={busy || !tenantId || !aiModelId}
-          className="px-3 py-1.5 text-sm rounded bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
+          className="px-3 py-1.5 text-sm rounded bg-[color:var(--state-success)] hover:bg-[color:var(--state-success)] text-white disabled:opacity-50"
         >
           {busy ? 'Saving…' : 'Set override'}
         </button>

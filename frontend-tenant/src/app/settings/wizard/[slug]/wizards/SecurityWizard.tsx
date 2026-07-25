@@ -159,7 +159,7 @@ export function SecurityWizard({ slug }: { slug: WizardSlug }) {
     return (
       <WizardShell title="Security">
         <div className="text-center space-y-3 py-4">
-          <CheckCircle2 className="w-10 h-10 mx-auto text-green-500" />
+          <CheckCircle2 className="w-10 h-10 mx-auto text-[color:var(--state-success)]" />
           <p className="text-sm text-muted-foreground">Security settings saved.</p>
         </div>
       </WizardShell>
@@ -278,7 +278,7 @@ export function SecurityWizard({ slug }: { slug: WizardSlug }) {
                     {saving && <Loader2 className="w-3 h-3 mr-1 animate-spin" />} Update password
                   </Button>
                   {passwordChangeDone && (
-                    <span className="text-xs text-green-600 flex items-center gap-1">
+                    <span className="text-xs text-[color:var(--state-success)] flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> Updated
                     </span>
                   )}

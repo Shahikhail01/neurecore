@@ -272,7 +272,7 @@ export default function EmailSettingsPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-950 border border-red-800 p-3 text-sm text-red-300">
+        <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -293,7 +293,7 @@ export default function EmailSettingsPage() {
               }}
               className={`pb-3 text-sm font-medium border-b-2 transition ${
                 activeTab === tab.id
-                  ? "border-indigo-500 text-indigo-400"
+                  ? "border-[color:var(--accent-500)] text-[color:var(--accent-400)]"
                   : "border-transparent text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -316,7 +316,7 @@ export default function EmailSettingsPage() {
             </button>
             <button
               onClick={openCreateConfig}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+              className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
             >
               + Add Provider
             </button>
@@ -351,14 +351,14 @@ export default function EmailSettingsPage() {
                           }
                         </h3>
                         {config.isDefault && (
-                          <span className="rounded-full bg-indigo-900 text-indigo-300 text-xs px-2 py-0.5">
+                          <span className="rounded-full bg-[color:var(--accent-500)] text-indigo-300 text-xs px-2 py-0.5">
                             Default
                           </span>
                         )}
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             config.isEnabled
-                              ? "bg-green-900 text-green-300"
+                              ? "bg-[color:var(--state-success)] text-green-300"
                               : "bg-zinc-700 text-zinc-400"
                           }`}
                         >
@@ -394,7 +394,7 @@ export default function EmailSettingsPage() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                           config.isEnabled
                             ? "bg-yellow-900 text-yellow-300 hover:bg-yellow-800"
-                            : "bg-green-900 text-green-300 hover:bg-green-800"
+                            : "bg-[color:var(--state-success)] text-green-300 hover:bg-green-800"
                         }`}
                       >
                         {config.isEnabled ? "Disable" : "Enable"}
@@ -407,7 +407,7 @@ export default function EmailSettingsPage() {
                       </button>
                       <button
                         onClick={() => setDeleteTarget(config)}
-                        className="px-3 py-1.5 rounded-lg text-xs text-red-400 hover:text-red-300 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs text-[color:var(--state-danger)] hover:text-red-300 transition"
                       >
                         Delete
                       </button>
@@ -434,7 +434,7 @@ export default function EmailSettingsPage() {
               </button>
               <button
                 onClick={openCreateTemplate}
-                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+                className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
               >
                 + Add Template
               </button>
@@ -463,7 +463,7 @@ export default function EmailSettingsPage() {
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             template.isActive
-                              ? "bg-green-900 text-green-300"
+                              ? "bg-[color:var(--state-success)] text-green-300"
                               : "bg-zinc-700 text-zinc-400"
                           }`}
                         >
@@ -488,7 +488,7 @@ export default function EmailSettingsPage() {
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                           template.isActive
                             ? "bg-yellow-900 text-yellow-300 hover:bg-yellow-800"
-                            : "bg-green-900 text-green-300 hover:bg-green-800"
+                            : "bg-[color:var(--state-success)] text-green-300 hover:bg-green-800"
                         }`}
                       >
                         {template.isActive ? "Disable" : "Enable"}
@@ -501,7 +501,7 @@ export default function EmailSettingsPage() {
                       </button>
                       <button
                         onClick={() => handleDeleteTemplate(template.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs text-red-400 hover:text-red-300 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs text-[color:var(--state-danger)] hover:text-red-300 transition"
                       >
                         Delete
                       </button>
@@ -579,10 +579,10 @@ export default function EmailSettingsPage() {
                             log.status === "sent" ||
                             log.status === "delivered" ||
                             log.status === "opened"
-                              ? "bg-green-900 text-green-300"
+                              ? "bg-[color:var(--state-success)] text-green-300"
                               : log.status === "failed" ||
                                   log.status === "bounced"
-                                ? "bg-red-900 text-red-300"
+                                ? "bg-[color:var(--state-danger)] text-red-300"
                                 : "bg-yellow-900 text-yellow-300"
                           }`}
                         >
@@ -702,7 +702,7 @@ export default function EmailSettingsPage() {
                 </div>
 
                 {saveError && (
-                  <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+                  <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
                     {saveError}
                   </div>
                 )}
@@ -717,7 +717,7 @@ export default function EmailSettingsPage() {
                   <button
                     onClick={handleSaveConfig}
                     disabled={saving}
-                    className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium disabled:opacity-50"
+                    className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium disabled:opacity-50"
                   >
                     {saving
                       ? "Saving..."
@@ -868,7 +868,7 @@ export default function EmailSettingsPage() {
                   <button
                     onClick={handleSaveTemplate}
                     disabled={saving}
-                    className="flex-1 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50"
+                    className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] text-white text-sm disabled:opacity-50"
                   >
                     {saving ? "Saving..." : editTemplate ? "Save" : "Create"}
                   </button>

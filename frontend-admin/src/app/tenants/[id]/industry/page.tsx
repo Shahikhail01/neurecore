@@ -194,7 +194,7 @@ export default function TenantIndustryPage({
         </div>
 
         {!isSuperAdmin && (
-          <div className="mb-4 rounded-lg bg-amber-950 border border-amber-800 p-3 text-sm text-amber-300 flex items-start gap-2">
+          <div className="mb-4 rounded-lg bg-[color:var(--state-warning)] border border-amber-800 p-3 text-sm text-amber-300 flex items-start gap-2">
             <IconAlert className="w-4 h-4 mt-0.5 shrink-0" />
             <span>
               Only SUPER_ADMIN can change a tenant&apos;s industry. Your role
@@ -205,7 +205,7 @@ export default function TenantIndustryPage({
         )}
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-950 border border-red-800 p-3 text-sm text-red-300">
+          <div className="mb-4 rounded-lg bg-[color:var(--state-danger)] border border-red-800 p-3 text-sm text-red-300">
             {error}
           </div>
         )}
@@ -214,7 +214,7 @@ export default function TenantIndustryPage({
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-4 rounded-lg bg-green-950 border border-green-800 p-3 text-sm text-green-300 flex items-center gap-2"
+            className="mb-4 rounded-lg bg-[color:var(--state-success)] border border-green-800 p-3 text-sm text-green-300 flex items-center gap-2"
           >
             <IconCheck className="w-4 h-4" /> Industry updated.
           </motion.div>
@@ -266,7 +266,7 @@ export default function TenantIndustryPage({
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="rounded-md bg-amber-950/40 border border-amber-800/60 p-3 text-xs text-amber-300"
+                className="rounded-md bg-[color:var(--state-warning)]/40 border border-amber-800/60 p-3 text-xs text-amber-300"
               >
                 <strong>Pending change:</strong> {labelOf(tenant?.industry)}{' '}
                 → {labelOf(selectedIndustry)}
@@ -287,7 +287,7 @@ export default function TenantIndustryPage({
               <button
                 onClick={() => void handleSave()}
                 disabled={!isDirty || !isSuperAdmin || saving}
-                className="px-6 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition flex items-center gap-1.5"
+                className="px-6 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition flex items-center gap-1.5"
               >
                 <IconSave className="w-3.5 h-3.5" />
                 {saving ? 'Saving…' : 'Save Industry'}

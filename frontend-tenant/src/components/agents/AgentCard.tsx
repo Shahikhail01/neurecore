@@ -32,20 +32,20 @@ const getStatusDisplay = (
         ACTIVE: {
             label: 'Active',
             icon: <Zap className="w-4 h-4" />,
-            bgColor: 'bg-emerald-50 dark:bg-emerald-950',
-            dotColor: 'bg-emerald-500',
+            bgColor: 'bg-emerald-50 dark:bg-[color:var(--state-success)]',
+            dotColor: 'bg-[color:var(--state-success)]',
         },
         IDLE: {
             label: 'Idle',
             icon: <Clock className="w-4 h-4" />,
-            bgColor: 'bg-blue-50 dark:bg-blue-950',
-            dotColor: 'bg-blue-500',
+            bgColor: 'bg-blue-50 dark:bg-[color:var(--state-info)]',
+            dotColor: 'bg-[color:var(--state-info)]',
         },
         STANDBY: {
             label: 'Standby',
             icon: <AlertCircle className="w-4 h-4" />,
-            bgColor: 'bg-amber-50 dark:bg-amber-950',
-            dotColor: 'bg-amber-500',
+            bgColor: 'bg-amber-50 dark:bg-[color:var(--state-warning)]',
+            dotColor: 'bg-[color:var(--state-warning)]',
         },
         OFFLINE: {
             label: 'Offline',
@@ -180,7 +180,7 @@ export const AgentCardComponent: React.FC<AgentCardProps> = ({
             {/* Queue + Performance */}
             <div className="px-4 py-3">
                 {queue > 0 && (
-                    <div className="flex items-center justify-between mb-3 p-2 bg-amber-50 dark:bg-amber-950 rounded">
+                    <div className="flex items-center justify-between mb-3 p-2 bg-amber-50 dark:bg-[color:var(--state-warning)] rounded">
                         <span className="text-xs text-amber-700 dark:text-amber-200 font-medium">
                             {queue} in queue
                         </span>
@@ -192,7 +192,7 @@ export const AgentCardComponent: React.FC<AgentCardProps> = ({
                     {/* Completed Today */}
                     <div className="text-center p-2 bg-slate-50 dark:bg-slate-900 rounded-md">
                         <div className="flex items-center justify-center mb-1">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                            <CheckCircle2 className="w-4 h-4 text-[color:var(--state-success)]" />
                         </div>
                         <p className="text-sm font-bold text-slate-900 dark:text-white">
                             {performance.completedToday}
@@ -205,7 +205,7 @@ export const AgentCardComponent: React.FC<AgentCardProps> = ({
                     {/* Accuracy */}
                     <div className="text-center p-2 bg-slate-50 dark:bg-slate-900 rounded-md">
                         <div className="flex items-center justify-center mb-1">
-                            <TrendingUp className="w-4 h-4 text-blue-500" />
+                            <TrendingUp className="w-4 h-4 text-[color:var(--state-info)]" />
                         </div>
                         <p className="text-sm font-bold text-slate-900 dark:text-white">
                             {performance.accuracy}%

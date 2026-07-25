@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { authService } from "@/services/auth.service";
+import { PageShell, GlassPanel, GradientText } from "@neurecore/ui-visual";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -28,66 +29,72 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
-        <div className="flex justify-center mb-6">
-          <img src="/logo.png" alt="NeureCore" className="h-10 w-auto object-contain" />
-        </div>
+    <PageShell variant="auth">
+      <div className="flex items-center justify-center min-h-[calc(100vh-3rem)]">
+        <GlassPanel variant="auth" padding="lg" className="w-full max-w-md">
+          <div className="flex justify-center mb-6">
+            <img src="/logo.png" alt="NeureCore" className="h-10 w-auto object-contain" />
+          </div>
 
-        {sent ? (
-          <>
-            <h1 className="mb-2 text-xl font-semibold text-center">Check your email</h1>
-            <p className="text-sm text-gray-600 text-center">
-              If an account with that email exists, we&apos;ve sent a password reset link.
-            </p>
-            <p className="mt-6 text-center text-sm text-gray-500">
-              <Link href="/login" className="text-blue-600 hover:underline">
-                Back to sign in
-              </Link>
-            </p>
-          </>
-        ) : (
-          <>
-            <h1 className="mb-2 text-xl font-semibold text-center">Forgot password</h1>
-            <p className="mb-6 text-sm text-gray-500 text-center">
-              Enter your email and we&apos;ll send you a reset link.
-            </p>
+          {sent ? (
+            <>
+              <h1 className="mb-2 text-xl font-semibold text-center">
+                <GradientText>Check your email</GradientText>
+              </h1>
+              <p className="text-sm text-zinc-400 text-center">
+                If an account with that email exists, we&apos;ve sent a password reset link.
+              </p>
+              <p className="mt-6 text-center text-sm text-zinc-400">
+                <Link href="/login" className="text-[color:var(--accent-400)] hover:underline">
+                  Back to sign in
+                </Link>
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="mb-2 text-xl font-semibold text-center">
+                <GradientText>Forgot password</GradientText>
+              </h1>
+              <p className="mb-6 text-sm text-zinc-400 text-center">
+                Enter your email and we&apos;ll send you a reset link.
+              </p>
 
-            {error && (
-              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
+              {error && (
+                <div className="mb-4 rounded-lg border border-[color:var(--state-danger)]/40 bg-[color:var(--state-danger)]/10 p-3 text-sm text-[color:var(--state-danger)]">
+                  {error}
+                </div>
+              )}
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                Email
-                <input
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-base outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-2 rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition"
-              >
-                {loading ? "Sending…" : "Send reset link"}
-              </button>
-            </form>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <label className="flex flex-col gap-1 text-sm font-medium text-zinc-300">
+                  Email
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="nv-surface-inline px-3 py-2 text-base text-zinc-100 outline-none focus:accent-ring"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="nv-btn-accent mt-2"
+                >
+                  {loading ? "Sending…" : "Send reset link"}
+                </button>
+              </form>
 
-            <p className="mt-4 text-center text-sm text-gray-500">
-              <Link href="/login" className="text-blue-600 hover:underline">
-                Back to sign in
-              </Link>
-            </p>
-          </>
-        )}
+              <p className="mt-4 text-center text-sm text-zinc-400">
+                <Link href="/login" className="text-[color:var(--accent-400)] hover:underline">
+                  Back to sign in
+                </Link>
+              </p>
+            </>
+          )}
+        </GlassPanel>
       </div>
-    </main>
+    </PageShell>
   );
 }

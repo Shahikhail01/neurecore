@@ -1,15 +1,12 @@
 'use client';
 
 // components/wizard/WizardShell.tsx — Page chrome for all 11 sub-wizards.
-// PR-1 ships an empty scaffold so the route can resolve. PR-3 fills this with
-// step navigation, autosave, and per-wizard step rendering.
 //
-// The contract is intentionally narrow: any wizard page can render this with
-// a title, a list of children (one per step), and standard Back/Skip/Finish
-// actions. PR-3 introduces the WizardDefinition-driven rendering.
+// Now composed from the global @neurecore/ui-visual primitives — single
+// source of truth for all visual chrome across the monorepo.
 
 import type { ReactNode } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { GlassPanel, GradientText } from '@neurecore/ui-visual';
 
 export interface WizardShellProps {
   title: string;
@@ -19,14 +16,18 @@ export interface WizardShellProps {
 
 export function WizardShell({ title, description, children }: WizardShellProps) {
   return (
-    <Card className="max-w-3xl mx-auto">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description && (
-          <p className="text-sm text-muted-foreground">{description}</p>
-        )}
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+    <div className="max-w-3xl mx-auto">
+      <GlassPanel variant="panel" padding="lg" className="w-full">
+        <div className="mb-4">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            <GradientText>{title}</GradientText>
+          </h1>
+          {description && (
+            <p className="mt-1 text-sm text-zinc-400">{description}</p>
+          )}
+        </div>
+        <div>{children}</div>
+      </GlassPanel>
+    </div>
   );
 }

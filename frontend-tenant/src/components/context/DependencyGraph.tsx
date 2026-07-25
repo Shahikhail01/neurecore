@@ -26,8 +26,8 @@ const getPriorityStyles = (
     switch (priority) {
         case 'HIGH':
             return {
-                badge: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
-                icon: 'text-red-600 dark:text-red-400',
+                badge: 'bg-red-100 text-red-800 dark:bg-[color:var(--state-danger)] dark:text-red-100',
+                icon: 'text-[color:var(--state-danger)] dark:text-[color:var(--state-danger)]',
             };
         case 'MEDIUM':
             return {
@@ -36,8 +36,8 @@ const getPriorityStyles = (
             };
         case 'LOW':
             return {
-                badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100',
-                icon: 'text-blue-600 dark:text-blue-400',
+                badge: 'bg-blue-100 text-blue-800 dark:bg-[color:var(--state-info)] dark:text-blue-100',
+                icon: 'text-[color:var(--state-info)] dark:text-[color:var(--state-info)]',
             };
     }
 };
@@ -181,7 +181,7 @@ const DependencyGraphComponent: FC<DependencyGraphProps> = ({
                         className="space-y-2"
                     >
                         <div className="flex items-center gap-2 px-1">
-                            <ArrowDown className="w-4 h-4 text-blue-500" />
+                            <ArrowDown className="w-4 h-4 text-[color:var(--state-info)]" />
                             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                                 Downstream Waiters ({downstreamWaiters.length})
                             </h3>

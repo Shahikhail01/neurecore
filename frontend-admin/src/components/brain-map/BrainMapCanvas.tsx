@@ -395,7 +395,7 @@ export default function BrainMapCanvas() {
             onClick={() => setHideIdle((v) => !v)}
             className={`px-3 py-1.5 rounded-lg border text-xs transition ${
               hideIdle
-                ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/20 text-indigo-300'
                 : 'border-surface-border bg-surface-overlay text-zinc-400 hover:text-zinc-200'
             }`}
           >

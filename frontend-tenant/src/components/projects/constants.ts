@@ -22,9 +22,9 @@ export const MEMORY_CATEGORIES = ['NOTE', 'INSIGHT', 'CONSTRAINT', 'RISK', 'OPPO
 
 export const CATEGORY_COLORS: Record<(typeof MEMORY_CATEGORIES)[number], string> = {
   NOTE: 'bg-zinc-500/20 text-zinc-400',
-  INSIGHT: 'bg-blue-500/20 text-blue-400',
+  INSIGHT: 'bg-[color:var(--state-info)]/20 text-[color:var(--state-info)]',
   CONSTRAINT: 'bg-orange-500/20 text-orange-400',
-  RISK: 'bg-red-500/20 text-red-400',
-  OPPORTUNITY: 'bg-green-500/20 text-green-400',
+  RISK: 'bg-[color:var(--state-danger)]/20 text-[color:var(--state-danger)]',
+  OPPORTUNITY: 'bg-[color:var(--state-success)]/20 text-[color:var(--state-success)]',
   LESSON: 'bg-purple-500/20 text-purple-400',
 };

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Send, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
+import { PageShell, PageHero, GlassPanel } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import { integrationsService } from '@/services/integrations.service';
 import { Card } from '@/components/ui/card';
@@ -83,12 +84,15 @@ export default function ComposeEmailPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-4">
-      <Link href="/settings/integrations/google" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-        <ChevronLeft className="w-4 h-4" /> Back to Inbox
-      </Link>
-
-      <h1 className="text-xl font-semibold">Compose Email</h1>
+    <PageShell variant="default">
+      <PageHero
+        title="Compose Email"
+        actions={
+          <Link href="/settings/integrations/google" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+            <ChevronLeft className="w-4 h-4" /> Back to Inbox
+          </Link>
+        }
+      />
 
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive flex items-center gap-2">
@@ -99,14 +103,14 @@ export default function ComposeEmailPage() {
 
       {success && (
         <div
-          className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-sm text-green-500 flex items-center gap-2"
+          className="border border-[color:var(--state-success)]/30 bg-[color:var(--state-success)]/10 rounded-lg p-3 text-sm text-[color:var(--state-success)] flex items-center gap-2"
         >
           <CheckCircle2 className="w-4 h-4" />
           Email sent successfully! Redirecting to inbox...
         </div>
       )}
 
-      <Card className="p-6 space-y-4">
+      <GlassPanel variant="panel" padding="lg" className="p-6 space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="to">To</Label>
@@ -192,7 +196,7 @@ export default function ComposeEmailPage() {
             )}
           </Button>
         </div>
-      </Card>
-    </div>
+      </GlassPanel>
+    </PageShell>
   );
 }

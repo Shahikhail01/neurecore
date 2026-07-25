@@ -16,10 +16,10 @@ export interface CompletenessMeterProps {
 }
 
 function pctClass(score: number): string {
-  if (score >= 100) return 'bg-emerald-500';
-  if (score >= 75) return 'bg-emerald-600/70';
-  if (score >= 50) return 'bg-amber-500';
-  return 'bg-rose-500';
+  if (score >= 100) return 'bg-[color:var(--state-success)]';
+  if (score >= 75) return 'bg-[color:var(--state-success)]/70';
+  if (score >= 50) return 'bg-[color:var(--state-warning)]';
+  return 'bg-[color:var(--visual-accent-rose-500)]';
 }
 
 function fmtCount(s: EntityCompleteness | null): string {
@@ -42,7 +42,7 @@ export function CompletenessMeter({
   }
   if (error) {
     return (
-      <div className="flex items-center gap-2 text-xs text-rose-400" data-testid="completeness-error">
+      <div className="flex items-center gap-2 text-xs text-[color:var(--visual-accent-rose-400)]" data-testid="completeness-error">
         <span>{error}</span>
         {onRetry ? (
           <button

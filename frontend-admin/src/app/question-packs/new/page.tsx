@@ -80,26 +80,26 @@ export default function NewQuestionPackPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-zinc-400 mb-1.5">
-                Key <span className="text-red-400">*</span>
+                Key <span className="text-[color:var(--state-danger)]">*</span>
               </label>
               <input
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 placeholder="e.g. compliance"
                 data-testid="pack-key"
-                className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-indigo-500 font-mono"
+                className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] font-mono"
               />
             </div>
             <div>
               <label className="block text-xs text-zinc-400 mb-1.5">
-                Name <span className="text-red-400">*</span>
+                Name <span className="text-[color:var(--state-danger)]">*</span>
               </label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Compliance"
                 data-testid="pack-name"
-                className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)]"
               />
             </div>
           </div>
@@ -109,7 +109,7 @@ export default function NewQuestionPackPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)]"
             />
           </div>
           <div>
@@ -143,7 +143,7 @@ onChange={(next) =>
           </div>
 
           {error ? (
-            <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+            <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
               {error}
             </div>
           ) : null}
@@ -159,7 +159,7 @@ onChange={(next) =>
               type="button"
               onClick={save}
               disabled={busy || !canEdit || !key.trim() || !name.trim()}
-              className="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+              className="flex-1 py-2.5 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
               data-testid="pack-save"
             >
               {busy ? 'Creating…' : 'Create Question Pack'}

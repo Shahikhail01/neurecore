@@ -83,7 +83,7 @@ export default function PackagesPage() {
           {canEdit && (
             <Link
               href="/packages/new"
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+              className="px-4 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition"
             >
               + New Package
             </Link>
@@ -112,7 +112,7 @@ export default function PackagesPage() {
             title="No packages yet"
             hint={canEdit ? 'Compose your first offering.' : 'Ask a SUPER_ADMIN to seed this pool.'}
             action={canEdit ? (
-              <Link href="/packages/new" className="text-indigo-400 hover:underline">
+              <Link href="/packages/new" className="text-[color:var(--accent-400)] hover:underline">
                 + New Package
               </Link>
             ) : undefined}
@@ -126,7 +126,7 @@ export default function PackagesPage() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="rounded-xl border border-surface-border bg-surface-raised p-4 flex gap-4 items-start hover:border-indigo-700/50 transition"
+                  className="rounded-xl border border-surface-border bg-surface-raised p-4 flex gap-4 items-start hover:border-[color:var(--accent-500)]/50 transition"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
@@ -167,13 +167,13 @@ export default function PackagesPage() {
                     <div className="flex flex-col gap-2 shrink-0">
                       <Link
                         href={`/packages/${pkg.id}/edit`}
-                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                       >
                         Edit
                       </Link>
                       <button
                         onClick={() => setDeleting(pkg)}
-                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-red-400 hover:border-red-700 transition"
+                        className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-600 hover:text-[color:var(--state-danger)] hover:border-[color:var(--state-danger)] transition"
                       >
                         ✕
                       </button>

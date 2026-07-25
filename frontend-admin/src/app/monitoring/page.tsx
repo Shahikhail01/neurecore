@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { PageHero, GlassPanel } from '@neurecore/ui-visual';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { KpiTile } from '@/components/kpi/KpiTile';
@@ -88,25 +89,24 @@ export default function MonitoringPage() {
 
   return (
     <AdminShell user={user}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-100">Monitoring</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">Platform health and operational telemetry</p>
-          </div>
+      <PageHero
+        title="Monitoring"
+        subtitle="Platform health and operational telemetry"
+        actions={
           <div className="flex gap-1">
             {RANGE_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setRange(opt.value)}
-                className={`px-2.5 py-1 rounded-md text-xs transition ${range === opt.value ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                className={`px-2.5 py-1 rounded-md text-xs transition ${range === opt.value ? 'bg-[color:var(--accent-500)] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
               >
                 {opt.label}
               </button>
             ))}
           </div>
-        </div>
+        }
+      />
+      <div className="max-w-7xl mx-auto space-y-6">
 
         {/* ── KPI tiles ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -148,11 +148,11 @@ export default function MonitoringPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-xl border border-surface-border bg-surface-raised p-4">
             <h3 className="text-sm font-semibold text-zinc-200 mb-4">Error Rate Trend</h3>
-            <AreaChart data={errorData} dataKey="value" xKey="timestamp" color="#ef4444" loading={errorLoading} height={200} />
+            <AreaChart data={errorData} dataKey="value" xKey="timestamp" color="var(--state-danger)" loading={errorLoading} height={200} />
           </div>
           <div className="rounded-xl border border-surface-border bg-surface-raised p-4">
             <h3 className="text-sm font-semibold text-zinc-200 mb-4">Task Throughput</h3>
-            <LineChart data={taskData} dataKey="value" xKey="timestamp" color="#6366f1" loading={taskLoading} height={200} />
+            <LineChart data={taskData} dataKey="value" xKey="timestamp" color="var(--accent-500)" loading={taskLoading} height={200} />
           </div>
         </div>
       </div>

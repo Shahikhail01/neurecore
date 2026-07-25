@@ -55,7 +55,7 @@ export function PoolConfirmDeleteDialog({
               <button
                 onClick={onConfirm}
                 disabled={busy}
-                className="flex-1 py-2 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm font-medium transition disabled:opacity-50"
+                className="flex-1 py-2 rounded-lg bg-red-700 hover:bg-[color:var(--state-danger)] text-white text-sm font-medium transition disabled:opacity-50"
               >
                 {busy ? "Working…" : confirmLabel}
               </button>

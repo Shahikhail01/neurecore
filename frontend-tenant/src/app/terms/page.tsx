@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { PageShell, GlassPanel, GradientText } from '@neurecore/ui-visual';
 
 export const metadata: Metadata = {
   title: 'Terms of Service — NeureCore',
@@ -9,31 +10,31 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="mx-auto max-w-3xl">
+    <PageShell variant="compact">
+      <GlassPanel variant="panel" padding="lg" className="max-w-3xl mx-auto">
         <div className="mb-6">
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition"
+            className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Sign In
           </Link>
         </div>
 
-        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
+        <div className="rounded-2xl bg-white/5 p-8 shadow-sm border border-white/10">
           <div className="mb-8 flex items-center gap-3">
             <img src="/logo.png" alt="NeureCore" className="h-8 w-auto object-contain" />
-            <h1 className="text-2xl font-bold text-gray-900">Terms of Service</h1>
+            <h1 className="text-2xl font-bold text-zinc-100"><GradientText>Terms of Service</GradientText></h1>
           </div>
 
-          <div className="prose prose-gray max-w-none text-sm text-gray-600">
-            <p className="text-xs text-gray-400">Last updated: June 27, 2026</p>
+          <div className="prose prose-invert max-w-none text-sm text-zinc-300">
+            <p className="text-xs text-zinc-500">Last updated: June 27, 2026</p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">1. Acceptance of Terms</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">1. Acceptance of Terms</h2>
             <p>
               By creating an account or accessing the NeureCore platform at{' '}
-              <a href="https://hq.neurecore.com" className="text-blue-600 hover:underline">
+              <a href="https://hq.neurecore.com" className="text-[color:var(--accent-400)] hover:underline">
                 hq.neurecore.com
               </a>{' '}
               (the &quot;Platform&quot;), you (&quot;you,&quot; &quot;your,&quot; or &quot;User&quot;) agree to be bound by
@@ -48,7 +49,7 @@ export default function TermsPage() {
               to the changes taking effect.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">2. Description of Service</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">2. Description of Service</h2>
             <p>
               NeureCore provides an AI agent orchestration platform that allows
               organizations to create, manage, and govern AI agents and workflows
@@ -58,7 +59,7 @@ export default function TermsPage() {
               Services at any time without prior notice.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">3. Eligibility</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">3. Eligibility</h2>
             <p>
               The Platform is intended for users aged 16 and older. By registering, you
               represent that you are at least 16 years old and have the legal capacity
@@ -72,7 +73,7 @@ export default function TermsPage() {
               complies with all local laws.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">4. Account Registration and Security</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">4. Account Registration and Security</h2>
             <p>
               To access the Platform, you must create an account with accurate and
               complete information. You are solely responsible for:
@@ -88,7 +89,7 @@ export default function TermsPage() {
               Terms, including accounts used for fraudulent, abusive, or illegal activity.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">5. Acceptable Use</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">5. Acceptable Use</h2>
             <p>You agree not to use the Platform to:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>Violate any applicable local, national, or international law or regulation</li>
@@ -106,8 +107,8 @@ export default function TermsPage() {
               produce content that violates these Terms or applicable law.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">6. Intellectual Property</h2>
-            <h3 className="font-medium text-gray-800">6.1 NeureCore IP</h3>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">6. Intellectual Property</h2>
+            <h3 className="font-medium text-zinc-200">6.1 NeureCore IP</h3>
             <p>
               NeureCore and its licensors retain all right, title, and interest in and
               to the Platform, including all software, trademarks, logos, documentation,
@@ -115,14 +116,14 @@ export default function TermsPage() {
               non-exclusive, non-transferable, revocable right to use the Platform in
               accordance with these Terms. No ownership rights are transferred.
             </p>
-            <h3 className="font-medium text-gray-800 mt-3">6.2 Your Content</h3>
+            <h3 className="font-medium text-zinc-200 mt-3">6.2 Your Content</h3>
             <p>
               You retain all rights to the data, content, and materials you submit to the
               Platform (&quot;User Content&quot;). By using the Platform, you grant us a limited
               license to process your User Content solely to provide and improve the
               Services to you. We do not use your User Content to train AI models.
             </p>
-            <h3 className="font-medium text-gray-800 mt-3">6.3 AI Agent Outputs</h3>
+            <h3 className="font-medium text-zinc-200 mt-3">6.3 AI Agent Outputs</h3>
             <p>
               Outputs generated by your AI agents (&quot;Agent Outputs&quot;) are your property.
               NeureCore makes no claim to Agent Outputs. You bear sole responsibility
@@ -130,12 +131,12 @@ export default function TermsPage() {
               property or applicable law.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">7. Subscription Plans and Fees</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">7. Subscription Plans and Fees</h2>
             <p>
               Access to certain features is governed by a subscription plan (STARTER,
               GROWTH, PRO, or ENTERPRISE) selected at tenant registration. Details of
               each plan are available at{' '}
-              <a href="https://neurecore.com/plans" className="text-blue-600 hover:underline">
+              <a href="https://neurecore.com/plans" className="text-[color:var(--accent-400)] hover:underline">
                 neurecore.com/plans
               </a>{' '}
               and are incorporated by reference.
@@ -147,7 +148,7 @@ export default function TermsPage() {
               <li>Failure to pay fees may result in suspension of your account and data after 14 days of non-payment.</li>
             </ul>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">8. Confidentiality</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">8. Confidentiality</h2>
             <p>
               Your account data, including data processed by your AI agents, is
               considered confidential. NeureCore employees and subcontractors are
@@ -158,7 +159,7 @@ export default function TermsPage() {
               intended purpose.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">9. Service Availability and Support</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">9. Service Availability and Support</h2>
             <ul className="list-disc pl-5 space-y-1">
               <li>
                 We aim for 99.9% uptime for the Platform but do not guarantee
@@ -175,7 +176,7 @@ export default function TermsPage() {
               </li>
             </ul>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">10. Disclaimer of Warranties</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">10. Disclaimer of Warranties</h2>
             <p>
               THE PLATFORM IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES
               OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED
@@ -190,7 +191,7 @@ export default function TermsPage() {
               TERMS AND APPLICABLE LAW.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">11. Limitation of Liability</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">11. Limitation of Liability</h2>
             <p>
               TO THE MAXIMUM EXTENT PERMITTED BY LAW, NEURECORE AND ITS AFFILIATES,
               OFFICERS, DIRECTORS, AND EMPLOYEES SHALL NOT BE LIABLE FOR ANY
@@ -211,7 +212,7 @@ export default function TermsPage() {
               LIMITATION WOULD BE UNENFORCEABLE UNDER APPLICABLE LAW.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">12. Indemnification</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">12. Indemnification</h2>
             <p>
               You agree to indemnify, defend, and hold harmless NeureCore and its
               affiliates, officers, directors, and employees from and against any
@@ -226,7 +227,7 @@ export default function TermsPage() {
               <li>Any dispute between you and a third party arising from your use of the Platform</li>
             </ul>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">13. Termination</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">13. Termination</h2>
             <p>
               You may terminate your account at any time by contacting us or through
               the account settings within the Platform. We may suspend or terminate
@@ -242,7 +243,7 @@ export default function TermsPage() {
               Indemnification, and General Provisions) remain in effect.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">14. Governing Law and Dispute Resolution</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">14. Governing Law and Dispute Resolution</h2>
             <p>
               These Terms are governed by the laws of the Federal Republic of Germany,
               without regard to conflict of law principles. Any dispute arising out of
@@ -257,7 +258,7 @@ export default function TermsPage() {
               home country.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">15. General Provisions</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">15. General Provisions</h2>
             <ul className="list-disc pl-5 space-y-1">
               <li>
                 <strong>Entire Agreement:</strong> These Terms, together with our
@@ -284,17 +285,17 @@ export default function TermsPage() {
               </li>
             </ul>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">16. Contact Us</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">16. Contact Us</h2>
             <p>For questions or notices regarding these Terms:</p>
             <p className="mt-1">
               <strong>Email:</strong>{' '}
-              <a href="mailto:legal@neurecore.com" className="text-blue-600 hover:underline">
+              <a href="mailto:legal@neurecore.com" className="text-[color:var(--accent-400)] hover:underline">
                 legal@neurecore.com
               </a>
             </p>
             <p className="mt-1">
               <strong>Platform:</strong>{' '}
-              <a href="https://hq.neurecore.com" className="text-blue-600 hover:underline">
+              <a href="https://hq.neurecore.com" className="text-[color:var(--accent-400)] hover:underline">
                 hq.neurecore.com
               </a>
             </p>
@@ -303,7 +304,7 @@ export default function TermsPage() {
             </p>
           </div>
         </div>
-      </div>
-    </main>
+      </GlassPanel>
+    </PageShell>
   );
 }

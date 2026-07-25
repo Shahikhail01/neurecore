@@ -14,6 +14,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { PageShell, PageHero, GlassPanel } from '@neurecore/ui-visual';
 import { ApprovalHub } from '@/components/approvals';
 import { useApprovalStore } from '@/stores/approvalStore';
 import {
@@ -128,50 +129,48 @@ export default function ApprovalsHubPage() {
     // Error state
     if (error) {
         return (
-            <div className="p-6">
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+            <PageShell variant="default">
+                <GlassPanel variant="panel" padding="lg" className="border border-[color:var(--state-danger)]/30 bg-[color:var(--state-danger)]/10">
                     <div className="flex items-start gap-3">
-                        <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <AlertCircle className="h-5 w-5 text-[color:var(--state-danger)] flex-shrink-0 mt-0.5" />
                         <div>
-                            <h3 className="font-semibold text-red-900">Error loading approvals</h3>
-                            <p className="text-sm text-red-800 mt-1">{error}</p>
+                            <h3 className="font-semibold text-[color:var(--state-danger)]">Error loading approvals</h3>
+                            <p className="text-sm text-zinc-300 mt-1">{error}</p>
                             <button
                                 onClick={() => {
                                     setError(null);
                                     window.location.reload();
                                 }}
-                                className="mt-2 text-sm text-red-600 hover:text-red-700 font-medium"
+                                className="mt-2 text-sm text-[color:var(--state-danger)] hover:text-[color:var(--state-danger)] font-medium"
                             >
                                 Try again
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
+                </GlassPanel>
+            </PageShell>
         );
     }
 
     // No data
     if (!approvals) {
         return (
-            <div className="p-6 text-center text-gray-500">
-                No approval data available
-            </div>
+            <PageShell variant="default">
+                <p className="text-center text-zinc-500">
+                    No approval data available
+                </p>
+            </PageShell>
         );
     }
 
     // Render approvals hub
     return (
-        <div className="p-6 max-w-7xl mx-auto">
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">
-                    Risk-Stratified Approvals
-                </h1>
-                <p className="text-gray-600 mt-1">
-                    AI-powered approval prioritization with confidence scoring
-                </p>
-            </div>
-
+        <PageShell variant="default">
+            <PageHero
+                eyebrow="Service Desk"
+                title="Risk-Stratified Approvals"
+                subtitle="AI-powered approval prioritization with confidence scoring"
+            />
             <ApprovalHub
                 approvals={approvals}
                 onApprove={handleApprove}
@@ -180,6 +179,6 @@ export default function ApprovalsHubPage() {
                 onReview={handleReview}
                 isLoading={isLoading}
             />
-        </div>
+        </PageShell>
     );
 }

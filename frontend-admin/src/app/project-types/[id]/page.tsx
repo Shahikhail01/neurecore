@@ -72,7 +72,7 @@ export default function ProjectTypeDetailPage() {
         {loading ? (
           <div className="h-32 rounded-xl bg-surface-raised border border-surface-border animate-pulse" />
         ) : error ? (
-          <div className="rounded-lg bg-red-950 border border-red-800 px-4 py-3 text-sm text-red-200">
+          <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         ) : pt ? (
@@ -86,7 +86,7 @@ export default function ProjectTypeDetailPage() {
                       <span className="text-xs text-zinc-400">{pt.industry}</span>
                     )}
                     {pt.isSystem && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-400 border border-amber-800">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--state-warning)]/40 text-[color:var(--state-warning)] border border-amber-800">
                         SYSTEM
                       </span>
                     )}
@@ -100,7 +100,7 @@ export default function ProjectTypeDetailPage() {
                 {canEdit && (
                   <Link
                     href={`/project-types/${pt.id}/edit`}
-                    className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-indigo-500 transition"
+                    className="px-3 py-1.5 rounded-lg text-xs border border-surface-border text-zinc-400 hover:text-zinc-200 hover:border-[color:var(--accent-500)] transition"
                   >
                     Edit Latest Version
                   </Link>
@@ -116,7 +116,7 @@ export default function ProjectTypeDetailPage() {
                 {canEdit && (
                   <Link
                     href={`/project-types/${pt.id}/edit`}
-                    className="px-3 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition"
+                    className="px-3 py-1.5 rounded-lg text-xs bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white font-medium transition"
                   >
                     + New Version
                   </Link>
@@ -129,7 +129,7 @@ export default function ProjectTypeDetailPage() {
                   {canEdit && (
                     <Link
                       href={`/project-types/${pt.id}/edit`}
-                      className="mt-2 inline-block text-xs text-indigo-400 hover:underline"
+                      className="mt-2 inline-block text-xs text-[color:var(--accent-400)] hover:underline"
                     >
                       Create the first version
                     </Link>
@@ -164,7 +164,7 @@ function VersionCard({ version }: { version: ProjectTypeVersion }) {
               Version {version.version}
             </h3>
             {version.version === 1 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-400 border border-emerald-800">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--state-success)]/40 text-[color:var(--state-success)] border border-emerald-800">
                 LATEST
               </span>
             )}
@@ -206,7 +206,7 @@ function VersionCard({ version }: { version: ProjectTypeVersion }) {
                 className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-surface-border"
               >
                 {f.label}
-                {f.required && <span className="text-red-400 ml-0.5">*</span>}
+                {f.required && <span className="text-[color:var(--state-danger)] ml-0.5">*</span>}
                 <span className="ml-1 text-zinc-600">({f.type})</span>
               </span>
             ))}

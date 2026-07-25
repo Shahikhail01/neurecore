@@ -66,7 +66,7 @@ export function SkinSwitcher({ projectId, value, onChange, allowed }: SkinSwitch
           }}
           className={`px-2 py-0.5 rounded transition ${
             value === s.kind
-              ? 'bg-indigo-600 text-white'
+              ? 'bg-[color:var(--accent-500)] text-white'
               : 'text-zinc-400 hover:text-zinc-200'
           }`}
         >

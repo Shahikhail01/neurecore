@@ -109,7 +109,7 @@ export function ProjectCreationDiscovery({
         />
         {recordError ? (
           <p
-            className="mt-2 text-xs text-rose-400"
+            className="mt-2 text-xs text-[color:var(--visual-accent-rose-400)]"
             data-testid="discovery-record-error"
           >
             Could not save your answer: {recordError}

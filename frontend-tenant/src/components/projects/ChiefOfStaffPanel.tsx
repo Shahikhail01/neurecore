@@ -86,7 +86,7 @@ export function ChiefOfStaffPanel({ projectId, projectName }: CosPanelProps) {
             <div
               className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[color:var(--state-info)] text-white'
                   : 'bg-slate-100 text-slate-800'
               }`}
             >
@@ -117,7 +117,7 @@ export function ChiefOfStaffPanel({ projectId, projectName }: CosPanelProps) {
         <button
           onClick={handleSend}
           disabled={loading || !input.trim()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-700"
+          className="bg-[color:var(--state-info)] text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-700"
         >
           Send
         </button>

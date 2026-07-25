@@ -24,13 +24,13 @@ const getStatusIcon = (status: ContextCardProps['status']): React.ReactNode => {
     const iconProps = { className: 'w-4 h-4' };
     switch (status) {
         case 'COMPLETED':
-            return <CheckCircle2 {...iconProps} className="w-4 h-4 text-green-500" />;
+            return <CheckCircle2 {...iconProps} className="w-4 h-4 text-[color:var(--state-success)]" />;
         case 'ON_TRACK':
-            return <Clock {...iconProps} className="w-4 h-4 text-blue-500" />;
+            return <Clock {...iconProps} className="w-4 h-4 text-[color:var(--state-info)]" />;
         case 'AT_RISK':
             return <AlertCircle {...iconProps} className="w-4 h-4 text-yellow-500" />;
         case 'BLOCKED':
-            return <XCircle {...iconProps} className="w-4 h-4 text-red-500" />;
+            return <XCircle {...iconProps} className="w-4 h-4 text-[color:var(--state-danger)]" />;
         default:
             return null;
     }
@@ -46,15 +46,15 @@ const getStatusStyles = (
     switch (status) {
         case 'COMPLETED':
             return {
-                bg: 'bg-green-50 dark:bg-green-950',
+                bg: 'bg-green-50 dark:bg-[color:var(--state-success)]',
                 border: 'border-green-200 dark:border-green-800',
-                badge: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
+                badge: 'bg-green-100 text-green-800 dark:bg-[color:var(--state-success)] dark:text-green-100',
             };
         case 'ON_TRACK':
             return {
-                bg: 'bg-blue-50 dark:bg-blue-950',
+                bg: 'bg-blue-50 dark:bg-[color:var(--state-info)]',
                 border: 'border-blue-200 dark:border-blue-800',
-                badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100',
+                badge: 'bg-blue-100 text-blue-800 dark:bg-[color:var(--state-info)] dark:text-blue-100',
             };
         case 'AT_RISK':
             return {
@@ -64,9 +64,9 @@ const getStatusStyles = (
             };
         case 'BLOCKED':
             return {
-                bg: 'bg-red-50 dark:bg-red-950',
+                bg: 'bg-red-50 dark:bg-[color:var(--state-danger)]',
                 border: 'border-red-200 dark:border-red-800',
-                badge: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
+                badge: 'bg-red-100 text-red-800 dark:bg-[color:var(--state-danger)] dark:text-red-100',
             };
         default:
             return {
@@ -84,13 +84,13 @@ const getStatusStyles = (
 const getDeptStatColor = (color?: string): string => {
     switch (color) {
         case 'green':
-            return 'text-green-600 dark:text-green-400';
+            return 'text-[color:var(--state-success)] dark:text-[color:var(--state-success)]';
         case 'blue':
-            return 'text-blue-600 dark:text-blue-400';
+            return 'text-[color:var(--state-info)] dark:text-[color:var(--state-info)]';
         case 'yellow':
             return 'text-yellow-600 dark:text-yellow-400';
         case 'red':
-            return 'text-red-600 dark:text-red-400';
+            return 'text-[color:var(--state-danger)] dark:text-[color:var(--state-danger)]';
         case 'purple':
             return 'text-purple-600 dark:text-purple-400';
         default:
@@ -186,10 +186,10 @@ const ContextCardComponent: FC<ContextCardProps> = ({
                         animate={{ width: `${progressScore}%` }}
                         transition={{ duration: 0.8, ease: 'easeOut' }}
                         className={cn('h-full rounded-full transition-colors', {
-                            'bg-green-500': status === 'COMPLETED',
-                            'bg-blue-500': status === 'ON_TRACK',
+                            'bg-[color:var(--state-success)]': status === 'COMPLETED',
+                            'bg-[color:var(--state-info)]': status === 'ON_TRACK',
                             'bg-yellow-500': status === 'AT_RISK',
-                            'bg-red-500': status === 'BLOCKED',
+                            'bg-[color:var(--state-danger)]': status === 'BLOCKED',
                         })}
                     />
                 </div>

@@ -108,12 +108,12 @@ export function DeployToTenantModal({
             </p>
 
             {result ? (
-              <div className="rounded-lg bg-green-950 border border-green-800 px-4 py-5 text-sm text-green-300 text-center">
+              <div className="rounded-lg bg-[color:var(--state-success)] border border-green-800 px-4 py-5 text-sm text-green-300 text-center">
                 <div className="text-2xl mb-2">✓</div>
                 {result.label}
                 <button
                   onClick={onClose}
-                  className="mt-3 text-xs text-indigo-400 hover:underline block mx-auto"
+                  className="mt-3 text-xs text-[color:var(--accent-400)] hover:underline block mx-auto"
                 >
                   Close
                 </button>
@@ -130,13 +130,13 @@ export function DeployToTenantModal({
                     placeholder="Search tenants…"
                     value={tenantSearch}
                     onChange={(e) => setTenantSearch(e.target.value)}
-                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500 mb-2"
+                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)] mb-2"
                   />
                   <select
                     value={tenantId}
                     onChange={(e) => setTenantId(e.target.value)}
                     size={Math.min(filtered.length + 1, 6)}
-                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
                   >
                     <option value="">— select tenant —</option>
                     {filtered.map((t) => (
@@ -157,7 +157,7 @@ export function DeployToTenantModal({
                       <input
                         value={agentName}
                         onChange={(e) => setAgentName(e.target.value)}
-                        className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500"
+                        className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-[color:var(--accent-500)]"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -169,7 +169,7 @@ export function DeployToTenantModal({
                           type="number"
                           value={budget}
                           onChange={(e) => setBudget(Number(e.target.value))}
-                          className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500"
+                          className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-[color:var(--accent-500)]"
                         />
                       </div>
                       <div>
@@ -179,7 +179,7 @@ export function DeployToTenantModal({
                         <select
                           value={authority}
                           onChange={(e) => setAuthority(e.target.value as AgentDeployConfig['authorityLevel'])}
-                          className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500"
+                          className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-[color:var(--accent-500)]"
                         >
                           <option value="AUTO">AUTO</option>
                           <option value="RECOMMEND">RECOMMEND</option>
@@ -201,7 +201,7 @@ export function DeployToTenantModal({
                       value={itemIndex}
                       onChange={(e) => setItemIndex(Number(e.target.value))}
                       min={0}
-                      className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500"
+                      className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-[color:var(--accent-500)]"
                     />
                     <p className="text-[10px] text-zinc-600 mt-1">
                       The index of the department in the template&apos;s structure array.
@@ -210,7 +210,7 @@ export function DeployToTenantModal({
                 )}
 
                 {error && (
-                  <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-sm text-red-300">
+                  <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-3 py-2 text-sm text-red-300">
                     {error}
                   </div>
                 )}
@@ -226,7 +226,7 @@ export function DeployToTenantModal({
                   <button
                     onClick={handleDeploy}
                     disabled={!tenantId || busy}
-                    className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+                    className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
                   >
                     {busy ? 'Deploying…' : 'Deploy'}
                   </button>

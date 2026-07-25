@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { HelpCircle, Mail, Book, MessageCircle, ArrowLeft, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { PageShell, PageHero } from '@neurecore/ui-visual';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 import TenantShell from '@/components/TenantShell';
 
@@ -51,20 +52,26 @@ export default function HelpPage() {
 
   return (
     <TenantShell user={user}>
+      <PageShell variant="default">
+        <PageHero
+          title="How can we help?"
+          subtitle="Find documentation, contact support, or get in touch with our team."
+          actions={
+            <button
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Back
+            </button>
+          }
+        />
       <div className="max-w-3xl mx-auto space-y-6">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Back
-        </button>
-
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="text-center space-y-3 py-8"
+          className="text-center space-y-3 py-8 hidden"
         >
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent-500/15 text-accent-500">
             <HelpCircle className="w-8 h-8" />
@@ -126,6 +133,7 @@ export default function HelpPage() {
           <p>Need something else? Reach us at <a href="mailto:support@neurecore.com" className="text-accent-500 hover:underline">support@neurecore.com</a></p>
         </div>
       </div>
+      </PageShell>
     </TenantShell>
   );
 }

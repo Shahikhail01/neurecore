@@ -234,7 +234,7 @@ export default function EditProjectTypePage() {
         </Section>
 
         {error && (
-          <div className="rounded-lg bg-red-950 border border-red-800 px-4 py-3 text-sm text-red-300">
+          <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 px-4 py-3 text-sm text-red-300">
             {error}
           </div>
         )}
@@ -250,7 +250,7 @@ export default function EditProjectTypePage() {
             type="button"
             onClick={save}
             disabled={busy || !canEdit}
-            className="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition disabled:opacity-50"
+            className="flex-1 py-2.5 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
           >
             {busy ? 'Creating Version…' : 'Create Version'}
           </button>

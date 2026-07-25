@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { PageShell, GlassPanel, GradientText } from '@neurecore/ui-visual';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy — NeureCore',
@@ -9,32 +10,32 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="mx-auto max-w-3xl">
+    <PageShell variant="compact">
+      <GlassPanel variant="panel" padding="lg" className="max-w-3xl mx-auto">
         <div className="mb-6">
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition"
+            className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Sign In
           </Link>
         </div>
 
-        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
+        <div className="rounded-2xl bg-white/5 p-8 shadow-sm border border-white/10">
           <div className="mb-8 flex items-center gap-3">
             <img src="/logo.png" alt="NeureCore" className="h-8 w-auto object-contain" />
-            <h1 className="text-2xl font-bold text-gray-900">Privacy Policy</h1>
+            <h1 className="text-2xl font-bold text-zinc-100"><GradientText>Privacy Policy</GradientText></h1>
           </div>
 
-          <div className="prose prose-gray max-w-none text-sm text-gray-600">
-            <p className="text-xs text-gray-400">Last updated: June 27, 2026</p>
+          <div className="prose prose-invert max-w-none text-sm text-zinc-300">
+            <p className="text-xs text-zinc-500">Last updated: June 27, 2026</p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">1. Who We Are</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">1. Who We Are</h2>
             <p>
               NeureCore (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is an AI agent orchestration platform.
               We operate the web application at{' '}
-              <a href="https://hq.neurecore.com" className="text-blue-600 hover:underline">
+              <a href="https://hq.neurecore.com" className="text-[color:var(--accent-400)] hover:underline">
                 hq.neurecore.com
               </a>{' '}
               (the &quot;Platform&quot;). We are the data controller for the personal information
@@ -42,20 +43,20 @@ export default function PrivacyPage() {
             </p>
             <p>
               <strong>Contact:</strong>{' '}
-              <a href="mailto:privacy@neurecore.com" className="text-blue-600 hover:underline">
+              <a href="mailto:privacy@neurecore.com" className="text-[color:var(--accent-400)] hover:underline">
                 privacy@neurecore.com
               </a>
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">2. Information We Collect</h2>
-            <h3 className="font-medium text-gray-800">2.1 Account Information</h3>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">2. Information We Collect</h2>
+            <h3 className="font-medium text-zinc-200">2.1 Account Information</h3>
             <p>
               When you register or sign in, we collect your name, email address, and
               profile information you choose to provide. If you sign in with Google,
               we receive your name and email address from Google OAuth.
             </p>
 
-            <h3 className="font-medium text-gray-800">2.2 Usage Data</h3>
+            <h3 className="font-medium text-zinc-200">2.2 Usage Data</h3>
             <p>
               We collect metadata about how you interact with the Platform, including
               pages visited, features used, timestamps, and device information
@@ -63,19 +64,19 @@ export default function PrivacyPage() {
               automatically to operate and improve the Platform.
             </p>
 
-            <h3 className="font-medium text-gray-800">2.3 Authentication Tokens</h3>
+            <h3 className="font-medium text-zinc-200">2.3 Authentication Tokens</h3>
             <p>
               We issue JWT access tokens (15-minute expiry) and refresh tokens
               (7-day expiry) to maintain your session. These are stored securely
               in your browser and are revocable.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">3. How We Use Your Information</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">3. How We Use Your Information</h2>
             <ul className="list-disc pl-5 space-y-1">
               <li>Authenticate you and maintain your session</li>
               <li>Provide, operate, and improve the Platform and its features</li>
               <li>Enforce our{' '}
-                <a href="/terms" className="text-blue-600 hover:underline">Terms of Service</a>
+                <a href="/terms" className="text-[color:var(--accent-400)] hover:underline">Terms of Service</a>
               </li>
               <li>Respond to support requests and communicate important updates</li>
               <li>Detect, investigate, and prevent fraud, abuse, and security incidents</li>
@@ -86,7 +87,7 @@ export default function PrivacyPage() {
               sell your data to third parties, or serve advertising.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">4. Legal Basis for Processing (GDPR)</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">4. Legal Basis for Processing (GDPR)</h2>
             <p>If you are located in the European Economic Area, our legal bases are:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>
@@ -104,7 +105,7 @@ export default function PrivacyPage() {
               </li>
             </ul>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">5. Third-Party Services</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">5. Third-Party Services</h2>
             <p>We use the following third-party processors:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>
@@ -114,7 +115,7 @@ export default function PrivacyPage() {
                   href="https://policies.google.com/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+                  className="text-[color:var(--accent-400)] hover:underline"
                 >
                   policies.google.com/privacy
                 </a>
@@ -126,7 +127,7 @@ export default function PrivacyPage() {
                   href="https://vercel.com/legal/privacy-policy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+                  className="text-[color:var(--accent-400)] hover:underline"
                 >
                   vercel.com/legal/privacy-policy
                 </a>
@@ -142,7 +143,7 @@ export default function PrivacyPage() {
                   href="https://neon.tech/privacy-policy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+                  className="text-[color:var(--accent-400)] hover:underline"
                 >
                   neon.tech/privacy-policy
                 </a>
@@ -154,7 +155,7 @@ export default function PrivacyPage() {
                   href="https://upstash.com/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+                  className="text-[color:var(--accent-400)] hover:underline"
                 >
                   upstash.com/privacy
                 </a>
@@ -165,7 +166,7 @@ export default function PrivacyPage() {
               restrict their use of your data to the services they provide to us.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">6. Data Retention</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">6. Data Retention</h2>
             <ul className="list-disc pl-5 space-y-1">
               <li>
                 <strong>Account data</strong> — Retained while your account is active and
@@ -186,7 +187,7 @@ export default function PrivacyPage() {
               </li>
             </ul>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">7. Your Rights</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">7. Your Rights</h2>
             <p>
               Depending on your location, you may have the right to:
             </p>
@@ -220,7 +221,7 @@ export default function PrivacyPage() {
             </ul>
             <p className="mt-2">
               To exercise any rights, contact us at{' '}
-              <a href="mailto:privacy@neurecore.com" className="text-blue-600 hover:underline">
+              <a href="mailto:privacy@neurecore.com" className="text-[color:var(--accent-400)] hover:underline">
                 privacy@neurecore.com
               </a>
               . We respond to all requests within 30 days.
@@ -231,7 +232,7 @@ export default function PrivacyPage() {
               authority.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">8. Data Security</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">8. Data Security</h2>
             <p>
               We implement industry-standard technical and organizational measures to
               protect your data, including: TLS encryption in transit, hashed
@@ -247,7 +248,7 @@ export default function PrivacyPage() {
               GDPR.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">9. Cookies</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">9. Cookies</h2>
             <p>
               We use minimal cookies necessary for authentication and session
               management:
@@ -267,7 +268,7 @@ export default function PrivacyPage() {
               security/debugging logs), or third-party tracking pixels.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">10. Children&apos;s Privacy</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">10. Children&apos;s Privacy</h2>
             <p>
               The Platform is not intended for individuals under the age of 16. We do
               not knowingly collect personal information from children. If we become
@@ -275,7 +276,7 @@ export default function PrivacyPage() {
               verified parental consent, we will delete that account promptly.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">11. International Transfers</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">11. International Transfers</h2>
             <p>
               Your data is primarily processed within the European Economic Area
               (Germany — Contabo servers; EEA-based managed services). Where data is
@@ -284,7 +285,7 @@ export default function PrivacyPage() {
               mechanisms.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">12. Changes to This Policy</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">12. Changes to This Policy</h2>
             <p>
               We may update this Privacy Policy from time to time. We will notify
               users of material changes via email and/or a prominent notice on the
@@ -292,26 +293,26 @@ export default function PrivacyPage() {
               revision is always indicated at the top of this page.
             </p>
 
-            <h2 className="text-lg font-semibold text-gray-900 mt-6">13. Contact Us</h2>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-6">13. Contact Us</h2>
             <p>
               For privacy-related questions, data subject requests, or to report
               a suspected data incident:
             </p>
             <p className="mt-1">
               <strong>Email:</strong>{' '}
-              <a href="mailto:privacy@neurecore.com" className="text-blue-600 hover:underline">
+              <a href="mailto:privacy@neurecore.com" className="text-[color:var(--accent-400)] hover:underline">
                 privacy@neurecore.com
               </a>
             </p>
             <p className="mt-1">
               <strong>Platform:</strong>{' '}
-              <a href="https://hq.neurecore.com" className="text-blue-600 hover:underline">
+              <a href="https://hq.neurecore.com" className="text-[color:var(--accent-400)] hover:underline">
                 hq.neurecore.com
               </a>
             </p>
           </div>
         </div>
-      </div>
-    </main>
+      </GlassPanel>
+    </PageShell>
   );
 }

@@ -6,6 +6,7 @@
 // existing checklist service endpoints.
 
 import { useParams } from 'next/navigation';
+import { PageShell, PageHero } from '@neurecore/ui-visual';
 import { WizardShell } from '@/components/wizard/WizardShell';
 import { WIZARD_SLUGS } from '@/lib/wizard/types';
 import type { WizardSlug } from '@/lib/wizard/types';
@@ -45,16 +46,24 @@ export default function WizardPage() {
 
   if (!slug || !WIZARD_SLUGS.includes(slug)) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <PageShell variant="default">
         <p className="text-sm text-destructive">Unknown wizard: {String(slug)}</p>
-      </div>
+      </PageShell>
     );
   }
 
   const WizardComponent = WIZARD_COMPONENTS[slug];
 
   return (
-    <div className="p-6">
+    <PageShell variant="default">
+      <PageHero
+        eyebrow="Settings"
+        title={slug
+          .split('-')
+          .map((w) => w[0].toUpperCase() + w.slice(1))
+          .join(' ')}
+        subtitle="Configure this setting from its dedicated page."
+      />
       {WizardComponent ? (
         <WizardComponent slug={slug} />
       ) : (
@@ -71,6 +80,6 @@ export default function WizardPage() {
           </p>
         </WizardShell>
       )}
-    </div>
+    </PageShell>
   );
 }
