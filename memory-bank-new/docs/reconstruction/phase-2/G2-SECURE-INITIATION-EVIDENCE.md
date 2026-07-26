@@ -221,7 +221,7 @@ Backend health:
 
 ```text
 GET https://brain.neurecore.com/api/v1/health -> 200
-timestamp: 2026-07-26T13:27:47.949Z
+timestamp: 2026-07-26T13:43:45Z
 ```
 
 PM2 status on Contabo:
@@ -239,15 +239,43 @@ Hermes runtime trace:
 CommandRegistry registered:
 - ApproveEnterpriseInitiationCommand:1.0
 - CreateProjectFromInitiationCommand:1.0
+
+G2 live PROJECT_DISCOVERY trace:
+runId: G2-2026-07-26T13-39-HERMES-TRACE
+hermesAgent.type: PROJECT_DISCOVERY
+approvalsCreated: 2
+tracedCommands:
+- ApproveEnterpriseInitiationCommand
+- CreateProjectFromInitiationCommand
+cleanupStatus:
+- dd5a1472-3dc7-4a3f-b5cc-ff5dca20bd3d -> CANCELLED
+- e4c186a9-b445-4479-a798-55cebd54d498 -> CANCELLED
+passed: true
 ```
 
 Frontend/API recovery probe:
 
 ```text
 GET https://brain.neurecore.com/api/v1/enterprise-initiation/G2-probe/status -> 401
+
+Authenticated recovery verification:
+runId: G2-2026-07-26T13-28-CONTABO-PRISMA
+loginStatus: 200
+GET https://brain.neurecore.com/api/v1/enterprise-initiation/cms1u21fl003dsq2ty2zohu7u/status -> 200
+projectId: cms1u21ft003psq2tw3pl3bhl
+projectStatus: ACTIVE
+automationStatus: REQUESTED_OR_COMPLETED
+passed: true
+
+Negative failure-semantics verification:
+POST https://brain.neurecore.com/api/v1/enterprise-initiation/create-project for unapproved DRAFT initiation -> 403
+responseCode: PERMISSION_DENIED
+post-check status: DRAFT
+post-check projectId: null
+passed: true
 ```
 
-Conclusion: the Phase 2 status route is deployed and protected by authentication. Public unauthenticated probing verifies routing presence by returning auth failure instead of 404. Full browser/frontend refresh-relogin verification still requires an authenticated tenant session and a live database with compute available.
+Conclusion: the Phase 2 status route is deployed, protected by authentication, and recoverable through a real authenticated login/API session. Public unauthenticated probing returns auth failure instead of 404; authenticated recovery resolves the materialized initiation to its active project without replaying a mutation.
 
 ### 3.8 Enum and Migration Drift Reconciliation
 
@@ -281,24 +309,22 @@ Prisma project create with executionEngineVersion='canonical' succeeded inside r
 | Zero duplicate projects | PASS DB | Strict Contabo concurrency test: 1 success, 9 rejected, 0 duplicate initiation links |
 | No tool performs a direct business mutation | PASS LOCALLY | Architecture tests pass |
 | Project and outbox event commit together | PASS DB | Strict Contabo run created 21 projects and 21 outbox events in transaction-scoped flow |
-| Refresh/relogin resolves to correct result | PARTIAL LIVE | Status endpoint deployed; unauthenticated route probe returns 401, authenticated browser recovery still requires a tenant browser session |
-| Failure never returns misleading success | PARTIAL | Handler throws on missing/unapproved initiation; live UX/API negative test pending |
+| Refresh/relogin resolves to correct result | PASS API | Authenticated live recovery returned the materialized initiation, active project, and automation summary |
+| Failure never returns misleading success | PASS API | Live unapproved DRAFT create-project attempt returned 403 and left initiation unmaterialized |
 | Canonical and legacy routes cannot both process same initiation | PASS LOCALLY | Legacy isolation tests pass |
-| Hermes runtime trace uses canonical tools | PARTIAL LIVE | CommandRegistry registered both canonical Phase 2 commands live; end-to-end Hermes tool invocation still pending |
+| Hermes runtime trace uses canonical tools | PASS LIVE | `PROJECT_DISCOVERY` live trace created approval-gated records for both canonical commands and cleaned them up |
 | Enum/migration drift fixed | PASS LIVE | AWL enum columns verified; migrations up to date; strict Contabo Prisma enum write path passed |
 
 ## 5. Readiness Decision
 
-**Decision:** Phase 2 is deployed and technically ready for reviewer evaluation, but G2 is not formally closed until sign-off is recorded.
+**Decision:** Phase 2 technical evidence is green and ready for formal reviewer sign-off, but G2 is not formally closed until signatures are recorded.
 
-Phase 3 should not start until these final Phase 2 verification items are completed:
+Phase 3 should not start until this final Phase 2 governance item is completed:
 
-- Verify an authenticated frontend refresh/relogin recovery against `GET /enterprise-initiation/:initiationId/status`.
-- Verify a full Hermes `PROJECT_DISCOVERY` invocation trace using `approve_initiation` and `create_project_from_initiation` metadata, not direct project mutation.
 - Record formal reviewer sign-off for G2.
 
 ## 6. Notes
 
 The checked-in Prisma schema, generated client, and live database have been reconciled to AWL-prefixed enum names for the affected Phase 2 columns.
 
-The live audit table now includes `correlationId` and `causationId` compatibility columns from the G2 drift migration. The remaining closure blocker is not schema drift or database target configuration; it is authenticated end-to-end reviewer verification and formal sign-off.
+The live audit table now includes `correlationId` and `causationId` compatibility columns from the G2 drift migration. The remaining closure blocker is governance only: formal reviewer sign-off.

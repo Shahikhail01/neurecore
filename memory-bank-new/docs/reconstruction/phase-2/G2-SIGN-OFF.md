@@ -14,9 +14,10 @@
 - Strict Contabo DB 20-run repetition: PASS, `G2-2026-07-26T13-28-CONTABO-PRISMA`
 - Strict Contabo DB concurrency duplicate test: PASS, 1 fulfilled and 9 rejected
 - Enum/migration drift: PASS, AWL enum columns verified live and migrations report no pending migrations
-- Deployed backend health: PASS, `GET https://brain.neurecore.com/api/v1/health` returned 200 at `2026-07-26T13:27:47.949Z`
-- Deployed Hermes runtime trace: PARTIAL, live `CommandRegistry` registered `ApproveEnterpriseInitiationCommand:1.0` and `CreateProjectFromInitiationCommand:1.0`; full tool invocation trace still pending
-- Deployed frontend/status recovery: PARTIAL, status route is deployed and returns 401 instead of 404 without auth; authenticated browser recovery still requires a tenant session
+- Deployed backend health: PASS, `GET https://brain.neurecore.com/api/v1/health` returned 200 after closure-script deploy
+- Deployed Hermes runtime trace: PASS, `G2-2026-07-26T13-39-HERMES-TRACE` created approval-gated PROJECT_DISCOVERY trace records for `ApproveEnterpriseInitiationCommand` and `CreateProjectFromInitiationCommand`, then cancelled them as cleanup
+- Deployed authenticated recovery: PASS, live login returned 200 and `GET /enterprise-initiation/cms1u21fl003dsq2ty2zohu7u/status` returned the linked active project `cms1u21ft003psq2tw3pl3bhl`
+- Deployed failure semantics: PASS, unapproved DRAFT create-project attempt returned 403 and left `projectId=null`
 
 ## Required Signatures
 
@@ -34,10 +35,8 @@ Codex records technical evidence only. Codex cannot sign as a human reviewer or 
 
 ## G2 Closure Decision
 
-**Current decision:** HOLD before Phase 3.
+**Current decision:** TECHNICAL GREEN; HOLD only for human signatures.
 
 Required before closing G2:
 
-- Verify full Hermes `PROJECT_DISCOVERY` invocation trace in deployed logs.
-- Verify authenticated frontend refresh/relogin status recovery.
 - Collect all five human signatures above.
