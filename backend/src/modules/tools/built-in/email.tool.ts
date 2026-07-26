@@ -30,7 +30,7 @@ import {
   StructuredToolResult,
   ToolExecutionContext,
 } from '../interfaces/structured-tool.interface';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { ToolDataAccessService } from '../tool-data-access.service';
 import { GoogleGmailService } from '../../integrations/google/google-gmail.service';
 import { EmailProviderFactory } from '../../integrations/email/email-provider.factory';
 import { withGoogleRetry } from '../../integrations/google/gmail-rate-limiter';
@@ -126,7 +126,7 @@ export class EmailTool extends BaseStructuredTool {
   readonly requiredPermissions = ['email:read', 'email:send'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     private readonly gmail: GoogleGmailService,
     private readonly providerFactory: EmailProviderFactory,
   ) {
@@ -368,7 +368,7 @@ export class EmailTool extends BaseStructuredTool {
     signature?: string;
   }> {
     const agent = agentId
-      ? await this.prisma.agent.findUnique({ where: { id: agentId } })
+      ? await this.data.agent.findUnique({ where: { id: agentId } })
       : null;
 
     const preferred = (agent?.emailProvider as 'gmail' | 'brevo') ?? 'brevo';

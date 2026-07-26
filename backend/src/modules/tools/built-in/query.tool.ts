@@ -33,7 +33,7 @@ import {
   StructuredToolResult,
   ToolExecutionContext,
 } from '../interfaces/structured-tool.interface';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { ToolDataAccessService } from '../tool-data-access.service';
 import { FeatureFlagService } from '../../../common/feature-flag/feature-flag.service';
 import { AiGatewayService } from '../../ai-gateway/ai-gateway.service';
 import { LLMFactory } from '../../models/services/llm-factory.service';
@@ -150,7 +150,7 @@ export class QueryTool extends BaseStructuredTool {
   readonly requiredPermissions = ['data:read'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     private readonly llm: LLMFactory,
     private readonly featureFlags: FeatureFlagService,
     private readonly aiGateway: AiGatewayService,
@@ -265,7 +265,7 @@ User question: ${question}`;
       }
       const where = buildWhere(plan, tenantId);
       const aggFn = plan.aggregation;
-      const result = await (this.prisma as Record<string, any>)[plan.entity].aggregate({
+      const result = await (this.data as Record<string, any>)[plan.entity].aggregate({
         where,
         _count: aggFn === 'count' ? { _all: true } : undefined,
         _sum: aggFn === 'sum' ? { [plan.aggregateField]: true } : undefined,
@@ -296,7 +296,7 @@ User question: ${question}`;
       : { createdAt: 'desc' };
     const where = buildWhere(plan, tenantId);
 
-    const rows = await (this.prisma as Record<string, any>)[plan.entity].findMany({
+    const rows = await (this.data as Record<string, any>)[plan.entity].findMany({
       where,
       select: select.reduce<Record<string, true>>((acc, f) => ({ ...acc, [f]: true }), {}),
       orderBy,

@@ -37,7 +37,7 @@ import {
   StructuredToolResult,
   ToolExecutionContext,
 } from '../interfaces/structured-tool.interface';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { ToolDataAccessService } from '../tool-data-access.service';
 import { GoogleDriveService } from '../../integrations/google/google-drive.service';
 
 export const DocumentInputSchema = z.object({
@@ -146,7 +146,7 @@ export class DocumentsTool extends BaseStructuredTool {
   readonly requiredPermissions = ['documents:read', 'documents:write'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     private readonly drive: GoogleDriveService,
   ) {
     super();
@@ -417,7 +417,7 @@ export class DocumentsTool extends BaseStructuredTool {
       return root.id;
     }
 
-    const agent = await this.prisma.agent.findUnique({
+    const agent = await this.data.agent.findUnique({
       where: { id: agentId },
       select: { id: true, name: true, tenantId: true, googleDriveFolderId: true },
     });

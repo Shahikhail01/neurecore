@@ -11,7 +11,11 @@ import { OUTBOX_REPOSITORY } from '../../../common/outbox/outbox-repository.port
 import type { IReviewRepository } from '../domain/ports/review-repository.port';
 import { REVIEW_REPOSITORY } from '../domain/ports/review-repository.port';
 import { ReviewDecision } from '../domain/review-states';
-import { ReviewStatus, type ReviewDecision as PrismaReviewDecision, type ReviewStatus as PrismaReviewStatus } from '@prisma/client';
+import {
+  AwlReviewStatus as ReviewStatus,
+  type ReviewDecision as PrismaReviewDecision,
+  type AwlReviewStatus as PrismaReviewStatus,
+} from '@prisma/client';
 import { TaskStateMachine } from '../../tasks/domain/task-states';
 
 /**

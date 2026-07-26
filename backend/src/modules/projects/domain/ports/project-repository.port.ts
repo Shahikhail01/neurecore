@@ -1,5 +1,5 @@
 // src/modules/projects/domain/ports/project-repository.port.ts
-import { ExecutionEngine } from '@prisma/client';
+import { AwlExecutionEngine as ExecutionEngine } from '@prisma/client';
 
 export const PROJECT_REPOSITORY = Symbol('PROJECT_REPOSITORY');
 

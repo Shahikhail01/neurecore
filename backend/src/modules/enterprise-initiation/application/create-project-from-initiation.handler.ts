@@ -14,7 +14,7 @@ import type {
   CreateProjectFromInitiationInput,
   CreateProjectFromInitiationResult,
 } from '../commands/create-project-from-initiation.command';
-import { ExecutionEngine } from '@prisma/client';
+import { AwlExecutionEngine as ExecutionEngine } from '@prisma/client';
 
 /**
  * Application handler — depends on PORTS only via DI tokens.

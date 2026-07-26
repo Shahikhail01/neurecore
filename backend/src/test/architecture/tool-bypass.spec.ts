@@ -113,6 +113,97 @@ describe('Architecture: New code follows SOLID layering', () => {
     }
     expect(violations).toEqual([]);
   });
+
+  it('legacy task tools do not mutate tasks through ToolDataAccessService', () => {
+    const file = path.join(
+      __dirname,
+      '../../modules/tools/built-in/neurecore-tools.ts',
+    );
+    const content = fs.readFileSync(file, 'utf8');
+    const violations = content.match(
+      /this\.data\.task\.(create|update|delete|upsert|updateMany|deleteMany)\s*\(/g,
+    ) ?? [];
+
+    expect(violations).toEqual([]);
+  });
+
+  it('legacy approval tools do not mutate approvals through ToolDataAccessService', () => {
+    const file = path.join(
+      __dirname,
+      '../../modules/tools/built-in/neurecore-tools.ts',
+    );
+    const content = fs.readFileSync(file, 'utf8');
+    const violations = content.match(
+      /this\.data\.approvalRequest\.(create|update|delete|upsert|updateMany|deleteMany)\s*\(/g,
+    ) ?? [];
+
+    expect(violations).toEqual([]);
+  });
+
+  it('legacy customer tools do not mutate customers through ToolDataAccessService', () => {
+    const file = path.join(
+      __dirname,
+      '../../modules/tools/built-in/neurecore-tools.ts',
+    );
+    const content = fs.readFileSync(file, 'utf8');
+    const violations = content.match(
+      /this\.data\.customer\.(create|update|delete|upsert|updateMany|deleteMany)\s*\(/g,
+    ) ?? [];
+
+    expect(violations).toEqual([]);
+  });
+
+  it('legacy notification tools do not mutate notifications through ToolDataAccessService', () => {
+    const file = path.join(
+      __dirname,
+      '../../modules/tools/built-in/neurecore-tools.ts',
+    );
+    const content = fs.readFileSync(file, 'utf8');
+    const violations = content.match(
+      /this\.data\.notification\.(create|update|delete|upsert|updateMany|deleteMany)\s*\(/g,
+    ) ?? [];
+
+    expect(violations).toEqual([]);
+  });
+
+  it('legacy tenant tools do not mutate tenants through ToolDataAccessService', () => {
+    const file = path.join(
+      __dirname,
+      '../../modules/tools/built-in/neurecore-tools.ts',
+    );
+    const content = fs.readFileSync(file, 'utf8');
+    const violations = content.match(
+      /this\.data\.tenant\.(create|update|delete|upsert|updateMany|deleteMany)\s*\(/g,
+    ) ?? [];
+
+    expect(violations).toEqual([]);
+  });
+
+  it('legacy governance tools do not mutate governance rules through ToolDataAccessService', () => {
+    const file = path.join(
+      __dirname,
+      '../../modules/tools/built-in/neurecore-tools.ts',
+    );
+    const content = fs.readFileSync(file, 'utf8');
+    const violations = content.match(
+      /this\.data\.governanceRule\.(create|update|delete|upsert|updateMany|deleteMany)\s*\(/g,
+    ) ?? [];
+
+    expect(violations).toEqual([]);
+  });
+
+  it('legacy tools do not perform adapter-backed business mutations', () => {
+    const file = path.join(
+      __dirname,
+      '../../modules/tools/built-in/neurecore-tools.ts',
+    );
+    const content = fs.readFileSync(file, 'utf8');
+    const violations = content.match(
+      /this\.data\.[A-Za-z0-9_]+\.(create|update|delete|upsert|updateMany|deleteMany)\s*\(/g,
+    ) ?? [];
+
+    expect(violations).toEqual([]);
+  });
 });
 
 describe('Architecture: New modules use command pattern', () => {

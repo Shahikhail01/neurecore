@@ -1,6 +1,7 @@
 import { Module, OnModuleInit, forwardRef, Logger } from '@nestjs/common';
 import { ToolsController } from './tools.controller';
 import { ToolsService } from './tools.service';
+import { ToolDataAccessService } from './tool-data-access.service';
 import { StructuredToolRegistry } from './structured-tool.registry';
 import { HttpRequestTool } from './built-in/http-request.tool';
 import { CalculatorTool } from './built-in/calculator.tool';
@@ -26,6 +27,12 @@ import { CustomersModule } from '../customers/customers.module';
 import { DepartmentsModule } from '../departments/departments.module';
 import { AgentsModule } from '../agents/agents.module';
 import { ApprovalsModule } from '../approvals/approvals.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { TenantsModule } from '../tenants/tenants.module';
+import { GovernanceModule } from '../governance/governance.module';
+import { ProjectMembersModule } from '../project-members/project-members.module';
+import { ProjectStagesModule } from '../project-stages/project-stages.module';
+import { GoalsModule } from '../goals/goals.module';
 import {
   CreateTaskTool,
   CreateProjectTool,
@@ -137,9 +144,10 @@ import {
 import type { IStructuredTool } from './interfaces/structured-tool.interface';
 
 @Module({
-  imports: [forwardRef(() => IntegrationsModule), ModelsModule, MemoryModule, ProjectMemoryModule, ProjectsModule, OrchestrationModule, ProjectShapeModule, CustomersModule, DepartmentsModule, forwardRef(() => AgentsModule), ApprovalsModule],
+  imports: [forwardRef(() => IntegrationsModule), ModelsModule, MemoryModule, ProjectMemoryModule, ProjectsModule, OrchestrationModule, ProjectShapeModule, CustomersModule, DepartmentsModule, forwardRef(() => AgentsModule), ApprovalsModule, NotificationsModule, TenantsModule, GovernanceModule, ProjectMembersModule, ProjectStagesModule, GoalsModule],
   controllers: [ToolsController],
   providers: [
+    ToolDataAccessService,
     HttpRequestTool,
     CalculatorTool,
     CalculatorEnhancedTool,

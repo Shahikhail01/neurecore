@@ -29,7 +29,7 @@ import {
 } from '../interfaces/structured-tool.interface';
 import { MemoryService } from '../../memory/memory.service';
 import { GoogleDriveService } from '../../integrations/google/google-drive.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { ToolDataAccessService } from '../tool-data-access.service';
 
 const SNIPPET_MAX_CHARS = 800;
 const MAX_SNIPPETS = 5;
@@ -91,7 +91,7 @@ export class ContextTool extends BaseStructuredTool {
   constructor(
     private readonly memory: MemoryService,
     private readonly drive: GoogleDriveService,
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
   ) {
     super();
   }
@@ -178,7 +178,7 @@ export class ContextTool extends BaseStructuredTool {
       const root = await this.drive.ensureRootFolder(tenantId);
       parentId = root.id;
     } else {
-      const agent = await this.prisma.agent.findUnique({
+      const agent = await this.data.agent.findUnique({
         where: { id: agentId },
         select: { id: true, name: true, tenantId: true },
       });
@@ -247,7 +247,7 @@ export class ContextTool extends BaseStructuredTool {
     const limit = input.limit ?? MAX_HISTORY_TURNS;
 
     // History is stored as MemoryEntry rows with metadata.conversationTopic + metadata.role
-    const rows = await this.prisma.memoryEntry.findMany({
+    const rows = await this.data.memoryEntry.findMany({
       where: {
         tenantId,
         ...(agentId ? { agentId } : {}),

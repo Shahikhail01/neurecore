@@ -31,7 +31,7 @@ import {
   StructuredToolResult,
   ToolExecutionContext,
 } from '../interfaces/structured-tool.interface';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { ToolDataAccessService } from '../tool-data-access.service';
 import { GoogleDriveService } from '../../integrations/google/google-drive.service';
 
 export const ReportInputSchema = z.object({
@@ -97,7 +97,7 @@ export class ReportsTool extends BaseStructuredTool {
   readonly requiredPermissions = ['reports:read'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     private readonly drive: GoogleDriveService,
   ) {
     super();
@@ -239,17 +239,17 @@ export class ReportsTool extends BaseStructuredTool {
 
   private async collectTaskSummary(tenantId: string, since: Date) {
     const [byStatus, byPriority, overdue, recentlyCompleted] = await Promise.all([
-      this.prisma.task.groupBy({
+      this.data.task.groupBy({
         by: ['status'],
         where: { tenantId },
         _count: { _all: true },
       }),
-      this.prisma.task.groupBy({
+      this.data.task.groupBy({
         by: ['priority'],
         where: { tenantId },
         _count: { _all: true },
       }),
-      this.prisma.task.findMany({
+      this.data.task.findMany({
         where: {
           tenantId,
           status: { notIn: ['COMPLETED', 'CANCELLED'] },
@@ -259,7 +259,7 @@ export class ReportsTool extends BaseStructuredTool {
         orderBy: { scheduledAt: 'asc' },
         take: 10,
       }),
-      this.prisma.task.findMany({
+      this.data.task.findMany({
         where: { tenantId, status: 'COMPLETED', completedAt: { gte: since } },
         select: { id: true, title: true, completedAt: true, priority: true },
         orderBy: { completedAt: 'desc' },
@@ -271,18 +271,18 @@ export class ReportsTool extends BaseStructuredTool {
 
   private async collectCostSummary(tenantId: string, since: Date) {
     const [total, byDepartment, byAgent] = await Promise.all([
-      this.prisma.costRecord.aggregate({
+      this.data.costRecord.aggregate({
         where: { tenantId, windowStart: { gte: since } },
         _sum: { costCents: true },
         _count: { _all: true },
       }),
-      this.prisma.costRecord.groupBy({
+      this.data.costRecord.groupBy({
         by: ['departmentId'],
         where: { tenantId, windowStart: { gte: since }, departmentId: { not: null } },
         _sum: { costCents: true },
         _count: { _all: true },
       }),
-      this.prisma.costRecord.groupBy({
+      this.data.costRecord.groupBy({
         by: ['agentId'],
         where: { tenantId, windowStart: { gte: since }, agentId: { not: null } },
         _sum: { costCents: true },
@@ -295,7 +295,7 @@ export class ReportsTool extends BaseStructuredTool {
   }
 
   private async collectAgentWorkload(tenantId: string, agentId?: string) {
-    const agents = await this.prisma.agent.findMany({
+    const agents = await this.data.agent.findMany({
       where: {
         tenantId,
         ...(agentId ? { id: agentId } : {}),
@@ -324,12 +324,12 @@ export class ReportsTool extends BaseStructuredTool {
 
   private async collectPipelineOverview(tenantId: string, since: Date) {
     const [byStatus, recent, topPerformers] = await Promise.all([
-      this.prisma.task.groupBy({
+      this.data.task.groupBy({
         by: ['status'],
         where: { tenantId },
         _count: { _all: true },
       }),
-      this.prisma.task.findMany({
+      this.data.task.findMany({
         where: { tenantId, createdAt: { gte: since } },
         select: {
           id: true,
@@ -342,7 +342,7 @@ export class ReportsTool extends BaseStructuredTool {
         orderBy: { createdAt: 'desc' },
         take: 15,
       }),
-      this.prisma.task.groupBy({
+      this.data.task.groupBy({
         by: ['agentId'],
         where: { tenantId, status: 'COMPLETED', completedAt: { gte: since } },
         _count: { _all: true },
@@ -412,7 +412,7 @@ ${sections.join('\n')}
       const root = await this.drive.ensureRootFolder(tenantId);
       return root.id;
     }
-    const agent = await this.prisma.agent.findUnique({
+    const agent = await this.data.agent.findUnique({
       where: { id: agentId },
       select: { id: true, name: true, tenantId: true },
     });

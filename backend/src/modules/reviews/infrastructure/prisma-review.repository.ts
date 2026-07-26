@@ -7,7 +7,10 @@ import {
   CreateReviewInput,
   UpdateReviewInput,
 } from '../domain/ports/review-repository.port';
-import type { ReviewDecision, ReviewStatus } from '@prisma/client';
+import type {
+  ReviewDecision,
+  AwlReviewStatus as ReviewStatus,
+} from '@prisma/client';
 
 @Injectable()
 export class PrismaReviewRepository implements IReviewRepository {

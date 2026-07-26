@@ -1,5 +1,8 @@
 // src/modules/execution/domain/ports/execution-attempt-repository.port.ts
-import type { ExecutionAttemptStatus, ExecutionEngine } from '@prisma/client';
+import type {
+  ExecutionAttemptStatus,
+  AwlExecutionEngine as ExecutionEngine,
+} from '@prisma/client';
 
 export const EXECUTION_ATTEMPT_REPOSITORY = Symbol('EXECUTION_ATTEMPT_REPOSITORY');
 

@@ -16,13 +16,21 @@ import {
   StructuredToolResult,
   ToolExecutionContext,
 } from '../interfaces/structured-tool.interface';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { ToolDataAccessService } from '../tool-data-access.service';
 import { ProjectMemoryService } from '../../project-memory/project-memory.service';
 import { ProjectsService } from '../../projects/projects.service';
 import { TasksService } from '../../orchestration/services/tasks.service';
 import { AgentsService } from '../../agents/services/agents.service';
 import { ProjectShapeSynthesisService } from '../../project-shape/project-shape-synthesis.service';
 import { CustomersService } from '../../customers/customers.service';
+import { ApprovalsService } from '../../approvals/services/approvals.service';
+import { NotificationsService } from '../../notifications/services/notifications.service';
+import { TenantsService } from '../../tenants/tenants.service';
+import { GovernanceRulesService } from '../../governance/services/governance-rules.service';
+import { DepartmentsService } from '../../departments/services/departments.service';
+import { ProjectMembersService } from '../../project-members/project-members.service';
+import { ProjectStagesService } from '../../project-stages/project-stages.service';
+import { GoalsService } from '../../goals/goals.service';
 
 // ─── Enums (matching Prisma schema) ────────────────────────────────────────
 
@@ -558,7 +566,7 @@ export class CreateTaskTool extends BaseStructuredTool {
   readonly requiredPermissions = ['task:create'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly tasksService?: TasksService,
   ) {
     super();
@@ -595,32 +603,7 @@ export class CreateTaskTool extends BaseStructuredTool {
           metadata: { model: 'neurecore-task-v1' },
         };
       }
-      // Fallback: TasksService not wired — direct prisma write. Does NOT
-      // trigger workflow side effects.
-      const task = await this.prisma.task.create({
-        data: {
-          title: input.title,
-          description: input.description,
-          priority: input.priority ?? 'MEDIUM',
-          tenantId: context.tenantId as string,
-          agentId: input.agentId ?? null,
-          status: 'PENDING',
-          input: {},
-          createdById: actorUserId ?? null,
-        },
-      });
-      return {
-        success: true,
-        data: {
-          taskId: task.id,
-          title: task.title,
-          status: task.status,
-          priority: task.priority,
-          createdAt: task.createdAt.toISOString(),
-          automation: { stage: 'skipped', note: 'TasksService not available' },
-        },
-        metadata: { model: 'neurecore-task-v1' },
-      };
+      return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to create task' };
     }
@@ -642,7 +625,7 @@ export class CreateProjectTool extends BaseStructuredTool implements OnModuleIni
   private synthesisService: ProjectShapeSynthesisService | undefined;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly projectsService?: ProjectsService,
     private readonly moduleRef?: ModuleRef,
   ) {
@@ -697,7 +680,7 @@ export class CreateProjectTool extends BaseStructuredTool implements OnModuleIni
         let resolvedHint: string | undefined = input.industryHint;
         if (!resolvedHint) {
           try {
-            const tenant = await this.prisma.tenant.findUnique({
+            const tenant = await this.data.tenant.findUnique({
               where: { id: context.tenantId as string },
               select: { industry: true, industryGroup: true },
             });
@@ -798,37 +781,7 @@ export class CreateProjectTool extends BaseStructuredTool implements OnModuleIni
       }
     }
 
-    // Fallback: ProjectsService was not wired in. Direct prisma write — does
-    // NOT trigger automation. This branch exists only so the tool still
-    // functions in unit-test contexts that don't supply ProjectsService.
-    try {
-      const project = await this.prisma.project.create({
-        data: {
-          name: input.name,
-          description: input.description,
-          tenantId: context.tenantId as string,
-          departmentId: input.departmentId ?? null,
-          targetDate,
-          status: 'ACTIVE',
-        },
-      });
-      return {
-        success: true,
-        data: {
-          projectId: project.id,
-          name: project.name,
-          status: project.status,
-          createdAt: project.createdAt.toISOString(),
-          automation: {
-            stage: 'skipped',
-            note: 'ProjectsService not available; automation pipeline was not triggered.',
-          },
-        },
-        metadata: { model: 'neurecore-project-v1' },
-      };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to create project' };
-    }
+    return { success: false, error: 'ProjectsService unavailable; refusing direct project mutation' };
   }
 }
 
@@ -839,12 +792,15 @@ export class ListDepartmentsTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = ListDepartmentsInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly departmentsService?: DepartmentsService,
+  ) { super(); }
 
   protected async executeImpl(input: ListDepartmentsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const departments = await this.prisma.department.findMany({
+      const departments = await this.data.department.findMany({
         where: { tenantId: context.tenantId as string, status: input.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE' },
         take: input.limit ?? 20,
         select: { id: true, name: true, description: true, status: true, _count: { select: { agents: true, members: true } } },
@@ -863,7 +819,10 @@ export class ListAgentsTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = ListAgentsInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly departmentsService?: DepartmentsService,
+  ) { super(); }
 
   protected async executeImpl(input: ListAgentsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -871,7 +830,7 @@ export class ListAgentsTool extends BaseStructuredTool {
       const where: Record<string, unknown> = { tenantId: context.tenantId };
       if (input.departmentId) where.departmentId = input.departmentId;
       if (input.status) where.status = input.status;
-      const agents = await this.prisma.agent.findMany({ where, take: input.limit ?? 20, select: { id: true, name: true, type: true, status: true, departmentId: true } });
+      const agents = await this.data.agent.findMany({ where, take: input.limit ?? 20, select: { id: true, name: true, type: true, status: true, departmentId: true } });
       return { success: true, data: { agents: agents.map(a => ({ id: a.id, name: a.name, type: a.type, status: a.status, departmentId: a.departmentId })), total: agents.length }, metadata: { model: 'neurecore-agent-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to list agents' };
@@ -889,7 +848,7 @@ export class PauseAgentTool extends BaseStructuredTool {
   readonly requiredPermissions = ['agent:pause'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly agentsService?: AgentsService,
   ) {
     super();
@@ -898,13 +857,10 @@ export class PauseAgentTool extends BaseStructuredTool {
   protected async executeImpl(input: PauseAgentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const agent = await this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
+      const agent = await this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
       if (!agent) return { success: false, error: 'Agent not found' };
-      if (this.agentsService) {
-        await this.agentsService.setStatus(agent.id, 'PAUSED' as never, context.tenantId as string);
-      } else {
-        await this.prisma.agent.update({ where: { id: input.agentId }, data: { status: 'PAUSED' } });
-      }
+      if (!this.agentsService) return { success: false, error: 'AgentsService unavailable; refusing direct agent mutation' };
+      await this.agentsService.setStatus(agent.id, 'PAUSED' as never, context.tenantId as string);
       return { success: true, data: { agentId: agent.id, name: agent.name, previousStatus: agent.status, newStatus: 'PAUSED' }, metadata: { model: 'neurecore-agent-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to pause agent' };
@@ -922,7 +878,7 @@ export class ResumeAgentTool extends BaseStructuredTool {
   readonly requiredPermissions = ['agent:resume'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly agentsService?: AgentsService,
   ) {
     super();
@@ -931,13 +887,10 @@ export class ResumeAgentTool extends BaseStructuredTool {
   protected async executeImpl(input: ResumeAgentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const agent = await this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
+      const agent = await this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
       if (!agent) return { success: false, error: 'Agent not found' };
-      if (this.agentsService) {
-        await this.agentsService.setStatus(agent.id, 'RUNNING' as never, context.tenantId as string);
-      } else {
-        await this.prisma.agent.update({ where: { id: input.agentId }, data: { status: 'RUNNING' } });
-      }
+      if (!this.agentsService) return { success: false, error: 'AgentsService unavailable; refusing direct agent mutation' };
+      await this.agentsService.setStatus(agent.id, 'RUNNING' as never, context.tenantId as string);
       return { success: true, data: { agentId: agent.id, name: agent.name, previousStatus: agent.status, newStatus: 'RUNNING' }, metadata: { model: 'neurecore-agent-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to resume agent' };
@@ -952,7 +905,10 @@ export class ListTasksTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = ListTasksInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectsService?: ProjectsService,
+  ) { super(); }
 
   protected async executeImpl(input: ListTasksInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -960,7 +916,7 @@ export class ListTasksTool extends BaseStructuredTool {
       const where: Record<string, unknown> = { tenantId: context.tenantId };
       if (input.status) where.status = input.status;
       if (input.agentId) where.agentId = input.agentId;
-      const tasks = await this.prisma.task.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, status: true, priority: true, agentId: true, createdAt: true } });
+      const tasks = await this.data.task.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, status: true, priority: true, agentId: true, createdAt: true } });
       return { success: true, data: { tasks: tasks.map(t => ({ id: t.id, title: t.title, status: t.status, priority: t.priority, agentId: t.agentId, createdAt: t.createdAt.toISOString() })), total: tasks.length }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to list tasks' };
@@ -975,7 +931,10 @@ export class GetTenantSnapshotTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = GetTenantSnapshotInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly departmentsService?: DepartmentsService,
+  ) { super(); }
 
   protected async executeImpl(_input: unknown, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -984,12 +943,12 @@ export class GetTenantSnapshotTool extends BaseStructuredTool {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const [agentsByStatus, departmentsCount, tasksByStatus, workflowsByStatus, pendingApprovals, costMonth] = await Promise.all([
-        this.prisma.agent.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
-        this.prisma.department.count({ where: { tenantId, status: 'ACTIVE' } }).catch(() => 0),
-        this.prisma.task.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
-        this.prisma.workflow.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
-        this.prisma.approvalRequest.count({ where: { tenantId, status: 'PENDING' } }).catch(() => 0),
-        this.prisma.costRecord.aggregate({ where: { tenantId, windowStart: { gte: monthStart } }, _sum: { costCents: true } }).catch(() => null),
+        this.data.agent.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
+        this.data.department.count({ where: { tenantId, status: 'ACTIVE' } }).catch(() => 0),
+        this.data.task.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
+        this.data.workflow.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
+        this.data.approvalRequest.count({ where: { tenantId, status: 'PENDING' } }).catch(() => 0),
+        this.data.costRecord.aggregate({ where: { tenantId, windowStart: { gte: monthStart } }, _sum: { costCents: true } }).catch(() => null),
       ]);
       const agentCounts: Record<string, number> = {}; let totalAgents = 0;
       for (const row of agentsByStatus) { const c = row._count?._all ?? 0; agentCounts[row.status] = c; totalAgents += c; }
@@ -1015,14 +974,18 @@ export class UpdateDepartmentTool extends BaseStructuredTool {
   readonly inputSchema = UpdateDepartmentInputSchema;
   readonly requiredPermissions = ['department:update'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly departmentsService?: DepartmentsService,
+  ) { super(); }
 
   protected async executeImpl(input: UpdateDepartmentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const dept = await this.prisma.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } });
+      const dept = await this.data.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } });
       if (!dept) return { success: false, error: 'Department not found' };
-      const updated = await this.prisma.department.update({ where: { id: input.departmentId }, data: { name: input.name ?? dept.name, description: input.description ?? dept.description } });
+      if (!this.departmentsService) return { success: false, error: 'DepartmentsService unavailable; refusing direct department mutation' };
+      const updated = await this.departmentsService.update(input.departmentId, { name: input.name ?? dept.name, description: input.description ?? dept.description }, context.tenantId as string);
       return { success: true, data: { departmentId: updated.id, name: updated.name, description: updated.description }, metadata: { model: 'neurecore-dept-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to update department' };
@@ -1038,14 +1001,18 @@ export class ArchiveDepartmentTool extends BaseStructuredTool {
   readonly inputSchema = ArchiveDepartmentInputSchema;
   readonly requiredPermissions = ['department:archive'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly departmentsService?: DepartmentsService,
+  ) { super(); }
 
   protected async executeImpl(input: ArchiveDepartmentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const dept = await this.prisma.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } });
+      const dept = await this.data.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } });
       if (!dept) return { success: false, error: 'Department not found' };
-      const updated = await this.prisma.department.update({ where: { id: input.departmentId }, data: { status: 'INACTIVE' } });
+      if (!this.departmentsService) return { success: false, error: 'DepartmentsService unavailable; refusing direct department mutation' };
+      const updated = await this.departmentsService.update(input.departmentId, { status: 'INACTIVE' as never }, context.tenantId as string);
       return { success: true, data: { departmentId: updated.id, name: updated.name, previousStatus: dept.status, newStatus: updated.status }, metadata: { model: 'neurecore-dept-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to archive department' };
@@ -1061,15 +1028,19 @@ export class DeleteDepartmentTool extends BaseStructuredTool {
   readonly inputSchema = DeleteDepartmentInputSchema;
   readonly requiredPermissions = ['department:delete'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly departmentsService?: DepartmentsService,
+  ) { super(); }
 
   protected async executeImpl(input: DeleteDepartmentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const dept = await this.prisma.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId }, include: { _count: { select: { agents: true, members: true } } } });
+      const dept = await this.data.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId }, include: { _count: { select: { agents: true, members: true } } } });
       if (!dept) return { success: false, error: 'Department not found' };
       if (dept._count.agents > 0 || dept._count.members > 0) return { success: false, error: `Cannot delete department with ${dept._count.agents} agents and ${dept._count.members} members.` };
-      await this.prisma.department.delete({ where: { id: input.departmentId } });
+      if (!this.departmentsService) return { success: false, error: 'DepartmentsService unavailable; refusing direct department mutation' };
+      await this.departmentsService.remove(input.departmentId, context.tenantId as string);
       return { success: true, data: { departmentId: input.departmentId, deleted: true }, metadata: { model: 'neurecore-dept-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to delete department' };
@@ -1085,18 +1056,22 @@ export class AssignManagerTool extends BaseStructuredTool {
   readonly inputSchema = AssignManagerInputSchema;
   readonly requiredPermissions = ['department:assignManager'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly departmentsService?: DepartmentsService,
+  ) { super(); }
 
   protected async executeImpl(input: AssignManagerInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const [dept, agent] = await Promise.all([
-        this.prisma.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } }),
-        this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } }),
+        this.data.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } }),
+        this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } }),
       ]);
       if (!dept) return { success: false, error: 'Department not found' };
       if (!agent) return { success: false, error: 'Agent not found' };
-      const updated = await this.prisma.department.update({ where: { id: input.departmentId }, data: { headAgentId: input.agentId } });
+      if (!this.departmentsService) return { success: false, error: 'DepartmentsService unavailable; refusing direct department mutation' };
+      const updated = await this.departmentsService.update(input.departmentId, { headAgentId: input.agentId }, context.tenantId as string);
       return { success: true, data: { departmentId: updated.id, departmentName: updated.name, managerAgentId: agent.id, managerAgentName: agent.name }, metadata: { model: 'neurecore-dept-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to assign manager' };
@@ -1112,14 +1087,18 @@ export class UnassignManagerTool extends BaseStructuredTool {
   readonly inputSchema = UnassignManagerInputSchema;
   readonly requiredPermissions = ['department:assignManager'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly departmentsService?: DepartmentsService,
+  ) { super(); }
 
   protected async executeImpl(input: UnassignManagerInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const dept = await this.prisma.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } });
+      const dept = await this.data.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } });
       if (!dept) return { success: false, error: 'Department not found' };
-      const updated = await this.prisma.department.update({ where: { id: input.departmentId }, data: { headAgentId: null } });
+      if (!this.departmentsService) return { success: false, error: 'DepartmentsService unavailable; refusing direct department mutation' };
+      const updated = await this.departmentsService.update(input.departmentId, { headAgentId: null }, context.tenantId as string);
       return { success: true, data: { departmentId: updated.id, departmentName: updated.name, managerRemoved: true }, metadata: { model: 'neurecore-dept-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to unassign manager' };
@@ -1138,12 +1117,15 @@ export class GetAgentTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = GetAgentInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectsService?: ProjectsService,
+  ) { super(); }
 
   protected async executeImpl(input: GetAgentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const agent = await this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId }, include: { department: { select: { id: true, name: true } }, _count: { select: { tasks: true } } } });
+      const agent = await this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId }, include: { department: { select: { id: true, name: true } }, _count: { select: { tasks: true } } } });
       if (!agent) return { success: false, error: 'Agent not found' };
       return { success: true, data: { id: agent.id, name: agent.name, description: agent.description, type: agent.type, status: agent.status, model: agent.model, department: agent.department, taskCount: agent._count.tasks, createdAt: agent.createdAt.toISOString() }, metadata: { model: 'neurecore-agent-v1' } };
     } catch (error) {
@@ -1160,12 +1142,15 @@ export class UpdateAgentTool extends BaseStructuredTool {
   readonly inputSchema = UpdateAgentInputSchema;
   readonly requiredPermissions = ['agent:update'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly agentsService?: AgentsService,
+  ) { super(); }
 
   protected async executeImpl(input: UpdateAgentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const agent = await this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
+      const agent = await this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
       if (!agent) return { success: false, error: 'Agent not found' };
       const updateData: Record<string, unknown> = {};
       if (input.name !== undefined) updateData.name = input.name;
@@ -1173,7 +1158,8 @@ export class UpdateAgentTool extends BaseStructuredTool {
       if (input.status !== undefined) updateData.status = input.status;
       if (input.model !== undefined) updateData.model = input.model;
       if (input.systemPrompt !== undefined) updateData.systemPrompt = input.systemPrompt;
-      const updated = await this.prisma.agent.update({ where: { id: input.agentId }, data: updateData });
+      if (!this.agentsService) return { success: false, error: 'AgentsService unavailable; refusing direct agent mutation' };
+      const updated = await this.agentsService.update(input.agentId, updateData as never, context.tenantId as string) as any;
       return { success: true, data: { agentId: updated.id, name: updated.name, status: updated.status, updatedFields: Object.keys(updateData) }, metadata: { model: 'neurecore-agent-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to update agent' };
@@ -1189,14 +1175,18 @@ export class ArchiveAgentTool extends BaseStructuredTool {
   readonly inputSchema = ArchiveAgentInputSchema;
   readonly requiredPermissions = ['agent:archive'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly agentsService?: AgentsService,
+  ) { super(); }
 
   protected async executeImpl(input: ArchiveAgentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const agent = await this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
+      const agent = await this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
       if (!agent) return { success: false, error: 'Agent not found' };
-      const updated = await this.prisma.agent.update({ where: { id: input.agentId }, data: { status: 'ARCHIVED', isActive: false } });
+      if (!this.agentsService) return { success: false, error: 'AgentsService unavailable; refusing direct agent mutation' };
+      const updated = await this.agentsService.archive(input.agentId, context.tenantId as string) as any;
       return { success: true, data: { agentId: updated.id, name: updated.name, previousStatus: agent.status, newStatus: 'ARCHIVED' }, metadata: { model: 'neurecore-agent-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to archive agent' };
@@ -1212,18 +1202,22 @@ export class AssignAgentToDepartmentTool extends BaseStructuredTool {
   readonly inputSchema = AssignAgentToDepartmentInputSchema;
   readonly requiredPermissions = ['agent:assignDepartment'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly agentsService?: AgentsService,
+  ) { super(); }
 
   protected async executeImpl(input: AssignAgentToDepartmentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const [agent, dept] = await Promise.all([
-        this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } }),
-        this.prisma.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } }),
+        this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } }),
+        this.data.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } }),
       ]);
       if (!agent) return { success: false, error: 'Agent not found' };
       if (!dept) return { success: false, error: 'Department not found' };
-      const updated = await this.prisma.agent.update({ where: { id: input.agentId }, data: { departmentId: input.departmentId } });
+      if (!this.agentsService) return { success: false, error: 'AgentsService unavailable; refusing direct agent mutation' };
+      const updated = await this.agentsService.update(input.agentId, { departmentId: input.departmentId }, context.tenantId as string) as any;
       return { success: true, data: { agentId: updated.id, agentName: updated.name, departmentId: dept.id, departmentName: dept.name }, metadata: { model: 'neurecore-agent-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to assign agent to department' };
@@ -1238,12 +1232,15 @@ export class RemoveAgentFromProjectTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = RemoveAgentFromProjectInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectsService?: ProjectsService,
+  ) { super(); }
 
   protected async executeImpl(input: RemoveAgentFromProjectInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const project = await this.prisma.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
+      const project = await this.data.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
       if (!project) return { success: false, error: 'Project not found' };
       return { success: true, data: { agentId: input.agentId, projectId: input.projectId, note: 'Projects are not directly linked to agents. Agents work on projects via tasks.' }, metadata: { model: 'neurecore-project-v1' } };
     } catch (error) {
@@ -1260,13 +1257,24 @@ export class BulkCreateAgentsTool extends BaseStructuredTool {
   readonly inputSchema = BulkCreateAgentsInputSchema;
   readonly requiredPermissions = ['agent:create'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly agentsService?: AgentsService,
+  ) { super(); }
 
   protected async executeImpl(input: BulkCreateAgentsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
+    if (!context.userId) return { success: false, error: 'User context required' };
     try {
-      const results = await Promise.all(input.agents.map(a => this.prisma.agent.create({ data: { name: a.name, type: a.type, model: a.model ?? 'gpt-4o-mini', tenantId: context.tenantId as string, departmentId: a.departmentId ?? null, description: a.description ?? null, status: 'IDLE' } })));
-      return { success: true, data: { created: results.map(a => ({ id: a.id, name: a.name, type: a.type, status: a.status })), total: results.length }, metadata: { model: 'neurecore-agent-v1' } };
+      if (!this.agentsService) return { success: false, error: 'AgentsService unavailable; refusing direct agent mutation' };
+      const results = await Promise.all(input.agents.map(async (a) => {
+        const created = await this.agentsService!.create({ name: a.name, type: a.type as never, model: a.model, description: a.description }, context.userId!, context.tenantId as string) as any;
+        if (a.departmentId) {
+          return this.agentsService!.update(created.id, { departmentId: a.departmentId }, context.tenantId as string) as any;
+        }
+        return created;
+      }));
+      return { success: true, data: { created: results.map((a: any) => ({ id: a.id, name: a.name, type: a.type, status: a.status })), total: results.length }, metadata: { model: 'neurecore-agent-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to bulk create agents' };
     }
@@ -1281,14 +1289,18 @@ export class BulkAssignToDepartmentTool extends BaseStructuredTool {
   readonly inputSchema = BulkAssignToDepartmentInputSchema;
   readonly requiredPermissions = ['agent:assignDepartment'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly agentsService?: AgentsService,
+  ) { super(); }
 
   protected async executeImpl(input: BulkAssignToDepartmentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const dept = await this.prisma.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } });
+      const dept = await this.data.department.findFirst({ where: { id: input.departmentId, tenantId: context.tenantId } });
       if (!dept) return { success: false, error: 'Department not found' };
-      await Promise.all(input.agentIds.map(id => this.prisma.agent.update({ where: { id }, data: { departmentId: input.departmentId } })));
+      if (!this.agentsService) return { success: false, error: 'AgentsService unavailable; refusing direct agent mutation' };
+      await Promise.all(input.agentIds.map(id => this.agentsService!.update(id, { departmentId: input.departmentId }, context.tenantId as string)));
       return { success: true, data: { departmentId: dept.id, departmentName: dept.name, movedAgentIds: input.agentIds, count: input.agentIds.length }, metadata: { model: 'neurecore-agent-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to bulk assign agents' };
@@ -1303,14 +1315,14 @@ export class GetAgentWorkloadTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = GetAgentWorkloadInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetAgentWorkloadInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const agent = await this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
+      const agent = await this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
       if (!agent) return { success: false, error: 'Agent not found' };
-      const tasksByStatus = await this.prisma.task.groupBy({ by: ['status'], where: { agentId: input.agentId, tenantId: context.tenantId }, _count: { _all: true } });
+      const tasksByStatus = await this.data.task.groupBy({ by: ['status'], where: { agentId: input.agentId, tenantId: context.tenantId }, _count: { _all: true } });
       const breakdown: Record<string, number> = {}; let total = 0;
       for (const row of tasksByStatus) { const c = row._count?._all ?? 0; breakdown[row.status] = c; total += c; }
       return { success: true, data: { agentId: agent.id, agentName: agent.name, status: agent.status, totalTasks: total, byStatus: breakdown }, metadata: { model: 'neurecore-agent-v1' } };
@@ -1330,13 +1342,13 @@ export class GetProjectTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = GetProjectInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetProjectInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const project = await this.prisma.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
-      const goals = await this.prisma.goal.count({ where: { tenantId: context.tenantId } }).catch(() => 0);
+      const project = await this.data.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
+      const goals = await this.data.goal.count({ where: { tenantId: context.tenantId } }).catch(() => 0);
       if (!project) return { success: false, error: 'Project not found' };
       return { success: true, data: { id: project.id, name: project.name, description: project.description, status: project.status, departmentId: project.departmentId, goalCount: goals, targetDate: project.targetDate?.toISOString() ?? null, createdAt: project.createdAt.toISOString() }, metadata: { model: 'neurecore-project-v1' } };
     } catch (error) {
@@ -1353,19 +1365,23 @@ export class UpdateProjectTool extends BaseStructuredTool {
   readonly inputSchema = UpdateProjectInputSchema;
   readonly requiredPermissions = ['project:update'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectsService?: ProjectsService,
+  ) { super(); }
 
   protected async executeImpl(input: UpdateProjectInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const project = await this.prisma.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
+      const project = await this.data.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
       if (!project) return { success: false, error: 'Project not found' };
       const updateData: Record<string, unknown> = {};
       if (input.name !== undefined) updateData.name = input.name;
       if (input.description !== undefined) updateData.description = input.description;
       if (input.status !== undefined) updateData.status = input.status;
       if (input.targetDate !== undefined) updateData.targetDate = new Date(input.targetDate);
-      const updated = await this.prisma.project.update({ where: { id: input.projectId }, data: updateData });
+      if (!this.projectsService) return { success: false, error: 'ProjectsService unavailable; refusing direct project mutation' };
+      const updated = await this.projectsService.update(input.projectId, context.tenantId as string, updateData as never);
       return { success: true, data: { projectId: updated.id, name: updated.name, status: updated.status, updatedFields: Object.keys(updateData) }, metadata: { model: 'neurecore-project-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to update project' };
@@ -1381,14 +1397,18 @@ export class ArchiveProjectTool extends BaseStructuredTool {
   readonly inputSchema = ArchiveProjectInputSchema;
   readonly requiredPermissions = ['project:archive'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectsService?: ProjectsService,
+  ) { super(); }
 
   protected async executeImpl(input: ArchiveProjectInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const project = await this.prisma.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
+      const project = await this.data.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
       if (!project) return { success: false, error: 'Project not found' };
-      const updated = await this.prisma.project.update({ where: { id: input.projectId }, data: { status: 'ARCHIVED' } });
+      if (!this.projectsService) return { success: false, error: 'ProjectsService unavailable; refusing direct project mutation' };
+      const updated = await this.projectsService.update(input.projectId, context.tenantId as string, { status: 'ARCHIVED' } as never);
       return { success: true, data: { projectId: updated.id, name: updated.name, previousStatus: project.status, newStatus: 'ARCHIVED' }, metadata: { model: 'neurecore-project-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to archive project' };
@@ -1404,14 +1424,18 @@ export class DeleteProjectTool extends BaseStructuredTool {
   readonly inputSchema = DeleteProjectInputSchema;
   readonly requiredPermissions = ['project:delete'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectsService?: ProjectsService,
+  ) { super(); }
 
   protected async executeImpl(input: DeleteProjectInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const project = await this.prisma.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
+      const project = await this.data.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
       if (!project) return { success: false, error: 'Project not found' };
-      await this.prisma.project.delete({ where: { id: input.projectId } });
+      if (!this.projectsService) return { success: false, error: 'ProjectsService unavailable; refusing direct project mutation' };
+      await this.projectsService.delete(input.projectId, context.tenantId as string);
       return { success: true, data: { projectId: input.projectId, deleted: true }, metadata: { model: 'neurecore-project-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to delete project' };
@@ -1427,14 +1451,18 @@ export class CloneProjectTool extends BaseStructuredTool {
   readonly inputSchema = CloneProjectInputSchema;
   readonly requiredPermissions = ['project:create'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectsService?: ProjectsService,
+  ) { super(); }
 
   protected async executeImpl(input: CloneProjectInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const original = await this.prisma.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
+      const original = await this.data.project.findFirst({ where: { id: input.projectId, tenantId: context.tenantId } });
       if (!original) return { success: false, error: 'Project not found' };
-      const cloned = await this.prisma.project.create({ data: { name: input.newName, description: original.description, tenantId: context.tenantId as string, departmentId: original.departmentId, goalIds: [], status: 'ACTIVE', targetDate: original.targetDate } });
+      if (!this.projectsService) return { success: false, error: 'ProjectsService unavailable; refusing direct project mutation' };
+      const cloned = await this.projectsService.cloneFromProject(input.projectId, input.newName, context.tenantId as string);
       return { success: true, data: { originalProjectId: input.projectId, newProjectId: cloned.id, newProjectName: cloned.name, tasksCloned: input.includeTasks }, metadata: { model: 'neurecore-project-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to clone project' };
@@ -1453,12 +1481,12 @@ export class GetTaskTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = GetTaskInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetTaskInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const task = await this.prisma.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId }, include: { agent: { select: { id: true, name: true } }, createdBy: { select: { id: true, firstName: true, lastName: true } } } });
+      const task = await this.data.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId }, include: { agent: { select: { id: true, name: true } }, createdBy: { select: { id: true, firstName: true, lastName: true } } } });
       if (!task) return { success: false, error: 'Task not found' };
       return { success: true, data: { id: task.id, title: task.title, description: task.description, status: task.status, priority: task.priority, agent: task.agent, createdBy: task.createdBy ? `${task.createdBy.firstName} ${task.createdBy.lastName}` : null, createdAt: task.createdAt.toISOString(), completedAt: task.completedAt?.toISOString() ?? null }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
@@ -1475,23 +1503,58 @@ export class UpdateTaskTool extends BaseStructuredTool {
   readonly inputSchema = UpdateTaskInputSchema;
   readonly requiredPermissions = ['task:update'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: UpdateTaskInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const task = await this.prisma.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
+      const task = await this.data.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
       if (!task) return { success: false, error: 'Task not found' };
       const updateData: Record<string, unknown> = {};
       if (input.title !== undefined) updateData.title = input.title;
       if (input.description !== undefined) updateData.description = input.description;
       if (input.priority !== undefined) updateData.priority = input.priority;
       if (input.status !== undefined) { updateData.status = input.status; if (input.status === 'COMPLETED') updateData.completedAt = new Date(); }
-      const updated = await this.prisma.task.update({ where: { id: input.taskId }, data: updateData });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      const updated = await this.updateViaTasksService(input, updateData, context.tenantId as string);
       return { success: true, data: { taskId: updated.id, title: updated.title, status: updated.status, priority: updated.priority, updatedFields: Object.keys(updateData) }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to update task' };
     }
+  }
+
+  private async updateViaTasksService(
+    input: UpdateTaskInput,
+    updateData: Record<string, unknown>,
+    tenantId: string,
+  ) {
+    const updates: {
+      title?: string;
+      description?: string;
+      priority?: never;
+    } = {};
+    if (input.title !== undefined) updates.title = input.title;
+    if (input.description !== undefined) updates.description = input.description;
+    if (input.priority !== undefined) updates.priority = input.priority as never;
+
+    let updated = Object.keys(updates).length > 0
+      ? await this.tasksService!.update(input.taskId, updates, tenantId)
+      : await this.tasksService!.findOne(input.taskId, tenantId);
+
+    if (input.status !== undefined) {
+      updated = await this.tasksService!.updateStatus(
+        input.taskId,
+        input.status as never,
+        tenantId,
+      );
+    }
+
+    return updated;
   }
 }
 
@@ -1503,12 +1566,18 @@ export class DeleteTaskTool extends BaseStructuredTool {
   readonly inputSchema = DeleteTaskInputSchema;
   readonly requiredPermissions = ['task:delete'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: DeleteTaskInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      await this.prisma.task.delete({ where: { id: input.taskId } });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      await this.tasksService.remove(input.taskId, context.tenantId as string);
       return { success: true, data: { taskId: input.taskId, deleted: true }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to delete task' };
@@ -1524,15 +1593,25 @@ export class AssignTaskTool extends BaseStructuredTool {
   readonly inputSchema = AssignTaskInputSchema;
   readonly requiredPermissions = ['task:assign'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: AssignTaskInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const [task, agent] = await Promise.all([this.prisma.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } }), this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } })]);
+      const [task, agent] = await Promise.all([this.data.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } }), this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } })]);
       if (!task) return { success: false, error: 'Task not found' };
       if (!agent) return { success: false, error: 'Agent not found' };
-      const updated = await this.prisma.task.update({ where: { id: input.taskId }, data: { agentId: input.agentId } });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      const updated = await this.tasksService.update(
+        input.taskId,
+        { agentId: input.agentId },
+        context.tenantId as string,
+      );
       return { success: true, data: { taskId: updated.id, title: updated.title, assignedAgentId: agent.id, assignedAgentName: agent.name }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to assign task' };
@@ -1548,14 +1627,24 @@ export class UnassignTaskTool extends BaseStructuredTool {
   readonly inputSchema = UnassignTaskInputSchema;
   readonly requiredPermissions = ['task:assign'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: UnassignTaskInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const task = await this.prisma.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
+      const task = await this.data.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
       if (!task) return { success: false, error: 'Task not found' };
-      const updated = await this.prisma.task.update({ where: { id: input.taskId }, data: { agentId: null } });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      const updated = await this.tasksService.update(
+        input.taskId,
+        { agentId: null },
+        context.tenantId as string,
+      );
       return { success: true, data: { taskId: updated.id, title: updated.title, unassigned: true }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to unassign task' };
@@ -1571,14 +1660,24 @@ export class MarkTaskCompleteTool extends BaseStructuredTool {
   readonly inputSchema = MarkTaskCompleteInputSchema;
   readonly requiredPermissions = ['task:update'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: MarkTaskCompleteInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const task = await this.prisma.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
+      const task = await this.data.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
       if (!task) return { success: false, error: 'Task not found' };
-      const updated = await this.prisma.task.update({ where: { id: input.taskId }, data: { status: 'COMPLETED', completedAt: new Date() } });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      const updated = await this.tasksService.updateStatus(
+        input.taskId,
+        'COMPLETED' as never,
+        context.tenantId as string,
+      );
       return { success: true, data: { taskId: updated.id, title: updated.title, previousStatus: task.status, newStatus: 'COMPLETED', completedAt: updated.completedAt?.toISOString() }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to mark task complete' };
@@ -1594,14 +1693,24 @@ export class MarkTaskInProgressTool extends BaseStructuredTool {
   readonly inputSchema = MarkTaskInProgressInputSchema;
   readonly requiredPermissions = ['task:update'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: MarkTaskInProgressInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const task = await this.prisma.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
+      const task = await this.data.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
       if (!task) return { success: false, error: 'Task not found' };
-      const updated = await this.prisma.task.update({ where: { id: input.taskId }, data: { status: 'RUNNING', startedAt: task.startedAt ?? new Date() } });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      const updated = await this.tasksService.updateStatus(
+        input.taskId,
+        'RUNNING' as never,
+        context.tenantId as string,
+      );
       return { success: true, data: { taskId: updated.id, title: updated.title, previousStatus: task.status, newStatus: 'RUNNING' }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to mark task in progress' };
@@ -1617,14 +1726,20 @@ export class ReopenTaskTool extends BaseStructuredTool {
   readonly inputSchema = ReopenTaskInputSchema;
   readonly requiredPermissions = ['task:update'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: ReopenTaskInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const task = await this.prisma.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
+      const task = await this.data.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
       if (!task) return { success: false, error: 'Task not found' };
-      const updated = await this.prisma.task.update({ where: { id: input.taskId }, data: { status: 'PENDING', completedAt: null, error: null } });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      const updated = await this.tasksService.reopen(input.taskId, context.tenantId as string);
       return { success: true, data: { taskId: updated.id, title: updated.title, previousStatus: task.status, newStatus: 'PENDING' }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to reopen task' };
@@ -1640,14 +1755,24 @@ export class ChangeTaskPriorityTool extends BaseStructuredTool {
   readonly inputSchema = ChangeTaskPriorityInputSchema;
   readonly requiredPermissions = ['task:update'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: ChangeTaskPriorityInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const task = await this.prisma.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
+      const task = await this.data.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
       if (!task) return { success: false, error: 'Task not found' };
-      const updated = await this.prisma.task.update({ where: { id: input.taskId }, data: { priority: input.priority } });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      const updated = await this.tasksService.update(
+        input.taskId,
+        { priority: input.priority as never },
+        context.tenantId as string,
+      );
       return { success: true, data: { taskId: updated.id, title: updated.title, previousPriority: task.priority, newPriority: updated.priority }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to change task priority' };
@@ -1663,14 +1788,28 @@ export class AddSubtaskTool extends BaseStructuredTool {
   readonly inputSchema = AddSubtaskInputSchema;
   readonly requiredPermissions = ['task:create'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: AddSubtaskInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const parent = await this.prisma.task.findFirst({ where: { id: input.parentTaskId, tenantId: context.tenantId } });
+      const parent = await this.data.task.findFirst({ where: { id: input.parentTaskId, tenantId: context.tenantId } });
       if (!parent) return { success: false, error: 'Parent task not found' };
-      const subtask = await this.prisma.task.create({ data: { title: input.title, tenantId: context.tenantId as string, agentId: input.agentId ?? null, priority: input.priority ?? 'MEDIUM', status: 'PENDING', input: { parentTaskId: input.parentTaskId } } });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      const subtask = await this.tasksService.create(
+        {
+          title: input.title,
+          agentId: input.agentId ?? null,
+          priority: (input.priority ?? 'MEDIUM') as never,
+          input: { parentTaskId: input.parentTaskId },
+        },
+        context.tenantId as string,
+      );
       return { success: true, data: { subtaskId: subtask.id, title: subtask.title, parentTaskId: input.parentTaskId, priority: subtask.priority, status: subtask.status }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to add subtask' };
@@ -1685,12 +1824,12 @@ export class ListSubtasksTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = ListSubtasksInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListSubtasksInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const subtasks = await this.prisma.task.findMany({ where: { tenantId: context.tenantId as string, input: { path: ['parentTaskId'], equals: input.parentTaskId } }, select: { id: true, title: true, status: true, priority: true, agentId: true, createdAt: true } });
+      const subtasks = await this.data.task.findMany({ where: { tenantId: context.tenantId as string, input: { path: ['parentTaskId'], equals: input.parentTaskId } }, select: { id: true, title: true, status: true, priority: true, agentId: true, createdAt: true } });
       return { success: true, data: { parentTaskId: input.parentTaskId, subtasks: subtasks.map(s => ({ id: s.id, title: s.title, status: s.status, priority: s.priority, agentId: s.agentId, createdAt: s.createdAt.toISOString() })), total: subtasks.length }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to list subtasks' };
@@ -1705,7 +1844,7 @@ export class GetMyTasksTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = GetMyTasksInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetMyTasksInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -1714,7 +1853,7 @@ export class GetMyTasksTool extends BaseStructuredTool {
       const where: Record<string, unknown> = { tenantId: context.tenantId as string, agentId: context.agentId };
       if (input.status) where.status = input.status;
       if (input.priority) where.priority = input.priority;
-      const tasks = await this.prisma.task.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, status: true, priority: true, createdAt: true } });
+      const tasks = await this.data.task.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, status: true, priority: true, createdAt: true } });
       return { success: true, data: { tasks: tasks.map(t => ({ id: t.id, title: t.title, status: t.status, priority: t.priority, createdAt: t.createdAt.toISOString() })), total: tasks.length }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to get my tasks' };
@@ -1729,14 +1868,14 @@ export class GetOverdueTasksTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = GetOverdueTasksInputSchema;
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetOverdueTasksInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const where: Record<string, unknown> = { tenantId: context.tenantId as string, status: { not: 'COMPLETED' } };
       if (input.departmentId) where.departmentId = input.departmentId;
-      const tasks = await this.prisma.task.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, include: { agent: { select: { id: true, name: true } } } });
+      const tasks = await this.data.task.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, include: { agent: { select: { id: true, name: true } } } });
       const overdue = tasks.filter(t => t.completedAt === null);
       return { success: true, data: { overdueTasks: overdue.map(t => ({ id: t.id, title: t.title, status: t.status, priority: t.priority, agent: t.agent, createdAt: t.createdAt.toISOString() })), total: overdue.length }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
@@ -1753,14 +1892,26 @@ export class BulkAssignTasksTool extends BaseStructuredTool {
   readonly inputSchema = BulkAssignTasksInputSchema;
   readonly requiredPermissions = ['task:assign'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: BulkAssignTasksInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const agent = await this.prisma.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
+      const agent = await this.data.agent.findFirst({ where: { id: input.agentId, tenantId: context.tenantId } });
       if (!agent) return { success: false, error: 'Agent not found' };
-      await Promise.all(input.taskIds.map(id => this.prisma.task.update({ where: { id }, data: { agentId: input.agentId } })));
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      await Promise.all(input.taskIds.map((id) =>
+        this.tasksService!.update(
+          id,
+          { agentId: input.agentId },
+          context.tenantId as string,
+        ),
+      ));
       return { success: true, data: { assignedAgentId: agent.id, assignedAgentName: agent.name, taskCount: input.taskIds.length, taskIds: input.taskIds }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to bulk assign tasks' };
@@ -1776,14 +1927,22 @@ export class BulkChangeStatusTool extends BaseStructuredTool {
   readonly inputSchema = BulkChangeStatusInputSchema;
   readonly requiredPermissions = ['task:update'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: BulkChangeStatusInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const updateData: Record<string, unknown> = { status: input.status };
-      if (input.status === 'COMPLETED') updateData.completedAt = new Date();
-      await Promise.all(input.taskIds.map(id => this.prisma.task.update({ where: { id }, data: updateData })));
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      await this.tasksService.bulkUpdateStatus(
+        input.taskIds,
+        input.status as never,
+        context.tenantId as string,
+      );
       return { success: true, data: { newStatus: input.status, taskCount: input.taskIds.length, taskIds: input.taskIds }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to bulk change status' };
@@ -1799,14 +1958,24 @@ export class CloneTaskTool extends BaseStructuredTool {
   readonly inputSchema = CloneTaskInputSchema;
   readonly requiredPermissions = ['task:create'];
 
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tasksService?: TasksService,
+  ) { super(); }
 
   protected async executeImpl(input: CloneTaskInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const original = await this.prisma.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
+      const original = await this.data.task.findFirst({ where: { id: input.taskId, tenantId: context.tenantId } });
       if (!original) return { success: false, error: 'Task not found' };
-      const cloned = await this.prisma.task.create({ data: { title: `${original.title} (copy)`, description: original.description, priority: original.priority, tenantId: context.tenantId as string, agentId: input.newAssigneeId ?? null, status: 'PENDING', input: original.input as any } });
+      if (!this.tasksService) {
+        return { success: false, error: 'TasksService unavailable; refusing direct task mutation' };
+      }
+      const cloned = await this.tasksService.clone(
+        input.taskId,
+        context.tenantId as string,
+        { assigneeId: input.newAssigneeId },
+      );
       return { success: true, data: { originalTaskId: input.taskId, newTaskId: cloned.id, newTaskTitle: cloned.title, newAssigneeId: cloned.agentId }, metadata: { model: 'neurecore-task-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to clone task' };
@@ -1820,13 +1989,13 @@ export class ListPendingApprovalsTool extends BaseStructuredTool {
   readonly description = 'List all pending approval requests for the tenant.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListPendingApprovalsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: ListPendingApprovalsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const where: Record<string, unknown> = { tenantId: context.tenantId as string, status: 'PENDING' };
       if (input.priority) where.priority = input.priority;
-      const approvals = await this.prisma.approvalRequest.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, description: true, resourceType: true, priority: true, status: true, createdAt: true } });
+      const approvals = await this.data.approvalRequest.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, description: true, resourceType: true, priority: true, status: true, createdAt: true } });
       return { success: true, data: { approvals: approvals.map(a => ({ id: a.id, title: a.title, description: a.description, resourceType: a.resourceType, priority: a.priority, status: a.status, createdAt: a.createdAt.toISOString() })), total: approvals.length }, metadata: { model: 'neurecore-approval-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to list pending approvals' }; }
   }
@@ -1837,11 +2006,11 @@ export class GetApprovalTool extends BaseStructuredTool {
   readonly description = 'Get detailed information about an approval request.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetApprovalInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: GetApprovalInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const approval = await this.prisma.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId }, include: { requestedBy: { select: { id: true, firstName: true, lastName: true } }, reviewedBy: { select: { id: true, firstName: true, lastName: true } } } });
+      const approval = await this.data.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId }, include: { requestedBy: { select: { id: true, firstName: true, lastName: true } }, reviewedBy: { select: { id: true, firstName: true, lastName: true } } } });
       if (!approval) return { success: false, error: 'Approval request not found' };
       return { success: true, data: { id: approval.id, title: approval.title, description: approval.description, resourceType: approval.resourceType, resourceId: approval.resourceId, priority: approval.priority, status: approval.status, requestedBy: approval.requestedBy ? `${approval.requestedBy.firstName} ${approval.requestedBy.lastName}` : null, reviewedBy: approval.reviewedBy ? `${approval.reviewedBy.firstName} ${approval.reviewedBy.lastName}` : null, approvedAt: approval.approvedAt?.toISOString() ?? null, rejectedAt: approval.rejectedAt?.toISOString() ?? null, rejectionReason: approval.rejectionReason, createdAt: approval.createdAt.toISOString() }, metadata: { model: 'neurecore-approval-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get approval' }; }
@@ -1854,15 +2023,20 @@ export class ApproveRequestTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = ApproveRequestInputSchema;
   readonly requiredPermissions = ['approval:approve'];
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly approvalsService?: ApprovalsService,
+  ) { super(); }
   protected async executeImpl(input: ApproveRequestInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const approval = await this.prisma.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId } });
+      const approval = await this.data.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId } });
       if (!approval) return { success: false, error: 'Approval request not found' };
       if (approval.status !== 'PENDING') return { success: false, error: `Cannot approve request with status: ${approval.status}` };
-      const updated = await this.prisma.approvalRequest.update({ where: { id: input.approvalId }, data: { status: 'APPROVED', approvedAt: new Date(), reviewedById: context.userId } });
-      return { success: true, data: { approvalId: updated.id, title: updated.title, newStatus: 'APPROVED', approvedAt: updated.approvedAt?.toISOString() }, metadata: { model: 'neurecore-approval-v1' } };
+      if (!this.approvalsService) return { success: false, error: 'ApprovalsService unavailable; refusing direct approval mutation' };
+      await this.approvalsService.approveRequest(context.tenantId as string, input.approvalId, context.userId);
+      const updated = await this.approvalsService.findOne(input.approvalId, context.tenantId as string);
+      return { success: true, data: { approvalId: approval.id, title: approval.title, newStatus: 'APPROVED', approvedAt: updated?.approvedAt?.toISOString() ?? null }, metadata: { model: 'neurecore-approval-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to approve request' }; }
   }
 }
@@ -1873,15 +2047,19 @@ export class RejectRequestTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = RejectRequestInputSchema;
   readonly requiredPermissions = ['approval:reject'];
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly approvalsService?: ApprovalsService,
+  ) { super(); }
   protected async executeImpl(input: RejectRequestInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const approval = await this.prisma.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId } });
+      const approval = await this.data.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId } });
       if (!approval) return { success: false, error: 'Approval request not found' };
       if (approval.status !== 'PENDING') return { success: false, error: `Cannot reject request with status: ${approval.status}` };
-      const updated = await this.prisma.approvalRequest.update({ where: { id: input.approvalId }, data: { status: 'REJECTED', rejectedAt: new Date(), rejectionReason: input.reason, reviewedById: context.userId } });
-      return { success: true, data: { approvalId: updated.id, title: updated.title, newStatus: 'REJECTED', rejectionReason: input.reason }, metadata: { model: 'neurecore-approval-v1' } };
+      if (!this.approvalsService) return { success: false, error: 'ApprovalsService unavailable; refusing direct approval mutation' };
+      await this.approvalsService.rejectRequest(context.tenantId as string, input.approvalId, context.userId, input.reason);
+      return { success: true, data: { approvalId: approval.id, title: approval.title, newStatus: 'REJECTED', rejectionReason: input.reason }, metadata: { model: 'neurecore-approval-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to reject request' }; }
   }
 }
@@ -1892,10 +2070,18 @@ export class BulkApproveTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = BulkApproveInputSchema;
   readonly requiredPermissions = ['approval:approve'];
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly approvalsService?: ApprovalsService,
+  ) { super(); }
   protected async executeImpl(input: BulkApproveInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
-    try { await Promise.all(input.approvalIds.map(id => this.prisma.approvalRequest.update({ where: { id }, data: { status: 'APPROVED', approvedAt: new Date(), reviewedById: context.userId } }))); return { success: true, data: { approvedIds: input.approvalIds, count: input.approvalIds.length }, metadata: { model: 'neurecore-approval-v1' } }; }
+    try {
+      if (!this.approvalsService) return { success: false, error: 'ApprovalsService unavailable; refusing direct approval mutation' };
+      const results = await this.approvalsService.bulkApprove(context.tenantId as string, input.approvalIds, context.userId);
+      const approvedIds = results.filter((r) => r.status === 'approved').map((r) => r.id);
+      return { success: true, data: { approvedIds, count: approvedIds.length, results }, metadata: { model: 'neurecore-approval-v1' } };
+    }
     catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to bulk approve' }; }
   }
 }
@@ -1906,10 +2092,18 @@ export class BulkRejectTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = BulkRejectInputSchema;
   readonly requiredPermissions = ['approval:reject'];
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly approvalsService?: ApprovalsService,
+  ) { super(); }
   protected async executeImpl(input: BulkRejectInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
-    try { await Promise.all(input.approvalIds.map(id => this.prisma.approvalRequest.update({ where: { id }, data: { status: 'REJECTED', rejectedAt: new Date(), rejectionReason: input.reason, reviewedById: context.userId } }))); return { success: true, data: { rejectedIds: input.approvalIds, count: input.approvalIds.length, reason: input.reason }, metadata: { model: 'neurecore-approval-v1' } }; }
+    try {
+      if (!this.approvalsService) return { success: false, error: 'ApprovalsService unavailable; refusing direct approval mutation' };
+      const results = await this.approvalsService.bulkReject(context.tenantId as string, input.approvalIds, context.userId, input.reason);
+      const rejectedIds = results.filter((r) => r.status === 'rejected').map((r) => r.id);
+      return { success: true, data: { rejectedIds, count: rejectedIds.length, reason: input.reason, results }, metadata: { model: 'neurecore-approval-v1' } };
+    }
     catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to bulk reject' }; }
   }
 }
@@ -1920,11 +2114,22 @@ export class CreateApprovalRequestTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = CreateApprovalRequestInputSchema;
   readonly requiredPermissions = ['approval:create'];
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly approvalsService?: ApprovalsService,
+  ) { super(); }
   protected async executeImpl(input: CreateApprovalRequestInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const approval = await this.prisma.approvalRequest.create({ data: { title: input.title, description: input.description, resourceType: input.resourceType, resourceId: input.resourceId ?? null, priority: input.priority ?? 'MEDIUM', tenantId: context.tenantId as string, requestedById: context.userId, status: 'PENDING' } });
+      if (!this.approvalsService) return { success: false, error: 'ApprovalsService unavailable; refusing direct approval mutation' };
+      const approval = await this.approvalsService.create(context.tenantId as string, {
+        title: input.title,
+        description: input.description,
+        resourceType: input.resourceType,
+        resourceId: input.resourceId ?? undefined,
+        priority: input.priority ?? 'MEDIUM',
+        requestedById: context.userId,
+      });
       return { success: true, data: { approvalId: approval.id, title: approval.title, resourceType: approval.resourceType, status: approval.status, priority: approval.priority, createdAt: approval.createdAt.toISOString() }, metadata: { model: 'neurecore-approval-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to create approval request' }; }
   }
@@ -1935,12 +2140,12 @@ export class GetMyPendingApprovalsTool extends BaseStructuredTool {
   readonly description = 'Get pending approval requests submitted by the current user.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetMyPendingApprovalsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: GetMyPendingApprovalsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     if (!context.userId) return { success: false, error: 'User context required' };
     try {
-      const approvals = await this.prisma.approvalRequest.findMany({ where: { tenantId: context.tenantId as string, status: 'PENDING', requestedById: context.userId }, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, resourceType: true, priority: true, status: true, createdAt: true } });
+      const approvals = await this.data.approvalRequest.findMany({ where: { tenantId: context.tenantId as string, status: 'PENDING', requestedById: context.userId }, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, resourceType: true, priority: true, status: true, createdAt: true } });
       return { success: true, data: { approvals: approvals.map(a => ({ id: a.id, title: a.title, resourceType: a.resourceType, priority: a.priority, status: a.status, createdAt: a.createdAt.toISOString() })), total: approvals.length }, metadata: { model: 'neurecore-approval-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get my pending approvals' }; }
   }
@@ -1952,14 +2157,18 @@ export class ResubmitApprovalTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = ResubmitApprovalInputSchema;
   readonly requiredPermissions = ['approval:create'];
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly approvalsService?: ApprovalsService,
+  ) { super(); }
   protected async executeImpl(input: ResubmitApprovalInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const approval = await this.prisma.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId } });
+      const approval = await this.data.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId } });
       if (!approval) return { success: false, error: 'Approval request not found' };
       if (approval.status !== 'REJECTED') return { success: false, error: `Can only resubmit rejected requests. Status: ${approval.status}` };
-      const updated = await this.prisma.approvalRequest.update({ where: { id: input.approvalId }, data: { status: 'PENDING', rejectedAt: null, rejectionReason: null } });
+      if (!this.approvalsService) return { success: false, error: 'ApprovalsService unavailable; refusing direct approval mutation' };
+      const updated = await this.approvalsService.resubmit(context.tenantId as string, input.approvalId);
       return { success: true, data: { approvalId: updated.id, title: updated.title, newStatus: 'PENDING' }, metadata: { model: 'neurecore-approval-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to resubmit approval' }; }
   }
@@ -1971,15 +2180,19 @@ export class CancelApprovalRequestTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = CancelApprovalRequestInputSchema;
   readonly requiredPermissions = ['approval:cancel'];
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly approvalsService?: ApprovalsService,
+  ) { super(); }
   protected async executeImpl(input: CancelApprovalRequestInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const approval = await this.prisma.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId } });
+      const approval = await this.data.approvalRequest.findFirst({ where: { id: input.approvalId, tenantId: context.tenantId } });
       if (!approval) return { success: false, error: 'Approval request not found' };
       if (approval.status !== 'PENDING') return { success: false, error: `Can only cancel pending requests. Status: ${approval.status}` };
-      const updated = await this.prisma.approvalRequest.update({ where: { id: input.approvalId }, data: { status: 'CANCELLED' } });
-      return { success: true, data: { approvalId: updated.id, title: updated.title, newStatus: 'CANCELLED' }, metadata: { model: 'neurecore-approval-v1' } };
+      if (!this.approvalsService) return { success: false, error: 'ApprovalsService unavailable; refusing direct approval mutation' };
+      await this.approvalsService.cancel(context.tenantId as string, input.approvalId);
+      return { success: true, data: { approvalId: approval.id, title: approval.title, newStatus: 'CANCELLED' }, metadata: { model: 'neurecore-approval-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to cancel approval request' }; }
   }
 }
@@ -1990,13 +2203,13 @@ export class GetCostReportTool extends BaseStructuredTool {
   readonly description = 'Get cost breakdown over a date range, grouped by day/week/month.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetCostReportInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: GetCostReportInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const fromDate = input.fromDate ? new Date(input.fromDate) : new Date(new Date().setDate(new Date().getDate() - 30));
       const toDate = input.toDate ? new Date(input.toDate) : new Date();
-      const records = await this.prisma.costRecord.findMany({ where: { tenantId: context.tenantId as string, windowStart: { gte: fromDate }, windowEnd: { lte: toDate } }, orderBy: { windowStart: 'asc' } });
+      const records = await this.data.costRecord.findMany({ where: { tenantId: context.tenantId as string, windowStart: { gte: fromDate }, windowEnd: { lte: toDate } }, orderBy: { windowStart: 'asc' } });
       return { success: true, data: { fromDate: fromDate.toISOString(), toDate: toDate.toISOString(), groupBy: input.groupBy ?? 'day', totalRecords: records.length, records: records.map(r => ({ provider: r.provider, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, costCents: Number(r.costCents), windowStart: r.windowStart.toISOString() })) }, metadata: { model: 'neurecore-cost-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get cost report' }; }
   }
@@ -2007,15 +2220,15 @@ export class GetCostByDepartmentTool extends BaseStructuredTool {
   readonly description = 'Get costs grouped by department.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetCostByDepartmentInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: GetCostByDepartmentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const fromDate = input.fromDate ? new Date(input.fromDate) : new Date(new Date().setDate(new Date().getDate() - 30));
       const toDate = input.toDate ? new Date(input.toDate) : new Date();
-      const records = await this.prisma.costRecord.groupBy({ by: ['departmentId'], where: { tenantId: context.tenantId as string, windowStart: { gte: fromDate }, departmentId: { not: null } }, _sum: { costCents: true }, _count: { _all: true } });
+      const records = await this.data.costRecord.groupBy({ by: ['departmentId'], where: { tenantId: context.tenantId as string, windowStart: { gte: fromDate }, departmentId: { not: null } }, _sum: { costCents: true }, _count: { _all: true } });
       const deptIds = records.filter(r => r.departmentId).map(r => r.departmentId!);
-      const depts = await this.prisma.department.findMany({ where: { id: { in: deptIds } }, select: { id: true, name: true } });
+      const depts = await this.data.department.findMany({ where: { id: { in: deptIds } }, select: { id: true, name: true } });
       const deptMap = new Map(depts.map(d => [d.id, d.name]));
       return { success: true, data: { fromDate: fromDate.toISOString(), toDate: toDate.toISOString(), byDepartment: records.map(r => ({ departmentId: r.departmentId, departmentName: deptMap.get(r.departmentId!) ?? 'Unknown', totalCostCents: r._sum?.costCents ? Number(r._sum.costCents) : 0, recordCount: r._count?._all ?? 0 })) }, metadata: { model: 'neurecore-cost-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get cost by department' }; }
@@ -2027,15 +2240,15 @@ export class GetCostByAgentTool extends BaseStructuredTool {
   readonly description = 'Get costs grouped by agent.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetCostByAgentInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: GetCostByAgentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const fromDate = input.fromDate ? new Date(input.fromDate) : new Date(new Date().setDate(new Date().getDate() - 30));
       const toDate = input.toDate ? new Date(input.toDate) : new Date();
-      const records = await this.prisma.costRecord.groupBy({ by: ['agentId'], where: { tenantId: context.tenantId as string, windowStart: { gte: fromDate }, agentId: { not: null } }, _sum: { costCents: true }, _count: { _all: true } });
+      const records = await this.data.costRecord.groupBy({ by: ['agentId'], where: { tenantId: context.tenantId as string, windowStart: { gte: fromDate }, agentId: { not: null } }, _sum: { costCents: true }, _count: { _all: true } });
       const agentIds = records.filter(r => r.agentId).map(r => r.agentId!);
-      const agents = await this.prisma.agent.findMany({ where: { id: { in: agentIds } }, select: { id: true, name: true } });
+      const agents = await this.data.agent.findMany({ where: { id: { in: agentIds } }, select: { id: true, name: true } });
       const agentMap = new Map(agents.map(a => [a.id, a.name]));
       return { success: true, data: { fromDate: fromDate.toISOString(), toDate: toDate.toISOString(), byAgent: records.map(r => ({ agentId: r.agentId, agentName: agentMap.get(r.agentId!) ?? 'Unknown', totalCostCents: r._sum?.costCents ? Number(r._sum.costCents) : 0, recordCount: r._count?._all ?? 0 })) }, metadata: { model: 'neurecore-cost-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get cost by agent' }; }
@@ -2047,11 +2260,11 @@ export class GetCostByProjectTool extends BaseStructuredTool {
   readonly description = 'Get costs grouped by project. Note: Projects are linked via departments.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetCostByProjectInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: GetCostByProjectInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const projects = await this.prisma.project.findMany({ where: { tenantId: context.tenantId }, select: { id: true, name: true, departmentId: true } });
+      const projects = await this.data.project.findMany({ where: { tenantId: context.tenantId }, select: { id: true, name: true, departmentId: true } });
       return { success: true, data: { projects: projects.map(p => ({ projectId: p.id, projectName: p.name, note: 'Cost records are attributed by department.' })) }, metadata: { model: 'neurecore-cost-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get cost by project' }; }
   }
@@ -2063,11 +2276,15 @@ export class SetBudgetAlertTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = SetBudgetAlertInputSchema;
   readonly requiredPermissions = ['budget:configure'];
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly governanceRulesService?: GovernanceRulesService,
+  ) { super(); }
   protected async executeImpl(input: SetBudgetAlertInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const rule = await this.prisma.governanceRule.create({ data: { name: `Budget Alert ${input.thresholdPercent}%`, trigger: `cost.percentage >= ${input.thresholdPercent}`, actionType: 'ALERT', tenantId: input.departmentId ? null : context.tenantId, isActive: true, priority: 0 } });
+      if (!this.governanceRulesService) return { success: false, error: 'GovernanceRulesService unavailable; refusing direct governance mutation' };
+      const rule = await this.governanceRulesService.create(context.tenantId as string, { name: `Budget Alert ${input.thresholdPercent}%`, trigger: `cost.percentage >= ${input.thresholdPercent}`, actionType: 'ALERT', isActive: true, priority: 0 });
       return { success: true, data: { alertId: rule.id, thresholdPercent: input.thresholdPercent, departmentId: input.departmentId ?? 'tenant-wide', isActive: true }, metadata: { model: 'neurecore-budget-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to set budget alert' }; }
   }
@@ -2078,13 +2295,13 @@ export class GetTodayCostTool extends BaseStructuredTool {
   readonly description = 'Get total platform cost for today.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetTodayCostInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(_input: unknown, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-      const result = await this.prisma.costRecord.aggregate({ where: { tenantId: context.tenantId as string, windowStart: { gte: todayStart }, windowEnd: { lte: todayEnd } }, _sum: { costCents: true } });
+      const result = await this.data.costRecord.aggregate({ where: { tenantId: context.tenantId as string, windowStart: { gte: todayStart }, windowEnd: { lte: todayEnd } }, _sum: { costCents: true } });
       const totalCents = result._sum?.costCents ? Number(result._sum.costCents) : 0;
       return { success: true, data: { date: todayStart.toISOString().split('T')[0], totalCostCents: totalCents, totalCostUsd: (totalCents / 100).toFixed(4), currency: 'USD' }, metadata: { model: 'neurecore-cost-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get today cost' }; }
@@ -2097,11 +2314,11 @@ export class GetCompanyProfileTool extends BaseStructuredTool {
   readonly description = 'Get the company/tenant profile.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetCompanyProfileInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(_input: unknown, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const tenant = await this.prisma.tenant.findFirst({ where: { id: context.tenantId }, select: { id: true, name: true, logoUrl: true, website: true, industry: true, status: true, createdAt: true } });
+      const tenant = await this.data.tenant.findFirst({ where: { id: context.tenantId }, select: { id: true, name: true, logoUrl: true, website: true, industry: true, status: true, createdAt: true } });
       if (!tenant) return { success: false, error: 'Tenant not found' };
       return { success: true, data: { tenantId: tenant.id, name: tenant.name, logoUrl: tenant.logoUrl, website: tenant.website, industry: tenant.industry, status: tenant.status, createdAt: tenant.createdAt.toISOString() }, metadata: { model: 'neurecore-tenant-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get company profile' }; }
@@ -2114,16 +2331,21 @@ export class UpdateCompanyProfileTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = UpdateCompanyProfileInputSchema;
   readonly requiredPermissions = ['tenant:update'];
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly tenantsService?: TenantsService,
+  ) { super(); }
   protected async executeImpl(input: UpdateCompanyProfileInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
+    if (!context.userId) return { success: false, error: 'User context required' };
     try {
       const updateData: Record<string, unknown> = {};
       if (input.name !== undefined) updateData.name = input.name;
       if (input.logoUrl !== undefined) updateData.logoUrl = input.logoUrl;
       if (input.website !== undefined) updateData.website = input.website;
       if (input.industry !== undefined) updateData.industry = input.industry;
-      const updated = await this.prisma.tenant.update({ where: { id: context.tenantId }, data: updateData });
+      if (!this.tenantsService) return { success: false, error: 'TenantsService unavailable; refusing direct tenant mutation' };
+      const updated = await this.tenantsService.updateMine(context.tenantId as string, context.userId, updateData);
       return { success: true, data: { tenantId: updated.id, name: updated.name, logoUrl: updated.logoUrl, website: updated.website, industry: updated.industry, updatedFields: Object.keys(updateData) }, metadata: { model: 'neurecore-tenant-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to update company profile' }; }
   }
@@ -2134,11 +2356,11 @@ export class GetTenantSettingsTool extends BaseStructuredTool {
   readonly description = 'Get tenant settings and feature flags.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetTenantSettingsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(_input: unknown, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const tenant = await this.prisma.tenant.findFirst({ where: { id: context.tenantId }, select: { id: true, name: true, settings: true, metadata: true } });
+      const tenant = await this.data.tenant.findFirst({ where: { id: context.tenantId }, select: { id: true, name: true, settings: true, metadata: true } });
       if (!tenant) return { success: false, error: 'Tenant not found' };
       return { success: true, data: { tenantId: tenant.id, name: tenant.name, settings: tenant.settings, metadata: tenant.metadata }, metadata: { model: 'neurecore-tenant-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get tenant settings' }; }
@@ -2151,14 +2373,14 @@ export class GetMyNotificationsTool extends BaseStructuredTool {
   readonly description = 'Get notifications for the current user.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetMyNotificationsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: GetMyNotificationsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     if (!context.userId) return { success: false, error: 'User context required' };
     try {
       const where: Record<string, unknown> = { tenantId: context.tenantId as string, userId: context.userId };
       if (input.isRead !== undefined) where.isRead = input.isRead;
-      const notifications = await this.prisma.notification.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, type: true, title: true, message: true, isRead: true, createdAt: true } });
+      const notifications = await this.data.notification.findMany({ where, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, type: true, title: true, message: true, isRead: true, createdAt: true } });
       return { success: true, data: { notifications: notifications.map(n => ({ id: n.id, type: n.type, title: n.title, message: n.message, isRead: n.isRead, createdAt: n.createdAt.toISOString() })), total: notifications.length, unreadCount: notifications.filter(n => !n.isRead).length }, metadata: { model: 'neurecore-notification-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get notifications' }; }
   }
@@ -2169,14 +2391,19 @@ export class MarkNotificationReadTool extends BaseStructuredTool {
   readonly description = 'Mark a single notification as read.';
   readonly category = ToolCategory.API;
   readonly inputSchema = MarkNotificationReadInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly notificationsService?: NotificationsService,
+  ) { super(); }
   protected async executeImpl(input: MarkNotificationReadInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
+    if (!context.userId) return { success: false, error: 'User context required' };
     try {
-      const notification = await this.prisma.notification.findFirst({ where: { id: input.notificationId, tenantId: context.tenantId } });
+      const notification = await this.data.notification.findFirst({ where: { id: input.notificationId, tenantId: context.tenantId } });
       if (!notification) return { success: false, error: 'Notification not found' };
-      const updated = await this.prisma.notification.update({ where: { id: input.notificationId }, data: { isRead: true } });
-      return { success: true, data: { notificationId: updated.id, isRead: true }, metadata: { model: 'neurecore-notification-v1' } };
+      if (!this.notificationsService) return { success: false, error: 'NotificationsService unavailable; refusing direct notification mutation' };
+      await this.notificationsService.markRead(input.notificationId, context.userId);
+      return { success: true, data: { notificationId: input.notificationId, isRead: true }, metadata: { model: 'neurecore-notification-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to mark notification read' }; }
   }
 }
@@ -2186,12 +2413,16 @@ export class MarkAllNotificationsReadTool extends BaseStructuredTool {
   readonly description = 'Mark all notifications for the current user as read.';
   readonly category = ToolCategory.API;
   readonly inputSchema = MarkAllNotificationsReadInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly notificationsService?: NotificationsService,
+  ) { super(); }
   protected async executeImpl(_input: unknown, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     if (!context.userId) return { success: false, error: 'User context required' };
     try {
-      const result = await this.prisma.notification.updateMany({ where: { tenantId: context.tenantId as string, userId: context.userId, isRead: false }, data: { isRead: true } });
+      if (!this.notificationsService) return { success: false, error: 'NotificationsService unavailable; refusing direct notification mutation' };
+      const result = await this.notificationsService.markAllRead(context.userId, context.tenantId as string);
       return { success: true, data: { markedCount: result.count }, metadata: { model: 'neurecore-notification-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to mark all notifications read' }; }
   }
@@ -2203,7 +2434,7 @@ export class GetDashboardSummaryTool extends BaseStructuredTool {
   readonly description = 'Get a comprehensive dashboard summary.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetDashboardSummaryInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(_input: unknown, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
@@ -2211,11 +2442,11 @@ export class GetDashboardSummaryTool extends BaseStructuredTool {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const [agentStats, taskStats, deptCount, pendingApprovals, todayCost] = await Promise.all([
-        this.prisma.agent.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
-        this.prisma.task.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
-        this.prisma.department.count({ where: { tenantId, status: 'ACTIVE' } }).catch(() => 0),
-        this.prisma.approvalRequest.count({ where: { tenantId, status: 'PENDING' } }).catch(() => 0),
-        this.prisma.costRecord.aggregate({ where: { tenantId, windowStart: { gte: new Date(now.setHours(0, 0, 0, 0)) } }, _sum: { costCents: true } }).catch(() => null),
+        this.data.agent.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
+        this.data.task.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }).catch(() => []),
+        this.data.department.count({ where: { tenantId, status: 'ACTIVE' } }).catch(() => 0),
+        this.data.approvalRequest.count({ where: { tenantId, status: 'PENDING' } }).catch(() => 0),
+        this.data.costRecord.aggregate({ where: { tenantId, windowStart: { gte: new Date(now.setHours(0, 0, 0, 0)) } }, _sum: { costCents: true } }).catch(() => null),
       ]);
       const buildCounts = (rows: Array<{ status: string; _count: { _all: number } }>) => { const m: Record<string, number> = {}; let t = 0; for (const r of rows) { m[r.status] = r._count._all; t += r._count._all; } return { total: t, byStatus: m }; };
       return { success: true, data: { generatedAt: now.toISOString(), agents: buildCounts(agentStats), tasks: buildCounts(taskStats), departments: { active: deptCount }, approvals: { pending: pendingApprovals }, cost: { todayCents: todayCost?._sum?.costCents ? Number(todayCost._sum.costCents) : 0, currency: 'USD' } }, metadata: { model: 'neurecore-report-v1' } };
@@ -2228,13 +2459,13 @@ export class GetOverdueTaskReportTool extends BaseStructuredTool {
   readonly description = 'Get all overdue tasks grouped by owner.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetOverdueTaskReportInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: GetOverdueTaskReportInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const where: Record<string, unknown> = { tenantId: context.tenantId as string, status: { not: 'COMPLETED' } };
       if (input.departmentId) where.departmentId = input.departmentId;
-      const tasks = await this.prisma.task.findMany({ where, take: input.limit ?? 50, orderBy: { createdAt: 'desc' }, include: { agent: { select: { id: true, name: true } } } });
+      const tasks = await this.data.task.findMany({ where, take: input.limit ?? 50, orderBy: { createdAt: 'desc' }, include: { agent: { select: { id: true, name: true } } } });
       const overdue = tasks.filter(t => t.completedAt === null);
       const byAgent: Record<string, { agentId: string; agentName: string; tasks: number }> = {};
       for (const t of overdue) { if (t.agent) { const key = t.agent.id; if (!byAgent[key]) byAgent[key] = { agentId: t.agent.id, agentName: t.agent.name, tasks: 0 }; byAgent[key].tasks++; } }
@@ -2249,14 +2480,14 @@ export class GetInboxSummaryTool extends BaseStructuredTool {
   readonly description = 'Get inbox summary counts by type for the current user.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetInboxSummaryInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(_input: unknown, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     if (!context.userId) return { success: false, error: 'User context required' };
     try {
       const [pendingApprovals, unreadNotifications] = await Promise.all([
-        this.prisma.approvalRequest.count({ where: { tenantId: context.tenantId as string, requestedById: context.userId, status: 'PENDING' } }),
-        this.prisma.notification.count({ where: { tenantId: context.tenantId as string, userId: context.userId, isRead: false } }),
+        this.data.approvalRequest.count({ where: { tenantId: context.tenantId as string, requestedById: context.userId, status: 'PENDING' } }),
+        this.data.notification.count({ where: { tenantId: context.tenantId as string, userId: context.userId, isRead: false } }),
       ]);
       return { success: true, data: { pendingApprovals, unreadNotifications, totalItems: pendingApprovals + unreadNotifications }, metadata: { model: 'neurecore-inbox-v1' } };
     } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to get inbox summary' }; }
@@ -2268,18 +2499,18 @@ export class ListInboxItemsTool extends BaseStructuredTool {
   readonly description = 'List inbox items (approvals, notifications) for the current user.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListInboxItemsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: ListInboxItemsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     if (!context.userId) return { success: false, error: 'User context required' };
     try {
       const items: Array<{ id: string; type: string; title: string; status: string; createdAt: string }> = [];
       if (!input.type || input.type === 'approval') {
-        const approvals = await this.prisma.approvalRequest.findMany({ where: { tenantId: context.tenantId as string, requestedById: context.userId, status: 'PENDING' }, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, status: true, createdAt: true } });
+        const approvals = await this.data.approvalRequest.findMany({ where: { tenantId: context.tenantId as string, requestedById: context.userId, status: 'PENDING' }, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, status: true, createdAt: true } });
         items.push(...approvals.map(a => ({ id: a.id, type: 'approval', title: a.title, status: a.status, createdAt: a.createdAt.toISOString() })));
       }
       if (!input.type || input.type === 'notification') {
-        const notifs = await this.prisma.notification.findMany({ where: { tenantId: context.tenantId as string, userId: context.userId }, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, isRead: true, createdAt: true } });
+        const notifs = await this.data.notification.findMany({ where: { tenantId: context.tenantId as string, userId: context.userId }, take: input.limit ?? 20, orderBy: { createdAt: 'desc' }, select: { id: true, title: true, isRead: true, createdAt: true } });
         items.push(...notifs.map(n => ({ id: n.id, type: 'notification', title: n.title, status: n.isRead ? 'read' : 'unread', createdAt: n.createdAt.toISOString() })));
       }
       items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -2293,13 +2524,13 @@ export class GetInboxItemTool extends BaseStructuredTool {
   readonly description = 'Get detailed information about an inbox item.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetInboxItemInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
   protected async executeImpl(input: GetInboxItemInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const [approval, notification] = await Promise.all([
-        this.prisma.approvalRequest.findFirst({ where: { id: input.itemId, tenantId: context.tenantId } }).catch(() => null),
-        this.prisma.notification.findFirst({ where: { id: input.itemId, tenantId: context.tenantId } }).catch(() => null),
+        this.data.approvalRequest.findFirst({ where: { id: input.itemId, tenantId: context.tenantId } }).catch(() => null),
+        this.data.notification.findFirst({ where: { id: input.itemId, tenantId: context.tenantId } }).catch(() => null),
       ]);
       if (approval) return { success: true, data: { id: approval.id, type: 'approval', title: approval.title, description: approval.description, status: approval.status, priority: approval.priority, resourceType: approval.resourceType, createdAt: approval.createdAt.toISOString() }, metadata: { model: 'neurecore-inbox-v1' } };
       if (notification) return { success: true, data: { id: notification.id, type: notification.type, title: notification.title, message: notification.message, isRead: notification.isRead, createdAt: notification.createdAt.toISOString() }, metadata: { model: 'neurecore-inbox-v1' } };
@@ -2313,17 +2544,21 @@ export class RespondToInboxItemTool extends BaseStructuredTool {
   readonly description = 'Approve, reject, or respond to an inbox item.';
   readonly category = ToolCategory.API;
   readonly inputSchema = RespondToInboxItemInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly approvalsService?: ApprovalsService,
+  ) { super(); }
   protected async executeImpl(input: RespondToInboxItemInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const approval = await this.prisma.approvalRequest.findFirst({ where: { id: input.itemId, tenantId: context.tenantId } });
+      const approval = await this.data.approvalRequest.findFirst({ where: { id: input.itemId, tenantId: context.tenantId } });
       if (!approval) return { success: false, error: 'Approval request not found' };
+      if (!this.approvalsService) return { success: false, error: 'ApprovalsService unavailable; refusing direct approval mutation' };
       if (input.action === 'approve') {
-        await this.prisma.approvalRequest.update({ where: { id: input.itemId }, data: { status: 'APPROVED', approvedAt: new Date(), reviewedById: context.userId } });
+        await this.approvalsService.approveRequest(context.tenantId as string, input.itemId, context.userId);
         return { success: true, data: { itemId: input.itemId, action: 'approved' }, metadata: { model: 'neurecore-inbox-v1' } };
       } else if (input.action === 'reject') {
-        await this.prisma.approvalRequest.update({ where: { id: input.itemId }, data: { status: 'REJECTED', rejectedAt: new Date(), rejectionReason: input.comment ?? 'Rejected', reviewedById: context.userId } });
+        await this.approvalsService.rejectRequest(context.tenantId as string, input.itemId, context.userId, input.comment ?? 'Rejected');
         return { success: true, data: { itemId: input.itemId, action: 'rejected' }, metadata: { model: 'neurecore-inbox-v1' } };
       }
       return { success: true, data: { itemId: input.itemId, action: input.action, note: 'Response recorded' }, metadata: { model: 'neurecore-inbox-v1' } };
@@ -2422,7 +2657,7 @@ export class CreateCustomerTool extends BaseStructuredTool {
   readonly requiredPermissions = ['customer:create'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly customersService?: CustomersService,
   ) {
     super();
@@ -2434,9 +2669,6 @@ export class CreateCustomerTool extends BaseStructuredTool {
   ): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      // Prefer CustomersService so name-normalisation + BadRequestException +
-      // (tenantId, name) uniqueness all apply. Fall back to direct Prisma if
-      // the service isn't wired (mirrors the CreateProjectTool pattern).
       if (this.customersService) {
         const customer = await this.customersService.create(
           {
@@ -2455,24 +2687,7 @@ export class CreateCustomerTool extends BaseStructuredTool {
           metadata: { model: 'neurecore-customer-v1' },
         };
       }
-      const customer = await this.prisma.customer.create({
-        data: {
-          tenantId: context.tenantId as string,
-          name: input.name.trim(),
-          industry: input.industry ?? null,
-          primaryEmail: input.primaryEmail ?? null,
-          primaryPhone: input.primaryPhone ?? null,
-          billingInfo: input.billingInfo
-            ? (input.billingInfo as object as never)
-            : undefined,
-          tags: input.tags ?? [],
-        },
-      });
-      return {
-        success: true,
-        data: this.toDto(customer),
-        metadata: { model: 'neurecore-customer-v1' },
-      };
+      return { success: false, error: 'CustomersService unavailable; refusing direct customer mutation' };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to create customer' };
     }
@@ -2515,7 +2730,7 @@ export class UpdateCustomerTool extends BaseStructuredTool {
   readonly requiredPermissions = ['customer:update'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly customersService?: CustomersService,
   ) {
     super();
@@ -2550,35 +2765,7 @@ export class UpdateCustomerTool extends BaseStructuredTool {
           metadata: { model: 'neurecore-customer-v1' },
         };
       }
-      // Fallback: verify ownership then patch.
-      const existing = await this.prisma.customer.findFirst({
-        where: { id: customerId, tenantId: context.tenantId as string },
-      });
-      if (!existing) return { success: false, error: 'Customer not found' };
-      const updated = await this.prisma.customer.update({
-        where: { id: customerId },
-        data: {
-          ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
-          ...(patch.industry !== undefined ? { industry: patch.industry } : {}),
-          ...(patch.primaryEmail !== undefined ? { primaryEmail: patch.primaryEmail } : {}),
-          ...(patch.primaryPhone !== undefined ? { primaryPhone: patch.primaryPhone } : {}),
-          ...(patch.billingInfo !== undefined
-            ? { billingInfo: patch.billingInfo as object as never }
-            : {}),
-          ...(patch.status !== undefined ? { status: patch.status } : {}),
-          ...(patch.tags !== undefined ? { tags: patch.tags } : {}),
-        },
-      });
-      return {
-        success: true,
-        data: {
-          customerId: updated.id,
-          name: updated.name,
-          status: updated.status,
-          updatedAt: updated.updatedAt.toISOString(),
-        },
-        metadata: { model: 'neurecore-customer-v1' },
-      };
+      return { success: false, error: 'CustomersService unavailable; refusing direct customer mutation' };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to update customer' };
     }
@@ -2594,7 +2781,7 @@ export class GetCustomerTool extends BaseStructuredTool {
   readonly inputSchema = GetCustomerInputSchema;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly customersService?: CustomersService,
   ) {
     super();
@@ -2606,7 +2793,7 @@ export class GetCustomerTool extends BaseStructuredTool {
   ): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const customer = await this.prisma.customer.findFirst({
+      const customer = await this.data.customer.findFirst({
         where: { id: input.customerId, tenantId: context.tenantId as string },
         include: {
           _count: { select: { projects: true, contacts: true } },
@@ -2646,7 +2833,7 @@ export class ListCustomersTool extends BaseStructuredTool {
   readonly inputSchema = ListCustomersInputSchema;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly customersService?: CustomersService,
   ) {
     super();
@@ -2676,7 +2863,7 @@ export class ListCustomersTool extends BaseStructuredTool {
       const sortDir = input.sortDir ?? 'asc';
 
       const [data, total] = await Promise.all([
-        this.prisma.customer.findMany({
+        this.data.customer.findMany({
           where,
           take: limit,
           skip: (page - 1) * limit,
@@ -2693,7 +2880,7 @@ export class ListCustomersTool extends BaseStructuredTool {
             _count: { select: { projects: true } },
           },
         }),
-        this.prisma.customer.count({ where }),
+        this.data.customer.count({ where }),
       ]);
 
       return {
@@ -2731,7 +2918,7 @@ export class FindCustomerByNameTool extends BaseStructuredTool {
   readonly category = ToolCategory.API;
   readonly inputSchema = FindCustomerByNameInputSchema;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(private readonly data: ToolDataAccessService) {
     super();
   }
 
@@ -2742,7 +2929,7 @@ export class FindCustomerByNameTool extends BaseStructuredTool {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const q = input.name.trim();
-      const matches = await this.prisma.customer.findMany({
+      const matches = await this.data.customer.findMany({
         where: {
           tenantId: context.tenantId as string,
           OR: [
@@ -2792,7 +2979,7 @@ export class ArchiveCustomerTool extends BaseStructuredTool {
   readonly requiredPermissions = ['customer:archive'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly customersService?: CustomersService,
   ) {
     super();
@@ -2812,19 +2999,7 @@ export class ArchiveCustomerTool extends BaseStructuredTool {
           metadata: { model: 'neurecore-customer-v1' },
         };
       }
-      const existing = await this.prisma.customer.findFirst({
-        where: { id: input.customerId, tenantId: context.tenantId as string },
-      });
-      if (!existing) return { success: false, error: 'Customer not found' };
-      const updated = await this.prisma.customer.update({
-        where: { id: input.customerId },
-        data: { status: 'ARCHIVED' },
-      });
-      return {
-        success: true,
-        data: { customerId: updated.id, name: updated.name, previousStatus: existing.status, newStatus: updated.status },
-        metadata: { model: 'neurecore-customer-v1' },
-      };
+      return { success: false, error: 'CustomersService unavailable; refusing direct customer mutation' };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to archive customer' };
     }
@@ -2841,7 +3016,7 @@ export class UnarchiveCustomerTool extends BaseStructuredTool {
   readonly requiredPermissions = ['customer:archive'];
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly data: ToolDataAccessService,
     @Optional() private readonly customersService?: CustomersService,
   ) {
     super();
@@ -2861,19 +3036,7 @@ export class UnarchiveCustomerTool extends BaseStructuredTool {
           metadata: { model: 'neurecore-customer-v1' },
         };
       }
-      const existing = await this.prisma.customer.findFirst({
-        where: { id: input.customerId, tenantId: context.tenantId as string },
-      });
-      if (!existing) return { success: false, error: 'Customer not found' };
-      const updated = await this.prisma.customer.update({
-        where: { id: input.customerId },
-        data: { status: 'ACTIVE' },
-      });
-      return {
-        success: true,
-        data: { customerId: updated.id, name: updated.name, previousStatus: existing.status, newStatus: updated.status },
-        metadata: { model: 'neurecore-customer-v1' },
-      };
+      return { success: false, error: 'CustomersService unavailable; refusing direct customer mutation' };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to unarchive customer' };
     }
@@ -2920,7 +3083,7 @@ export class ListProjectsTool extends BaseStructuredTool {
   readonly description = 'List projects in the workspace. Use when the user asks about projects, wants to see active work, or needs a project ID.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListProjectsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListProjectsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -2930,7 +3093,7 @@ export class ListProjectsTool extends BaseStructuredTool {
       if (input.departmentId) where.departmentId = input.departmentId;
       if (input.customerId) where.customerId = input.customerId;
       if (input.search) where.name = { contains: input.search, mode: 'insensitive' };
-      const projects = await this.prisma.project.findMany({
+      const projects = await this.data.project.findMany({
         where,
         take: input.limit ?? 20,
         orderBy: { createdAt: 'desc' },
@@ -2972,12 +3135,12 @@ export class SearchProjectsTool extends BaseStructuredTool {
   readonly description = 'Full-text search across project names and descriptions. Use when the user asks for projects matching a specific topic.';
   readonly category = ToolCategory.API;
   readonly inputSchema = SearchProjectsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: SearchProjectsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const projects = await this.prisma.project.findMany({
+      const projects = await this.data.project.findMany({
         where: {
           tenantId: context.tenantId as string,
           OR: [
@@ -3018,12 +3181,12 @@ export class GetProjectByNameTool extends BaseStructuredTool {
   readonly description = 'Find a project by its name (case-insensitive substring match). Returns the best match plus any close alternatives.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetProjectByNameInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetProjectByNameInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const matches = await this.prisma.project.findMany({
+      const matches = await this.data.project.findMany({
         where: {
           tenantId: context.tenantId as string,
           name: { contains: input.name, mode: 'insensitive' },
@@ -3063,12 +3226,15 @@ export class UpdateProjectStatusTool extends BaseStructuredTool {
   readonly description = 'Change a project status (LEAD → ACTIVE → COMPLETED, etc). Returns the updated project.';
   readonly category = ToolCategory.API;
   readonly inputSchema = UpdateProjectStatusInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectsService?: ProjectsService,
+  ) { super(); }
 
   protected async executeImpl(input: UpdateProjectStatusInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const existing = await this.prisma.project.findFirst({
+      const existing = await this.data.project.findFirst({
         where: { id: input.projectId, tenantId: context.tenantId as string },
         select: { id: true, status: true },
       });
@@ -3078,15 +3244,8 @@ export class UpdateProjectStatusTool extends BaseStructuredTool {
         return { success: false, error: `lostReason is required when setting status to ${input.status}` };
       }
 
-      const project = await this.prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          status: input.status as 'LEAD' | 'PROPOSAL_SENT' | 'WON' | 'LOST' | 'ACTIVE' | 'ON_HOLD' | 'REVIEW' | 'COMPLETED' | 'ARCHIVED',
-          ...(input.status === 'COMPLETED' ? { completedAt: new Date() } : {}),
-          ...(input.lostReason ? { lostReason: input.lostReason } : {}),
-        },
-        select: { id: true, name: true, status: true, completedAt: true, updatedAt: true },
-      });
+      if (!this.projectsService) return { success: false, error: 'ProjectsService unavailable; refusing direct project mutation' };
+      const project = await this.projectsService.transitionStatus(input.projectId, context.tenantId as string, input.status as never, input.lostReason);
       return {
         success: true,
         data: { previousStatus: existing.status, project },
@@ -3112,32 +3271,25 @@ export class AddProjectMemberTool extends BaseStructuredTool {
   readonly description = 'Add an agent or user to a project as a member with a specific role.';
   readonly category = ToolCategory.API;
   readonly inputSchema = AddProjectMemberInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectMembersService?: ProjectMembersService,
+  ) { super(); }
 
   protected async executeImpl(input: AddProjectMemberInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const project = await this.prisma.project.findFirst({
+      const project = await this.data.project.findFirst({
         where: { id: input.projectId, tenantId: context.tenantId as string },
         select: { id: true },
       });
       if (!project) return { success: false, error: 'Project not found' };
 
-      const member = await this.prisma.projectMember.upsert({
-        where: {
-          projectId_actorId_role: {
-            projectId: input.projectId,
-            actorId: input.actorId,
-            role: input.role as 'PROJECT_DIRECTOR' | 'PROJECT_MANAGER' | 'RESEARCH_LEAD' | 'QUALITY_LEAD' | 'REVIEWER' | 'COMPLIANCE_OFFICER' | 'CLIENT_LIAISON' | 'DOCUMENTATION_LEAD' | 'KNOWLEDGE_MANAGER' | 'CHIEF_OF_STAFF',
-          },
-        },
-        update: {},
-        create: {
-          projectId: input.projectId,
-          actorId: input.actorId,
-          actorType: input.actorType as 'HUMAN' | 'AI' | 'SYSTEM',
-          role: input.role as 'PROJECT_DIRECTOR' | 'PROJECT_MANAGER' | 'RESEARCH_LEAD' | 'QUALITY_LEAD' | 'REVIEWER' | 'COMPLIANCE_OFFICER' | 'CLIENT_LIAISON' | 'DOCUMENTATION_LEAD' | 'KNOWLEDGE_MANAGER' | 'CHIEF_OF_STAFF',
-        },
+      if (!this.projectMembersService) return { success: false, error: 'ProjectMembersService unavailable; refusing direct project member mutation' };
+      const member = await this.projectMembersService.assign(input.projectId, context.tenantId as string, {
+        actorId: input.actorId,
+        actorType: input.actorType as never,
+        role: input.role as never,
       });
       return {
         success: true,
@@ -3162,17 +3314,21 @@ export class RemoveProjectMemberTool extends BaseStructuredTool {
   readonly description = 'Remove a member from a project by their ProjectMember ID.';
   readonly category = ToolCategory.API;
   readonly inputSchema = RemoveProjectMemberInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectMembersService?: ProjectMembersService,
+  ) { super(); }
 
   protected async executeImpl(input: RemoveProjectMemberInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const member = await this.prisma.projectMember.findFirst({
+      const member = await this.data.projectMember.findFirst({
         where: { id: input.memberId, projectId: input.projectId },
         select: { id: true },
       });
       if (!member) return { success: false, error: 'Member not found on this project' };
-      await this.prisma.projectMember.delete({ where: { id: input.memberId } });
+      if (!this.projectMembersService) return { success: false, error: 'ProjectMembersService unavailable; refusing direct project member mutation' };
+      await this.projectMembersService.remove(input.projectId, context.tenantId as string, input.memberId);
       return { success: true, data: { memberId: input.memberId, removed: true }, metadata: { model: 'neurecore-project-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to remove project member' };
@@ -3191,24 +3347,24 @@ export class ListProjectMembersTool extends BaseStructuredTool {
   readonly description = 'List all members (agents and humans) on a project with their roles.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListProjectMembersInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListProjectMembersInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const project = await this.prisma.project.findFirst({
+      const project = await this.data.project.findFirst({
         where: { id: input.projectId, tenantId: context.tenantId as string },
         select: { id: true, name: true },
       });
       if (!project) return { success: false, error: 'Project not found' };
 
-      const members = await this.prisma.projectMember.findMany({
+      const members = await this.data.projectMember.findMany({
         where: { projectId: input.projectId },
         orderBy: { assignedAt: 'asc' },
       });
       const agentIds = members.filter((m) => m.actorType === 'AI').map((m) => m.actorId);
-      const agents = agentIds.length > 0
-        ? await this.prisma.agent.findMany({
+      const agents: Array<{ id: string; name: string; status: string }> = agentIds.length > 0
+        ? await this.data.agent.findMany({
             where: { id: { in: agentIds } },
             select: { id: true, name: true, status: true },
           })
@@ -3250,12 +3406,12 @@ export class ListProjectStagesTool extends BaseStructuredTool {
   readonly description = 'List the stages (milestones) of a project in order with their statuses.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListProjectStagesInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListProjectStagesInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const stages = await this.prisma.projectStage.findMany({
+      const stages = await this.data.projectStage.findMany({
         where: { projectId: input.projectId },
         orderBy: { order: 'asc' },
         select: { id: true, name: true, description: true, order: true, status: true, startDate: true, endDate: true },
@@ -3293,7 +3449,10 @@ export class UpdateProjectStageTool extends BaseStructuredTool {
   readonly description = 'Update a project stage (rename, change description, or mark status).';
   readonly category = ToolCategory.API;
   readonly inputSchema = UpdateProjectStageInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly projectStagesService?: ProjectStagesService,
+  ) { super(); }
 
   protected async executeImpl(input: UpdateProjectStageInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -3305,11 +3464,13 @@ export class UpdateProjectStageTool extends BaseStructuredTool {
       if (Object.keys(data).length === 0) {
         return { success: false, error: 'No fields to update' };
       }
-      const stage = await this.prisma.projectStage.update({
-        where: { id: input.stageId },
-        data,
-        select: { id: true, name: true, status: true, order: true, updatedAt: true },
+      const existing = await this.data.projectStage.findFirst({
+        where: { id: input.stageId, project: { tenantId: context.tenantId as string } },
+        select: { id: true, projectId: true },
       });
+      if (!existing) return { success: false, error: 'Project stage not found' };
+      if (!this.projectStagesService) return { success: false, error: 'ProjectStagesService unavailable; refusing direct project stage mutation' };
+      const stage = await this.projectStagesService.update(existing.projectId, context.tenantId as string, input.stageId, data as never);
       return { success: true, data: { stage }, metadata: { model: 'neurecore-project-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to update project stage' };
@@ -3334,7 +3495,7 @@ export class ListWorkflowsTool extends BaseStructuredTool {
   readonly description = 'List workflows in the workspace. Use when user asks about automations, DAGs, or repeatable task sequences.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListWorkflowsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListWorkflowsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -3342,7 +3503,7 @@ export class ListWorkflowsTool extends BaseStructuredTool {
       const where: Record<string, unknown> = { tenantId: context.tenantId };
       if (input.status) where.status = input.status;
       if (input.isActive !== undefined) where.isActive = input.isActive;
-      const workflows = await this.prisma.workflow.findMany({
+      const workflows = await this.data.workflow.findMany({
         where,
         take: input.limit ?? 20,
         orderBy: { createdAt: 'desc' },
@@ -3380,12 +3541,12 @@ export class GetWorkflowTool extends BaseStructuredTool {
   readonly description = 'Get a single workflow by ID including its DAG definition and execution history.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetWorkflowInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetWorkflowInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const workflow = await this.prisma.workflow.findFirst({
+      const workflow = await this.data.workflow.findFirst({
         where: { id: input.workflowId, tenantId: context.tenantId as string },
         select: {
           id: true, name: true, description: true, status: true, isActive: true,
@@ -3394,7 +3555,7 @@ export class GetWorkflowTool extends BaseStructuredTool {
         },
       });
       if (!workflow) return { success: false, error: 'Workflow not found' };
-      const recentExecutions = await this.prisma.workflowExecution.findMany({
+      const recentExecutions = await this.data.workflowExecution.findMany({
         where: { workflowId: input.workflowId },
         take: 5,
         orderBy: { startedAt: 'desc' },
@@ -3440,7 +3601,7 @@ export class ListGoalsTool extends BaseStructuredTool {
   readonly description = 'List goals in the workspace. Use when user asks about objectives, OKRs, or progress.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListGoalsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListGoalsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -3448,7 +3609,7 @@ export class ListGoalsTool extends BaseStructuredTool {
       const where: Record<string, unknown> = { tenantId: context.tenantId };
       if (input.status) where.status = input.status;
       if (input.parentId) where.parentId = input.parentId;
-      const goals = await this.prisma.goal.findMany({
+      const goals = await this.data.goal.findMany({
         where,
         take: input.limit ?? 20,
         orderBy: { createdAt: 'desc' },
@@ -3481,23 +3642,23 @@ export class UpdateGoalProgressTool extends BaseStructuredTool {
   readonly description = "Update a goal's progress percentage (0-100) and optionally its status.";
   readonly category = ToolCategory.API;
   readonly inputSchema = UpdateGoalProgressInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(
+    private readonly data: ToolDataAccessService,
+    @Optional() private readonly goalsService?: GoalsService,
+  ) { super(); }
 
   protected async executeImpl(input: UpdateGoalProgressInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const goal = await this.prisma.goal.update({
-        where: { id: input.goalId },
-        data: {
-          progress: input.progress,
-          ...(input.progress >= 100
-            ? { status: 'COMPLETED' as const }
-            : input.status
-              ? { status: input.status as 'ACTIVE' | 'COMPLETED' | 'PAUSED' | 'ARCHIVED' }
-              : {}),
-        },
-        select: { id: true, title: true, progress: true, status: true, updatedAt: true },
-      });
+      if (!this.goalsService) return { success: false, error: 'GoalsService unavailable; refusing direct goal mutation' };
+      const goal = await this.goalsService.update(input.goalId, context.tenantId as string, {
+        progress: input.progress,
+        ...(input.progress >= 100
+          ? { status: 'COMPLETED' as const }
+          : input.status
+            ? { status: input.status as 'ACTIVE' | 'COMPLETED' | 'PAUSED' | 'ARCHIVED' }
+            : {}),
+      } as never);
       return { success: true, data: { goal }, metadata: { model: 'neurecore-goal-v1' } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to update goal progress' };
@@ -3521,14 +3682,14 @@ export class ListBudgetPoliciesTool extends BaseStructuredTool {
   readonly description = 'List budget policies (spending caps) at tenant, department, agent, or project scope.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListBudgetPoliciesInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListBudgetPoliciesInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const where: Record<string, unknown> = { tenantId: context.tenantId };
       if (input.scope) where.scope = input.scope;
-      const policies = await this.prisma.budgetPolicy.findMany({
+      const policies = await this.data.budgetPolicy.findMany({
         where,
         take: input.limit ?? 20,
         orderBy: { createdAt: 'desc' },
@@ -3569,7 +3730,7 @@ export class GetDepartmentTool extends BaseStructuredTool {
   readonly description = 'Get a single department by ID or name with agent/member counts and manager info.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetDepartmentInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetDepartmentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -3578,16 +3739,16 @@ export class GetDepartmentTool extends BaseStructuredTool {
     }
     try {
       const department = input.departmentId
-        ? await this.prisma.department.findFirst({
+        ? await this.data.department.findFirst({
             where: { id: input.departmentId, tenantId: context.tenantId as string },
           })
-        : await this.prisma.department.findFirst({
+        : await this.data.department.findFirst({
             where: { tenantId: context.tenantId as string, name: input.name! },
           });
       if (!department) return { success: false, error: 'Department not found' };
       const [agentCount, runningAgentCount] = await Promise.all([
-        this.prisma.agent.count({ where: { departmentId: department.id } }),
-        this.prisma.agent.count({ where: { departmentId: department.id, status: 'RUNNING' } }),
+        this.data.agent.count({ where: { departmentId: department.id } }),
+        this.data.agent.count({ where: { departmentId: department.id, status: 'RUNNING' } }),
       ]);
       return {
         success: true,
@@ -3623,14 +3784,14 @@ export class ListDepartmentMembersTool extends BaseStructuredTool {
   readonly description = 'List all agents that belong to a department.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListDepartmentMembersInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListDepartmentMembersInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const where: Record<string, unknown> = { departmentId: input.departmentId };
       if (input.status) where.status = input.status;
-      const agents = await this.prisma.agent.findMany({
+      const agents = await this.data.agent.findMany({
         where: { departmentId: input.departmentId },
         orderBy: { name: 'asc' },
         select: { id: true, name: true, type: true, status: true, createdAt: true },
@@ -3667,14 +3828,14 @@ export class ListAgentsByDepartmentTool extends BaseStructuredTool {
   readonly description = 'List all agents in a specific department. More targeted than listAgents when user names a department.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListAgentsByDepartmentInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListAgentsByDepartmentInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       const where: Record<string, unknown> = { departmentId: input.departmentId };
       if (input.status) where.status = input.status;
-      const agents = await this.prisma.agent.findMany({
+      const agents = await this.data.agent.findMany({
         where,
         take: input.limit ?? 50,
         orderBy: [{ name: 'asc' }],
@@ -3707,12 +3868,12 @@ export class SearchAgentsTool extends BaseStructuredTool {
   readonly description = 'Search agents by name or role across the workspace.';
   readonly category = ToolCategory.API;
   readonly inputSchema = SearchAgentsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: SearchAgentsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const agents = await this.prisma.agent.findMany({
+      const agents = await this.data.agent.findMany({
         where: {
           tenantId: context.tenantId as string,
           OR: [
@@ -3750,17 +3911,17 @@ export class GetCustomerProjectsTool extends BaseStructuredTool {
   readonly description = 'Get all projects that belong to a specific customer.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetCustomerProjectsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetCustomerProjectsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const customer = await this.prisma.customer.findFirst({
+      const customer = await this.data.customer.findFirst({
         where: { id: input.customerId, tenantId: context.tenantId as string },
         select: { id: true, name: true },
       });
       if (!customer) return { success: false, error: 'Customer not found' };
-      const projects = await this.prisma.project.findMany({
+      const projects = await this.data.project.findMany({
         where: { customerId: input.customerId, tenantId: context.tenantId as string },
         orderBy: { createdAt: 'desc' },
         select: { id: true, name: true, status: true, budgetAmount: true, budgetCurrency: true, createdAt: true },
@@ -3795,17 +3956,17 @@ export class ListCustomerContactsTool extends BaseStructuredTool {
   readonly description = 'List contacts associated with a customer (primary, billing, technical, etc).';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListCustomerContactsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListCustomerContactsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
-      const customer = await this.prisma.customer.findFirst({
+      const customer = await this.data.customer.findFirst({
         where: { id: input.customerId, tenantId: context.tenantId as string },
         select: { id: true, name: true },
       });
       if (!customer) return { success: false, error: 'Customer not found' };
-      const contacts = await this.prisma.customerContact.findMany({
+      const contacts = await this.data.customerContact.findMany({
         where: { customerId: input.customerId },
         orderBy: [{ isPrimary: 'desc' }, { name: 'asc' }],
       });
@@ -3844,7 +4005,7 @@ export class ListAllNotificationsTool extends BaseStructuredTool {
   readonly description = 'List all tenant notifications (across all users). Use for admin/dashboard views.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListAllNotificationsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListAllNotificationsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -3852,7 +4013,7 @@ export class ListAllNotificationsTool extends BaseStructuredTool {
       const where: Record<string, unknown> = { tenantId: context.tenantId };
       if (input.unreadOnly) where.isRead = false;
       if (input.type) where.type = input.type;
-      const notifications = await this.prisma.notification.findMany({
+      const notifications = await this.data.notification.findMany({
         where,
         take: input.limit ?? 20,
         orderBy: { createdAt: 'desc' },
@@ -3893,7 +4054,7 @@ export class GetActivityFeedTool extends BaseStructuredTool {
   readonly description = 'Get recent activity events for the workspace (project created, task completed, etc).';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetActivityFeedInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetActivityFeedInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -3901,7 +4062,7 @@ export class GetActivityFeedTool extends BaseStructuredTool {
       const where: Record<string, unknown> = { tenantId: context.tenantId };
       if (input.since) where.createdAt = { gte: new Date(input.since) };
       if (input.entityType) where.entityType = input.entityType;
-      const events = await this.prisma.activityEvent.findMany({
+      const events = await this.data.activityEvent.findMany({
         where,
         take: input.limit ?? 30,
         orderBy: { createdAt: 'desc' },
@@ -3944,7 +4105,7 @@ export class ListMyApprovalHistoryTool extends BaseStructuredTool {
   readonly description = 'List approvals I have actioned (approved/rejected), as opposed to those still pending.';
   readonly category = ToolCategory.API;
   readonly inputSchema = ListMyApprovalHistoryInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: ListMyApprovalHistoryInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -3956,7 +4117,7 @@ export class ListMyApprovalHistoryTool extends BaseStructuredTool {
         status: { in: ['APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'] },
       };
       if (input.status) where.status = input.status;
-      const approvals = await this.prisma.approvalRequest.findMany({
+      const approvals = await this.data.approvalRequest.findMany({
         where,
         take: input.limit ?? 20,
         orderBy: { createdAt: 'desc' },
@@ -4000,7 +4161,7 @@ export class SearchTasksTool extends BaseStructuredTool {
   readonly description = 'Full-text search across task titles and descriptions.';
   readonly category = ToolCategory.API;
   readonly inputSchema = SearchTasksInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: SearchTasksInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -4013,7 +4174,7 @@ export class SearchTasksTool extends BaseStructuredTool {
         ],
       };
       if (input.status) where.status = input.status;
-      const tasks = await this.prisma.task.findMany({
+      const tasks = await this.data.task.findMany({
         where,
         take: input.limit ?? 20,
         orderBy: { createdAt: 'desc' },
@@ -4045,7 +4206,7 @@ export class GetTaskStatsTool extends BaseStructuredTool {
   readonly description = 'Get task statistics: counts by status, by priority, overdue count. Optionally filter by agent or department.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GetTaskStatsInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GetTaskStatsInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -4055,17 +4216,17 @@ export class GetTaskStatsTool extends BaseStructuredTool {
       if (input.departmentId) baseWhere.departmentId = input.departmentId;
 
       const [byStatus, byPriority, overdueCount] = await Promise.all([
-        this.prisma.task.groupBy({
+        this.data.task.groupBy({
           by: ['status'],
           where: baseWhere,
           _count: { _all: true },
         }),
-        this.prisma.task.groupBy({
+        this.data.task.groupBy({
           by: ['priority'],
           where: baseWhere,
           _count: { _all: true },
         }),
-        this.prisma.task.count({
+        this.data.task.count({
           where: { ...baseWhere, status: { in: ['PENDING', 'QUEUED', 'RUNNING'] }, scheduledAt: { lt: new Date() } },
         }),
       ]);
@@ -4107,7 +4268,7 @@ export class GlobalSearchTool extends BaseStructuredTool {
   readonly description = 'Search across projects, tasks, agents, customers, and departments in one call. Returns mixed results grouped by entity type.';
   readonly category = ToolCategory.API;
   readonly inputSchema = GlobalSearchInputSchema;
-  constructor(private readonly prisma: PrismaService) { super(); }
+  constructor(private readonly data: ToolDataAccessService) { super(); }
 
   protected async executeImpl(input: GlobalSearchInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
@@ -4115,27 +4276,27 @@ export class GlobalSearchTool extends BaseStructuredTool {
       const tenantId = context.tenantId as string;
       const limit = input.limit ?? 10;
       const [projects, tasks, agents, customers, departments] = await Promise.all([
-        this.prisma.project.findMany({
+        this.data.project.findMany({
           where: { tenantId, OR: [{ name: { contains: input.query, mode: 'insensitive' } }, { description: { contains: input.query, mode: 'insensitive' } }] },
           take: limit,
           select: { id: true, name: true, status: true },
         }),
-        this.prisma.task.findMany({
+        this.data.task.findMany({
           where: { tenantId, OR: [{ title: { contains: input.query, mode: 'insensitive' } }, { description: { contains: input.query, mode: 'insensitive' } }] },
           take: limit,
           select: { id: true, title: true, status: true },
         }),
-        this.prisma.agent.findMany({
+        this.data.agent.findMany({
           where: { tenantId, OR: [{ name: { contains: input.query, mode: 'insensitive' } }, { description: { contains: input.query, mode: 'insensitive' } }] },
           take: limit,
           select: { id: true, name: true, type: true, status: true },
         }),
-        this.prisma.customer.findMany({
+        this.data.customer.findMany({
           where: { tenantId, OR: [{ name: { contains: input.query, mode: 'insensitive' } }] },
           take: limit,
           select: { id: true, name: true, status: true },
         }),
-        this.prisma.department.findMany({
+        this.data.department.findMany({
           where: { tenantId, OR: [{ name: { contains: input.query, mode: 'insensitive' } }] },
           take: limit,
           select: { id: true, name: true, status: true },

@@ -1,5 +1,5 @@
 import { DocumentsTool } from './documents.tool';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { ToolDataAccessService } from '../tool-data-access.service';
 import { GoogleDriveService } from '../../integrations/google/google-drive.service';
 
 const mockPrisma = {
@@ -21,7 +21,7 @@ const originalFetch = global.fetch;
 
 function makeTool(): DocumentsTool {
   return new DocumentsTool(
-    mockPrisma as unknown as PrismaService,
+    mockPrisma as unknown as ToolDataAccessService,
     mockDrive as unknown as GoogleDriveService,
   );
 }
