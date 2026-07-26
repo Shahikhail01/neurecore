@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
-function loadEnv(file) {
+function loadEnv(file, options = { override: false }) {
   if (!fs.existsSync(file)) return;
   for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -16,30 +16,8 @@ function loadEnv(file) {
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
-    if (!process.env[key]) process.env[key] = value;
+    if (options.override || !process.env[key]) process.env[key] = value;
   }
-}
-
-function base64url(input) {
-  return Buffer.from(input)
-    .toString('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-}
-
-function signJwt(payload, secret) {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const encodedHeader = base64url(JSON.stringify(header));
-  const encodedPayload = base64url(JSON.stringify(payload));
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(`${encodedHeader}.${encodedPayload}`)
-    .digest('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
 }
 
 loadEnv(path.join(__dirname, '..', '.env'));
@@ -55,9 +33,6 @@ const ACTOR_EMAIL = process.env.AWL_G2_ACTOR_EMAIL || 'awl-g2-verifier@reconstru
 const RUN_ID = process.env.AWL_G2_SOURCE_RUN_ID || 'G2-2026-07-26T13-28-CONTABO-PRISMA';
 
 async function main() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.includes('CHANGE_ME')) throw new Error('JWT_SECRET is not configured for live verification');
-
   const actor = await prisma.user.findUnique({
     where: { email: ACTOR_EMAIL },
     select: {
@@ -66,7 +41,6 @@ async function main() {
       role: true,
       tenantId: true,
       isActive: true,
-      passwordChangedAt: true,
     },
   });
   if (!actor || actor.tenantId !== TENANT_ID || !actor.isActive) {
@@ -84,17 +58,41 @@ async function main() {
   });
   if (!initiation) throw new Error(`No materialized initiation found for run ${RUN_ID}`);
 
-  const now = Math.floor(Date.now() / 1000);
-  const token = signJwt({
-    sub: actor.id,
-    email: actor.email,
-    role: actor.role,
-    tenantId: actor.tenantId,
-    jti: `g2-recovery-${Date.now()}`,
-    iat: now,
-    exp: now + 300,
-    pwd: actor.passwordChangedAt ? Math.floor(actor.passwordChangedAt.getTime() / 1000) : undefined,
-  }, secret);
+  if (actor.email !== 'awl-g2-verifier@reconstruction.local') {
+    throw new Error('Refusing to modify password for a non-G2 verifier account');
+  }
+
+  const password = `G2-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const passwordHash = await bcrypt.hash(password, 12);
+  await prisma.user.update({
+    where: { id: actor.id },
+    data: {
+      passwordHash,
+      isActive: true,
+      isVerified: true,
+      lockedUntil: null,
+      metadata: {
+        g2RecoveryVerifier: true,
+        passwordRotatedFor: 'g2-authenticated-recovery-verification.cjs',
+        rotatedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  const loginResponse = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ email: actor.email, password }),
+  });
+  const loginBody = await loginResponse.json().catch(() => null);
+  const token =
+    loginBody?.tokens?.accessToken ??
+    loginBody?.data?.tokens?.accessToken ??
+    loginBody?.accessToken ??
+    loginBody?.data?.accessToken;
+  if (!token) {
+    throw new Error(`Login failed with HTTP ${loginResponse.status}: ${JSON.stringify(loginBody)}`);
+  }
 
   const url = `${API_BASE}/enterprise-initiation/${initiation.id}/status`;
   const response = await fetch(url, {
@@ -113,6 +111,7 @@ async function main() {
   console.log(JSON.stringify({
     runId: RUN_ID,
     url,
+    loginStatus: loginResponse.status,
     httpStatus: response.status,
     actor: actor.email,
     initiation,
