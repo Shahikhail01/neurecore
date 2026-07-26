@@ -1,7 +1,7 @@
 // src/modules/projects/application/project-capability.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { AwlExecutionEngine as ExecutionEngine } from '@prisma/client';
+import { ExecutionEngine } from '@prisma/client';
 
 export type AutomationState =
   | 'AUTOMATION_READY'

@@ -9,7 +9,7 @@ import {
 } from '../domain/ports/review-repository.port';
 import type {
   ReviewDecision,
-  AwlReviewStatus as ReviewStatus,
+  ReviewStatus,
 } from '@prisma/client';
 
 @Injectable()

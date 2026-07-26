@@ -1,5 +1,5 @@
 // src/modules/assignments/domain/ports/agent-repository.port.ts
-import type { AwlAgentAvailability as AgentAvailability } from '@prisma/client';
+import type { AgentAvailability } from '@prisma/client';
 
 export const AGENT_REPOSITORY = Symbol('AGENT_REPOSITORY');
 

@@ -1,7 +1,7 @@
 // src/modules/reviews/domain/ports/review-repository.port.ts
 import type {
   ReviewDecision,
-  AwlReviewStatus as ReviewStatus,
+  ReviewStatus,
 } from '@prisma/client';
 
 export const REVIEW_REPOSITORY = Symbol('REVIEW_REPOSITORY');

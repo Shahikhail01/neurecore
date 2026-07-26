@@ -12,9 +12,9 @@ import type { IReviewRepository } from '../domain/ports/review-repository.port';
 import { REVIEW_REPOSITORY } from '../domain/ports/review-repository.port';
 import { ReviewDecision } from '../domain/review-states';
 import {
-  AwlReviewStatus as ReviewStatus,
+  ReviewStatus,
   type ReviewDecision as PrismaReviewDecision,
-  type AwlReviewStatus as PrismaReviewStatus,
+  type ReviewStatus as PrismaReviewStatus,
 } from '@prisma/client';
 import { TaskStateMachine } from '../../tasks/domain/task-states';
 

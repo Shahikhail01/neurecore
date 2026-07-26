@@ -6,7 +6,7 @@ import {
   ProjectAggregate,
   CreateProjectInput,
 } from '../domain/ports/project-repository.port';
-import { AwlExecutionEngine as ExecutionEngine } from '@prisma/client';
+import { ExecutionEngine } from '@prisma/client';
 
 /**
  * Prisma adapter for IProjectRepository.
