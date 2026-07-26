@@ -1,5 +1,5 @@
 // src/modules/assignments/domain/ports/agent-repository.port.ts
-import type { AgentAvailability } from '@prisma/client';
+import type { AwlAgentAvailability } from '@prisma/client';
 
 export const AGENT_REPOSITORY = Symbol('AGENT_REPOSITORY');
 
@@ -10,7 +10,7 @@ export interface AgentEntity {
   role: string | null;
   capabilities: string[];
   maxConcurrency: number | null;
-  availability: AgentAvailability | null;
+  availability: AwlAgentAvailability | null;
   archived: boolean;
 }
 

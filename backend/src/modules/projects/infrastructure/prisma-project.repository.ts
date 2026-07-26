@@ -6,7 +6,7 @@ import {
   ProjectAggregate,
   CreateProjectInput,
 } from '../domain/ports/project-repository.port';
-import { ExecutionEngine } from '@prisma/client';
+import type { ITransactionalClient } from '../../../common/ports/transaction.interface';
 
 /**
  * Prisma adapter for IProjectRepository.
@@ -34,22 +34,25 @@ export class PrismaProjectRepository implements IProjectRepository {
     };
   }
 
-  async findById(tenantId: string, id: string): Promise<ProjectAggregate | null> {
-    const row = await this.prisma.project.findFirst({
+  async findById(tenantId: string, id: string, tx?: ITransactionalClient): Promise<ProjectAggregate | null> {
+    const client = (tx ?? this.prisma) as any;
+    const row = await client.project.findFirst({
       where: { id, tenantId },
     });
     return this.toAggregate(row);
   }
 
-  async findByInitiationId(tenantId: string, initiationId: string): Promise<ProjectAggregate | null> {
-    const row = await this.prisma.project.findFirst({
+  async findByInitiationId(tenantId: string, initiationId: string, tx?: ITransactionalClient): Promise<ProjectAggregate | null> {
+    const client = (tx ?? this.prisma) as any;
+    const row = await client.project.findFirst({
       where: { tenantId, initiation: { id: initiationId } },
     });
     return this.toAggregate(row);
   }
 
-  async create(input: CreateProjectInput): Promise<ProjectAggregate> {
-    const row = await this.prisma.project.create({
+  async create(input: CreateProjectInput, tx?: ITransactionalClient): Promise<ProjectAggregate> {
+    const client = (tx ?? this.prisma) as any;
+    const row = await client.project.create({
       data: {
         tenantId: input.tenantId,
         name: input.name,

@@ -1,7 +1,7 @@
 // src/modules/reviews/domain/ports/review-repository.port.ts
 import type {
   ReviewDecision,
-  ReviewStatus,
+  AwlReviewStatus,
 } from '@prisma/client';
 
 export const REVIEW_REPOSITORY = Symbol('REVIEW_REPOSITORY');
@@ -11,7 +11,7 @@ export interface ReviewEntity {
   tenantId: string;
   taskId: string;
   attemptId: string;
-  status: ReviewStatus;
+  status: AwlReviewStatus;
   decision: ReviewDecision;
   reviewerId: string | null;
   comment: string | null;
@@ -23,7 +23,7 @@ export interface ReviewEntity {
 export interface UpdateReviewInput {
   id: string;
   expectedVersion: number;
-  status: ReviewStatus;
+  status: AwlReviewStatus;
   decision: ReviewDecision;
   reviewerId: string;
   comment?: string;

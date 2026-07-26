@@ -12,9 +12,9 @@ import type { IReviewRepository } from '../domain/ports/review-repository.port';
 import { REVIEW_REPOSITORY } from '../domain/ports/review-repository.port';
 import { ReviewDecision } from '../domain/review-states';
 import {
-  ReviewStatus,
+  AwlReviewStatus,
   type ReviewDecision as PrismaReviewDecision,
-  type ReviewStatus as PrismaReviewStatus,
+  type AwlReviewStatus as PrismaReviewStatus,
 } from '@prisma/client';
 import { TaskStateMachine } from '../../tasks/domain/task-states';
 
@@ -46,7 +46,7 @@ export class ReviewService {
       const review = await this.reviewRepo.findById(metadata.tenantId, reviewId);
       if (!review) throw new Error('REVIEW_NOT_FOUND');
       if (review.tenantId !== metadata.tenantId) throw new Error('CROSS_TENANT_ACCESS_DENIED');
-      if (review.status !== 'PENDING' as ReviewStatus) {
+      if (review.status !== 'PENDING' as AwlReviewStatus) {
         throw new Error('REVIEW_ALREADY_DECIDED');
       }
 
@@ -118,7 +118,7 @@ export class ReviewService {
           {
             id: reviewId,
             expectedVersion: review.version,
-            status: ReviewStatus.REVISION_REQUESTED as PrismaReviewStatus,
+            status: AwlReviewStatus.REVISION_REQUESTED as PrismaReviewStatus,
             decision: 'NEEDS_REVISION' as PrismaReviewDecision,
             reviewerId,
             comment,

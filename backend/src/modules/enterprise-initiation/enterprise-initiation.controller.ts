@@ -1,5 +1,5 @@
 // src/modules/enterprise-initiation/enterprise-initiation.controller.ts
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CorrelationService } from '../../common/correlation/correlation.service';
@@ -65,5 +65,23 @@ export class EnterpriseInitiationController {
       },
       metadata,
     );
+  }
+
+  @Get(':initiationId/status')
+  async status(
+    @Param('initiationId') initiationId: string,
+    @CurrentUser() user: { id: string; tenantId: string },
+  ) {
+    const context = this.correlation.createContext({
+      tenantId: user.tenantId,
+      actorId: user.id,
+      actorType: 'HUMAN',
+    });
+    const metadata = this.correlation.buildMetadata(
+      context,
+      `status:${initiationId}`,
+    );
+
+    return this.service.getInitiationStatus(initiationId, metadata);
   }
 }

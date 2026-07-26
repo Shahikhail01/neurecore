@@ -9,7 +9,7 @@ import {
 } from '../domain/ports/review-repository.port';
 import type {
   ReviewDecision,
-  ReviewStatus,
+  AwlReviewStatus,
 } from '@prisma/client';
 
 @Injectable()
@@ -44,7 +44,7 @@ export class PrismaReviewRepository implements IReviewRepository {
         tenantId: input.tenantId,
         taskId: input.taskId,
         attemptId: input.attemptId,
-        status: 'PENDING' as ReviewStatus,
+        status: 'PENDING' as AwlReviewStatus,
         decision: 'PENDING' as ReviewDecision,
       },
     });

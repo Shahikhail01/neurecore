@@ -8,6 +8,7 @@ import {
   CreateInitiationInput,
 } from '../domain/ports/initiation-repository.port';
 import { InitiationStatus } from '../domain/initiation-states';
+import type { ITransactionalClient } from '../../../common/ports/transaction.interface';
 
 /**
  * Prisma adapter for IInitiationRepository.
@@ -39,8 +40,9 @@ export class PrismaInitiationRepository implements IInitiationRepository {
     };
   }
 
-  async findById(tenantId: string, id: string): Promise<InitiationAggregate | null> {
-    const row = await this.prisma.enterpriseInitiation.findFirst({
+  async findById(tenantId: string, id: string, tx?: ITransactionalClient): Promise<InitiationAggregate | null> {
+    const client = (tx ?? this.prisma) as any;
+    const row = await client.enterpriseInitiation.findFirst({
       where: { id, tenantId },
     });
     return this.toAggregate(row);
@@ -49,10 +51,10 @@ export class PrismaInitiationRepository implements IInitiationRepository {
   async findApprovedForUpdate(
     tenantId: string,
     id: string,
+    tx?: ITransactionalClient,
   ): Promise<InitiationAggregate | null> {
-    // Note: row-level locking requires explicit transaction.
-    // The application handler is expected to call this within a UoW.execute()
-    const row = await this.prisma.enterpriseInitiation.findFirst({
+    const client = (tx ?? this.prisma) as any;
+    const row = await client.enterpriseInitiation.findFirst({
       where: { id, tenantId, status: InitiationStatus.APPROVED },
     });
     return this.toAggregate(row);
@@ -63,8 +65,10 @@ export class PrismaInitiationRepository implements IInitiationRepository {
     id: string,
     projectId: string,
     expectedVersion: number,
+    tx?: ITransactionalClient,
   ): Promise<InitiationAggregate> {
-    const result = await this.prisma.enterpriseInitiation.updateMany({
+    const client = (tx ?? this.prisma) as any;
+    const result = await client.enterpriseInitiation.updateMany({
       where: { id, tenantId, version: expectedVersion },
       data: {
         status: InitiationStatus.MATERIALIZING,
@@ -75,12 +79,13 @@ export class PrismaInitiationRepository implements IInitiationRepository {
     if (result.count === 0) {
       throw new Error('OPTIMISTIC_LOCK_FAILED');
     }
-    const updated = await this.prisma.enterpriseInitiation.findUnique({ where: { id } });
+    const updated = await client.enterpriseInitiation.findUnique({ where: { id } });
     return this.toAggregate(updated)!;
   }
 
-  async create(input: CreateInitiationInput): Promise<InitiationAggregate> {
-    const row = await this.prisma.enterpriseInitiation.create({
+  async create(input: CreateInitiationInput, tx?: ITransactionalClient): Promise<InitiationAggregate> {
+    const client = (tx ?? this.prisma) as any;
+    const row = await client.enterpriseInitiation.create({
       data: {
         tenantId: input.tenantId,
         customerId: input.customerId ?? null,
@@ -101,8 +106,10 @@ export class PrismaInitiationRepository implements IInitiationRepository {
     expectedVersion: number,
     approvedByActorId: string,
     approvalComment: string | undefined,
+    tx?: ITransactionalClient,
   ): Promise<InitiationAggregate> {
-    const result = await this.prisma.enterpriseInitiation.updateMany({
+    const client = (tx ?? this.prisma) as any;
+    const result = await client.enterpriseInitiation.updateMany({
       where: { id, tenantId, version: expectedVersion },
       data: {
         status: InitiationStatus.APPROVED,
@@ -115,7 +122,7 @@ export class PrismaInitiationRepository implements IInitiationRepository {
     if (result.count === 0) {
       throw new Error('OPTIMISTIC_LOCK_FAILED');
     }
-    const updated = await this.prisma.enterpriseInitiation.findUnique({ where: { id } });
+    const updated = await client.enterpriseInitiation.findUnique({ where: { id } });
     return this.toAggregate(updated)!;
   }
 }

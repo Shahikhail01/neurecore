@@ -21,6 +21,7 @@ export interface CreateProjectFromInitiationResult {
   projectId: string;
   initiationId: string;
   automationStatus: string;
+  automationRequestId?: string;
   correlationId: string;
 }
 

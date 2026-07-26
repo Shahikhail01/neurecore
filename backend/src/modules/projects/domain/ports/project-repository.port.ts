@@ -1,5 +1,6 @@
 // src/modules/projects/domain/ports/project-repository.port.ts
-import { ExecutionEngine } from '@prisma/client';
+import { AwlExecutionEngine } from '@prisma/client';
+import type { ITransactionalClient } from '../../../../common/ports/transaction.interface';
 
 export const PROJECT_REPOSITORY = Symbol('PROJECT_REPOSITORY');
 
@@ -11,7 +12,7 @@ export interface ProjectAggregate {
   customerId: string | null;
   targetDate: Date | null;
   status: string;
-  executionEngineVersion: ExecutionEngine;
+  executionEngineVersion: AwlExecutionEngine;
   initiationId: string | null;
   version: number;
   createdAt: Date;
@@ -25,12 +26,12 @@ export interface CreateProjectInput {
   customerId?: string;
   targetDate?: Date;
   initiationId?: string;
-  executionEngineVersion: ExecutionEngine;
+  executionEngineVersion: AwlExecutionEngine;
   status?: string;
 }
 
 export interface IProjectRepository {
-  findById(tenantId: string, id: string): Promise<ProjectAggregate | null>;
-  findByInitiationId(tenantId: string, initiationId: string): Promise<ProjectAggregate | null>;
-  create(input: CreateProjectInput): Promise<ProjectAggregate>;
+  findById(tenantId: string, id: string, tx?: ITransactionalClient): Promise<ProjectAggregate | null>;
+  findByInitiationId(tenantId: string, initiationId: string, tx?: ITransactionalClient): Promise<ProjectAggregate | null>;
+  create(input: CreateProjectInput, tx?: ITransactionalClient): Promise<ProjectAggregate>;
 }

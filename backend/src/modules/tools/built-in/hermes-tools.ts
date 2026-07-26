@@ -206,6 +206,18 @@ export const HERMES_TOOL_SETS: Record<HermesAgentType, HermesToolDescriptor[]> =
     // Exposes the conversational + document channels of the EIE to Hermes.
     PROJECT_DISCOVERY: [
         {
+            name: 'approve_initiation',
+            description: 'Approve a discovered project initiation through the canonical command path',
+            permission: ToolPermissionLevel.APPROVAL_REQUIRED,
+            conditions: { approvalType: 'PROJECT_CREATION', command: 'ApproveEnterpriseInitiationCommand' },
+        },
+        {
+            name: 'create_project_from_initiation',
+            description: 'Materialize an approved initiation through CreateProjectFromInitiationCommand',
+            permission: ToolPermissionLevel.APPROVAL_REQUIRED,
+            conditions: { approvalType: 'PROJECT_CREATION', command: 'CreateProjectFromInitiationCommand' },
+        },
+        {
             name: 'interview_ask_next',
             description: 'Return the next discovery question + prompt for a project',
             permission: ToolPermissionLevel.ALLOW,

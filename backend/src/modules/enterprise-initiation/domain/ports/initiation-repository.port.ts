@@ -1,16 +1,18 @@
 // src/modules/enterprise-initiation/domain/ports/initiation-repository.port.ts
 import { InitiationStatus } from '../initiation-states';
+import type { ITransactionalClient } from '../../../../common/ports/transaction.interface';
 
 export const INITIATION_REPOSITORY = Symbol('INITIATION_REPOSITORY');
 
 export interface IInitiationRepository {
-  findById(tenantId: string, id: string): Promise<InitiationAggregate | null>;
-  findApprovedForUpdate(tenantId: string, id: string): Promise<InitiationAggregate | null>;
+  findById(tenantId: string, id: string, tx?: ITransactionalClient): Promise<InitiationAggregate | null>;
+  findApprovedForUpdate(tenantId: string, id: string, tx?: ITransactionalClient): Promise<InitiationAggregate | null>;
   markMaterializing(
     tenantId: string,
     id: string,
     projectId: string,
     expectedVersion: number,
+    tx?: ITransactionalClient,
   ): Promise<InitiationAggregate>;
   approve(
     tenantId: string,
@@ -18,8 +20,9 @@ export interface IInitiationRepository {
     expectedVersion: number,
     approvedByActorId: string,
     approvalComment: string | undefined,
+    tx?: ITransactionalClient,
   ): Promise<InitiationAggregate>;
-  create(input: CreateInitiationInput): Promise<InitiationAggregate>;
+  create(input: CreateInitiationInput, tx?: ITransactionalClient): Promise<InitiationAggregate>;
 }
 
 export interface InitiationAggregate {

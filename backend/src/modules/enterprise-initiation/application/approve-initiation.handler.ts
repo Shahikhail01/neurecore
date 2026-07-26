@@ -43,10 +43,11 @@ export class ApproveInitiationHandler {
       throw new Error('CANONICAL_INITIATION flag must be enabled');
     }
 
-    return this.uow.execute(async () => {
-      const initiation = await this.initiationRepo.findApprovedForUpdate(
+    return this.uow.execute(async (tx) => {
+      const initiation = await this.initiationRepo.findById(
         metadata.tenantId,
         input.initiationId,
+        tx,
       );
 
       if (!initiation) {
@@ -62,39 +63,46 @@ export class ApproveInitiationHandler {
         InitiationStatus.APPROVED,
       );
 
-      const updated = await (this.initiationRepo as any).approve(
+      const updated = await this.initiationRepo.approve(
         metadata.tenantId,
         input.initiationId,
         initiation.version,
         input.approvedByActorId,
         input.approvalComment,
+        tx,
       );
 
-      await this.auditRepo.record({
-        tenantId: metadata.tenantId,
-        actor: metadata.actorId,
-        action: 'INITIATION_APPROVED',
-        resource: 'EnterpriseInitiation',
-        resourceId: input.initiationId,
-        correlationId: metadata.correlationId,
-        causationId: metadata.causationId ?? undefined,
-        result: 'success',
-      });
-
-      await this.outboxRepo.publish({
-        tenantId: metadata.tenantId,
-        eventType: 'InitiationApproved',
-        sourceModule: 'enterprise-initiation',
-        payload: {
-          initiationId: input.initiationId,
-          approvedBy: metadata.actorId,
+      await this.auditRepo.record(
+        {
+          tenantId: metadata.tenantId,
+          actor: metadata.actorId,
+          action: 'INITIATION_APPROVED',
+          resource: 'EnterpriseInitiation',
+          resourceId: input.initiationId,
+          correlationId: metadata.correlationId,
+          causationId: metadata.causationId ?? undefined,
+          result: 'success',
         },
-        correlationId: metadata.correlationId,
-        causationId: metadata.causationId,
-        idempotencyKey: `initiation-approved:${input.initiationId}`,
-        actorId: metadata.actorId,
-        actorType: metadata.actorType,
-      });
+        tx,
+      );
+
+      await this.outboxRepo.publish(
+        {
+          tenantId: metadata.tenantId,
+          eventType: 'InitiationApproved',
+          sourceModule: 'enterprise-initiation',
+          payload: {
+            initiationId: input.initiationId,
+            approvedBy: metadata.actorId,
+          },
+          correlationId: metadata.correlationId,
+          causationId: metadata.causationId,
+          idempotencyKey: `initiation-approved:${input.initiationId}`,
+          actorId: metadata.actorId,
+          actorType: metadata.actorType,
+        },
+        tx,
+      );
 
       return {
         success: true,

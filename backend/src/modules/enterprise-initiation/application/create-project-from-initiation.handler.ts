@@ -14,7 +14,7 @@ import type {
   CreateProjectFromInitiationInput,
   CreateProjectFromInitiationResult,
 } from '../commands/create-project-from-initiation.command';
-import { ExecutionEngine } from '@prisma/client';
+import { AwlExecutionEngine } from '@prisma/client';
 
 /**
  * Application handler — depends on PORTS only via DI tokens.
@@ -45,10 +45,11 @@ export class CreateProjectFromInitiationHandler {
       throw new Error('CANONICAL_INITIATION flag must be enabled for golden path');
     }
 
-    return this.uow.execute(async () => {
+    return this.uow.execute(async (tx) => {
       const initiation = await this.initiationRepo.findApprovedForUpdate(
         metadata.tenantId,
         input.initiationId,
+        tx,
       );
 
       if (!initiation) {
@@ -66,6 +67,7 @@ export class CreateProjectFromInitiationHandler {
       const existingProject = await this.projectRepo.findByInitiationId(
         metadata.tenantId,
         input.initiationId,
+        tx,
       );
 
       if (existingProject) {
@@ -83,51 +85,61 @@ export class CreateProjectFromInitiationHandler {
         };
       }
 
-      const project = await this.projectRepo.create({
-        tenantId: metadata.tenantId,
-        name: input.projectName,
-        description: input.projectDescription ?? initiation.projectDescription ?? undefined,
-        customerId: input.customerId ?? initiation.customerId ?? undefined,
-        targetDate: input.targetDate,
-        initiationId: initiation.id,
-        executionEngineVersion: ExecutionEngine.canonical,
-        status: 'ACTIVE',
-      });
+      const project = await this.projectRepo.create(
+        {
+          tenantId: metadata.tenantId,
+          name: input.projectName,
+          description: input.projectDescription ?? initiation.projectDescription ?? undefined,
+          customerId: input.customerId ?? initiation.customerId ?? undefined,
+          targetDate: input.targetDate,
+          initiationId: initiation.id,
+          executionEngineVersion: AwlExecutionEngine.canonical,
+          status: 'ACTIVE',
+        },
+        tx,
+      );
 
       await this.initiationRepo.markMaterializing(
         metadata.tenantId,
         initiation.id,
         project.id,
         initiation.version,
+        tx,
       );
 
-      await this.auditRepo.record({
-        tenantId: metadata.tenantId,
-        actor: metadata.actorId,
-        action: 'PROJECT_CREATED_FROM_INITIATION',
-        resource: 'Project',
-        resourceId: project.id,
-        correlationId: metadata.correlationId,
-        causationId: metadata.causationId ?? undefined,
-        result: 'success',
-      });
-
-      await this.outboxRepo.publish({
-        tenantId: metadata.tenantId,
-        eventType: 'ProjectAutomationRequested',
-        sourceModule: 'project-automation',
-        payload: {
-          projectId: project.id,
-          initiationId: initiation.id,
-          automationConfig: input.automationConfig,
-          requestedBy: metadata.actorId,
+      await this.auditRepo.record(
+        {
+          tenantId: metadata.tenantId,
+          actor: metadata.actorId,
+          action: 'PROJECT_CREATED_FROM_INITIATION',
+          resource: 'Project',
+          resourceId: project.id,
+          correlationId: metadata.correlationId,
+          causationId: metadata.causationId ?? undefined,
+          result: 'success',
         },
-        correlationId: metadata.correlationId,
-        causationId: metadata.causationId,
-        idempotencyKey: `automation-requested:${project.id}`,
-        actorId: metadata.actorId,
-        actorType: metadata.actorType,
-      });
+        tx,
+      );
+
+      const automationRequestId = await this.outboxRepo.publish(
+        {
+          tenantId: metadata.tenantId,
+          eventType: 'ProjectAutomationRequested',
+          sourceModule: 'project-automation',
+          payload: {
+            projectId: project.id,
+            initiationId: initiation.id,
+            automationConfig: input.automationConfig,
+            requestedBy: metadata.actorId,
+          },
+          correlationId: metadata.correlationId,
+          causationId: metadata.causationId,
+          idempotencyKey: `automation-requested:${project.id}`,
+          actorId: metadata.actorId,
+          actorType: metadata.actorType,
+        },
+        tx,
+      );
 
       return {
         success: true,
@@ -135,6 +147,7 @@ export class CreateProjectFromInitiationHandler {
           projectId: project.id,
           initiationId: initiation.id,
           automationStatus: 'REQUESTED',
+          automationRequestId,
           correlationId: metadata.correlationId,
         },
         correlationId: metadata.correlationId,
