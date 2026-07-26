@@ -1,6 +1,8 @@
 // src/modules/project-automation/project-automation.module.ts
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
+import { PersistenceModule } from '../../common/persistence/persistence.module';
 import { OutboxWorker } from '../../common/outbox/outbox.worker';
+import { TimelineModule } from '../timeline/timeline.module';
 import { ProjectAutomationHandler } from './application/project-automation.handler';
 import { ProjectAutomationController } from './project-automation.controller';
 import { ProjectAutomationService } from './project-automation.service';
@@ -14,6 +16,7 @@ import { GOAL_REPOSITORY } from './domain/ports/goal-template-repository.port';
 import { TASK_REPOSITORY } from './domain/ports/task-template-repository.port';
 
 @Module({
+  imports: [PersistenceModule, TimelineModule],
   controllers: [ProjectAutomationController],
   providers: [
     ProjectAutomationService,
