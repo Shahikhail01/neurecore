@@ -1,11 +1,14 @@
+// src/modules/observability/observability.module.ts
 import { Module } from '@nestjs/common';
-import { ObservabilityController } from './observability.controller';
-import { ObservabilityService } from './services/observability.service';
-import { TelemetryService } from './services/telemetry.service';
+import { MetricsService } from './metrics.service';
+import { AwlHealthController } from './awl-health.controller';
+import { OutboxService } from '../../common/outbox/outbox.service';
+import { OutboxWorker } from '../../common/outbox/outbox.worker';
+import { CommandRegistry } from '../../common/commands/command.registry';
 
 @Module({
-  controllers: [ObservabilityController],
-  providers: [ObservabilityService, TelemetryService],
-  exports: [ObservabilityService, TelemetryService],
+  controllers: [AwlHealthController],
+  providers: [MetricsService, OutboxService, OutboxWorker, CommandRegistry],
+  exports: [MetricsService],
 })
 export class ObservabilityModule {}

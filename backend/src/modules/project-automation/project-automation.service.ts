@@ -1,46 +1,16 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
+// src/modules/project-automation/project-automation.service.ts
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { RoleTemplateService } from './services/role-template.service';
-import { GoalTemplateService } from './services/goal-template.service';
-import { TaskPlannerService } from './services/task-planner.service';
-import { ChiefOfStaffService } from './services/chief-of-staff.service';
-import { MemorySeederService } from './services/memory-seeder.service';
-import { DerivedShapeApplier } from '../projects/services/derived-shape-applier.service';
-import {
-  PROJECT_AUTOMATION_REPOSITORY,
-  type IProjectAutomationRepository,
-  type ProjectAutomationLog,
-} from './interfaces';
-
-export interface AutomationResult {
-  agentsSpawned: number;
-  goalsCreated: number;
-  tasksCreated: number;
-  chiefOfStaffAssigned: boolean;
-  memorySeeded: boolean;
-  logId: string;
-  errors: string[];
-}
+import { AutomationStatus } from '@prisma/client';
+import { ProjectAutomationHandler } from './application/project-automation.handler';
 
 @Injectable()
 export class ProjectAutomationService {
   private readonly logger = new Logger(ProjectAutomationService.name);
 
   constructor(
-    private readonly roleTemplateService: RoleTemplateService,
-    private readonly goalTemplateService: GoalTemplateService,
-    private readonly taskPlannerService: TaskPlannerService,
-    private readonly chiefOfStaffService: ChiefOfStaffService,
-    private readonly memorySeederService: MemorySeederService,
-    @Inject(PROJECT_AUTOMATION_REPOSITORY)
-    private readonly automationRepo: IProjectAutomationRepository,
     private readonly prisma: PrismaService,
-    // Lazy-resolved via ModuleRef to avoid the
-    // ProjectsModule → AgentsModule → ToolsModule cycle when re-exporting
-    // DerivedShapeApplier's class. Used by replan() to re-derive goals/members
-    // from a stored Project.derivedShape.
-    private readonly moduleRef: ModuleRef,
+    private readonly handler: ProjectAutomationHandler,
   ) {}
 
   async onProjectCreated(
@@ -49,216 +19,84 @@ export class ProjectAutomationService {
     projectName: string,
     tenantId: string,
     actorId: string = 'SYSTEM',
-  ): Promise<AutomationResult> {
-    const log = await this.automationRepo.create({
-      projectId,
-      event: 'PROJECT_CREATED',
-      triggeredBy: actorId,
+  ): Promise<{
+    agentsSpawned: number;
+    goalsCreated: number;
+    tasksCreated: number;
+    chiefOfStaffAssigned: boolean;
+    memorySeeded: boolean;
+    logId: string;
+    errors: string[];
+  }> {
+    const log = await this.prisma.projectAutomationLog.create({
+      data: {
+        projectId,
+        event: 'PROJECT_CREATED',
+        status: AutomationStatus.PENDING,
+        triggeredBy: actorId,
+      },
     });
 
     const errors: string[] = [];
-
-    try {
-      const roleResult = await this.roleTemplateService.spawnAgentsFromTemplate(
-        projectId,
-        projectTypeId,
-        tenantId,
-        actorId,
-      );
-
-      const cosResult = await this.chiefOfStaffService.autoAssign(
-        projectId,
-        tenantId,
-        actorId,
-      );
-
-      const goalResult = await this.goalTemplateService.createGoalsFromTemplate(
-        projectId,
-        projectTypeId,
-        tenantId,
-      );
-
-      let tasksCreated = 0;
-      if (goalResult.goals.length > 0) {
-        const taskResult = await this.taskPlannerService.decomposeAll(
-          goalResult.goals,
-          roleResult.spawned,
-          tenantId,
-          actorId,
-        );
-        tasksCreated = taskResult.totalTasks;
-      }
-
-      const memoryResult = await this.memorySeederService.seedInitialMemory(
-        projectId,
-        tenantId,
-        projectName,
-      );
-
-      const result: AutomationResult = {
-        agentsSpawned: roleResult.spawned.length,
-        goalsCreated: goalResult.goals.length,
-        tasksCreated,
-        chiefOfStaffAssigned: cosResult.assigned,
-        memorySeeded: memoryResult.seeded,
-        logId: log.id,
-        errors: [
-          ...roleResult.errors,
-          ...goalResult.errors,
-          cosResult.error ? [cosResult.error] : [],
-          memoryResult.error ? [memoryResult.error] : [],
-        ].flat(),
-      };
-
-      await this.automationRepo.updateResult(log.id, result as unknown as Record<string, unknown>);
-      this.logger.log(
-        `Automation complete for project ${projectId}: ` +
-          `${result.agentsSpawned} agents, ${result.goalsCreated} goals, ` +
-          `${result.tasksCreated} tasks, CoS=${result.chiefOfStaffAssigned}`,
-      );
-
-      return result;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Automation failed for project ${projectId}: ${msg}`);
-      errors.push(msg);
-      await this.automationRepo.updateError(log.id, msg);
-
-      await this.automationRepo.updateResult(log.id, {
-        agentsSpawned: 0,
-        goalsCreated: 0,
-        tasksCreated: 0,
-        chiefOfStaffAssigned: false,
-        memorySeeded: false,
-        logId: log.id,
-        errors,
-      } as unknown as Record<string, unknown>);
-
-      return {
-        agentsSpawned: 0,
-        goalsCreated: 0,
-        tasksCreated: 0,
-        chiefOfStaffAssigned: false,
-        memorySeeded: false,
-        logId: log.id,
-        errors,
-      };
-    }
-  }
-
-  async getLatestAutomation(projectId: string): Promise<ProjectAutomationLog | null> {
-    return this.automationRepo.findLatest(projectId);
-  }
-
-  async getAutomationHistory(projectId: string): Promise<ProjectAutomationLog[]> {
-    return this.automationRepo.findByProjectId(projectId);
-  }
-
-  async replan(projectId: string, tenantId: string, actorId: string = 'SYSTEM'): Promise<AutomationResult> {
-    const log = await this.automationRepo.create({
-      projectId,
-      event: 'MANUAL_TRIGGER',
-      triggeredBy: actorId,
-    });
-
-    const errors: string[] = [];
-    let tasksCreated = 0;
-    let goalsProcessed = 0;
     let agentsSpawned = 0;
+    let goalsCreated = 0;
+    let tasksCreated = 0;
 
     try {
-      const project = await this.prisma.project.findUnique({
-        where: { id: projectId },
-        select: { id: true, projectTypeId: true, derivedShape: true },
+      await this.handler.handleProjectAutomationRequested({
+        id: log.id,
+        tenantId,
+        payload: { projectId, requestedBy: actorId },
+        correlationId: log.id,
       });
 
-      if (!project) {
-        errors.push(`Project ${projectId} not found`);
-      } else if (!project.projectTypeId && !project.derivedShape) {
-        errors.push(
-          'Project has neither projectTypeId nor derivedShape — cannot replan. Re-create the project via Hermes chat to get a fresh shape.',
-        );
-      } else if (project.projectTypeId) {
-        // Template-driven path (existing behavior)
-        const goalsResult = await this.goalTemplateService.createGoalsFromTemplate(
-          projectId,
-          project.projectTypeId,
-          tenantId,
-        );
-        goalsProcessed = goalsResult.goals.length;
-
-        const existingMembers = await this.prisma.projectMember.findMany({
-          where: { projectId, actorType: 'AI' },
-          select: { actorId: true },
-        });
-        const spawnedAgents = existingMembers.map((m) => ({ id: m.actorId } as never));
-
-        if (goalsResult.goals.length > 0) {
-          const taskResult = await this.taskPlannerService.decomposeAll(
-            goalsResult.goals,
-            spawnedAgents as never,
-            tenantId,
-            actorId,
-          );
-          tasksCreated = taskResult.totalTasks;
-          errors.push(...taskResult.results.flatMap((r) => r.errors));
-        }
-      } else if (project.derivedShape) {
-        // Hermes-driven path — re-derive goals/members from the stored shape
-        // using the same DerivedShapeApplier ProjectsService uses on create.
-        // SRP: this branch reuses DerivedShapeApplier rather than duplicating
-        // its logic. The applier is idempotent so re-running is safe.
-        const applier = this.moduleRef.get(DerivedShapeApplier, { strict: false });
-        if (!applier) {
-          errors.push('DerivedShapeApplier unavailable — cannot replan derived-shape project');
-        } else {
-          const shapeResult = await applier.apply(
-            projectId,
-            project.derivedShape as never,
-            tenantId,
-          );
-          goalsProcessed = shapeResult.goalsCreated;
-          agentsSpawned = shapeResult.membersCreated;
-          errors.push(...shapeResult.errors);
-          // Re-decompose tasks from the goals
-          if (shapeResult.goalsCreated > 0) {
-            const goals = await this.prisma.goal.findMany({
-              where: { projectId },
-              select: { id: true, title: true, status: true, measurableCriteria: true },
-            });
-            const existingMembers = await this.prisma.projectMember.findMany({
-              where: { projectId, actorType: 'AI' },
-              select: { actorId: true },
-            });
-            const spawnedAgents = existingMembers.map((m) => ({ id: m.actorId } as never));
-            const taskResult = await this.taskPlannerService.decomposeAll(
-              goals as never,
-              spawnedAgents as never,
-              tenantId,
-              actorId,
-            );
-            tasksCreated = taskResult.totalTasks;
-            errors.push(...taskResult.results.flatMap((r) => r.errors));
-          }
-        }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Replan failed for project ${projectId}: ${msg}`);
-      errors.push(msg);
+      const goals = await this.prisma.goal.count({ where: { projectId } });
+      const tasks = await this.prisma.task.count({ where: { projectId } });
+      goalsCreated = goals;
+      tasksCreated = tasks;
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
     }
 
-    const result: AutomationResult = {
+    return {
       agentsSpawned,
-      goalsCreated: goalsProcessed,
+      goalsCreated,
       tasksCreated,
       chiefOfStaffAssigned: false,
       memorySeeded: false,
       logId: log.id,
       errors,
     };
+  }
 
-    await this.automationRepo.updateResult(log.id, result as unknown as Record<string, unknown>);
-    return result;
+  async getAutomationStatus(projectId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        goals: true,
+        tasks: true,
+      },
+    });
+
+    if (!project) {
+      throw new Error('PROJECT_NOT_FOUND');
+    }
+
+    const latestLog = await this.prisma.projectAutomationLog.findFirst({
+      where: { projectId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      projectId,
+      status: latestLog?.status ?? 'NOT_REQUESTED',
+      lastProcessedAt: latestLog?.createdAt ?? null,
+      lastError: latestLog?.error ?? null,
+      progress: {
+        goalsCreated: project.goals?.length ?? 0,
+        tasksCreated: project.tasks?.length ?? 0,
+        assignmentsCreated: 0,
+      },
+    };
   }
 }

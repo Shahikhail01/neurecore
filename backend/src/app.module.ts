@@ -11,6 +11,8 @@ import { ConfigurationModule } from './config';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { CacheModule } from './infrastructure/cache/cache.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
+import { CommandIdempotencyModule } from './common/idempotency/command-idempotency.module';
+import { PersistenceModule } from './common/persistence/persistence.module';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
 import { ServiceIdentitiesModule } from './modules/service-identities/service-identities.module';
 import { TimelineEventsModule } from './modules/timeline-events/timeline-events.module';
@@ -78,6 +80,17 @@ import { ProjectAutomationModule } from './modules/project-automation/project-au
 import { ProjectEventsModule } from './modules/project-events/project-events.module';
 // Phase 3C — Chief of Staff agent + conversation API
 import { ChiefOfStaffModule } from './modules/chief-of-staff/chief-of-staff.module';
+// Phase 1-10 — Autonomous Work Layer Reconstruction
+import { EnterpriseInitiationModule } from './modules/enterprise-initiation/enterprise-initiation.module';
+import { ExecutionModule } from './modules/execution/execution.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { AssignmentsModule } from './modules/assignments/assignments.module';
+import { TenantFlagsModule } from './modules/tenant-flags/tenant-flags.module';
+import { TimelineModule } from './modules/timeline/timeline.module';
+import { CorrelationModule } from './common/correlation/correlation.module';
+import { CommandModule } from './common/commands/command.module';
+import { OutboxModule } from './common/outbox/outbox.module';
+import { LoggingModule } from './common/logging/logging.module';
 // Phase 3E — Digital Twin + Activity Timeline
 import { DigitalTwinModule } from './modules/digital-twin/digital-twin.module';
 // Phase 6 — Health Score + BI Dashboards
@@ -153,6 +166,8 @@ import { CsrfProtectionMiddleware } from './common/auth/csrf.middleware';
     DatabaseModule,
     CacheModule,
     IdempotencyModule, // Phase 1 reusable idempotency layer (idempotency_records)
+    CommandIdempotencyModule, // @Global — command pattern idempotency wrapper
+    PersistenceModule, // @Global — Prisma adapters bound to port interfaces
     SecurityModule, // Centralized secret management
 
     // Feature modules
@@ -245,6 +260,18 @@ import { CsrfProtectionMiddleware } from './common/auth/csrf.middleware';
     ProjectEventsModule,     // Phase 3B
     ChiefOfStaffModule,      // Phase 3C
     DigitalTwinModule,       // Phase 3E
+
+    // Phase 1-10 — Autonomous Work Layer Reconstruction
+    CorrelationModule,        // @Global — AsyncLocalStorage tenant context
+    CommandModule,            // @Global — Command pattern + idempotency
+    OutboxModule,             // @Global — Transactional outbox + worker
+    LoggingModule,            // @Global — Correlation logger
+    EnterpriseInitiationModule, // Phase 2 — Secure initiation
+    ExecutionModule,          // Phase 5 — Governed execution runtime
+    ReviewsModule,            // Phase 6 — Human review
+    AssignmentsModule,        // Phase 4 — Task-to-AI assignment
+    TenantFlagsModule,        // @Global — Tenant-scoped feature flags
+    TimelineModule,           // Phase 7 — Unified timeline
     ProjectHealthModule,
     // Phase 7 — Client Portal
     PortalModule,
@@ -297,7 +324,6 @@ import { CsrfProtectionMiddleware } from './common/auth/csrf.middleware';
     PackagesModule,         // Pool #6 — Packages (composite root)
 
     // Phase 1 — Simulation-5 modules
-    IdempotencyModule,       // @Global — reusable idempotency layer
     ServiceIdentitiesModule, // service identity + token management
     TimelineEventsModule,    // first-class event log
     DecisionEvaluationsModule, // immutable scores snapshot
