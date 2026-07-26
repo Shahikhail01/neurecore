@@ -100,21 +100,17 @@ async function materializeOne(index, actorId) {
       },
     });
 
-    const projectId = newId('g2proj');
-    const [project] = await tx.$queryRawUnsafe(
-      `INSERT INTO "projects"
-        ("id", "tenantId", "name", "description", "status", "executionEngineVersion", "metadata", "createdAt", "updatedAt")
-       VALUES
-        ($1, $2, $3, $4, $5::"ProjectStatus", $6::"ExecutionEngine", $7::jsonb, NOW(), NOW())
-       RETURNING "id", "name"`,
-      projectId,
-      TENANT_ID,
-      `${label} Canonical Project`,
-      `G2 controlled repetition ${index}`,
-      'ACTIVE',
-      'canonical',
-      JSON.stringify({ runId: RUN_ID, repetition: index, g2Verification: true }),
-    );
+    const project = await tx.project.create({
+      data: {
+        tenantId: TENANT_ID,
+        name: `${label} Canonical Project`,
+        description: `G2 controlled repetition ${index}`,
+        status: 'ACTIVE',
+        executionEngineVersion: 'canonical',
+        metadata: { runId: RUN_ID, repetition: index, g2Verification: true },
+      },
+      select: { id: true, name: true },
+    });
 
     const updateResult = await tx.enterpriseInitiation.updateMany({
       where: {
@@ -185,21 +181,17 @@ async function createApprovedInitiation(actorId) {
 
 async function attemptConcurrentMaterialization(initiation, actorId, index) {
   return prisma.$transaction(async (tx) => {
-    const projectId = newId('g2proj');
-    const [project] = await tx.$queryRawUnsafe(
-      `INSERT INTO "projects"
-        ("id", "tenantId", "name", "description", "status", "executionEngineVersion", "metadata", "createdAt", "updatedAt")
-       VALUES
-        ($1, $2, $3, $4, $5::"ProjectStatus", $6::"ExecutionEngine", $7::jsonb, NOW(), NOW())
-       RETURNING "id", "name"`,
-      projectId,
-      TENANT_ID,
-      `${RUN_ID}-CONCURRENCY attempt ${index}`,
-      'G2 concurrent duplicate attempt',
-      'ACTIVE',
-      'canonical',
-      JSON.stringify({ runId: RUN_ID, concurrencyAttempt: index, g2Verification: true }),
-    );
+    const project = await tx.project.create({
+      data: {
+        tenantId: TENANT_ID,
+        name: `${RUN_ID}-CONCURRENCY attempt ${index}`,
+        description: 'G2 concurrent duplicate attempt',
+        status: 'ACTIVE',
+        executionEngineVersion: 'canonical',
+        metadata: { runId: RUN_ID, concurrencyAttempt: index, g2Verification: true },
+      },
+      select: { id: true, name: true },
+    });
 
     const updateResult = await tx.enterpriseInitiation.updateMany({
       where: {
@@ -272,7 +264,7 @@ async function main() {
   for (let i = 1; i <= REPETITIONS; i += 1) {
     repetitions.push(await materializeOne(i, actor.id));
   }
-  console.log(`20-run controlled repetition: ${repetitions.length}/${REPETITIONS} materialized`);
+  console.log(`Controlled repetition: ${repetitions.length}/${REPETITIONS} materialized`);
 
   const concurrencyInitiation = await createApprovedInitiation(actor.id);
   const attempts = await Promise.allSettled(
