@@ -34,3 +34,8 @@ CREATE INDEX IF NOT EXISTS "task_assignment_override_audits_tenant_task_idx"
 -- covers the common case; this is defensive in case the schema is
 -- re-applied after the column was added during a hot-resync.
 UPDATE "tasks" SET "version" = 1 WHERE "version" IS NULL;
+
+-- Phase 4: capture which dataClassification floor was active when the
+-- override was recorded (plan §6.1 / §6.5).
+ALTER TABLE "task_assignment_override_audits"
+  ADD COLUMN IF NOT EXISTS "dataClassificationAtOverride" TEXT;
