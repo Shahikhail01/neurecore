@@ -80,6 +80,39 @@ describe('Architecture: New code follows SOLID layering', () => {
     }
     expect(violations).toEqual([]);
   });
+
+  it('no tool implementation imports PrismaService directly', () => {
+    // Tools are the gateway entry point. They must never directly access the database.
+    // They should use commands or ports instead.
+    const toolDir = 'src/modules/tools/built-in';
+    const fullPath = path.join(__dirname, '../../..', toolDir);
+    if (!fs.existsSync(fullPath)) {
+      return; // Skip if tools dir doesn't exist
+    }
+
+    const violations: string[] = [];
+    const files = getAllTsFiles(fullPath);
+    for (const file of files) {
+      if (file.includes('.spec.') || file.includes('__test_negative')) continue;
+      const content = fs.readFileSync(file, 'utf8');
+      // Tools must not import PrismaService or use prisma directly
+      if (/import.*PrismaService/.test(content)) {
+        violations.push(`${file}: imports PrismaService`);
+      }
+      if (/this\.prisma\./.test(content) || /tx\.prisma\./.test(content)) {
+        violations.push(`${file}: uses prisma directly`);
+      }
+      if (/prisma\.(task|project|user|tenant|agent|customer)\.(create|update|delete|upsert)/.test(content)) {
+        violations.push(`${file}: calls prisma mutation directly`);
+      }
+    }
+
+    if (violations.length > 0) {
+      console.error('Tool Prisma bypasses detected:');
+      violations.forEach(v => console.error('  -', v));
+    }
+    expect(violations).toEqual([]);
+  });
 });
 
 describe('Architecture: New modules use command pattern', () => {

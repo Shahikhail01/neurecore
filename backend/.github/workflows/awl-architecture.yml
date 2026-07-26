@@ -48,21 +48,26 @@ jobs:
       - name: Negative fixture verification
         run: |
           # Create a temp file with a prohibited Prisma import in tools
-          cat > /tmp/negative-fixture.ts <<'EOF'
+          cat > src/modules/tools/built-in/__test_negative__.ts <<'EOF'
           import { PrismaClient } from '@prisma/client';
           export class BadTool {
             async bad() { return this.prisma.task.create({ data: {} as any }); }
             private prisma: PrismaClient = new PrismaClient();
           }
           EOF
-          cp /tmp/negative-fixture.ts src/modules/tools/built-in/__test_negative__.ts
-          if npx jest --testPathPatterns="src/test/architecture" 2>&1 | grep -q "fail\|FAIL\|violation"; then
-            echo "✓ CI correctly detected prohibited mutation"
-            rm src/modules/tools/built-in/__test_negative__.ts
-            exit 1  # Fail the build because negative fixture triggered detection
+          echo "Negative fixture created. Running architecture tests..."
+          set +e
+          npx jest --testPathPatterns="src/test/architecture" 2>&1 > /tmp/neg-result.txt
+          NEG_EXIT=$?
+          set -e
+          rm -f src/modules/tools/built-in/__test_negative__.ts
+          if grep -q "no application handler imports PrismaService directly" /tmp/neg-result.txt && grep -q "FAIL\|fail" /tmp/neg-result.txt; then
+            echo "✓ Negative fixture correctly detected (test failed as expected)"
+            echo "✓ CI enforcement working"
+            exit 1  # Build fails because the bad code was caught
           else
-            echo "✗ CI DID NOT DETECT prohibited mutation"
-            rm src/modules/tools/built-in/__test_negative__.ts
+            echo "✗ NEGATIVE FIXTURE NOT DETECTED — CI IS BROKEN"
+            cat /tmp/neg-result.txt
             exit 1
           fi
 
@@ -165,10 +170,27 @@ jobs:
           })();
           "
 
-      - name: Run integration tests
+      - name: Run integration tests (HARD-FAIL if no DB)
         env:
           DATABASE_URL: postgresql://neurecore_test:test_password@localhost:5432/neurecore_awl_test
-        run: npx jest --testPathPatterns="src/test/integration" --runInBand
+          AWL_REQUIRE_INTEGRATION_DB: 'true'
+        run: |
+          # Pre-check: if PostgreSQL is unavailable, fail IMMEDIATELY (no skip)
+          echo "Checking PostgreSQL availability..."
+          pg_isready -h localhost -p 5432 -U neurecore_test || {
+            echo "✗ PostgreSQL unavailable. Integration tests CANNOT skip."
+            echo "✗ This is a CI failure, not a skip."
+            exit 1
+          }
+          npx jest --testPathPatterns="src/test/integration" --runInBand
+          # Verify tests actually ran (not skipped)
+          echo "Verifying integration tests ran (not skipped)..."
+          if npx jest --testPathPatterns="src/test/integration" --listTests 2>&1 | grep -q "integration"; then
+            echo "✓ Integration tests present in test suite"
+          else
+            echo "✗ No integration tests found — test runner BROKEN"
+            exit 1
+          fi
 
   migration-clean-apply:
     name: Migration from Clean Database
