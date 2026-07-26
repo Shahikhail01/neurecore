@@ -3,7 +3,7 @@
 **Date:** 2026-07-26  
 **Branch:** `feature/awl-g1-operational-gates`  
 **Plan Reference:** `memory-bank-new/docs/AI-IMPLEMENTATION-PLAN-v2.md` §4  
-**Status:** DEPLOYED RUNTIME PARTIALLY VERIFIED — refreshed live G2 repetition blocked by Neon quota; formal reviewer sign-off pending
+**Status:** DEPLOYED RUNTIME VERIFIED — formal reviewer sign-off pending
 
 ## 1. Objective
 
@@ -200,13 +200,20 @@ duplicateInitiationLinks: []
 Follow-up after enum/migration reconciliation:
 
 ```text
-Run id: G2-2026-07-26T13-08-PRISMA-ENUM
+Run id: G2-2026-07-26T13-28-CONTABO-PRISMA
 Path: Contabo host, updated runner using Prisma project.create with executionEngineVersion='canonical'
-Result: BLOCKED before tenant lookup
-Database error: Neon account/project exceeded compute time quota
+Tenant: reconstruction-integration-test (reconstruction-test)
+Actor: awl-g2-verifier@reconstruction.local
+Controlled repetition: 20/20 materialized
+Concurrency duplicate test: fulfilled=1, rejected=9
+passed: true
+projectCount: 21
+outboxCount: 21
+uniqueInitiationLinks: 21
+duplicateInitiationLinks: []
 ```
 
-The original 20-run/concurrency invariant remains valid as prior live evidence. The stricter post-fix rerun could not complete because the database provider rejected compute before the first read.
+This rerun used the Contabo-local PostgreSQL environment and Prisma project creation path, proving the enum drift workaround is no longer required.
 
 ### 3.7 Deployed Runtime Probes
 
@@ -214,7 +221,7 @@ Backend health:
 
 ```text
 GET https://brain.neurecore.com/api/v1/health -> 200
-timestamp: 2026-07-26T13:07:59.495Z
+timestamp: 2026-07-26T13:27:47.949Z
 ```
 
 PM2 status on Contabo:
@@ -270,23 +277,22 @@ Prisma project create with executionEngineVersion='canonical' succeeded inside r
 
 | Criterion | Status | Evidence |
 |-----------|--------|----------|
-| One approval creates exactly one project | PASS DB | Live G2 run `G2-2026-07-26T11-45-02-805Z`: 20/20 materialized |
-| Zero duplicate projects | PASS DB | Live concurrency test: 1 success, 9 rejected, 0 duplicate initiation links |
+| One approval creates exactly one project | PASS DB | Strict Contabo run `G2-2026-07-26T13-28-CONTABO-PRISMA`: 20/20 materialized |
+| Zero duplicate projects | PASS DB | Strict Contabo concurrency test: 1 success, 9 rejected, 0 duplicate initiation links |
 | No tool performs a direct business mutation | PASS LOCALLY | Architecture tests pass |
-| Project and outbox event commit together | PASS DB | Live run created 21 projects and 21 outbox events in transaction-scoped flow |
-| Refresh/relogin resolves to correct result | PARTIAL LIVE | Status endpoint deployed; unauthenticated route probe returns 401, authenticated browser recovery blocked by DB quota/session requirement |
+| Project and outbox event commit together | PASS DB | Strict Contabo run created 21 projects and 21 outbox events in transaction-scoped flow |
+| Refresh/relogin resolves to correct result | PARTIAL LIVE | Status endpoint deployed; unauthenticated route probe returns 401, authenticated browser recovery still requires a tenant browser session |
 | Failure never returns misleading success | PARTIAL | Handler throws on missing/unapproved initiation; live UX/API negative test pending |
 | Canonical and legacy routes cannot both process same initiation | PASS LOCALLY | Legacy isolation tests pass |
 | Hermes runtime trace uses canonical tools | PARTIAL LIVE | CommandRegistry registered both canonical Phase 2 commands live; end-to-end Hermes tool invocation still pending |
-| Enum/migration drift fixed | PASS LIVE | AWL enum columns verified; migrations up to date; rollback-only Prisma enum write succeeded |
+| Enum/migration drift fixed | PASS LIVE | AWL enum columns verified; migrations up to date; strict Contabo Prisma enum write path passed |
 
 ## 5. Readiness Decision
 
-**Decision:** Phase 2 is deployed and materially on track, but G2 is not formally closed yet.
+**Decision:** Phase 2 is deployed and technically ready for reviewer evaluation, but G2 is not formally closed until sign-off is recorded.
 
 Phase 3 should not start until these final Phase 2 verification items are completed:
 
-- Restore/upgrade Neon compute quota, then rerun `G2-2026-07-26T13-08-PRISMA-ENUM` or a new equivalent strict Prisma-backed 20-run/concurrency verification.
 - Verify an authenticated frontend refresh/relogin recovery against `GET /enterprise-initiation/:initiationId/status`.
 - Verify a full Hermes `PROJECT_DISCOVERY` invocation trace using `approve_initiation` and `create_project_from_initiation` metadata, not direct project mutation.
 - Record formal reviewer sign-off for G2.
@@ -295,4 +301,4 @@ Phase 3 should not start until these final Phase 2 verification items are comple
 
 The checked-in Prisma schema, generated client, and live database have been reconciled to AWL-prefixed enum names for the affected Phase 2 columns.
 
-The live audit table now includes `correlationId` and `causationId` compatibility columns from the G2 drift migration. The remaining closure blocker is not schema drift; it is external database compute quota plus authenticated end-to-end reviewer verification.
+The live audit table now includes `correlationId` and `causationId` compatibility columns from the G2 drift migration. The remaining closure blocker is not schema drift or database target configuration; it is authenticated end-to-end reviewer verification and formal sign-off.

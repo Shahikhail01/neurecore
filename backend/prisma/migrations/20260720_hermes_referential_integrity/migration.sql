@@ -1,7 +1,7 @@
 -- Phase 1.3: Hermes tenant/user referential integrity
 -- Adds missing FK constraints that the Prisma schema defines but the
 -- live PostgreSQL instance never received because the schema evolved
--- incrementally after the Neon→Contabo baseline migration.
+-- incrementally after the Contabo baseline migration.
 
 ALTER TABLE "HermesAgent"
   ADD CONSTRAINT "HermesAgent_tenantId_fkey"

@@ -137,16 +137,8 @@ export default function PrivacyPage() {
                 Server infrastructure is located in Germany.
               </li>
               <li>
-                <strong>Neon (Neon.tech)</strong> — Managed PostgreSQL database provider.
-                Their privacy policy:{' '}
-                <a
-                  href="https://neon.tech/privacy-policy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[color:var(--accent-400)] hover:underline"
-                >
-                  neon.tech/privacy-policy
-                </a>
+                <strong>NeureCore Cloud (Contabo PostgreSQL)</strong> — Our managed
+                database infrastructure hosted on the same Contabo environment.
               </li>
               <li>
                 <strong>Upstash</strong> — Redis provider for session management.

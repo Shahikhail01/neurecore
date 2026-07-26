@@ -1,4 +1,4 @@
--- Fix Script: Reseed Data Issues from Neon to Contabo Migration
+-- Fix Script: Reseed Data Issues from legacy database migration
 -- Idempotent. Run after the reseed to repair data left in inconsistent states.
 --
 -- Fixes:

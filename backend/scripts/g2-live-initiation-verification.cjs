@@ -23,9 +23,9 @@ function loadEnv(file) {
   }
 }
 
-loadEnv(process.env.AWL_G2_ENV_FILE || path.join(__dirname, '..', '..', '.env.production'));
-loadEnv(path.join(__dirname, '..', '.env.production'));
 loadEnv(path.join(__dirname, '..', '.env'));
+loadEnv(path.join(__dirname, '..', '.env.production'));
+loadEnv(process.env.AWL_G2_ENV_FILE || path.join(__dirname, '..', '..', '.env.production'));
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();

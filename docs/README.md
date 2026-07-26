@@ -6,7 +6,7 @@ This folder contains everything needed to build and deploy **NeureCore Gold** - 
 
 > **Current Status**: Phase 1 ~95% Complete - Integration Testing (March 2026)
 >
-> - Backend deployed on Vercel with Neon PostgreSQL + Upstash Redis
+> - Backend deployed on Contabo with local PostgreSQL + Redis
 > - Both frontends implemented (Admin: 90%, Tenant: 85%)
 > - All Phase 1-4 modules implemented in backend
 

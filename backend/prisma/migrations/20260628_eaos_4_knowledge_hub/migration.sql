@@ -14,7 +14,7 @@
 -- Old MemoryEntry.embedding (text JSON) is left untouched per §14.1 Q6.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- Enable pgvector extension (idempotent; Neon Postgres supports it)
+-- Enable pgvector extension (idempotent on Contabo PostgreSQL when available)
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- CreateEnum

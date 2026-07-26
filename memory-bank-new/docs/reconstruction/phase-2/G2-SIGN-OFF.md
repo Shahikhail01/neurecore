@@ -11,13 +11,12 @@
 - Local architecture tests: 20 passed
 - Local certification tests: 16 passed
 - Local documents tool regression: 13 passed
-- Live DB 20-run repetition: PASS
-- Live DB concurrency duplicate test: PASS
+- Strict Contabo DB 20-run repetition: PASS, `G2-2026-07-26T13-28-CONTABO-PRISMA`
+- Strict Contabo DB concurrency duplicate test: PASS, 1 fulfilled and 9 rejected
 - Enum/migration drift: PASS, AWL enum columns verified live and migrations report no pending migrations
-- Deployed backend health: PASS, `GET https://brain.neurecore.com/api/v1/health` returned 200 at `2026-07-26T13:07:59.495Z`
+- Deployed backend health: PASS, `GET https://brain.neurecore.com/api/v1/health` returned 200 at `2026-07-26T13:27:47.949Z`
 - Deployed Hermes runtime trace: PARTIAL, live `CommandRegistry` registered `ApproveEnterpriseInitiationCommand:1.0` and `CreateProjectFromInitiationCommand:1.0`; full tool invocation trace still pending
-- Deployed frontend/status recovery: PARTIAL, status route is deployed and returns 401 instead of 404 without auth; authenticated browser recovery blocked by DB quota/session requirement
-- Strict post-drift G2 rerun: BLOCKED, Neon returned compute quota exceeded before tenant lookup
+- Deployed frontend/status recovery: PARTIAL, status route is deployed and returns 401 instead of 404 without auth; authenticated browser recovery still requires a tenant session
 
 ## Required Signatures
 
@@ -39,8 +38,6 @@ Codex records technical evidence only. Codex cannot sign as a human reviewer or 
 
 Required before closing G2:
 
-- Restore/upgrade Neon compute quota.
-- Rerun strict Prisma-backed live 20-run/concurrency verification after quota recovery.
 - Verify full Hermes `PROJECT_DISCOVERY` invocation trace in deployed logs.
 - Verify authenticated frontend refresh/relogin status recovery.
 - Collect all five human signatures above.
