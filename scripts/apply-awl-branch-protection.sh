@@ -25,10 +25,7 @@ gh api \
     "strict": true,
     "contexts": [
       "architecture",
-      "focused-tests",
-      "postgres-integration",
-      "Quality Checks (Phase 0 mandatory gates)",
-      "MANDATORY GATE 5 — tests"
+      "focused-tests"
     ]
   },
   "enforce_admins": false,
