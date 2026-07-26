@@ -65,12 +65,20 @@ export class OutboxService implements IOutboxRepository {
     leaseToken: string,
     error: string,
     nextAttemptAt?: Date,
+    retryCount = 0,
     classification: string | null = 'TRANSIENT_INFRASTRUCTURE',
   ): Promise<boolean> {
     // nextAttemptAt is optional; if not provided, use the policy's backoff
     // schedule. Callers may pass a custom value for granular control.
-    const when = nextAttemptAt ?? this.computeNextAttempt(new Date());
-    return this.repo.settleFailure(id, leaseToken, error, when, classification);
+    const when = nextAttemptAt ?? this.computeNextAttempt(new Date(), retryCount);
+    return this.repo.settleFailure(
+      id,
+      leaseToken,
+      error,
+      when,
+      retryCount,
+      classification,
+    );
   }
 
   async replayDeadLetter(
@@ -114,14 +122,14 @@ export class OutboxService implements IOutboxRepository {
   async executeInTransaction<T>(
     fn: (tx: TransactionalClient) => Promise<T>,
   ): Promise<T> {
-    // The unit-of-work contract belongs to PrismaUnitOfWork; we re-assert
-    // it here only as a convenience for callers that may want to bind a
-    // single typed transaction client to outbox operations.
-    return fn(this.asTransactional({} as Prisma.TransactionClient));
+    if (!('executeInTransaction' in this.repo) || typeof (this.repo as any).executeInTransaction !== 'function') {
+      throw new Error('OUTBOX_TRANSACTION_HELPER_UNAVAILABLE');
+    }
+    return (this.repo as any).executeInTransaction(fn);
   }
 
-  computeNextAttempt(now: Date): Date {
-    const attempt = Math.max(1, this.policy.maxAttempts - 1);
+  computeNextAttempt(now: Date, retryCount = 0): Date {
+    const attempt = Math.max(1, retryCount + 1);
     const exponential = Math.min(
       this.policy.maxBackoffMs,
       this.policy.baseBackoffMs * Math.pow(2, attempt - 1),

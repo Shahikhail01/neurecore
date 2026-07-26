@@ -1,8 +1,8 @@
 // src/common/ports/task-repository.port.ts
 import type { TaskStatus } from '@prisma/client';
-import { TASK_REPOSITORY } from './di-tokens';
-
 export { TASK_REPOSITORY };
+
+import { TASK_REPOSITORY } from './di-tokens';
 
 export interface TaskEntity {
   id: string;
@@ -11,17 +11,50 @@ export interface TaskEntity {
   title: string;
   version: number;
   agentId: string | null;
+  requiredRole: string | null;
+  requiredCapabilities: string[];
+  dataClassification: string | null;
+  departmentId: string | null;
 }
 
 export interface UpdateTaskStatusInput {
   id: string;
   expectedVersion: number;
   status: TaskStatus;
-  agentId?: string;
+  agentId?: string | null;
+  /** When present, the update is gated by version equality. */
+  requireVersionMatch?: boolean;
+}
+
+export interface UpdateTaskAssignmentInput {
+  id: string;
+  expectedVersion: number;
+  agentId: string | null;
+  status: TaskStatus;
 }
 
 export interface ITaskRepository {
   findById(tenantId: string, id: string): Promise<TaskEntity | null>;
-  updateStatus(input: UpdateTaskStatusInput, tx?: any): Promise<TaskEntity>;
-  countActiveByAgent(agentId: string, statuses: TaskStatus[]): Promise<number>;
+  updateStatus(
+    input: UpdateTaskStatusInput,
+    tx?: any,
+  ): Promise<TaskEntity>;
+  /**
+   * Count tasks currently in any of the supplied statuses for the
+   * given agent. Used both for eligibility checks (active workload)
+   * and for "does the agent have a free slot" claims.
+   */
+  countActiveByAgent(
+    agentId: string,
+    statuses: TaskStatus[],
+  ): Promise<number>;
+  /**
+   * Optimistic update for task ↔ agent linkage during the AssignTask
+   * transaction. Returns the updated entity; throws
+   * `OPTIMISTIC_LOCK_FAILED` if expectedVersion ≠ currentVersion.
+   */
+  updateAssignment(
+    input: UpdateTaskAssignmentInput,
+    tx?: any,
+  ): Promise<TaskEntity>;
 }

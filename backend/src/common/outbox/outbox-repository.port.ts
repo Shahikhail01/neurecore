@@ -141,6 +141,7 @@ export interface IOutboxRepository {
     leaseToken: string,
     error: string,
     nextAttemptAt: Date,
+    retryCount: number,
     classification: string | null,
   ): Promise<boolean>;
 

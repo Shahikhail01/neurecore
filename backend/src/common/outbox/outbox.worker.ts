@@ -188,12 +188,13 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
       const handler = this.handlers.get(event.eventType);
       if (!handler) {
         this.logger.warn(`No handler for event type ${event.eventType}`);
-        const promoted = await this.outbox
+          const promoted = await this.outbox
           .settleFailure(
             event.id,
             this.workerId,
             'no handler registered',
             new Date(Date.now() + this.options.leaseMs),
+            event.retryCount + 1,
             'INVALID_INPUT',
           )
           .catch((e: unknown) => {
@@ -224,6 +225,7 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
             this.workerId,
             msg,
             nextAt,
+            event.retryCount + 1,
             classification,
           );
           if (promoted) deadLettered++;

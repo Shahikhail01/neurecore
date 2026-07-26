@@ -122,12 +122,12 @@ export function makeFakeRepo(options: FakeRepoOptions = {}) {
         lastError: reason,
       });
     },
-    async settleFailure(id, leaseToken, error, nextAttemptAt, classification) {
+    async settleFailure(id, leaseToken, error, nextAttemptAt, retryCount, classification) {
       const row = persisted.get(id);
       if (!row || row.processingWorkerId !== leaseToken) {
         return false;
       }
-      const newRetry = (row.retryCount ?? 0) + 1;
+      const newRetry = retryCount ?? (row.retryCount ?? 0) + 1;
       const isDead = newRetry >= 3;
       const updated: OutboxEventRecord = {
         ...row,

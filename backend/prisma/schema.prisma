@@ -925,29 +925,31 @@ model AgentTemplate {
 // ─── Agent ────────────────────────────────────────────────────────────────
 
 model Agent {
-  id                String               @id @default(uuid())
-  name              String
-  description       String?
-  type              AgentType            @default(FUNCTIONAL)
-  status            AgentStatus          @default(IDLE)
-  model             String               @default("gpt-4o-mini") // LLM model ID
-  systemPrompt      String?              @db.Text
-  instructions      String?              @db.Text
-  budgetPerDay      Decimal?             @db.Decimal(10, 4)
+  id                 String               @id @default(uuid())
+  name               String
+  description        String?
+  type               AgentType            @default(FUNCTIONAL)
+  status             AgentStatus          @default(IDLE)
+  model              String               @default("gpt-4o-mini") // LLM model ID
+  systemPrompt       String?              @db.Text
+  instructions       String?              @db.Text
+  budgetPerDay       Decimal?             @db.Decimal(10, 4)
   // Phase 1-10: Agent capability metadata
-  role              String?
-  capabilities      String[]             @default([])
-  maxConcurrency    Int                  @default(5)
-  availability      AwlAgentAvailability @default(AVAILABLE)
-  archived          Boolean              @default(false)
+  role               String?
+  capabilities       String[]             @default([])
+  maxConcurrency     Int                  @default(5)
+  availability       AwlAgentAvailability @default(AVAILABLE)
+  archived           Boolean              @default(false)
+  // Phase 4: data classification scope (plan §6.1)
+  dataClassification AgentClassification  @default(INTERNAL)
   // Back-relations
-  executionAttempts ExecutionAttempt[]
-  taskAssignments   TaskAssignment[]
-  totalSpend        Decimal              @default(0) @db.Decimal(10, 4)
-  permissions       Json                 @default("[]") // array of allowed actions
-  config            Json                 @default("{}")
-  metadata          Json                 @default("{}")
-  isActive          Boolean              @default(true)
+  executionAttempts  ExecutionAttempt[]
+  taskAssignments    TaskAssignment[]
+  totalSpend         Decimal              @default(0) @db.Decimal(10, 4)
+  permissions        Json                 @default("[]") // array of allowed actions
+  config             Json                 @default("{}")
+  metadata           Json                 @default("{}")
+  isActive           Boolean              @default(true)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1017,6 +1019,8 @@ model Agent {
   @@index([workspaceId])
   @@index([tenantId, status, createdAt(sort: Desc)])
   @@index([tenantId, createdAt(sort: Desc)])
+  // Phase 4 — assignment eligibility search (plan §6.2)
+  @@index([tenantId, dataClassification, availability, archived])
   @@map("agents")
 }
 
@@ -1075,6 +1079,9 @@ model Task {
 
   // Phase 3 — Output payload (kept for backward compatibility)
   expectedOutput Json? @default("{}")
+
+  // Phase 4 — Optimistic concurrency on task state mutations (plan §6.2)
+  version Int @default(1)
 
   // Phase 3 — Project + Stage linkage (audit fix 2026-07-09)
   stageId   String?
@@ -5484,6 +5491,36 @@ enum AwlExecutionEngine {
   canonical
 }
 
+// Phase 4: agent-level data classification (plan §6.1)
+enum AgentClassification {
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+}
+
+// Phase 4: per-task manual override audit (plan §6.5 "Manual override is
+// attributable and auditable"). Every human-driven reassignment or
+// forced override writes a row here, while auto-assignments stay
+// covered by the existing audit infrastructure.
+model TaskAssignmentOverrideAudit {
+  id                           String   @id @default(cuid())
+  tenantId                     String
+  taskId                       String
+  agentId                      String
+  assignmentGeneration         Int
+  previousAgentId              String?
+  rationale                    String   @db.Text
+  overrideByActorId            String
+  overrideByActorType          String   @default("HUMAN") // HUMAN | SYSTEM
+  dataClassificationAtOverride String?
+  occurredAt                   DateTime @default(now())
+
+  @@index([tenantId, taskId, overrideByActorId])
+  @@index([tenantId, agentId])
+  @@index([occurredAt])
+  @@map("task_assignment_override_audits")
+}
+
 model EnterpriseInitiation {
   id                 String           @id @default(cuid())
   tenantId           String
@@ -5591,24 +5628,30 @@ model EvidenceArtifact {
 }
 
 model TaskAssignment {
-  id         String               @id @default(cuid())
-  tenantId   String
-  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  taskId     String
-  task       Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  agentId    String
-  agent      Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  generation Int
-  rationale  String               @db.Text
-  status     TaskAssignmentStatus @default(ACTIVE)
-  version    Int                  @default(1)
-  createdAt  DateTime             @default(now())
-  updatedAt  DateTime             @updatedAt
+  id                String               @id @default(cuid())
+  tenantId          String
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  taskId            String
+  task              Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  agentId           String
+  agent             Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  generation        Int
+  rationale         String               @db.Text
+  status            TaskAssignmentStatus @default(ACTIVE)
+  version           Int                  @default(1)
+  // Phase 4 — release / reassign / expiry lifecycle (plan §6.2)
+  releasedAt        DateTime?
+  releasedByActorId String?
+  releaseReason     String?
+  expiresAt         DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   @@unique([tenantId, taskId, generation])
   @@index([tenantId])
   @@index([taskId])
   @@index([agentId])
+  @@index([status, expiresAt], map: "task_assignments_release_sweep_idx")
   @@map("task_assignments")
 }
 

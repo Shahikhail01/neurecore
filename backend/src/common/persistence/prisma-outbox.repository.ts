@@ -71,6 +71,12 @@ export class PrismaOutboxRepository implements IOutboxRepository {
     }
   }
 
+  async executeInTransaction<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction((tx) => fn(tx));
+  }
+
   async claimAvailable(
     workerId: string,
     leaseMs: number,
@@ -166,59 +172,73 @@ export class PrismaOutboxRepository implements IOutboxRepository {
     leaseToken: string,
     error: string,
     nextAttemptAt: Date,
+    retryCount: number,
     classification: string | null,
   ): Promise<boolean> {
-    // Atomic increment + classify is the durability boundary: any worker
-    // settling failure must consume this row exactly once.
-    const updated = await this.prisma.enterpriseEventOutbox.update({
-      where: { id },
-      data: {
-        status: { set: 'PENDING' },
-        retryCount: { increment: 1 },
-        processingWorkerId: null,
-        leaseExpiresAt: null,
-        lastError: error,
-        lastErrorClassification: classification,
-      },
-    });
-
-    const newRetry = updated.retryCount;
-    const isDeadLetter = newRetry >= 3;
-    if (isDeadLetter) {
-      await this.prisma.enterpriseEventOutbox.update({
-        where: { id },
+    return this.prisma.$transaction(async (tx) => {
+      const updatedCount = await tx.enterpriseEventOutbox.updateMany({
+        where: {
+          id,
+          status: 'PROCESSING',
+          processingWorkerId: leaseToken,
+        },
         data: {
-          status: 'DEAD_LETTER',
-          nextAttemptAt: null,
+          retryCount: { increment: 1 },
+          lastError: error,
+          lastErrorClassification: classification,
+          leaseExpiresAt: null,
+          processingWorkerId: null,
         },
       });
-      await this.prisma.enterpriseEventDeadLetter.upsert({
-        where: { originalEventId: id },
-        update: {
-          retryCount: newRetry,
-          lastError: error,
-          lastAttemptAt: new Date(),
-          replayStatus: 'NONE',
-        },
-        create: {
-          originalEventId: id,
-          eventType: updated.eventType,
-          tenantId: updated.tenantId,
-          consumerId: TERMINAL_WORKER,
-          payload: updated.payload as Prisma.InputJsonValue,
-          retryCount: newRetry,
-          lastError: error,
-          replayStatus: 'NONE',
-        },
-      });
-      return true;
-    }
+      if (updatedCount.count !== 1) {
+        return false;
+      }
 
-    await this.prisma.enterpriseEventOutbox.update({
-      where: { id },
-      data: { nextAttemptAt },
+      const updated = await tx.enterpriseEventOutbox.findUnique({
+        where: { id },
+      });
+      if (!updated) {
+        return false;
+      }
+
+      const newRetry = retryCount;
+      const isDeadLetter = newRetry >= 3;
+      if (isDeadLetter) {
+        await tx.enterpriseEventOutbox.update({
+          where: { id },
+          data: {
+            status: 'DEAD_LETTER',
+            nextAttemptAt: null,
+          },
+        });
+        await tx.enterpriseEventDeadLetter.upsert({
+          where: { originalEventId: id },
+          update: {
+            retryCount: newRetry,
+            lastError: error,
+            lastAttemptAt: new Date(),
+            replayStatus: 'NONE',
+          },
+          create: {
+            originalEventId: id,
+            eventType: updated.eventType,
+            tenantId: updated.tenantId,
+            consumerId: TERMINAL_WORKER,
+            payload: updated.payload as Prisma.InputJsonValue,
+            retryCount: newRetry,
+            lastError: error,
+            replayStatus: 'NONE',
+          },
+        });
+        return true;
+      }
+
+      await tx.enterpriseEventOutbox.update({
+        where: { id },
+        data: { status: 'PENDING', nextAttemptAt },
+      });
+      return false;
     });
-    return false;
   }
 
   async replayDeadLetter(
@@ -227,34 +247,39 @@ export class PrismaOutboxRepository implements IOutboxRepository {
   ): Promise<boolean> {
     // Replay returns a DEAD_LETTER row back into PENDING with retryCount=0.
     // The replay completion is recorded against the dead-letter row.
-    const dl = await this.prisma.enterpriseEventDeadLetter.findUnique({
-      where: { originalEventId },
+    return this.prisma.$transaction(async (tx) => {
+      const dl = await tx.enterpriseEventDeadLetter.findUnique({
+        where: { originalEventId },
+      });
+      if (!dl) return false;
+      const updatedCount = await tx.enterpriseEventOutbox.updateMany({
+        where: {
+          id: originalEventId,
+          status: 'DEAD_LETTER',
+        },
+        data: {
+          status: 'PENDING',
+          retryCount: 0,
+          nextAttemptAt: new Date(),
+          lastError: null,
+          lastErrorClassification: null,
+          leaseExpiresAt: null,
+          processingWorkerId: null,
+          processingStartedAt: null,
+          processedAt: null,
+          dispatchedAt: null,
+        },
+      });
+      if (updatedCount.count !== 1) return false;
+      await tx.enterpriseEventDeadLetter.update({
+        where: { originalEventId },
+        data: {
+          replayedAt: new Date(),
+          replayStatus: 'REPLAYED',
+        },
+      });
+      return true;
     });
-    if (!dl) return false;
-    const updated = await this.prisma.enterpriseEventOutbox.update({
-      where: { id: originalEventId },
-      data: {
-        status: 'PENDING',
-        retryCount: 0,
-        nextAttemptAt: new Date(),
-        lastError: null,
-        lastErrorClassification: null,
-        leaseExpiresAt: null,
-        processingWorkerId: null,
-        processingStartedAt: null,
-        processedAt: null,
-        dispatchedAt: null,
-      },
-    });
-    void updated;
-    await this.prisma.enterpriseEventDeadLetter.update({
-      where: { originalEventId },
-      data: {
-        replayedAt: new Date(),
-        replayStatus: 'REPLAYED',
-      },
-    });
-    return true;
   }
 
   async recoverStale(now: Date): Promise<number> {
