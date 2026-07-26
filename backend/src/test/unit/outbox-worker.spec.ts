@@ -49,7 +49,7 @@ describe('OutboxWorker (Phase 3)', () => {
     let processedEvents = 0;
     let concurrentTicks = 0;
     let maxConcurrent = 0;
-    const worker = new OutboxWorker(repo, {
+    const worker = OutboxWorker.forTesting(repo, {
       processIntervalMs: 10,
       processBatch: 5,
       leaseMs: 30,
@@ -74,7 +74,7 @@ describe('OutboxWorker (Phase 3)', () => {
   it('routes a successful handler to markProcessed and clears the lease', async () => {
     const fake = makeFakeRepo();
     const repo = fake.repo;
-    const worker = new OutboxWorker(repo, {
+    const worker = OutboxWorker.forTesting(repo, {
       processIntervalMs: 10,
       processBatch: 5,
       leaseMs: 100,
@@ -94,7 +94,7 @@ describe('OutboxWorker (Phase 3)', () => {
   it('settles failure into dead-letter after retry exhaustion', async () => {
     const fake = makeFakeRepo();
     const repo = fake.repo;
-    const worker = new OutboxWorker(repo, {
+    const worker = OutboxWorker.forTesting(repo, {
       processIntervalMs: 10,
       processBatch: 5,
       leaseMs: 0,
@@ -119,7 +119,7 @@ describe('OutboxWorker (Phase 3)', () => {
   it('recovers expired leases back to PENDING without bumping fail count', async () => {
     const fake = makeFakeRepo({ staleRows: 1 });
     const repo = fake.repo;
-    const worker = new OutboxWorker(repo, {
+    const worker = OutboxWorker.forTesting(repo, {
       processIntervalMs: 10,
       processBatch: 1,
       leaseMs: 50,
@@ -138,7 +138,7 @@ describe('OutboxWorker (Phase 3)', () => {
   it('does not re-claim a row that has already been PROCESSED', async () => {
     const fake = makeFakeRepo();
     const repo = fake.repo;
-    const worker = new OutboxWorker(repo, {
+    const worker = OutboxWorker.forTesting(repo, {
       processIntervalMs: 10,
       processBatch: 5,
       leaseMs: 50,
@@ -163,7 +163,7 @@ describe('OutboxWorker (Phase 3)', () => {
   it('classifies domain failures so dead-letter analytics stay meaningful', async () => {
     const fake = makeFakeRepo();
     const repo = fake.repo;
-    const worker = new OutboxWorker(repo, {
+    const worker = OutboxWorker.forTesting(repo, {
       processIntervalMs: 10,
       processBatch: 5,
       leaseMs: 5,

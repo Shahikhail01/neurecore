@@ -1,8 +1,9 @@
 // src/common/outbox/outbox.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   DEFAULT_OUTBOX_RETRY_POLICY,
+  OUTBOX_REPOSITORY,
   type IOutboxRepository,
   type OutboxBacklogSummary,
   type OutboxDeadLetterSummary,
@@ -28,7 +29,7 @@ export class OutboxService implements IOutboxRepository {
   private readonly logger = new Logger(OutboxService.name);
   private readonly policy: OutboxRetryPolicy;
 
-  constructor(private readonly repo: IOutboxRepository) {
+  constructor(@Inject(OUTBOX_REPOSITORY) private readonly repo: IOutboxRepository) {
     this.policy = DEFAULT_OUTBOX_RETRY_POLICY;
   }
 

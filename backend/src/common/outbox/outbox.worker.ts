@@ -1,6 +1,12 @@
 // src/common/outbox/outbox.worker.ts
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import type {
   IOutboxRepository,
   OutboxEventRecord,
@@ -17,18 +23,12 @@ export interface WorkerOptions {
   processBatch: number;
   /** Lease lifetime (ms) granted to a claimed row. */
   leaseMs: number;
-  /** Maximum tolerated concurrent ticks (1 = strictly serial). */
-  maxConcurrentTicks: number;
-  /** Maximum total processed-count before refusing further dispatch. */
-  maxProcessingCount?: number;
 }
 
 export const DEFAULT_WORKER_OPTIONS: WorkerOptions = {
   processIntervalMs: 1000,
   processBatch: 10,
   leaseMs: 30000,
-  maxConcurrentTicks: 1,
-  maxProcessingCount: 50,
 };
 
 export interface TickResult {
@@ -54,84 +54,45 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
   private shuttingDown = false;
 
   /**
-   * Production wiring: NestJS resolves `OUTBOX_REPOSITORY` through
-   * `OutboxWorker.setModuleRef(this.moduleRef)` registered by `OutboxModule`.
+   * Production constructor. NestJS DI resolves `OUTBOX_REPOSITORY` through
+   * `@Inject(OUTBOX_REPOSITORY)` and the registered token-based provider.
    *
-   * Test wiring: callers may construct the worker directly with
-   *   new OutboxWorker(repo, options)
-   * to bypass DI.
+   * Tests should use `OutboxWorker.forTesting(repo, options)` to bypass DI.
    */
-  private outbox: IOutboxRepository | null;
-
-  private static moduleRef: ModuleRef | null = null;
-
-  /** Called by `OutboxModule.onModuleInit` to enable production DI resolution. */
-  static setModuleRef(moduleRef: ModuleRef): void {
-    OutboxWorker.moduleRef = moduleRef;
+  constructor(
+    @Inject(OUTBOX_REPOSITORY) outbox: IOutboxRepository,
+    @Optional() options?: Partial<WorkerOptions>,
+  ) {
+    this.outbox = outbox;
+    this.options = { ...DEFAULT_WORKER_OPTIONS, ...(options ?? {}) };
   }
 
-  constructor(...args: unknown[]) {
-    let repo: IOutboxRepository | null = null;
-    let opts: Partial<WorkerOptions> = {};
-    for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
-      if (!arg || typeof arg !== 'object') continue;
-      const a = arg as { publish?: unknown } & Partial<WorkerOptions>;
-      if (typeof a.publish === 'function') {
-        repo = a as unknown as IOutboxRepository;
-        continue;
-      }
-      if (
-        'processIntervalMs' in a ||
-        'leaseMs' in a ||
-        'processBatch' in a
-      ) {
-        opts = a as Partial<WorkerOptions>;
-      }
-    }
-    if (!repo && args.length > 0) {
-      // First arg may be the repo directly when the test calls
-      //   new OutboxWorker(repo, opts)
-      // and some Object.prototype methods shadow the typed check above.
-      const firstArg = args[0] as { publish?: unknown } | null;
-      if (firstArg && typeof firstArg.publish === 'function') {
-        repo = firstArg as unknown as IOutboxRepository;
-      }
-    }
-    // Production paths leave `repo` null until onModuleInit resolves it
-    // through OutboxWorker.moduleRef. Test paths always set it directly.
-    this.outbox = (repo ?? null) as IOutboxRepository | null;
-    this.options = { ...DEFAULT_WORKER_OPTIONS, ...opts };
+  /** Test-only factory that emulates the production constructor signature. */
+  static forTesting(
+    repo: IOutboxRepository,
+    options?: Partial<WorkerOptions>,
+  ): OutboxWorker {
+    const w = Object.create(OutboxWorker.prototype) as OutboxWorker;
+    (w as any).outbox = repo;
+    (w as any).options = { ...DEFAULT_WORKER_OPTIONS, ...(options ?? {}) };
+    Object.assign(w, {
+      logger: new Logger(OutboxWorker.name),
+      workerId: `worker-test-${process.pid}-${Date.now()}`,
+      timer: null,
+      started: false,
+      inflight: null,
+      inflightStartedAt: null,
+      handlers: new Map<string, EventHandler>(),
+      circuit: new CircuitBreaker(),
+      shuttingDown: false,
+    });
+    return w;
   }
+
+  private outbox: IOutboxRepository;
 
   onModuleInit(): void {
-    if (!this.outbox || typeof (this.outbox as any).publish !== 'function') {
-      if (OutboxWorker.moduleRef) {
-        try {
-          this.outbox = OutboxWorker.moduleRef.get<IOutboxRepository>(
-            OUTBOX_REPOSITORY,
-            { strict: false },
-          );
-        } catch (e) {
-          this.logger.error(
-            `Failed to resolve OUTBOX_REPOSITORY: ${
-              e instanceof Error ? e.message : String(e)
-            }`,
-          );
-        }
-      }
-    }
-    if (!this.outbox || typeof (this.outbox as any).publish !== 'function') {
-      throw new Error('OUTBOX_REPOSITORY_REQUIRED');
-    }
     this.start();
-  }
-
-  private requireRepo(): IOutboxRepository {
-    if (!this.outbox || typeof this.outbox.publish !== 'function') {
-      throw new Error('OUTBOX_REPOSITORY_NOT_INITIALIZED');
-    }
-    return this.outbox;
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -200,10 +161,9 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
         circuitOpen: true,
       };
     }
-    const repo = this.requireRepo();
 
     // Stale-lease recovery happens at the head of every tick.
-    const staleRecovered = await repo
+    const staleRecovered = await this.outbox
       .recoverStale(new Date())
       .catch((e: unknown) => {
         this.logger.error(`recoverStale failed: ${e}`);
@@ -213,7 +173,7 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Recovered ${staleRecovered} stale lease(s)`);
     }
 
-    const events = await repo.claimAvailable(
+    const events = await this.outbox.claimAvailable(
       this.workerId,
       this.options.leaseMs,
       this.options.processBatch,
@@ -228,7 +188,7 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
       const handler = this.handlers.get(event.eventType);
       if (!handler) {
         this.logger.warn(`No handler for event type ${event.eventType}`);
-        const promoted = await repo
+        const promoted = await this.outbox
           .settleFailure(
             event.id,
             this.workerId,
@@ -251,7 +211,7 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
 
       try {
         await handler(event);
-        await repo.markProcessed(event.id, this.workerId);
+        await this.outbox.markProcessed(event.id, this.workerId);
         this.circuit.recordSuccess();
         processed++;
       } catch (e) {
@@ -259,7 +219,7 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
         const classification = classifyFailure(e);
         const nextAt = new Date(Date.now() + this.options.leaseMs);
         try {
-          const promoted = await repo.settleFailure(
+          const promoted = await this.outbox.settleFailure(
             event.id,
             this.workerId,
             msg,
