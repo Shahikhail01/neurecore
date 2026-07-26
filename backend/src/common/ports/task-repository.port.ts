@@ -1,7 +1,8 @@
 // src/common/ports/task-repository.port.ts
 import type { TaskStatus } from '@prisma/client';
+import { TASK_REPOSITORY } from './di-tokens';
 
-export const TASK_REPOSITORY = Symbol('TASK_REPOSITORY');
+export { TASK_REPOSITORY };
 
 export interface TaskEntity {
   id: string;

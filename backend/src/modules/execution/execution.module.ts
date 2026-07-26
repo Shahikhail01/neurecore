@@ -1,5 +1,6 @@
 // src/modules/execution/execution.module.ts
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
+import { PersistenceModule } from '../../common/persistence/persistence.module';
 import { ExecutionOrchestrator } from './application/execution-orchestrator';
 import { ExecutionController } from './execution.controller';
 import { ExecutionWorker } from './execution.worker';
@@ -8,6 +9,7 @@ import { PrismaExecutionAttemptRepository } from './infrastructure/prisma-execut
 import { EXECUTION_ATTEMPT_REPOSITORY } from './domain/ports/execution-attempt-repository.port';
 
 @Module({
+  imports: [PersistenceModule],
   controllers: [ExecutionController],
   providers: [
     ExecutionOrchestrator,
