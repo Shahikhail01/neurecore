@@ -3,7 +3,7 @@
 **Date:** 2026-07-26  
 **Branch:** `feature/awl-g1-operational-gates`  
 **Plan Reference:** `memory-bank-new/docs/AI-IMPLEMENTATION-PLAN-v2.md` §4  
-**Status:** DB INVARIANTS VERIFIED LIVE — deployed Hermes/frontend runtime verification and formal reviewer sign-off still pending
+**Status:** DEPLOYED RUNTIME PARTIALLY VERIFIED — refreshed live G2 repetition blocked by Neon quota; formal reviewer sign-off pending
 
 ## 1. Objective
 
@@ -197,12 +197,24 @@ uniqueInitiationLinks: 21
 duplicateInitiationLinks: []
 ```
 
+Follow-up after enum/migration reconciliation:
+
+```text
+Run id: G2-2026-07-26T13-08-PRISMA-ENUM
+Path: Contabo host, updated runner using Prisma project.create with executionEngineVersion='canonical'
+Result: BLOCKED before tenant lookup
+Database error: Neon account/project exceeded compute time quota
+```
+
+The original 20-run/concurrency invariant remains valid as prior live evidence. The stricter post-fix rerun could not complete because the database provider rejected compute before the first read.
+
 ### 3.7 Deployed Runtime Probes
 
 Backend health:
 
 ```text
 GET https://brain.neurecore.com/api/v1/health -> 200
+timestamp: 2026-07-26T13:07:59.495Z
 ```
 
 PM2 status on Contabo:
@@ -217,21 +229,42 @@ neurecore-cors-proxy online
 Hermes runtime trace:
 
 ```text
-No recent log trace found for:
-- PROJECT_DISCOVERY
-- approve_initiation
-- create_project_from_initiation
-- ApproveEnterpriseInitiationCommand
-- CreateProjectFromInitiationCommand
+CommandRegistry registered:
+- ApproveEnterpriseInitiationCommand:1.0
+- CreateProjectFromInitiationCommand:1.0
 ```
 
 Frontend/API recovery probe:
 
 ```text
-GET https://brain.neurecore.com/api/v1/enterprise-initiation/G2-probe/status -> 404
+GET https://brain.neurecore.com/api/v1/enterprise-initiation/G2-probe/status -> 401
 ```
 
-Conclusion: the Phase 2 status route is implemented locally but is not deployed in the currently running backend. Frontend refresh/relogin recovery cannot be honestly verified against production runtime until the Phase 2 commit is deployed.
+Conclusion: the Phase 2 status route is deployed and protected by authentication. Public unauthenticated probing verifies routing presence by returning auth failure instead of 404. Full browser/frontend refresh-relogin verification still requires an authenticated tenant session and a live database with compute available.
+
+### 3.8 Enum and Migration Drift Reconciliation
+
+Applied migrations:
+
+```text
+20260726_g2_enum_audit_drift
+20260726_g2_enum_column_casts
+```
+
+Verified live schema state:
+
+```text
+agents.availability -> AwlAgentAvailability
+projects.executionEngineVersion -> AwlExecutionEngine
+reviews.status -> AwlReviewStatus
+prisma migrate deploy -> No pending migrations to apply
+```
+
+Additional Prisma enum write proof:
+
+```text
+Prisma project create with executionEngineVersion='canonical' succeeded inside rollback-only verification transaction.
+```
 
 ## 4. G2 Criteria Status
 
@@ -241,24 +274,25 @@ Conclusion: the Phase 2 status route is implemented locally but is not deployed 
 | Zero duplicate projects | PASS DB | Live concurrency test: 1 success, 9 rejected, 0 duplicate initiation links |
 | No tool performs a direct business mutation | PASS LOCALLY | Architecture tests pass |
 | Project and outbox event commit together | PASS DB | Live run created 21 projects and 21 outbox events in transaction-scoped flow |
-| Refresh/relogin resolves to correct result | BLOCKED | Status endpoint implemented locally, deployed backend returns 404 |
+| Refresh/relogin resolves to correct result | PARTIAL LIVE | Status endpoint deployed; unauthenticated route probe returns 401, authenticated browser recovery blocked by DB quota/session requirement |
 | Failure never returns misleading success | PARTIAL | Handler throws on missing/unapproved initiation; live UX/API negative test pending |
 | Canonical and legacy routes cannot both process same initiation | PASS LOCALLY | Legacy isolation tests pass |
-| Hermes runtime trace uses canonical tools | BLOCKED | No deployed runtime trace found for Phase 2 tool names/commands |
+| Hermes runtime trace uses canonical tools | PARTIAL LIVE | CommandRegistry registered both canonical Phase 2 commands live; end-to-end Hermes tool invocation still pending |
+| Enum/migration drift fixed | PASS LIVE | AWL enum columns verified; migrations up to date; rollback-only Prisma enum write succeeded |
 
 ## 5. Readiness Decision
 
-**Decision:** Phase 2 DB invariants are on track and verified live, but G2 is not formally closed yet.
+**Decision:** Phase 2 is deployed and materially on track, but G2 is not formally closed yet.
 
 Phase 3 should not start until these final Phase 2 verification items are completed:
 
-- Deploy the Phase 2 backend code containing `GET /enterprise-initiation/:initiationId/status`.
-- Verify Hermes runtime trace shows `PROJECT_DISCOVERY` using `approve_initiation` and `create_project_from_initiation` metadata, not direct project mutation.
-- Verify frontend refresh/relogin recovery against `GET /enterprise-initiation/:initiationId/status`.
+- Restore/upgrade Neon compute quota, then rerun `G2-2026-07-26T13-08-PRISMA-ENUM` or a new equivalent strict Prisma-backed 20-run/concurrency verification.
+- Verify an authenticated frontend refresh/relogin recovery against `GET /enterprise-initiation/:initiationId/status`.
+- Verify a full Hermes `PROJECT_DISCOVERY` invocation trace using `approve_initiation` and `create_project_from_initiation` metadata, not direct project mutation.
 - Record formal reviewer sign-off for G2.
 
 ## 6. Notes
 
-The checked-in Prisma schema currently declares plain enum names, while the local generated client exposes AWL-prefixed enum exports. The live database enum type is plain `ExecutionEngine`; Prisma writes using the generated `AwlExecutionEngine` type fail unless explicitly cast. This must be normalized before deploying Phase 2 application code.
+The checked-in Prisma schema, generated client, and live database have been reconciled to AWL-prefixed enum names for the affected Phase 2 columns.
 
-The live audit table also lacks the local AWL `correlationId` and `causationId` columns. The verification runner stored correlation evidence inside `audit_logs.details` for compatibility. Migration deployment must be reconciled before formal G2 closure.
+The live audit table now includes `correlationId` and `causationId` compatibility columns from the G2 drift migration. The remaining closure blocker is not schema drift; it is external database compute quota plus authenticated end-to-end reviewer verification.

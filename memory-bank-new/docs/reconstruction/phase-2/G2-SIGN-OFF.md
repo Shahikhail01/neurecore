@@ -13,8 +13,11 @@
 - Local documents tool regression: 13 passed
 - Live DB 20-run repetition: PASS
 - Live DB concurrency duplicate test: PASS
-- Deployed Hermes runtime trace: BLOCKED, Phase 2 runtime not deployed
-- Deployed frontend/status recovery: BLOCKED, deployed backend returns 404 for status route
+- Enum/migration drift: PASS, AWL enum columns verified live and migrations report no pending migrations
+- Deployed backend health: PASS, `GET https://brain.neurecore.com/api/v1/health` returned 200 at `2026-07-26T13:07:59.495Z`
+- Deployed Hermes runtime trace: PARTIAL, live `CommandRegistry` registered `ApproveEnterpriseInitiationCommand:1.0` and `CreateProjectFromInitiationCommand:1.0`; full tool invocation trace still pending
+- Deployed frontend/status recovery: PARTIAL, status route is deployed and returns 401 instead of 404 without auth; authenticated browser recovery blocked by DB quota/session requirement
+- Strict post-drift G2 rerun: BLOCKED, Neon returned compute quota exceeded before tenant lookup
 
 ## Required Signatures
 
@@ -36,9 +39,8 @@ Codex records technical evidence only. Codex cannot sign as a human reviewer or 
 
 Required before closing G2:
 
-- Normalize Prisma enum/database enum drift.
-- Reconcile/deploy AWL audit correlation columns or update code to match live schema.
-- Deploy Phase 2 backend route and Hermes tool metadata.
-- Verify Hermes runtime trace in deployed logs.
-- Verify frontend refresh/relogin status recovery.
+- Restore/upgrade Neon compute quota.
+- Rerun strict Prisma-backed live 20-run/concurrency verification after quota recovery.
+- Verify full Hermes `PROJECT_DISCOVERY` invocation trace in deployed logs.
+- Verify authenticated frontend refresh/relogin status recovery.
 - Collect all five human signatures above.
