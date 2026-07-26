@@ -3,7 +3,10 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { AutomationEventType, AutomationStatus } from '@prisma/client';
 import type { IUnitOfWork } from '../../../common/ports/transaction.interface';
 import { UNIT_OF_WORK } from '../../../common/ports/transaction.interface';
-import type { IOutboxRepository } from '../../../common/outbox/outbox-repository.port';
+import type {
+  IOutboxRepository,
+  OutboxEventRecord,
+} from '../../../common/outbox/outbox-repository.port';
 import { OUTBOX_REPOSITORY } from '../../../common/outbox/outbox-repository.port';
 import type { IAuditRepository } from '../../../common/ports/audit.port';
 import { AUDIT_REPOSITORY } from '../../../common/ports/audit.port';
@@ -63,13 +66,21 @@ export class ProjectAutomationHandler {
     private readonly timeline: TimelineService,
   ) {}
 
-  async handleProjectAutomationRequested(event: {
-    id: string;
-    tenantId: string;
-    payload: any;
-    correlationId: string;
-  }): Promise<void> {
-    const { projectId, automationConfig } = event.payload;
+  async handleProjectAutomationRequested(event: OutboxEventRecord): Promise<void> {
+    const { projectId, automationConfig } = event.payload as {
+      projectId: string;
+      automationConfig?: { generateGoals?: boolean; generateTasks?: boolean };
+    };
+
+    if (!projectId) {
+      this.logger.warn(
+        `ProjectAutomationRequested payload missing projectId (event ${event.id}); treating as poison.`,
+      );
+      throw new Error('INVALID_EVENT_PAYLOAD');
+    }
+
+    const requestedBy =
+      (event.actorId as string | null | undefined) ?? 'SYSTEM';
 
     const completedLog = await this.automationLogRepo.findCompletedForProject(
       event.tenantId,
@@ -78,7 +89,9 @@ export class ProjectAutomationHandler {
     );
 
     if (completedLog) {
-      this.logger.log(`Project ${projectId} automation already complete`);
+      this.logger.log(
+        `Project ${projectId} automation already complete (idempotent replay)`,
+      );
       return;
     }
 
@@ -89,7 +102,7 @@ export class ProjectAutomationHandler {
             projectId,
             event: AutomationEventType.PROJECT_CREATED,
             status: AutomationStatus.PENDING,
-            triggeredBy: event.payload.requestedBy ?? 'SYSTEM',
+            triggeredBy: requestedBy,
           },
           tx,
         );
@@ -107,7 +120,20 @@ export class ProjectAutomationHandler {
             projectId,
             event: AutomationEventType.STAGE_COMPLETED,
             status: AutomationStatus.COMPLETED,
-            triggeredBy: event.payload.requestedBy ?? 'SYSTEM',
+            triggeredBy: requestedBy,
+          },
+          tx,
+        );
+
+        // Mirror the completion under PROJECT_CREATED so the
+        // findCompletedForProject(... PROJECT_CREATED, COMPLETED) guard
+        // short-circuits duplicate deliveries of the same event id.
+        await this.automationLogRepo.create(
+          {
+            projectId,
+            event: AutomationEventType.PROJECT_CREATED,
+            status: AutomationStatus.COMPLETED,
+            triggeredBy: requestedBy,
           },
           tx,
         );
@@ -127,7 +153,7 @@ export class ProjectAutomationHandler {
 
         await this.auditRepo.record({
           tenantId: event.tenantId,
-          actor: event.payload.requestedBy ?? 'SYSTEM',
+          actor: requestedBy,
           action: 'PROJECT_AUTOMATION_COMPLETED',
           resource: 'Project',
           resourceId: projectId,
@@ -157,6 +183,7 @@ export class ProjectAutomationHandler {
         event.tenantId,
         e instanceof Error ? e.message : String(e),
         event,
+        requestedBy,
       );
       throw e;
     }
@@ -213,24 +240,43 @@ export class ProjectAutomationHandler {
     projectId: string,
     tenantId: string,
     error: string,
-    event: any,
+    event: OutboxEventRecord,
+    requestedBy: string,
   ): Promise<void> {
-    await this.automationLogRepo.create({
-      projectId,
-      event: AutomationEventType.PROJECT_CREATED,
-      status: AutomationStatus.FAILED,
-      triggeredBy: 'SYSTEM',
-      error,
-    });
+    await this.automationLogRepo
+      .create({
+        projectId,
+        event: AutomationEventType.PROJECT_CREATED,
+        status: AutomationStatus.FAILED,
+        triggeredBy: requestedBy,
+        error,
+      })
+      .catch((logErr: unknown) =>
+        this.logger.error(
+          `Failed to write automation log: ${
+            logErr instanceof Error ? logErr.message : String(logErr)
+          }`,
+        ),
+      );
 
-    await this.outboxRepo.publish({
-      tenantId,
-      eventType: 'ProjectAutomationFailed',
-      sourceModule: 'project-automation',
-      payload: { projectId, error },
-      correlationId: `failed-${projectId}-${Date.now()}`,
-      causationId: event.id,
-      idempotencyKey: `automation-failed:${projectId}:${Date.now()}`,
-    });
+    // Emit a failure event using a deterministic idempotency key derived
+    // from the outbox event id so duplicate fan-out produces one row.
+    await this.outboxRepo
+      .publish({
+        tenantId,
+        eventType: 'ProjectAutomationFailed',
+        sourceModule: 'project-automation',
+        payload: { projectId, error, sourceEventId: event.id },
+        correlationId: event.correlationId,
+        causationId: event.id,
+        idempotencyKey: `automation-failed:${event.id}`,
+      })
+      .catch((outboxErr: unknown) =>
+        this.logger.error(
+          `Failed to publish ProjectAutomationFailed: ${
+            outboxErr instanceof Error ? outboxErr.message : String(outboxErr)
+          }`,
+        ),
+      );
   }
 }

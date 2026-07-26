@@ -2,7 +2,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AutomationStatus } from '@prisma/client';
+import type {
+  IOutboxRepository,
+  OutboxEventRecord,
+} from '../../common/outbox/outbox-repository.port';
+import { OUTBOX_REPOSITORY } from '../../common/outbox/outbox-repository.port';
 import { ProjectAutomationHandler } from './application/project-automation.handler';
+import {
+  AUTOMATION_TRANSITIONS,
+  ProjectAutomationStatus,
+} from './domain/automation-states';
 
 @Injectable()
 export class ProjectAutomationService {
@@ -43,12 +52,32 @@ export class ProjectAutomationService {
     let tasksCreated = 0;
 
     try {
-      await this.handler.handleProjectAutomationRequested({
+      const fakeEvent: OutboxEventRecord = {
         id: log.id,
         tenantId,
-        payload: { projectId, requestedBy: actorId },
+        eventType: 'ProjectAutomationRequested',
+        version: 1,
+        actorId,
+        actorType: 'SYSTEM',
         correlationId: log.id,
-      });
+        causationId: null,
+        idempotencyKey: `automation-requested:${projectId}`,
+        sourceModule: 'project-automation',
+        payload: { projectId, requestedBy: actorId },
+        status: 'PENDING',
+        retryCount: 0,
+        lastError: null,
+        lastErrorClassification: null,
+        createdAt: log.createdAt,
+        dispatchedAt: null,
+        processingStartedAt: null,
+        processedAt: null,
+        processingWorkerId: null,
+        leaseExpiresAt: null,
+        nextAttemptAt: null,
+        processingCount: 0,
+      };
+      await this.handler.handleProjectAutomationRequested(fakeEvent);
 
       const goals = await this.prisma.goal.count({ where: { projectId } });
       const tasks = await this.prisma.task.count({ where: { projectId } });
@@ -69,12 +98,15 @@ export class ProjectAutomationService {
     };
   }
 
-  async getAutomationStatus(projectId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
+  async getAutomationStatus(
+    tenantId: string,
+    projectId: string,
+  ): Promise<AutomationStatusView> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, tenantId },
       include: {
-        goals: true,
-        tasks: true,
+        goals: { select: { id: true, templateKey: true, title: true } },
+        tasks: { select: { id: true, templateKey: true, title: true, status: true } },
       },
     });
 
@@ -82,21 +114,88 @@ export class ProjectAutomationService {
       throw new Error('PROJECT_NOT_FOUND');
     }
 
-    const latestLog = await this.prisma.projectAutomationLog.findFirst({
+    const logs = await this.prisma.projectAutomationLog.findMany({
       where: { projectId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
     });
+    const latestLog = logs[logs.length - 1] ?? null;
+    const latestCompleted = [...logs]
+      .reverse()
+      .find((row) => row.status === AutomationStatus.COMPLETED);
+
+    // Map internal AutomationStatus (DB enum) to canonical state machine.
+    const canonical = mapCanonicalStatus(latestCompleted, latestLog);
 
     return {
       projectId,
-      status: latestLog?.status ?? 'NOT_REQUESTED',
-      lastProcessedAt: latestLog?.createdAt ?? null,
-      lastError: latestLog?.error ?? null,
+      tenantId,
+      canonical,
+      lastLog: latestLog
+        ? {
+            id: latestLog.id,
+            event: latestLog.event,
+            status: latestLog.status,
+            error: latestLog.error,
+            triggeredBy: latestLog.triggeredBy,
+            createdAt: latestLog.createdAt,
+          }
+        : null,
       progress: {
-        goalsCreated: project.goals?.length ?? 0,
-        tasksCreated: project.tasks?.length ?? 0,
+        goalsCreated: project.goals.length,
+        tasksCreated: project.tasks.length,
         assignmentsCreated: 0,
       },
+      history: logs.map((row) => ({
+        id: row.id,
+        event: row.event,
+        status: row.status,
+        triggeredBy: row.triggeredBy,
+        error: row.error,
+        createdAt: row.createdAt,
+      })),
     };
   }
+}
+
+export interface AutomationStatusView {
+  projectId: string;
+  tenantId: string;
+  canonical: ProjectAutomationStatus;
+  lastLog: {
+    id: string;
+    event: string;
+    status: AutomationStatus;
+    error: string | null;
+    triggeredBy: string | null;
+    createdAt: Date;
+  } | null;
+  progress: {
+    goalsCreated: number;
+    tasksCreated: number;
+    assignmentsCreated: number;
+  };
+  history: Array<{
+    id: string;
+    event: string;
+    status: AutomationStatus;
+    triggeredBy: string | null;
+    error: string | null;
+    createdAt: Date;
+  }>;
+}
+
+function mapCanonicalStatus(
+  completed: { event: string; status: AutomationStatus } | null | undefined,
+  latest: { event: string; status: AutomationStatus } | null,
+): ProjectAutomationStatus {
+  if (!latest) return ProjectAutomationStatus.NOT_REQUESTED;
+  if (latest.status === AutomationStatus.PENDING)
+    return ProjectAutomationStatus.REQUESTED;
+  if (latest.status === AutomationStatus.COMPLETED || completed)
+    return ProjectAutomationStatus.COMPLETED;
+  if (latest.status === AutomationStatus.FAILED)
+    return ProjectAutomationStatus.FAILED_FINAL;
+  // Reference state machine transitions for documentation purposes.
+  void AUTOMATION_TRANSITIONS;
+  return ProjectAutomationStatus.NOT_REQUESTED;
 }

@@ -5,7 +5,10 @@ import type { IExecutionAttemptRepository } from './domain/ports/execution-attem
 import { EXECUTION_ATTEMPT_REPOSITORY } from './domain/ports/execution-attempt-repository.port';
 import type { ITaskRepository } from '../../common/ports/task-repository.port';
 import { TASK_REPOSITORY } from '../../common/ports/task-repository.port';
-import type { IOutboxRepository } from '../../common/outbox/outbox-repository.port';
+import type {
+  IOutboxRepository,
+  OutboxEventRecord,
+} from '../../common/outbox/outbox-repository.port';
 import { OUTBOX_REPOSITORY } from '../../common/outbox/outbox-repository.port';
 import { ExecutionOrchestrator } from './application/execution-orchestrator';
 
@@ -21,13 +24,15 @@ export class ExecutionWorker {
     private readonly orchestrator: ExecutionOrchestrator,
   ) {}
 
-  async handleTaskExecutionRequested(event: {
-    id: string;
-    tenantId: string;
-    payload: { attemptId: string; taskId: string; agentId: string };
-    correlationId: string;
-  }): Promise<void> {
-    const { attemptId, taskId, agentId } = event.payload;
+  async handleTaskExecutionRequested(
+    event: OutboxEventRecord,
+  ): Promise<void> {
+    const payload = event.payload as {
+      attemptId: string;
+      taskId: string;
+      agentId: string;
+    };
+    const { attemptId, taskId, agentId } = payload;
 
     const attempt = await this.attemptRepo.findById(event.tenantId, attemptId);
 

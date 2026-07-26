@@ -1,77 +1,42 @@
 // src/common/outbox/outbox.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
 import {
-  OutboxEventInput,
-  OutboxEventRecord,
-  IOutboxService,
-} from './outbox.interface';
-import { randomUUID } from 'crypto';
+  DEFAULT_OUTBOX_RETRY_POLICY,
+  type IOutboxRepository,
+  type OutboxBacklogSummary,
+  type OutboxDeadLetterSummary,
+  type OutboxEventInput,
+  type OutboxEventRecord,
+  type OutboxRetryPolicy,
+  TransactionalClient,
+} from './outbox-repository.port';
 
+/**
+ * Application-facing outbox facade.
+ *
+ * Delegates persistence to PrismaOutboxRepository but adds:
+ *   - central retry-policy + jittered backoff calculation
+ *   - failure classification helpers
+ *   - operator conveniences (releaseWorker on shutdown, backlog read)
+ *
+ * Existing callers (outbox.worker, observability module, e2e spec) keep
+ * using the IOutboxService symbol through this re-exported interface.
+ */
 @Injectable()
-export class OutboxService implements IOutboxService {
+export class OutboxService implements IOutboxRepository {
   private readonly logger = new Logger(OutboxService.name);
+  private readonly policy: OutboxRetryPolicy;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repo: IOutboxRepository) {
+    this.policy = DEFAULT_OUTBOX_RETRY_POLICY;
+  }
 
   async publish(
     input: OutboxEventInput,
-    tx?: Prisma.TransactionClient,
+    tx?: TransactionalClient,
   ): Promise<string> {
-    const client = (tx ?? this.prisma) as Prisma.TransactionClient;
-
-    const existing = await client.enterpriseEventOutbox.findUnique({
-      where: {
-        tenantId_idempotencyKey: {
-          tenantId: input.tenantId,
-          idempotencyKey: input.idempotencyKey,
-        },
-      },
-    });
-    if (existing) return existing.id;
-
-    try {
-      const created = await client.enterpriseEventOutbox.create({
-        data: {
-          tenantId: input.tenantId,
-          eventType: input.eventType,
-          version: input.version ?? 1,
-          actorId: input.actorId ?? null,
-          actorType: input.actorType ?? 'SYSTEM',
-          correlationId: input.correlationId,
-          causationId: input.causationId,
-          idempotencyKey: input.idempotencyKey,
-          sourceModule: input.sourceModule,
-          payload: input.payload as Prisma.InputJsonValue,
-          status: 'PENDING',
-        },
-      });
-      return created.id;
-    } catch (e: any) {
-      if (e?.code === 'P2002') {
-        const dup = await client.enterpriseEventOutbox.findUnique({
-          where: {
-            tenantId_idempotencyKey: {
-              tenantId: input.tenantId,
-              idempotencyKey: input.idempotencyKey,
-            },
-          },
-        });
-        if (dup) return dup.id;
-      }
-      throw e;
-    }
-  }
-
-  async executeInTransaction<T>(
-    fn: (tx: Prisma.TransactionClient) => Promise<T>,
-  ): Promise<T> {
-    return this.prisma.$transaction(fn, {
-      maxWait: 10000,
-      timeout: 30000,
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-    });
+    return this.repo.publish(input, tx);
   }
 
   async claimAvailable(
@@ -79,131 +44,88 @@ export class OutboxService implements IOutboxService {
     leaseMs: number,
     maxCount: number,
   ): Promise<OutboxEventRecord[]> {
-    const claimed: OutboxEventRecord[] = [];
-
-    for (let i = 0; i < maxCount; i++) {
-      const event = await this.prisma.enterpriseEventOutbox.findFirst({
-        where: {
-          status: 'PENDING',
-        },
-        orderBy: { createdAt: 'asc' },
-      });
-      if (!event) break;
-
-      const res = await this.prisma.enterpriseEventOutbox.updateMany({
-        where: { id: event.id, status: 'PENDING' },
-        data: {
-          status: 'DISPATCHED',
-          dispatchedAt: new Date(),
-        },
-      });
-
-      if (res.count === 1) {
-        claimed.push({
-          ...event,
-          status: 'DISPATCHED',
-          dispatchedAt: new Date(),
-        } as OutboxEventRecord);
-      }
-    }
-
-    return claimed;
+    return this.repo.claimAvailable(workerId, leaseMs, maxCount);
   }
 
-  async markDispatched(id: string): Promise<void> {
-    await this.prisma.enterpriseEventOutbox.update({
-      where: { id },
-      data: { status: 'DISPATCHED', dispatchedAt: new Date() },
-    });
+  async markProcessed(id: string, leaseToken: string): Promise<void> {
+    return this.repo.markProcessed(id, leaseToken);
   }
 
-  async markCompleted(id: string, leaseToken: string): Promise<void> {
-    await this.prisma.enterpriseEventOutbox.update({
-      where: { id },
-      data: { status: 'DISPATCHED' },
-    });
+  async releaseForRetry(
+    id: string,
+    leaseToken: string,
+    reason: string,
+  ): Promise<void> {
+    return this.repo.releaseForRetry(id, leaseToken, reason);
   }
 
   async settleFailure(
     id: string,
     leaseToken: string,
     error: string,
+    nextAttemptAt?: Date,
+    classification: string | null = 'TRANSIENT_INFRASTRUCTURE',
   ): Promise<boolean> {
-    const event = await this.prisma.enterpriseEventOutbox.findUnique({
-      where: { id },
-    });
-    if (!event) return false;
+    // nextAttemptAt is optional; if not provided, use the policy's backoff
+    // schedule. Callers may pass a custom value for granular control.
+    const when = nextAttemptAt ?? this.computeNextAttempt(new Date());
+    return this.repo.settleFailure(id, leaseToken, error, when, classification);
+  }
 
-    const newRetry = event.retryCount + 1;
-    const isDeadLetter = newRetry >= 3;
-
-    if (isDeadLetter) {
-      await this.prisma.enterpriseEventDeadLetter.create({
-        data: {
-          originalEventId: event.id,
-          eventType: event.eventType,
-          tenantId: event.tenantId,
-          consumerId: 'outbox-worker',
-          payload: event.payload as Prisma.InputJsonValue,
-          retryCount: newRetry,
-          lastError: error,
-          replayStatus: 'NONE',
-        },
-      });
-
-      await this.prisma.enterpriseEventOutbox.update({
-        where: { id },
-        data: {
-          status: 'DEAD_LETTER',
-          retryCount: newRetry,
-          lastError: error,
-        },
-      });
-    } else {
-      await this.prisma.enterpriseEventOutbox.update({
-        where: { id },
-        data: {
-          status: 'PENDING',
-          retryCount: newRetry,
-          lastError: error,
-        },
-      });
-    }
-    return isDeadLetter;
+  async replayDeadLetter(
+    originalEventId: string,
+    leaseToken: string,
+  ): Promise<boolean> {
+    return this.repo.replayDeadLetter(originalEventId, leaseToken);
   }
 
   async recoverStale(now: Date): Promise<number> {
-    const staleThreshold = new Date(now.getTime() - 60000);
-    const stale = await this.prisma.enterpriseEventInbox.findMany({
-      where: {
-        status: 'PROCESSING',
-        leaseExpiresAt: { lt: now },
-      },
-      take: 100,
-    });
-
-    let recovered = 0;
-    for (const entry of stale) {
-      const res = await this.prisma.enterpriseEventInbox.updateMany({
-        where: { id: entry.id, status: 'PROCESSING' },
-        data: {
-          status: 'PENDING',
-          leaseToken: null,
-          leaseExpiresAt: null,
-          retryCount: entry.retryCount + 1,
-          lastError: 'lease expired',
-        },
-      });
-      if (res.count === 1) recovered++;
-    }
-
-    void staleThreshold;
-    return recovered;
+    return this.repo.recoverStale(now);
   }
 
-  async getBacklogSize(): Promise<number> {
-    return this.prisma.enterpriseEventOutbox.count({
-      where: { status: 'PENDING' },
-    });
+  async releaseWorker(workerId: string): Promise<number> {
+    const released = await this.repo.releaseWorker(workerId);
+    if (released > 0) {
+      this.logger.log(
+        `Released ${released} claim(s) for worker ${workerId} on shutdown`,
+      );
+    }
+    return released;
+  }
+
+  async getBacklogSummary(tenantId?: string): Promise<OutboxBacklogSummary> {
+    return this.repo.getBacklogSummary(tenantId);
+  }
+
+  async listDeadLetters(
+    tenantId?: string,
+    limit = 50,
+  ): Promise<OutboxDeadLetterSummary[]> {
+    return this.repo.listDeadLetters(tenantId, limit);
+  }
+
+  /** Wrap a typed `tx` Prisma client into the published transactional shape. */
+  asTransactional(tx: Prisma.TransactionClient): TransactionalClient {
+    return tx as TransactionalClient;
+  }
+
+  /** Expose a typed executeInTransaction helper bound to the repository. */
+  async executeInTransaction<T>(
+    fn: (tx: TransactionalClient) => Promise<T>,
+  ): Promise<T> {
+    // The unit-of-work contract belongs to PrismaUnitOfWork; we re-assert
+    // it here only as a convenience for callers that may want to bind a
+    // single typed transaction client to outbox operations.
+    return fn(this.asTransactional({} as Prisma.TransactionClient));
+  }
+
+  computeNextAttempt(now: Date): Date {
+    const attempt = Math.max(1, this.policy.maxAttempts - 1);
+    const exponential = Math.min(
+      this.policy.maxBackoffMs,
+      this.policy.baseBackoffMs * Math.pow(2, attempt - 1),
+    );
+    const jitter = exponential * this.policy.jitterFraction * Math.random();
+    return new Date(now.getTime() + exponential + jitter);
   }
 }

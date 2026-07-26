@@ -1,5 +1,5 @@
 // src/modules/observability/awl-health.controller.ts
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiCommon } from '../../common/decorators/api-common.decorator';
 import { Public } from '../../common/decorators/roles.decorator';
 import { OutboxService } from '../../common/outbox/outbox.service';
@@ -18,20 +18,41 @@ export class AwlHealthController {
 
   @Get()
   async getHealth() {
-    const outboxBacklog = await this.outbox.getBacklogSize();
+    const summary = await this.outbox.getBacklogSummary();
+    const deadLetters = await this.outbox.listDeadLetters(undefined, 10);
     const circuitOpen = this.outboxWorker.isCircuitOpen();
 
     return {
-      status: circuitOpen ? 'degraded' : 'healthy',
+      status: circuitOpen || summary.deadLetter > 0 ? 'degraded' : 'healthy',
       timestamp: new Date().toISOString(),
       components: {
         outbox: {
-          backlog: outboxBacklog,
-          status: outboxBacklog < 1000 ? 'healthy' : 'backlogged',
+          backlog: summary.pending,
+          processing: summary.processing,
+          processed: summary.processed,
+          deadLetter: summary.deadLetter,
+          oldestPendingAt: summary.oldestPendingAt,
+          oldestStuckAt: summary.oldestStuckAt,
+          workerId: this.outboxWorker.getWorkerId(),
+          status:
+            summary.pending < 1000 && summary.deadLetter === 0
+              ? 'healthy'
+              : 'backlogged',
         },
         circuit: {
           open: circuitOpen,
           status: circuitOpen ? 'open' : 'closed',
+        },
+        deadLetters: {
+          count: deadLetters.length,
+          recent: deadLetters.map((row) => ({
+            eventId: row.originalEventId,
+            eventType: row.eventType,
+            tenantId: row.tenantId,
+            retryCount: row.retryCount,
+            lastError: row.lastError,
+            createdAt: row.createdAt,
+          })),
         },
         commands: {
           registered: this.commandRegistry.getRegisteredCount(),
@@ -41,12 +62,26 @@ export class AwlHealthController {
   }
 
   @Get('outbox')
-  async getOutboxHealth() {
-    const backlog = await this.outbox.getBacklogSize();
+  async getOutboxHealth(@Query('tenantId') tenantId?: string) {
+    const summary = await this.outbox.getBacklogSummary(tenantId);
     return {
-      backlog,
-      status: backlog < 100 ? 'healthy' : backlog < 1000 ? 'warning' : 'critical',
+      backlog: summary,
+      status:
+        summary.pending < 100
+          ? 'healthy'
+          : summary.pending < 1000
+            ? 'warning'
+            : 'critical',
       threshold: { warning: 100, critical: 1000 },
+    };
+  }
+
+  @Get('dead-letters')
+  async getDeadLetters(@Query('tenantId') tenantId?: string) {
+    const rows = await this.outbox.listDeadLetters(tenantId, 50);
+    return {
+      count: rows.length,
+      rows,
     };
   }
 }
