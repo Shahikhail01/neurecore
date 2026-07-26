@@ -94,6 +94,16 @@ export interface ITaskAssignmentRepository {
     tx?: any,
   ): Promise<number>;
 
+  /**
+   * Promote expired ACTIVE rows to EXPIRED in a single pass and return
+   * the rows that were transitioned so the caller can emit per-row
+   * TaskAssignmentReleased outbox events.
+   */
+  releaseExpiredWithContext(
+    now: Date,
+    tx?: any,
+  ): Promise<TaskAssignmentEntity[]>;
+
   recordOverrideAudit(
     input: CreateAssignmentOverrideAuditInput,
     tx?: any,

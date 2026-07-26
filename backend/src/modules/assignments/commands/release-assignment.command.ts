@@ -29,6 +29,11 @@ export interface ReleaseAssignmentInput {
   reassignManualOverride?: boolean;
   reassignOverrideActorId?: string;
   reassignOverrideActorType?: string;
+  /**
+   * Override the inherited `expiresAt` for the reassignment. When
+   * omitted, the service defaults to the freshly assigned 8-hour TTL.
+   */
+  reassignExpiresInSeconds?: number;
 }
 
 export interface ReleaseAssignmentResult {

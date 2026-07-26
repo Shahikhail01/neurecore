@@ -37,6 +37,7 @@ import {
 } from '../domain/agent-capability';
 import type {
   AgentEntity,
+  AgentWorkload,
   AssignmentStatusForCapacity,
   IAgentRepository,
 } from '../domain/ports/agent-repository.port';
@@ -204,13 +205,22 @@ export class AssignmentService {
       if (task.tenantId !== input.tenantId) {
         throw new Error('CROSS_TENANT_ACCESS_DENIED');
       }
-      if (task.agentId) {
+
+      // Dedup: if the task already has an ACTIVE assignment at the same
+      // agent AND the request is auto-assign (no explicit agentId), the
+      // command is a replay and we return the prior result. Manual
+      // override always proceeds so the override audit row is recorded.
+      // The state machine guard runs after this so a closed-state
+      // task (COMPLETED / CANCELLED) cannot be silently re-assigned.
+      const replayMode =
+        !input.agentId && task.agentId !== null;
+      if (replayMode) {
         const existing = await this.taskAssignmentRepo.findLatestActive(
           input.tenantId,
           input.taskId,
           tx,
         );
-        if (existing && existing.agentId === input.agentId) {
+        if (existing && existing.agentId === task.agentId) {
           return {
             success: true,
             data: {
@@ -228,6 +238,7 @@ export class AssignmentService {
               departmentScore: 0,
               historicalScore: 0,
               totalScore: 0,
+              alternatives: [],
             },
             correlationId: metadata.correlationId,
             occurredAt: new Date(),
@@ -236,6 +247,9 @@ export class AssignmentService {
         }
       }
 
+      // Reject re-assignment of closed tasks so the dedup replay path
+      // can never resurrect COMPLETED / CANCELLED rows. Plan §6.5 —
+      // "Assignment persists consistently across views".
       TaskStateMachine.assertTransition(task.status as any, 'ASSIGNED');
 
       let scored: ScoredAgent;
@@ -251,6 +265,23 @@ export class AssignmentService {
         (task.dataClassification as AgentDataClassification | undefined) ??
         'INTERNAL';
 
+      let chosenAgentId: string;
+      let chosenAgentWorkload: AgentWorkload | null = null;
+      let alternativesList: AssignTaskResult['alternatives'] = [];
+
+      // Gate the auto-assign path behind the tenant-scoped AUTO_ASSIGNMENT
+      // flag. Plan §6.1 — manual override is independent of this flag.
+      if (!(input.agentId && input.manualOverrideRationale)) {
+        const autoEnabled =
+          (await this.tenantFlags?.isEnabled(
+            FeatureFlag.AUTO_ASSIGNMENT,
+            input.tenantId,
+          )) ?? false;
+        if (!autoEnabled) {
+          throw new Error('AUTO_ASSIGNMENT_DISABLED');
+        }
+      }
+
       if (input.agentId && input.manualOverrideRationale) {
         const overrideAgent = await this.agentRepo.findById(
           input.tenantId,
@@ -265,24 +296,84 @@ export class AssignmentService {
         if (overrideAgent.archived || !overrideAgent.availability) {
           throw new Error('AGENT_NOT_AVAILABLE');
         }
-        // Manual override is permitted whenever the actor provides
-        // a rationale. The tenant permission system gates WHO can
-        // submit overrides; AUTO_ASSIGNMENT is for automated
-        // selection and does not block overrides.
-        void input;
         preview = overrideAgent.dataClassification;
+        // Re-check workload inside the transaction so a concurrent
+        // assigner that consumed the last slot between the eligibility
+        // scan and now cannot oversubscribe the agent.
+        const overrideWorkloads = await this.agentRepo.loadWorkloads(
+          input.tenantId,
+          [overrideAgent.id],
+          ['ASSIGNED', 'QUEUED', 'IN_PROGRESS', 'BLOCKED'] as AssignmentStatusForCapacity[],
+        );
+        const ow =
+          overrideWorkloads[0] ?? {
+            agentId: overrideAgent.id,
+            activeCount: 0,
+            assignedCount: 0,
+            queuedCount: 0,
+            inProgressCount: 0,
+            blockedCount: 0,
+          };
+        chosenAgentWorkload = {
+          agentId: overrideAgent.id,
+          activeCount: ow.activeCount,
+          assignedCount: ow.assignedCount,
+          queuedCount: ow.queuedCount,
+          inProgressCount: ow.inProgressCount,
+          blockedCount: ow.blockedCount,
+        };
+        if (
+          typeof overrideAgent.maxConcurrency === 'number' &&
+          overrideAgent.maxConcurrency > 0 &&
+          ow.activeCount >= overrideAgent.maxConcurrency
+        ) {
+          throw new Error('AGENT_AT_MAX_CONCURRENCY');
+        }
+        const overrideScore = scoreAgent(
+          {
+            agentId: overrideAgent.id,
+            tenantId: overrideAgent.tenantId,
+            name: overrideAgent.name,
+            role: overrideAgent.role,
+            specializations: overrideAgent.capabilities,
+            permissions: overrideAgent.permissions,
+            maxConcurrency: overrideAgent.maxConcurrency ?? 0,
+            currentWorkload: ow.activeCount,
+            availability: overrideAgent.availability ?? 'AVAILABLE',
+            archived: overrideAgent.archived,
+            dataClassification: overrideAgent.dataClassification,
+            departmentId: overrideAgent.departmentId,
+          },
+          {
+            tenantId: input.tenantId,
+            requiredRole,
+            requiredCapabilities: capabilities,
+            departmentConstraint: input.departmentId ?? null,
+            dataClassification,
+          },
+          0,
+          {
+            activeCount: ow.activeCount,
+            inProgressCount: ow.inProgressCount,
+            queuedCount: ow.queuedCount,
+            blockedCount: ow.blockedCount,
+            historicalSuccessRate: 0,
+          },
+          getActiveScoringPolicy(),
+        );
         scored = {
           agentId: overrideAgent.id,
           name: overrideAgent.name,
-          score: 100,
+          score: overrideScore.score,
           rationale: `manual override: ${input.manualOverrideRationale}`,
-          currentWorkload: 0,
-          capabilityScore: 0,
-          workloadScore: 0,
-          departmentScore: 0,
-          historicalScore: 0,
+          currentWorkload: ow.activeCount,
+          capabilityScore: overrideScore.capabilityScore,
+          workloadScore: overrideScore.workloadScore,
+          departmentScore: overrideScore.departmentScore,
+          historicalScore: overrideScore.historicalScore,
           policyVersion: getActiveScoringPolicy().version,
         };
+        chosenAgentId = overrideAgent.id;
         manualOverride = true;
       } else {
         const candidates = await this.findEligibleAgents({
@@ -295,8 +386,61 @@ export class AssignmentService {
         if (candidates.length === 0) {
           throw new Error('NO_ELIGIBLE_AI_EMPLOYEE');
         }
-        scored = candidates[0];
+        const top = candidates[0];
+        // Re-resolve the chosen agent inside the transaction so a
+        // concurrent assigner that consumed the last slot cannot
+        // oversubscribe. The eligibility scan already filtered on
+        // capacity, but a write between scan and commit could tip the
+        // agent over the edge — re-check here.
+        const chosenAgent = await this.agentRepo.findById(
+          input.tenantId,
+          top.agentId,
+        );
+        if (!chosenAgent || chosenAgent.archived || !chosenAgent.availability) {
+          throw new Error('AGENT_NOT_AVAILABLE');
+        }
+        const chosenWorkloads = await this.agentRepo.loadWorkloads(
+          input.tenantId,
+          [chosenAgent.id],
+          ['ASSIGNED', 'QUEUED', 'IN_PROGRESS', 'BLOCKED'] as AssignmentStatusForCapacity[],
+        );
+        const cw = chosenWorkloads[0] ?? {
+          agentId: chosenAgent.id,
+          activeCount: 0,
+          assignedCount: 0,
+          queuedCount: 0,
+          inProgressCount: 0,
+          blockedCount: 0,
+        };
+        chosenAgentWorkload = {
+          agentId: chosenAgent.id,
+          activeCount: cw.activeCount,
+          assignedCount: cw.assignedCount,
+          queuedCount: cw.queuedCount,
+          inProgressCount: cw.inProgressCount,
+          blockedCount: cw.blockedCount,
+        };
+        if (
+          typeof chosenAgent.maxConcurrency === 'number' &&
+          chosenAgent.maxConcurrency > 0 &&
+          cw.activeCount >= chosenAgent.maxConcurrency
+        ) {
+          throw new Error('AGENT_AT_MAX_CONCURRENCY');
+        }
+        scored = top;
+        chosenAgentId = chosenAgent.id;
+        alternativesList = candidates.map((c) => ({
+          agentId: c.agentId,
+          agentName: c.name,
+          score: c.score,
+          rationale: c.rationale,
+          policyVersion: c.policyVersion,
+        }));
       }
+
+      // Light unused-vars hint for the analyzer — these are read by
+      // upstream diagnostics and the next-step outbox payload builder.
+      void chosenAgentWorkload;
 
       const lifecycle = input.expiresInSeconds ?? DEFAULT_EXPIRES_IN_SECONDS;
       const expiresAt =
@@ -304,26 +448,52 @@ export class AssignmentService {
           ? new Date(Date.now() + lifecycle * 1000)
           : null;
 
-      const generation = await this.nextGeneration(
-        input.tenantId,
-        input.taskId,
-        tx,
-      );
-
       const previousAgentId = task.agentId ?? null;
 
-      const assignment = await this.taskAssignmentRepo.create(
-        {
-          tenantId: input.tenantId,
-          taskId: input.taskId,
-          agentId: scored.agentId,
-          generation,
-          rationale: scored.rationale,
-          status: 'ACTIVE',
-          expiresAt,
-        },
-        tx,
-      );
+      // Race protection: two concurrent assigners on the same task can
+      // both compute the same nextGeneration before either commits. The
+      // (tenantId, taskId, generation) unique constraint catches the
+      // duplicate. Retry up to MAX_GENERATION_RETRIES with a fresh
+      // generation scan between attempts.
+      const MAX_GENERATION_RETRIES = 4;
+      let assignment: Awaited<
+        ReturnType<typeof this.taskAssignmentRepo.create>
+      >;
+      let attempts = 0;
+      let generation = 0;
+      // The assigner is supposed to pick a fresh `generation` per commit.
+      // `attempt` guards against pathological livelocks.
+      for (;;) {
+        attempts++;
+        generation = await this.nextGeneration(
+          input.tenantId,
+          input.taskId,
+          tx,
+        );
+        try {
+          assignment = await this.taskAssignmentRepo.create(
+            {
+              tenantId: input.tenantId,
+              taskId: input.taskId,
+              agentId: scored.agentId,
+              generation,
+              rationale: scored.rationale,
+              status: 'ACTIVE',
+              expiresAt,
+            },
+            tx,
+          );
+          break;
+        } catch (e: any) {
+          if (e?.code === 'P2002' && attempts < MAX_GENERATION_RETRIES) {
+            // Concurrent assigner beat us to this generation. Re-scan
+            // and try the next one.
+            continue;
+          }
+          throw e;
+        }
+      }
+      void attempts;
 
       await this.taskRepo.updateAssignment(
         {
@@ -401,7 +571,7 @@ export class AssignmentService {
         tx,
       );
 
-      return {
+return {
         success: true,
         data: {
           assignmentId: assignment.id,
@@ -418,6 +588,7 @@ export class AssignmentService {
           departmentScore: scored.departmentScore,
           historicalScore: scored.historicalScore,
           totalScore: scored.score,
+          alternatives: alternativesList,
         },
         correlationId: metadata.correlationId,
         occurredAt: new Date(),
@@ -463,6 +634,43 @@ export class AssignmentService {
 
       let reassignment: ReleaseAssignmentResult['reassignment'];
       if (input.reassignToAgentId && input.reassignRationale) {
+        // Validate the reassign target agent's tenant + capacity inside
+        // the transaction so we never accept a cross-tenant agent and
+        // never oversubscribe capacity.
+        const reassignAgent = await this.agentRepo.findById(
+          input.tenantId,
+          input.reassignToAgentId,
+        );
+        if (!reassignAgent) {
+          throw new Error('AGENT_NOT_FOUND');
+        }
+        if (reassignAgent.tenantId !== input.tenantId) {
+          throw new Error('CROSS_TENANT_ACCESS_DENIED');
+        }
+        if (reassignAgent.archived || !reassignAgent.availability) {
+          throw new Error('AGENT_NOT_AVAILABLE');
+        }
+        const reassignWorkloads = await this.agentRepo.loadWorkloads(
+          input.tenantId,
+          [reassignAgent.id],
+          ['ASSIGNED', 'QUEUED', 'IN_PROGRESS', 'BLOCKED'] as AssignmentStatusForCapacity[],
+        );
+        const rw = reassignWorkloads[0] ?? {
+          agentId: reassignAgent.id,
+          activeCount: 0,
+          assignedCount: 0,
+          queuedCount: 0,
+          inProgressCount: 0,
+          blockedCount: 0,
+        };
+        if (
+          typeof reassignAgent.maxConcurrency === 'number' &&
+          reassignAgent.maxConcurrency > 0 &&
+          rw.activeCount >= reassignAgent.maxConcurrency
+        ) {
+          throw new Error('AGENT_AT_MAX_CONCURRENCY');
+        }
+
         const nextGeneration = active.generation + 1;
         const existing = await this.taskAssignmentRepo.findByGeneration(
           input.tenantId,
@@ -471,6 +679,12 @@ export class AssignmentService {
           tx,
         );
         if (!existing) {
+          const reassignLifecycle =
+            input.reassignExpiresInSeconds ?? DEFAULT_EXPIRES_IN_SECONDS;
+          const reassignExpiresAt =
+            Number.isFinite(reassignLifecycle) && reassignLifecycle > 0
+              ? new Date(Date.now() + reassignLifecycle * 1000)
+              : null;
           const newRow = await this.taskAssignmentRepo.create(
             {
               tenantId: input.tenantId,
@@ -479,7 +693,7 @@ export class AssignmentService {
               generation: nextGeneration,
               rationale: input.reassignRationale,
               status: 'ACTIVE',
-              expiresAt: active.expiresAt,
+              expiresAt: reassignExpiresAt,
             },
             tx,
           );
@@ -493,7 +707,11 @@ export class AssignmentService {
             tx,
           );
 
-          if (input.reassignManualOverride) {
+          if (input.reassignManualOverride !== false) {
+            // Record an override audit for ANY reassignment triggered
+            // by a human (the default) so the audit trail captures who
+            // reassigned, to whom, and why. Auto-reassignments (e.g.
+            // EXPIRED_SWEEP) opt out via `reassignManualOverride: false`.
             await this.taskAssignmentRepo.recordOverrideAudit(
               {
                 tenantId: input.tenantId,
@@ -577,14 +795,70 @@ export class AssignmentService {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  //  Sweep job — release expired assignments (plan §6.2)
-  // ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────
+//  Sweep job — release expired assignments (plan §6.2)
+//  The sweep runs inside one unit-of-work so the EXPIRED transition
+//  and the outbox TaskAssignmentReleased emission commit together.
+// ─────────────────────────────────────────────────────────────────────
 
   async sweepExpiredReleases(): Promise<number> {
-    return this.uow.execute(async (tx) =>
-      this.taskAssignmentRepo.releaseExpired(new Date(), tx),
-    );
+    return this.uow.execute(async (tx) => {
+      // Delegate the actual SQL transition to the repository so the
+      // contract (status='ACTIVE' AND expiresAt <= now) stays in one
+      // place. The repo returns the rows it transitioned so we can
+      // emit the corresponding outbox events.
+      const releasedRows =
+        await this.taskAssignmentRepo.releaseExpiredWithContext(
+          new Date(),
+          tx,
+        );
+      for (const row of releasedRows) {
+        const task = await this.taskRepo.findById(row.tenantId, row.taskId);
+        if (task) {
+          try {
+            await this.taskRepo.updateAssignment(
+              {
+                id: row.taskId,
+                expectedVersion: task.version,
+                agentId: null,
+                status: 'READY' as any,
+              },
+              tx,
+            );
+          } catch (err: any) {
+            // Tolerate a version race: another path mutated the task
+            // between our findById and updateAssignment. The next sweep
+            // will reconcile.
+            this.logger.warn(
+              `sweepExpiredReleases: task version race for ${row.taskId}: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }
+        await this.outboxRepo.publish(
+          {
+            tenantId: row.tenantId,
+            eventType: 'TaskAssignmentReleased',
+            sourceModule: 'assignments',
+            payload: {
+              taskId: row.taskId,
+              releasedAssignmentId: row.id,
+              reason: 'EXPIRED_SWEEP',
+              expiredGeneration: row.generation,
+              agentId: row.agentId,
+            },
+            correlationId: `sweep-${row.id}`,
+            causationId: null,
+            idempotencyKey: `task-expired:${row.id}`,
+            actorId: 'SYSTEM',
+            actorType: 'SYSTEM',
+          },
+          tx,
+        );
+      }
+      return releasedRows.length;
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────
@@ -593,6 +867,14 @@ export class AssignmentService {
 
   async listOverrideAudits(tenantId: string, taskId: string, limit = 20) {
     return this.taskAssignmentRepo.listOverrideAudits(tenantId, taskId, limit);
+  }
+
+  async findTaskSummary(tenantId: string, taskId: string) {
+    const task = await this.taskRepo.findById(tenantId, taskId);
+    if (!task) {
+      throw new Error('TASK_NOT_FOUND');
+    }
+    return task;
   }
 
   // ─────────────────────────────────────────────────────────────────────

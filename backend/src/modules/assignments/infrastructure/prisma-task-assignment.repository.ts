@@ -112,16 +112,31 @@ export class PrismaTaskAssignmentRepository implements ITaskAssignmentRepository
   }
 
   async releaseExpired(now: Date, tx?: any): Promise<number> {
+    const released = await this.releaseExpiredWithContext(now, tx);
+    return released.length;
+  }
+
+  async releaseExpiredWithContext(
+    now: Date,
+    tx?: any,
+  ): Promise<TaskAssignmentEntity[]> {
     const client = tx ?? this.prisma;
     const expired = await client.taskAssignment.findMany({
       where: {
         status: 'ACTIVE',
         expiresAt: { not: null, lte: now },
       },
-      select: { id: true, version: true },
+      select: {
+        id: true,
+        version: true,
+        tenantId: true,
+        taskId: true,
+        agentId: true,
+        generation: true,
+      },
       take: 200,
     });
-    let promoted = 0;
+    const released: TaskAssignmentEntity[] = [];
     for (const row of expired) {
       const res = await client.taskAssignment.updateMany({
         where: { id: row.id, version: row.version, status: 'ACTIVE' },
@@ -132,9 +147,24 @@ export class PrismaTaskAssignmentRepository implements ITaskAssignmentRepository
           version: { increment: 1 },
         },
       });
-      if (res.count === 1) promoted++;
+      if (res.count === 1) {
+        released.push({
+          id: row.id,
+          tenantId: row.tenantId,
+          taskId: row.taskId,
+          agentId: row.agentId,
+          generation: row.generation,
+          rationale: '',
+          status: 'EXPIRED',
+          version: row.version + 1,
+          releasedAt: now,
+          releasedByActorId: null,
+          releaseReason: 'assignment-expired',
+          expiresAt: null,
+        });
+      }
     }
-    return promoted;
+    return released;
   }
 
   async recordOverrideAudit(

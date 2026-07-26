@@ -49,4 +49,16 @@ export interface AssignTaskResult {
   departmentScore: number;
   historicalScore: number;
   totalScore: number;
+  /**
+   * Ranked alternatives surfaced so the picker UI can show
+   * "other eligible AI employees" alongside the chosen one. Plan §6.2
+   * calls for "alternatives" on the assignment decision.
+   */
+  alternatives: Array<{
+    agentId: string;
+    agentName: string;
+    score: number;
+    rationale: string;
+    policyVersion: string;
+  }>;
 }

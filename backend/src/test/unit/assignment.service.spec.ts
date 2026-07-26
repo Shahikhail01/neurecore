@@ -160,9 +160,10 @@ function buildTaskRepo(initial: FakeTaskRepoRow[]) {
 }
 
 function buildAgentRepo(agents: FakeAgentRepoRow[]) {
+  let loadWorkloadsCalls = 0;
   const workloadsByAgent = new Map<
     string,
-    { active: number; queued: number; inProgress: number; blocked: number }
+    { active: number; assigned: number; queued: number; inProgress: number; blocked: number }
   >();
   const perfByAgent = new Map<string, { total: number; success: number }>();
   return {
@@ -222,6 +223,9 @@ function buildAgentRepo(agents: FakeAgentRepoRow[]) {
         : null;
     },
     async loadWorkloads(tenantId: string, agentIds: string[]) {
+      // Increment a call counter so a test can make the second call
+      // return inflated values simulating a concurrent assigner.
+      loadWorkloadsCalls++;
       return agentIds
         .filter((id) => {
           const agent = agents.find((a) => a.id === id);
@@ -230,13 +234,18 @@ function buildAgentRepo(agents: FakeAgentRepoRow[]) {
         .map((id) => {
           const w = workloadsByAgent.get(id) ?? {
             active: 0,
+            assigned: 0,
             queued: 0,
             inProgress: 0,
             blocked: 0,
           };
+          const useInflated =
+            w.inflatedActive !== undefined && loadWorkloadsCalls >= w.inflateOnCall;
+          const activeCount = useInflated ? w.inflatedActive! : w.active;
           return {
             agentId: id,
-            activeCount: w.active,
+            activeCount,
+            assignedCount: useInflated ? w.inflatedActive! : w.assigned,
             inProgressCount: w.inProgress,
             queuedCount: w.queued,
             blockedCount: w.blocked,
@@ -344,16 +353,21 @@ function buildTaskAssignmentRepo() {
       return row;
     },
     async releaseExpired(_now: Date) {
-      let promoted = 0;
+      const out = await this.releaseExpiredWithContext(_now);
+      return out.length;
+    },
+    async releaseExpiredWithContext(_now: Date) {
+      const released: any[] = [];
       for (const row of Array.from(rows.values())) {
         if (row.status === 'ACTIVE' && row.expiresAt && row.expiresAt <= _now) {
           row.status = 'EXPIRED';
           row.releasedAt = _now;
           row.releaseReason = 'assignment-expired';
-          promoted++;
+          row.version += 1;
+          released.push({ ...row });
         }
       }
-      return promoted;
+      return released;
     },
     async recordOverrideAudit(input: {
       tenantId: string;
@@ -431,11 +445,66 @@ function buildOutbox() {
   };
 }
 
-function buildUow() {
+function buildUow(opts: {
+  taskAssignment?: { rows: any[]; updates: any[] };
+  task?: { rows: Map<string, any> };
+} = {}) {
   let current: unknown = null;
   return {
     async execute<T>(fn: (tx: any) => Promise<T>): Promise<T> {
-      current = {};
+      const tx: any = {
+        taskAssignment: {
+          findMany: ({ where, take }: any) => {
+            const rows = (opts.taskAssignment?.rows ?? []).filter((row) => {
+              if (where?.status && row.status !== where.status) return false;
+              if (where?.expiresAt?.lte && row.expiresAt > where.expiresAt) return false;
+              return true;
+            });
+            return rows.slice(0, take ?? rows.length).map((r) => ({
+              id: r.id,
+              version: r.version,
+              tenantId: r.tenantId,
+              taskId: r.taskId,
+              agentId: r.agentId,
+              generation: r.generation,
+              releasedAt: r.releasedAt,
+            }));
+          },
+          updateMany: async ({ where, data }: any) => {
+            const row = (opts.taskAssignment?.rows ?? []).find(
+              (r) =>
+                r.id === where.id &&
+                r.version === where.version &&
+                r.status === where.status,
+            );
+            if (!row) return { count: 0 };
+            row.status = data.status;
+            row.version = data.version.increment;
+            if (data.releasedAt) row.releasedAt = data.releasedAt;
+            if (data.releaseReason) row.releaseReason = data.releaseReason;
+            return { count: 1 };
+          },
+        },
+        task: {
+          findFirst: ({ where, select }: any) => {
+            const row = opts.task?.rows.get(where.id);
+            if (!row || row.tenantId !== where.tenantId) return null;
+            if (select) {
+              const result: any = {};
+              for (const key of Object.keys(select)) result[key] = row[key];
+              return result;
+            }
+            return row;
+          },
+          updateMany: async ({ where, data }: any) => {
+            const row = opts.task?.rows.get(where.id);
+            if (!row || row.version !== where.version) return { count: 0 };
+            for (const [key, value] of Object.entries(data)) row[key] = value;
+            return { count: 1 };
+          },
+        },
+      };
+      current = tx;
       try {
         return await fn(current);
       } finally {
@@ -466,6 +535,7 @@ function buildService(opts: {
   outbox: ReturnType<typeof buildOutbox>;
   uow: ReturnType<typeof buildUow>;
   audit: ReturnType<typeof buildAudit>;
+  autoAssignmentEnabled?: boolean;
 }) {
   // Wire recordOverrideAudit → shared overrideAudits so tests can
   // assert on a single list.
@@ -487,6 +557,17 @@ function buildService(opts: {
     });
     return r;
   };
+  // Provide a tenant-flags stub. AUTO_ASSIGNMENT is on by default in
+  // tests so the auto path is exercised. Override per-test via
+  // `autoAssignmentEnabled: false` to exercise the disabled path.
+  const tenantFlags = {
+    async isEnabled(flag: string, _tenantId: string): Promise<boolean> {
+      if (flag === 'AUTO_ASSIGNMENT') {
+        return opts.autoAssignmentEnabled ?? true;
+      }
+      return true;
+    },
+  };
   return new AssignmentService(
     opts.uow as any,
     opts.taskRepo as any,
@@ -494,6 +575,7 @@ function buildService(opts: {
     opts.taskAssignmentRepo as any,
     opts.audit as any,
     opts.outbox as any,
+    tenantFlags as any,
   );
 }
 
@@ -552,8 +634,8 @@ describe('AssignmentService (Phase 4)', () => {
         departmentId: 'dept-accounting',
       },
     ]);
-    agentRepo.workloadsByAgent.set('agent-A', { active: 0, queued: 0, inProgress: 0, blocked: 0 });
-    agentRepo.workloadsByAgent.set('agent-B', { active: 3, queued: 3, inProgress: 0, blocked: 0 });
+    agentRepo.workloadsByAgent.set('agent-A', { active: 0, assigned: 0, queued: 0, inProgress: 0, blocked: 0 });
+    agentRepo.workloadsByAgent.set('agent-B', { active: 3, assigned: 0, queued: 3, inProgress: 0, blocked: 0 });
     agentRepo.perfByAgent.set('agent-A', { total: 10, success: 9 });
     agentRepo.perfByAgent.set('agent-B', { total: 10, success: 5 });
     const taskAssignmentRepo = buildTaskAssignmentRepo();
@@ -619,7 +701,7 @@ describe('AssignmentService (Phase 4)', () => {
         departmentId: null,
       },
     ]);
-    agentRepo.workloadsByAgent.set('agent-A', { active: 0, queued: 0, inProgress: 0, blocked: 0 });
+    agentRepo.workloadsByAgent.set('agent-A', { active: 0, assigned: 0, queued: 0, inProgress: 0, blocked: 0 });
     agentRepo.perfByAgent.set('agent-A', { total: 0, success: 0 });
     const taskAssignmentRepo = buildTaskAssignmentRepo();
     const overrideAudits = buildOverrideAudits();
@@ -676,7 +758,7 @@ describe('AssignmentService (Phase 4)', () => {
         departmentId: null,
       },
     ]);
-    agentRepo.workloadsByAgent.set('agent-A', { active: 0, queued: 0, inProgress: 0, blocked: 0 });
+    agentRepo.workloadsByAgent.set('agent-A', { active: 0, assigned: 0, queued: 0, inProgress: 0, blocked: 0 });
     agentRepo.perfByAgent.set('agent-A', { total: 0, success: 0 });
     const taskAssignmentRepo = buildTaskAssignmentRepo();
     const overrideAudits = buildOverrideAudits();
@@ -808,7 +890,29 @@ describe('AssignmentService (Phase 4)', () => {
         departmentId: null,
       },
     ]);
-    const agentRepo = buildAgentRepo([]);
+    const agentRepo = buildAgentRepo([
+      {
+        id: 'agent-B',
+        tenantId: 'tnt-acme',
+        name: 'Bob (Staff)',
+        role: 'STAFF_ACCOUNTANT',
+        capabilities: ['data_entry'],
+        permissions: [],
+        maxConcurrency: 5,
+        availability: 'AVAILABLE',
+        archived: false,
+        dataClassification: 'INTERNAL',
+        departmentId: 'dept-accounting',
+      },
+    ]);
+    agentRepo.workloadsByAgent.set('agent-B', {
+      active: 0,
+      assigned: 0,
+      queued: 0,
+      inProgress: 0,
+      blocked: 0,
+    });
+    agentRepo.perfByAgent.set('agent-B', { total: 0, success: 0 });
     const taskAssignmentRepo = buildTaskAssignmentRepo();
     taskAssignmentRepo.add({
       id: 'assign-1',
@@ -906,6 +1010,369 @@ describe('AssignmentService (Phase 4)', () => {
     expect(taskAssignmentRepo.list().find((r) => r.id === 'assign-active')?.status).toBe('ACTIVE');
   });
 
+  it('sweepExpiredReleases emits TaskAssignmentReleased outbox + drops agent linkage', async () => {
+    const taskRepo = buildTaskRepo([
+      {
+        id: 'task-1',
+        tenantId: 'tnt-acme',
+        status: 'ASSIGNED',
+        title: 'T',
+        version: 2,
+        agentId: 'agent-A',
+        requiredRole: null,
+        requiredCapabilities: [],
+        dataClassification: null,
+        departmentId: null,
+      },
+    ]);
+    const agentRepo = buildAgentRepo([]);
+    const taskAssignmentRepo = buildTaskAssignmentRepo();
+    taskAssignmentRepo.add({
+      id: 'assign-expired',
+      tenantId: 'tnt-acme',
+      taskId: 'task-1',
+      agentId: 'agent-A',
+      generation: 1,
+      rationale: 'auto',
+      status: 'ACTIVE',
+      version: 1,
+      releasedAt: null,
+      releasedByActorId: null,
+      releaseReason: null,
+      expiresAt: new Date(Date.now() - 60000),
+    });
+    const overrideAudits = buildOverrideAudits();
+    const outbox = buildOutbox();
+    const uow = buildUow();
+    const audit = buildAudit();
+    const service = buildService({ taskRepo, agentRepo, taskAssignmentRepo, overrideAudits, outbox, uow, audit });
+
+    await service.sweepExpiredReleases();
+
+    const events = outbox.list();
+    expect(events.length).toBe(1);
+    expect(events[0].eventType).toBe('TaskAssignmentReleased');
+    expect(events[0].payload.reason).toBe('EXPIRED_SWEEP');
+    expect(events[0].payload.taskId).toBe('task-1');
+    expect(events[0].payload.releasedAssignmentId).toBe('assign-expired');
+    // Task linkage should be dropped; the task is reusable.
+    expect(taskRepo.get('task-1')?.agentId).toBe(null);
+  });
+
+  it('rejects auto-assign when AUTO_ASSIGNMENT flag is disabled', async () => {
+    const taskRepo = buildTaskRepo([
+      {
+        id: 'task-1',
+        tenantId: 'tnt-acme',
+        status: 'READY',
+        title: 'T',
+        version: 1,
+        agentId: null,
+        requiredRole: null,
+        requiredCapabilities: [],
+        dataClassification: null,
+        departmentId: null,
+      },
+    ]);
+    const agentRepo = buildAgentRepo([
+      {
+        id: 'agent-A',
+        tenantId: 'tnt-acme',
+        name: 'Alice',
+        role: null,
+        capabilities: [],
+        permissions: [],
+        maxConcurrency: 5,
+        availability: 'AVAILABLE',
+        archived: false,
+        dataClassification: 'INTERNAL',
+        departmentId: null,
+      },
+    ]);
+    const taskAssignmentRepo = buildTaskAssignmentRepo();
+    const overrideAudits = buildOverrideAudits();
+    const outbox = buildOutbox();
+    const uow = buildUow();
+    const audit = buildAudit();
+    const service = buildService({
+      taskRepo, agentRepo, taskAssignmentRepo, overrideAudits, outbox, uow, audit,
+      autoAssignmentEnabled: false,
+    });
+
+    await expect(
+      service.executeAssign(
+        { tenantId: 'tnt-acme', taskId: 'task-1' },
+        metadata('tnt-acme'),
+      ),
+    ).rejects.toThrow('AUTO_ASSIGNMENT_DISABLED');
+  });
+
+  it('allows manual override even when AUTO_ASSIGNMENT flag is disabled', async () => {
+    const taskRepo = buildTaskRepo([
+      {
+        id: 'task-1',
+        tenantId: 'tnt-acme',
+        status: 'READY',
+        title: 'T',
+        version: 1,
+        agentId: null,
+        requiredRole: null,
+        requiredCapabilities: [],
+        dataClassification: null,
+        departmentId: null,
+      },
+    ]);
+    const agentRepo = buildAgentRepo([
+      {
+        id: 'agent-A',
+        tenantId: 'tnt-acme',
+        name: 'Alice',
+        role: null,
+        capabilities: [],
+        permissions: [],
+        maxConcurrency: 5,
+        availability: 'AVAILABLE',
+        archived: false,
+        dataClassification: 'INTERNAL',
+        departmentId: null,
+      },
+    ]);
+    agentRepo.workloadsByAgent.set('agent-A', { active: 0, assigned: 0, queued: 0, inProgress: 0, blocked: 0 });
+    agentRepo.perfByAgent.set('agent-A', { total: 0, success: 0 });
+    const taskAssignmentRepo = buildTaskAssignmentRepo();
+    const overrideAudits = buildOverrideAudits();
+    const outbox = buildOutbox();
+    const uow = buildUow();
+    const audit = buildAudit();
+    const service = buildService({
+      taskRepo, agentRepo, taskAssignmentRepo, overrideAudits, outbox, uow, audit,
+      autoAssignmentEnabled: false,
+    });
+
+    const result = await service.executeAssign(
+      {
+        tenantId: 'tnt-acme',
+        taskId: 'task-1',
+        agentId: 'agent-A',
+        manualOverrideRationale: 'override despite flag',
+      },
+      metadata('tnt-acme'),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.data?.manualOverride).toBe(true);
+    expect(overrideAudits.list().length).toBe(1);
+  });
+
+  it('rejects auto-assign when chosen agent has reached maxConcurrency inside the transaction', async () => {
+    const taskRepo = buildTaskRepo([
+      {
+        id: 'task-1',
+        tenantId: 'tnt-acme',
+        status: 'READY',
+        title: 'T',
+        version: 1,
+        agentId: null,
+        requiredRole: null,
+        requiredCapabilities: [],
+        dataClassification: null,
+        departmentId: null,
+      },
+    ]);
+    const agentRepo = buildAgentRepo([
+      {
+        id: 'agent-A',
+        tenantId: 'tnt-acme',
+        name: 'Alice',
+        role: null,
+        capabilities: ['data_entry'],
+        permissions: [],
+        maxConcurrency: 5,
+        availability: 'AVAILABLE',
+        archived: false,
+        dataClassification: 'INTERNAL',
+        departmentId: null,
+      },
+    ]);
+    // Pre-filter: agent has 4 active tasks (under 5) so the eligibility scan
+    // passes (first loadWorkloads call returns 4). Inside the transaction,
+    // the in-transaction re-check sees the inflated value (call #2
+    // returns 5) — should reject.
+    agentRepo.workloadsByAgent.set('agent-A', {
+      active: 4,
+      assigned: 4,
+      queued: 0,
+      inProgress: 0,
+      blocked: 0,
+      inflatedActive: 5,
+      inflateOnCall: 2,
+    });
+    agentRepo.perfByAgent.set('agent-A', { total: 0, success: 0 });
+    const taskAssignmentRepo = buildTaskAssignmentRepo();
+    const overrideAudits = buildOverrideAudits();
+    const outbox = buildOutbox();
+    const uow = buildUow();
+    const audit = buildAudit();
+    const service = buildService({ taskRepo, agentRepo, taskAssignmentRepo, overrideAudits, outbox, uow, audit });
+
+    await expect(
+      service.executeAssign(
+        { tenantId: 'tnt-acme', taskId: 'task-1', requiredCapabilities: ['data_entry'] },
+        metadata('tnt-acme'),
+      ),
+    ).rejects.toThrow('AGENT_AT_MAX_CONCURRENCY');
+  });
+
+  it('rejects manual override when override agent is at capacity', async () => {
+    const taskRepo = buildTaskRepo([
+      {
+        id: 'task-1',
+        tenantId: 'tnt-acme',
+        status: 'READY',
+        title: 'T',
+        version: 1,
+        agentId: null,
+        requiredRole: null,
+        requiredCapabilities: [],
+        dataClassification: null,
+        departmentId: null,
+      },
+    ]);
+    const agentRepo = buildAgentRepo([
+      {
+        id: 'agent-A',
+        tenantId: 'tnt-acme',
+        name: 'Alice',
+        role: null,
+        capabilities: [],
+        permissions: [],
+        maxConcurrency: 2,
+        availability: 'AVAILABLE',
+        archived: false,
+        dataClassification: 'INTERNAL',
+        departmentId: null,
+      },
+    ]);
+    // Override path only does one loadWorkloads call. Inflate to 2 on
+    // the first call to simulate the agent already at capacity.
+    agentRepo.workloadsByAgent.set('agent-A', {
+      active: 2,
+      assigned: 2,
+      queued: 0,
+      inProgress: 0,
+      blocked: 0,
+      inflatedActive: 2,
+      inflateOnCall: 1,
+    });
+    agentRepo.perfByAgent.set('agent-A', { total: 0, success: 0 });
+    const taskAssignmentRepo = buildTaskAssignmentRepo();
+    const overrideAudits = buildOverrideAudits();
+    const outbox = buildOutbox();
+    const uow = buildUow();
+    const audit = buildAudit();
+    const service = buildService({ taskRepo, agentRepo, taskAssignmentRepo, overrideAudits, outbox, uow, audit });
+
+    await expect(
+      service.executeAssign(
+        {
+          tenantId: 'tnt-acme',
+          taskId: 'task-1',
+          agentId: 'agent-A',
+          manualOverrideRationale: 'force override',
+        },
+        metadata('tnt-acme'),
+      ),
+    ).rejects.toThrow('AGENT_AT_MAX_CONCURRENCY');
+  });
+
+  it('dedup branch returns deduplicated:true without re-running scoring', async () => {
+    const taskRepo = buildTaskRepo([
+      {
+        id: 'task-1',
+        tenantId: 'tnt-acme',
+        status: 'ASSIGNED',
+        title: 'T',
+        version: 2,
+        agentId: 'agent-A',
+        requiredRole: null,
+        requiredCapabilities: [],
+        dataClassification: null,
+        departmentId: null,
+      },
+    ]);
+    const agentRepo = buildAgentRepo([]);
+    const taskAssignmentRepo = buildTaskAssignmentRepo();
+    taskAssignmentRepo.add({
+      id: 'assign-1',
+      tenantId: 'tnt-acme',
+      taskId: 'task-1',
+      agentId: 'agent-A',
+      generation: 1,
+      rationale: 'auto-assignment by scoring policy 1.0',
+      status: 'ACTIVE',
+      version: 1,
+      releasedAt: null,
+      releasedByActorId: null,
+      releaseReason: null,
+      expiresAt: null,
+    });
+    const overrideAudits = buildOverrideAudits();
+    const outbox = buildOutbox();
+    const uow = buildUow();
+    const audit = buildAudit();
+    const service = buildService({ taskRepo, agentRepo, taskAssignmentRepo, overrideAudits, outbox, uow, audit });
+
+    const result = await service.executeAssign(
+      // Auto-path replay: no agentId, no manualOverrideRationale.
+      { tenantId: 'tnt-acme', taskId: 'task-1' },
+      metadata('tnt-acme'),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.deduplicated).toBe(true);
+    expect(result.data?.agentId).toBe('agent-A');
+    // No new outbox, no new audit, no new assignment row.
+    expect(outbox.list().length).toBe(0);
+    expect(taskAssignmentRepo.list().length).toBe(1);
+  });
+
+  it('rejects dedup-replay only when no matching active assignment exists', async () => {
+    // A COMPLETED task with a stale ACTIVE assignment row (rare but
+    // possible if release was missed) must surface as "no active
+    // assignment" rather than silently resurrecting the prior row.
+    // Plan §6.5 — "Assignment persists consistently across views".
+    const taskRepo = buildTaskRepo([
+      {
+        id: 'task-1',
+        tenantId: 'tnt-acme',
+        status: 'COMPLETED',
+        title: 'T',
+        version: 5,
+        agentId: 'agent-A',
+        requiredRole: null,
+        requiredCapabilities: [],
+        dataClassification: null,
+        departmentId: null,
+      },
+    ]);
+    const agentRepo = buildAgentRepo([]);
+    const taskAssignmentRepo = buildTaskAssignmentRepo();
+    // No active assignment row → dedup doesn't fire → state machine
+    // check rejects.
+    const overrideAudits = buildOverrideAudits();
+    const outbox = buildOutbox();
+    const uow = buildUow();
+    const audit = buildAudit();
+    const service = buildService({ taskRepo, agentRepo, taskAssignmentRepo, overrideAudits, outbox, uow, audit });
+
+    await expect(
+      service.executeAssign(
+        { tenantId: 'tnt-acme', taskId: 'task-1' },
+        metadata('tnt-acme'),
+      ),
+    ).rejects.toThrow(/Invalid task transition|TASK_NOT_FOUND/);
+  });
+
   it('findEligibleAgents ranks by deterministic score', async () => {
     const taskRepo = buildTaskRepo([]);
     const agentRepo = buildAgentRepo([
@@ -936,8 +1403,8 @@ describe('AssignmentService (Phase 4)', () => {
         departmentId: 'dept-accounting',
       },
     ]);
-    agentRepo.workloadsByAgent.set('agent-A', { active: 5, queued: 0, inProgress: 5, blocked: 0 });
-    agentRepo.workloadsByAgent.set('agent-B', { active: 1, queued: 0, inProgress: 1, blocked: 0 });
+    agentRepo.workloadsByAgent.set('agent-A', { active: 5, assigned: 0, queued: 0, inProgress: 5, blocked: 0 });
+    agentRepo.workloadsByAgent.set('agent-B', { active: 1, assigned: 0, queued: 0, inProgress: 1, blocked: 0 });
     agentRepo.perfByAgent.set('agent-A', { total: 10, success: 6 });
     agentRepo.perfByAgent.set('agent-B', { total: 10, success: 10 });
     const taskAssignmentRepo = buildTaskAssignmentRepo();

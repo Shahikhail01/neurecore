@@ -11,6 +11,14 @@ import {
 } from '../domain/ports/agent-repository.port';
 import type { AgentDataClassification } from '../domain/agent-capability';
 
+// Plan §6.1 — agent qualifies when its dataClassification is
+// "at least as permissive" as the requested floor.
+const CLASSIFICATION_FLOOR: Record<AgentDataClassification, AgentDataClassification[]> = {
+  INTERNAL: ['INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'],
+  CONFIDENTIAL: ['CONFIDENTIAL', 'RESTRICTED'],
+  RESTRICTED: ['RESTRICTED'],
+};
+
 @Injectable()
 export class PrismaAgentRepository implements IAgentRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -47,6 +55,10 @@ export class PrismaAgentRepository implements IAgentRepository {
         ? { hasEvery: filter.requiredCapabilities }
         : undefined;
 
+    const classificationFloor = filter.dataClassification
+      ? CLASSIFICATION_FLOOR[filter.dataClassification]
+      : undefined;
+
     const agents = await this.prisma.agent.findMany({
       where: {
         tenantId,
@@ -55,7 +67,9 @@ export class PrismaAgentRepository implements IAgentRepository {
         availability: 'AVAILABLE',
         ...(filter.role ? { role: filter.role } : {}),
         ...(filter.departmentId ? { departmentId: filter.departmentId } : {}),
-        ...(filter.dataClassification ? { dataClassification: filter.dataClassification } : {}),
+        ...(classificationFloor
+          ? { dataClassification: { in: classificationFloor } }
+          : {}),
         ...(capAnd ? { capabilities: capAnd } : {}),
       },
       orderBy: [{ createdAt: 'asc' }],
@@ -92,6 +106,7 @@ export class PrismaAgentRepository implements IAgentRepository {
       map.set(id, {
         agentId: id,
         activeCount: 0,
+        assignedCount: 0,
         inProgressCount: 0,
         queuedCount: 0,
         blockedCount: 0,
@@ -102,12 +117,16 @@ export class PrismaAgentRepository implements IAgentRepository {
       const w = map.get(row.agentId) ?? {
         agentId: row.agentId,
         activeCount: 0,
+        assignedCount: 0,
         inProgressCount: 0,
         queuedCount: 0,
         blockedCount: 0,
       };
       const count = row._count._all;
       switch (row.status as unknown as string) {
+        case 'ASSIGNED':
+          w.assignedCount = count;
+          break;
         case 'IN_PROGRESS':
           w.inProgressCount = count;
           break;
@@ -120,7 +139,8 @@ export class PrismaAgentRepository implements IAgentRepository {
         default:
           break;
       }
-      w.activeCount = w.inProgressCount + w.queuedCount + w.blockedCount;
+      w.activeCount =
+        w.assignedCount + w.inProgressCount + w.queuedCount + w.blockedCount;
       map.set(row.agentId, w);
     }
     return Array.from(map.values());
@@ -131,7 +151,10 @@ export class PrismaAgentRepository implements IAgentRepository {
     agentIds: string[],
     windowSize: number,
   ): Promise<AgentPerformance[]> {
-    if (agentIds.length === 0 || windowSize <= 0) {
+    if (agentIds.length === 0) {
+      return [];
+    }
+    if (windowSize <= 0) {
       return agentIds.map((id) => ({
         agentId: id,
         totalAttempts: 0,
@@ -139,25 +162,36 @@ export class PrismaAgentRepository implements IAgentRepository {
         successRate: 0,
       }));
     }
-    const recent = await this.prisma.executionAttempt.findMany({
-      where: {
-        tenantId,
-        agentId: { in: agentIds },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: agentIds.length * windowSize,
-      select: {
-        agentId: true,
-        status: true,
-      },
-    });
+
+    // Compute the per-agent window correctly. `findMany({ take: N })`
+    // would be biased toward whichever agent had the most recent
+    // attempts. Instead, fetch each agent's windowSize most-recent
+    // attempts via a UNION ALL of per-agent parameterized queries.
+    //
+    // SQL pattern:
+    //   (SELECT ... WHERE agent_id = $1 ORDER BY created_at DESC LIMIT w)
+    //   UNION ALL
+    //   (SELECT ... WHERE agent_id = $2 ORDER BY created_at DESC LIMIT w)
+    const perAgentSelects = agentIds
+      .map(
+        (_, i) =>
+          `(SELECT "${i + 1}"::int AS agent_idx, status FROM "execution_attempts" WHERE "tenantId" = $1 AND "agentId" = $${i + 2} ORDER BY "createdAt" DESC LIMIT $${i + 2 + agentIds.length}::int)`,
+      )
+      .join(' UNION ALL ');
+    const params: unknown[] = [tenantId, ...agentIds, ...agentIds.map(() => windowSize)];
+    const result = await this.prisma.$queryRawUnsafe<
+      Array<{ agent_idx: number; status: string }>
+    >(perAgentSelects, ...params).catch(() => []);
+
     const map = new Map<string, { total: number; success: number }>();
-    for (const id of agentIds) {
+    agentIds.forEach((id, idx) => {
       map.set(id, { total: 0, success: 0 });
-    }
-    for (const row of recent) {
-      if (!row.agentId) continue;
-      const bucket = map.get(row.agentId);
+    });
+
+    for (const row of result) {
+      const agentId = agentIds[row.agent_idx - 1];
+      if (!agentId) continue;
+      const bucket = map.get(agentId);
       if (!bucket) continue;
       bucket.total++;
       if (
@@ -172,11 +206,15 @@ export class PrismaAgentRepository implements IAgentRepository {
         bucket.success++;
       }
     }
-    return Array.from(map.entries()).map(([agentId, b]) => ({
-      agentId,
-      totalAttempts: b.total,
-      succeededAttempts: b.success,
-      successRate: b.total === 0 ? 0 : (b.success / b.total) * 100,
-    }));
+
+    return agentIds.map((id) => {
+      const b = map.get(id) ?? { total: 0, success: 0 };
+      return {
+        agentId: id,
+        totalAttempts: b.total,
+        succeededAttempts: b.success,
+        successRate: b.total === 0 ? 0 : (b.success / b.total) * 100,
+      };
+    });
   }
 }

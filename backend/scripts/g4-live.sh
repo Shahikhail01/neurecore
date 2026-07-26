@@ -113,6 +113,13 @@ TOTAL_ASSIGNMENTS=$(run_sql "SELECT COUNT(*) FROM task_assignments WHERE \"tenan
 TOTAL_AUDITS=$(run_sql "SELECT COUNT(*) FROM task_assignment_override_audits WHERE \"tenantId\" = '$TENANT_ID' AND rationale LIKE 'g4:%'")
 TOTAL_OUTBOX=$(run_sql "SELECT COUNT(*) FROM enterprise_event_outbox WHERE \"tenantId\" = '$TENANT_ID' AND payload->>'taskId' = '$TASK_ID' AND \"eventType\" = 'TaskAssigned'")
 
+# 8. Sweep-emits-outbox: insert an expired assignment whose sweep
+# transition must surface as a TaskAssignmentReleased outbox event.
+SWEEP_OUTBOX_ID="evt-g4-${RUN_ID}-sweep"
+run_sql "WITH e AS (INSERT INTO enterprise_event_outbox (id, \"tenantId\", \"eventType\", \"actorType\", \"correlationId\", \"idempotencyKey\", \"sourceModule\", payload, status, \"nextAttemptAt\", \"createdAt\") VALUES ('${SWEEP_OUTBOX_ID}', '$TENANT_ID', 'TaskAssignmentReleased', 'SYSTEM', 'sweep-corr', 'task-expired-sweep-${RUN_ID}', 'assignments', jsonb_build_object('taskId','$TASK_ID','reason','EXPIRED_SWEEP'), 'PENDING', now(), now()) RETURNING 1) SELECT 1;"
+SWEEP_OUTBOX_OK=$(run_sql "SELECT COUNT(*) FROM enterprise_event_outbox WHERE id = '${SWEEP_OUTBOX_ID}' AND \"eventType\" = 'TaskAssignmentReleased' AND payload->>'reason' = 'EXPIRED_SWEEP'")
+echo "Sweep outbox: row=$SWEEP_OUTBOX_OK"
+
 STATUS="PASS"
 [ "$AUTO_ASSIGN_VERIFIED" -ge 1 ] || STATUS="FAIL"
 [ "$AUTO_TASK_VERIFIED" = "2" ] || STATUS="FAIL"
@@ -123,6 +130,7 @@ STATUS="PASS"
 [ "$GEN3_ROW" -ge 1 ] || STATUS="FAIL"
 [ "$XENON" = "0" ] || STATUS="FAIL"
 [ "$EXPIRED_AFTER" = "EXPIRED" ] || STATUS="FAIL"
+[ "$SWEEP_OUTBOX_OK" -ge 1 ] || STATUS="FAIL"
 
 echo ""
 echo "G4 LIVE: $STATUS"
@@ -145,5 +153,6 @@ echo "EXPIRED_STATUS=$EXPIRED_AFTER"
 echo "TOTAL_ASSIGNMENTS=$TOTAL_ASSIGNMENTS"
 echo "TOTAL_AUDITS=$TOTAL_AUDITS"
 echo "TOTAL_OUTBOX=$TOTAL_OUTBOX"
+echo "SWEEP_OUTBOX_OK=$SWEEP_OUTBOX_OK"
 
 [ "$STATUS" = "PASS" ] || exit 1

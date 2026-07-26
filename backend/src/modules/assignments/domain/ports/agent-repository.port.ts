@@ -22,6 +22,7 @@ export interface AgentEntity {
 export interface AgentWorkload {
   agentId: string;
   activeCount: number;
+  assignedCount: number;
   inProgressCount: number;
   queuedCount: number;
   blockedCount: number;
@@ -35,6 +36,7 @@ export interface AgentPerformance {
 }
 
 export type AssignmentStatusForCapacity =
+  | 'ASSIGNED'
   | 'QUEUED'
   | 'IN_PROGRESS'
   | 'BLOCKED';
