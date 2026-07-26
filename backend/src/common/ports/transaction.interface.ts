@@ -1,5 +1,8 @@
 // src/common/ports/transaction.interface.ts
 import { Prisma } from '@prisma/client';
+import { UNIT_OF_WORK } from './di-tokens';
+
+export { UNIT_OF_WORK };
 
 export interface IUnitOfWork {
   execute<T>(work: (tx: ITransactionalClient) => Promise<T>): Promise<T>;
@@ -15,5 +18,3 @@ export interface IRepository<T, TId = string> {
   exists(tenantId: string, where: Record<string, unknown>): Promise<boolean>;
   count(tenantId: string, where: Record<string, unknown>): Promise<number>;
 }
-
-export const UNIT_OF_WORK = Symbol('UNIT_OF_WORK');
