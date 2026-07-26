@@ -3,11 +3,11 @@ import { Module } from '@nestjs/common';
 import { ReviewService } from './application/review.service';
 import { ReviewController } from './review.controller';
 import { PrismaReviewRepository } from './infrastructure/prisma-review.repository';
-import { PrismaTaskRepository } from '../../common/persistence/prisma-task.repository';
+import { PersistenceModule } from '../../common/persistence/persistence.module';
 import { REVIEW_REPOSITORY } from './domain/ports/review-repository.port';
-import { TASK_REPOSITORY } from '../../common/ports/task-repository.port';
 
 @Module({
+  imports: [PersistenceModule],
   controllers: [ReviewController],
   providers: [
     ReviewService,
@@ -15,10 +15,6 @@ import { TASK_REPOSITORY } from '../../common/ports/task-repository.port';
     {
       provide: REVIEW_REPOSITORY,
       useExisting: PrismaReviewRepository,
-    },
-    {
-      provide: TASK_REPOSITORY,
-      useExisting: PrismaTaskRepository,
     },
   ],
   exports: [ReviewService],
