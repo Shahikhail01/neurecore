@@ -1,12 +1,14 @@
 // src/modules/enterprise-initiation/enterprise-initiation.module.ts
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { CommandRegistry } from '../../common/commands/command.registry';
+import { PersistenceModule } from '../../common/persistence/persistence.module';
 import { ApproveInitiationHandler } from './application/approve-initiation.handler';
 import { CreateProjectFromInitiationHandler } from './application/create-project-from-initiation.handler';
 import { EnterpriseInitiationController } from './enterprise-initiation.controller';
 import { EnterpriseInitiationService } from './enterprise-initiation.service';
 
 @Module({
+  imports: [PersistenceModule],
   controllers: [EnterpriseInitiationController],
   providers: [
     EnterpriseInitiationService,
