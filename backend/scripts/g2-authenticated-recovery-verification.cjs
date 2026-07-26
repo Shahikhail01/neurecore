@@ -108,6 +108,39 @@ async function main() {
     data?.initiationId === initiation.id &&
     data?.projectId === initiation.projectId;
 
+  const negativeInitiation = await prisma.enterpriseInitiation.create({
+    data: {
+      tenantId: TENANT_ID,
+      projectName: `G2 negative recovery guard ${Date.now()}`,
+      projectDescription: 'G2 failure semantics verification: unapproved initiation must not materialize',
+      discoveredData: { runId: `${RUN_ID}:negative`, verification: 'failure-semantics' },
+      status: 'DRAFT',
+    },
+    select: { id: true, status: true },
+  });
+  const negativeResponse = await fetch(`${API_BASE}/enterprise-initiation/create-project`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({
+      initiationId: negativeInitiation.id,
+      projectName: 'G2 negative should not create',
+      projectDescription: 'This request should fail because initiation is not approved',
+    }),
+  });
+  const negativeBody = await negativeResponse.json().catch(() => null);
+  const negativeAfter = await prisma.enterpriseInitiation.findUnique({
+    where: { id: negativeInitiation.id },
+    select: { id: true, status: true, projectId: true },
+  });
+  const negativePassed =
+    negativeResponse.status >= 400 &&
+    negativeAfter?.status === 'DRAFT' &&
+    negativeAfter?.projectId === null;
+
   console.log(JSON.stringify({
     runId: RUN_ID,
     url,
@@ -116,10 +149,17 @@ async function main() {
     actor: actor.email,
     initiation,
     response: data,
-    passed,
+    recoveryPassed: passed,
+    negativeFailureSemantics: {
+      initiation: negativeAfter,
+      httpStatus: negativeResponse.status,
+      responseCode: negativeBody?.error?.code ?? null,
+      passed: negativePassed,
+    },
+    passed: passed && negativePassed,
   }, null, 2));
 
-  if (!passed) process.exitCode = 1;
+  if (!passed || !negativePassed) process.exitCode = 1;
 }
 
 main()
