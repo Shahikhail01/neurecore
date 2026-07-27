@@ -29,6 +29,7 @@ export class PrismaProjectRepository implements IProjectRepository {
       executionEngineVersion: row.executionEngineVersion,
       initiationId: row.initiationId,
       version: row.version ?? 1,
+      stageVersion: row.stageVersion ?? 1,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -67,5 +68,31 @@ export class PrismaProjectRepository implements IProjectRepository {
       },
     });
     return this.toAggregate(row)!;
+  }
+
+  async advanceStage(
+    input: {
+      tenantId: string;
+      projectId: string;
+      expectedStageVersion: number;
+      toStage: string;
+      completedAt?: Date;
+    },
+    tx?: ITransactionalClient,
+  ): Promise<boolean> {
+    const client = (tx ?? this.prisma) as any;
+    const result = await client.project.updateMany({
+      where: {
+        id: input.projectId,
+        tenantId: input.tenantId,
+        stageVersion: input.expectedStageVersion,
+      },
+      data: {
+        status: input.toStage,
+        stageVersion: { increment: 1 },
+        completedAt: input.completedAt,
+      },
+    });
+    return result.count === 1;
   }
 }

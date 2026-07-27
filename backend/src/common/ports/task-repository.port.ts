@@ -19,6 +19,7 @@ export interface TaskEntity {
 
 export interface UpdateTaskStatusInput {
   id: string;
+  tenantId?: string;
   expectedVersion: number;
   status: TaskStatus;
   agentId?: string | null;
@@ -34,20 +35,20 @@ export interface UpdateTaskAssignmentInput {
 }
 
 export interface ITaskRepository {
-  findById(tenantId: string, id: string): Promise<TaskEntity | null>;
-  updateStatus(
-    input: UpdateTaskStatusInput,
+  findById(tenantId: string, id: string, tx?: any): Promise<TaskEntity | null>;
+  findByProjectAndStatuses(
+    tenantId: string,
+    projectId: string,
+    statuses: TaskStatus[],
     tx?: any,
-  ): Promise<TaskEntity>;
+  ): Promise<Array<Pick<TaskEntity, 'id' | 'title' | 'status'>>>;
+  updateStatus(input: UpdateTaskStatusInput, tx?: any): Promise<TaskEntity>;
   /**
    * Count tasks currently in any of the supplied statuses for the
    * given agent. Used both for eligibility checks (active workload)
    * and for "does the agent have a free slot" claims.
    */
-  countActiveByAgent(
-    agentId: string,
-    statuses: TaskStatus[],
-  ): Promise<number>;
+  countActiveByAgent(agentId: string, statuses: TaskStatus[]): Promise<number>;
   /**
    * Optimistic update for task ↔ agent linkage during the AssignTask
    * transaction. Returns the updated entity; throws

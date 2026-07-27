@@ -15,6 +15,7 @@ export interface ProjectAggregate {
   executionEngineVersion: AwlExecutionEngine;
   initiationId: string | null;
   version: number;
+  stageVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,4 +35,14 @@ export interface IProjectRepository {
   findById(tenantId: string, id: string, tx?: ITransactionalClient): Promise<ProjectAggregate | null>;
   findByInitiationId(tenantId: string, initiationId: string, tx?: ITransactionalClient): Promise<ProjectAggregate | null>;
   create(input: CreateProjectInput, tx?: ITransactionalClient): Promise<ProjectAggregate>;
+  advanceStage(
+    input: {
+      tenantId: string;
+      projectId: string;
+      expectedStageVersion: number;
+      toStage: string;
+      completedAt?: Date;
+    },
+    tx?: ITransactionalClient,
+  ): Promise<boolean>;
 }

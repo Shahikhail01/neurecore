@@ -15,7 +15,10 @@ export type ExecutionAttemptStatus =
   | 'FAILED_FINAL'
   | 'CANCELLED';
 
-export const ATTEMPT_TRANSITIONS: Record<ExecutionAttemptStatus, ExecutionAttemptStatus[]> = {
+export const ATTEMPT_TRANSITIONS: Record<
+  ExecutionAttemptStatus,
+  ExecutionAttemptStatus[]
+> = {
   CREATED: ['QUEUED'],
   QUEUED: ['RUNNING'],
   RUNNING: [
@@ -46,7 +49,11 @@ export class AttemptStateMachine {
   }
 
   static assertTransition(from: string, to: string): void {
-    if (!ATTEMPT_TRANSITIONS[from as ExecutionAttemptStatus]?.includes(to as ExecutionAttemptStatus)) {
+    if (
+      !ATTEMPT_TRANSITIONS[from as ExecutionAttemptStatus]?.includes(
+        to as ExecutionAttemptStatus,
+      )
+    ) {
       throw new Error(`Invalid attempt transition from ${from} to ${to}`);
     }
   }

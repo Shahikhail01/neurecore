@@ -30,6 +30,7 @@ import { EnterpriseCognitionModule } from './modules/enterprise-cognition/enterp
 import { EnterpriseAutonomyModule } from './modules/enterprise-autonomy/enterprise-autonomy.module';
 import { EnterpriseOperatingSystemModule } from './modules/enterprise-operating-system/enterprise-operating-system.module';
 import { PlatformOperationsModule } from './modules/platform-operations/platform-operations.module';
+import { Phase8Module } from './modules/phase8/phase8.module';
 import { EnterpriseIntelligenceNetworkModule } from './modules/enterprise-intelligence-network/enterprise-intelligence-network.module';
 import { PlatformSDKModule } from './modules/platform-sdk/platform-sdk.module';
 import { CloudPlatformModule } from './modules/cloud-platform/cloud-platform.module';
@@ -275,6 +276,9 @@ import { CsrfProtectionMiddleware } from './common/auth/csrf.middleware';
     ProjectHealthModule,
     // Phase 7 — Client Portal
     PortalModule,
+
+    // Phase 1-10 — Phase 8 (Security, Observability, Operations)
+    Phase8Module,
 
     // Phase 5 — Workflows (EAOS-2 / Paperclip)
     WorkflowsModule,

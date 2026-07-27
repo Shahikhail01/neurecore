@@ -1,189 +1,113 @@
 // src/modules/reviews/application/review.service.ts
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import type { IUnitOfWork } from '../../../common/ports/transaction.interface';
-import { UNIT_OF_WORK } from '../../../common/ports/transaction.interface';
-import type { ITaskRepository } from '../../../common/ports/task-repository.port';
-import { TASK_REPOSITORY } from '../../../common/ports/task-repository.port';
-import type { IAuditRepository } from '../../../common/ports/audit.port';
-import { AUDIT_REPOSITORY } from '../../../common/ports/audit.port';
-import type { IOutboxRepository } from '../../../common/outbox/outbox-repository.port';
-import { OUTBOX_REPOSITORY } from '../../../common/outbox/outbox-repository.port';
-import type { IReviewRepository } from '../domain/ports/review-repository.port';
-import { REVIEW_REPOSITORY } from '../domain/ports/review-repository.port';
+import { CommandRegistry } from '../../../common/commands/command.registry';
+import type { CommandMetadata } from '../../../common/correlation/correlation.interface';
+import type { CommandResult } from '../../../common/commands/command.interface';
 import { ReviewDecision } from '../domain/review-states';
 import {
-  AwlReviewStatus,
-  type ReviewDecision as PrismaReviewDecision,
-  type AwlReviewStatus as PrismaReviewStatus,
-} from '@prisma/client';
-import { TaskStateMachine } from '../../tasks/domain/task-states';
+  DecideTaskReviewInput,
+  DecideTaskReviewResult,
+  DECIDE_TASK_REVIEW_COMMAND,
+  DECIDE_TASK_REVIEW_VERSION,
+} from '../commands/decide-task-review.command';
+import {
+  AdvanceProjectStageInput,
+  AdvanceProjectStageResult,
+  ADVANCE_PROJECT_STAGE_COMMAND,
+  ADVANCE_PROJECT_STAGE_VERSION,
+} from '../commands/advance-project-stage.command';
+import {
+  UNIT_OF_WORK,
+  type IUnitOfWork,
+} from '../../../common/ports/transaction.interface';
+import {
+  REVIEW_REPOSITORY,
+  type IReviewRepository,
+} from '../domain/ports/review-repository.port';
 
 /**
- * Application service — depends on PORTS only via DI tokens.
- * No PrismaService import. No direct database access.
+ * Application service — exposes the Phase 6 command surface to controllers
+ * and other callers. All decision / stage mutations go through the
+ * CommandRegistry so the canonical command path enforces idempotency,
+ * atomicity, optimistic concurrency, and audit/outbox emission.
  */
 @Injectable()
 export class ReviewService {
   private readonly logger = new Logger(ReviewService.name);
 
   constructor(
+    private readonly commandRegistry: CommandRegistry,
     @Inject(UNIT_OF_WORK) private readonly uow: IUnitOfWork,
-    @Inject(TASK_REPOSITORY) private readonly taskRepo: ITaskRepository,
     @Inject(REVIEW_REPOSITORY) private readonly reviewRepo: IReviewRepository,
-    @Inject(AUDIT_REPOSITORY) private readonly auditRepo: IAuditRepository,
-    @Inject(OUTBOX_REPOSITORY) private readonly outboxRepo: IOutboxRepository,
   ) {}
 
+  /**
+   * Submits a review decision through the canonical command bus.
+   *
+   * Properties:
+   *  - Atomic transaction (UoW) covers review update, task update, revision
+   *    attempt creation, outbox publish, and audit record.
+   *  - Optimistic concurrency on review.version prevents double-decisions.
+   *  - AI cannot approve its own work (enforced in the handler).
+   *  - REVISION_REQUESTED creates a NEW execution attempt with parentAttemptId
+   *    linking to the prior attempt; prior attempt and evidence are never
+   *    mutated.
+   */
   async submitReview(
     reviewId: string,
     decision: ReviewDecision,
     reviewerId: string,
     comment: string | undefined,
     revisionInstructions: string | undefined,
-    metadata: { tenantId: string; correlationId: string; causationId?: string | null },
-  ): Promise<{ reviewId: string; newAttemptCreated: boolean }> {
-    return this.uow.execute(async (tx) => {
-      const review = await this.reviewRepo.findById(metadata.tenantId, reviewId);
-      if (!review) throw new Error('REVIEW_NOT_FOUND');
-      if (review.tenantId !== metadata.tenantId) throw new Error('CROSS_TENANT_ACCESS_DENIED');
-      if (review.status !== 'PENDING' as AwlReviewStatus) {
-        throw new Error('REVIEW_ALREADY_DECIDED');
-      }
-
-      const task = await this.taskRepo.findById(metadata.tenantId, review.taskId);
-      if (!task) throw new Error('TASK_NOT_FOUND');
-
-      if (decision === ReviewDecision.APPROVED) {
-        if (task.agentId === reviewerId) {
-          throw new Error('AI_CANNOT_APPROVE_OWN_WORK');
-        }
-
-        TaskStateMachine.assertTransition(task.status as any, 'APPROVED');
-
-        await this.reviewRepo.update(
-          {
-            id: reviewId,
-            expectedVersion: review.version,
-            status: 'APPROVED' as PrismaReviewStatus,
-            decision: 'APPROVED' as PrismaReviewDecision,
-            reviewerId,
-            comment,
-          },
-          tx,
-        );
-
-        await this.taskRepo.updateStatus(
-          {
-            id: review.taskId,
-            expectedVersion: 0,
-            status: 'APPROVED' as any,
-          },
-          tx,
-        );
-
-        await this.outboxRepo.publish(
-          {
-            tenantId: metadata.tenantId,
-            eventType: 'ReviewApproved',
-            sourceModule: 'reviews',
-            payload: { reviewId, taskId: review.taskId, reviewerId },
-            correlationId: metadata.correlationId,
-            causationId: metadata.causationId ?? null,
-            idempotencyKey: `review-approved:${reviewId}`,
-          },
-          tx,
-        );
-
-        await this.auditRepo.record(
-          {
-            tenantId: metadata.tenantId,
-            actor: reviewerId,
-            action: 'TASK_REVIEW_APPROVED',
-            resource: 'Review',
-            resourceId: reviewId,
-            correlationId: metadata.correlationId,
-            causationId: metadata.causationId ?? undefined,
-            result: 'success',
-          },
-          tx,
-        );
-
-        return { reviewId, newAttemptCreated: false };
-      }
-
-      if (decision === ReviewDecision.REVISION_REQUESTED) {
-        TaskStateMachine.assertTransition(task.status as any, 'QUEUED');
-
-        await this.reviewRepo.update(
-          {
-            id: reviewId,
-            expectedVersion: review.version,
-            status: AwlReviewStatus.REVISION_REQUESTED as PrismaReviewStatus,
-            decision: 'NEEDS_REVISION' as PrismaReviewDecision,
-            reviewerId,
-            comment,
-            revisionInstructions,
-          },
-          tx,
-        );
-
-        await this.taskRepo.updateStatus(
-          {
-            id: review.taskId,
-            expectedVersion: 0,
-            status: 'QUEUED' as any,
-          },
-          tx,
-        );
-
-        await this.outboxRepo.publish(
-          {
-            tenantId: metadata.tenantId,
-            eventType: 'RevisionRequested',
-            sourceModule: 'reviews',
-            payload: { reviewId, taskId: review.taskId, instructions: revisionInstructions },
-            correlationId: metadata.correlationId,
-            causationId: metadata.causationId ?? null,
-            idempotencyKey: `revision-requested:${reviewId}`,
-          },
-          tx,
-        );
-
-        return { reviewId, newAttemptCreated: true };
-      }
-
-      if (decision === ReviewDecision.REJECTED) {
-        TaskStateMachine.assertTransition(task.status as any, 'CANCELLED');
-
-        await this.reviewRepo.update(
-          {
-            id: reviewId,
-            expectedVersion: review.version,
-            status: 'REJECTED' as PrismaReviewStatus,
-            decision: 'REJECTED' as PrismaReviewDecision,
-            reviewerId,
-            comment,
-          },
-          tx,
-        );
-
-        await this.taskRepo.updateStatus(
-          {
-            id: review.taskId,
-            expectedVersion: 0,
-            status: 'CANCELLED' as any,
-          },
-          tx,
-        );
-
-        return { reviewId, newAttemptCreated: false };
-      }
-
-      throw new Error('INVALID_DECISION');
-    });
+    metadata: CommandMetadata,
+  ): Promise<CommandResult<DecideTaskReviewResult>> {
+    const input: DecideTaskReviewInput = {
+      reviewId,
+      decision,
+      reviewerId,
+      comment,
+      revisionInstructions,
+    };
+    return this.commandRegistry.execute<
+      DecideTaskReviewInput,
+      DecideTaskReviewResult,
+      undefined
+    >(DECIDE_TASK_REVIEW_COMMAND, DECIDE_TASK_REVIEW_VERSION, input, metadata);
   }
 
+  /**
+   * Advances a project lifecycle stage through the canonical command bus.
+   * Waivers are recorded before the transition when guards fail.
+   */
+  async advanceProjectStage(
+    input: AdvanceProjectStageInput,
+    metadata: CommandMetadata,
+  ): Promise<CommandResult<AdvanceProjectStageResult>> {
+    return this.commandRegistry.execute<
+      AdvanceProjectStageInput,
+      AdvanceProjectStageResult,
+      undefined
+    >(
+      ADVANCE_PROJECT_STAGE_COMMAND,
+      ADVANCE_PROJECT_STAGE_VERSION,
+      input,
+      metadata,
+    );
+  }
+
+  /**
+   * Returns the pending review queue for a tenant, augmented with task
+   * and attempt summaries so the review inbox can render execution context.
+   */
   async getPendingReviews(tenantId: string) {
-    return this.reviewRepo.findPending(tenantId);
+    return this.reviewRepo.findPendingWithContext(tenantId);
+  }
+
+  /**
+   * Returns full review context for the inbox detail view, including the
+   * task, attempt, and evidence artifacts linked to the attempt.
+   */
+  async getReviewDetail(tenantId: string, reviewId: string) {
+    return this.reviewRepo.findDetail(tenantId, reviewId);
   }
 }

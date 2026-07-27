@@ -1,6 +1,7 @@
 // src/modules/execution/domain/execution-policy.ts
 export interface ExecutionPolicy {
   taskId: string;
+  policyVersion: string;
   autonomyLevel: 0 | 1 | 2 | 3 | 4;
   allowedTools: string[];
   deniedTools: string[];
@@ -11,6 +12,12 @@ export interface ExecutionPolicy {
   requiresHumanApproval: boolean;
   externalSideEffectApproval: boolean;
   inputSources: string[];
+  promptVersion: string;
+  graphVersion: string;
+  modelVersion: string;
+  toolVersion: string;
+  redactionPolicy: 'STANDARD' | 'STRICT';
+  sideEffectAllowList: string[];
 }
 
 export enum AutonomyLevel {

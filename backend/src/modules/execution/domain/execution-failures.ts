@@ -20,33 +20,34 @@ export interface FailureHandling {
   visibleFailure?: boolean;
 }
 
-export const FAILURE_HANDLING: Record<FailureClassification, FailureHandling> = {
-  [FailureClassification.TRANSIENT_INFRASTRUCTURE]: {
-    retryable: true,
-    backoff: true,
-  },
-  [FailureClassification.INVALID_INPUT]: {
-    retryable: false,
-    requiresInput: true,
-  },
-  [FailureClassification.POLICY_DENIAL]: {
-    retryable: false,
-    requiresApproval: true,
-  },
-  [FailureClassification.TOOL_FUNCTIONAL_FAILURE]: {
-    retryable: true,
-    ifClassifiedRetryable: true,
-  },
-  [FailureClassification.MODEL_QUALITY_FAILURE]: {
-    retryable: true,
-    withinLimit: true,
-  },
-  [FailureClassification.CANCELLATION]: {
-    retryable: false,
-    safeStop: true,
-  },
-  [FailureClassification.BUDGET_EXHAUSTION]: {
-    retryable: false,
-    visibleFailure: true,
-  },
-};
+export const FAILURE_HANDLING: Record<FailureClassification, FailureHandling> =
+  {
+    [FailureClassification.TRANSIENT_INFRASTRUCTURE]: {
+      retryable: true,
+      backoff: true,
+    },
+    [FailureClassification.INVALID_INPUT]: {
+      retryable: false,
+      requiresInput: true,
+    },
+    [FailureClassification.POLICY_DENIAL]: {
+      retryable: false,
+      requiresApproval: true,
+    },
+    [FailureClassification.TOOL_FUNCTIONAL_FAILURE]: {
+      retryable: true,
+      ifClassifiedRetryable: true,
+    },
+    [FailureClassification.MODEL_QUALITY_FAILURE]: {
+      retryable: true,
+      withinLimit: true,
+    },
+    [FailureClassification.CANCELLATION]: {
+      retryable: false,
+      safeStop: true,
+    },
+    [FailureClassification.BUDGET_EXHAUSTION]: {
+      retryable: false,
+      visibleFailure: true,
+    },
+  };

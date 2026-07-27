@@ -32,11 +32,33 @@ export class PrismaTaskRepository implements ITaskRepository {
     };
   }
 
-  async findById(tenantId: string, id: string): Promise<TaskEntity | null> {
-    const row = await this.prisma.task.findFirst({
+  async findById(
+    tenantId: string,
+    id: string,
+    tx?: any,
+  ): Promise<TaskEntity | null> {
+    const client = tx ?? this.prisma;
+    const row = await client.task.findFirst({
       where: { id, tenantId },
     });
     return row ? this.toEntity(row) : null;
+  }
+
+  async findByProjectAndStatuses(
+    tenantId: string,
+    projectId: string,
+    statuses: TaskStatus[],
+    tx?: any,
+  ): Promise<Array<Pick<TaskEntity, 'id' | 'title' | 'status'>>> {
+    const client = tx ?? this.prisma;
+    return client.task.findMany({
+      where: {
+        tenantId,
+        projectId,
+        status: { in: statuses },
+      },
+      select: { id: true, title: true, status: true },
+    });
   }
 
   async updateStatus(
@@ -44,10 +66,16 @@ export class PrismaTaskRepository implements ITaskRepository {
     tx?: any,
   ): Promise<TaskEntity> {
     const client = tx ?? this.prisma;
-    const data: Prisma.TaskUncheckedUpdateInput = { status: input.status };
+    const data: Prisma.TaskUncheckedUpdateInput = {
+      status: input.status,
+      version: { increment: 1 },
+    };
     if (input.agentId !== undefined) data.agentId = input.agentId;
 
     const where: Prisma.TaskWhereUniqueInput = { id: input.id };
+    if (input.tenantId !== undefined) {
+      where.tenantId = input.tenantId;
+    }
     if (input.requireVersionMatch !== false) {
       where.version = input.expectedVersion;
     }

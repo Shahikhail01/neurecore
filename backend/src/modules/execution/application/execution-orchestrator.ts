@@ -1,5 +1,5 @@
 // src/modules/execution/application/execution-orchestrator.ts
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import type { IUnitOfWork } from '../../../common/ports/transaction.interface';
 import { UNIT_OF_WORK } from '../../../common/ports/transaction.interface';
 import type { IOutboxRepository } from '../../../common/outbox/outbox-repository.port';
@@ -9,9 +9,25 @@ import { EXECUTION_ATTEMPT_REPOSITORY } from '../domain/ports/execution-attempt-
 import type { ITaskRepository } from '../../../common/ports/task-repository.port';
 import { TASK_REPOSITORY } from '../../../common/ports/task-repository.port';
 import type { CommandMetadata } from '../../../common/correlation/correlation.interface';
-import { FailureClassification, FAILURE_HANDLING } from '../domain/execution-failures';
+import {
+  FailureClassification,
+  FAILURE_HANDLING,
+} from '../domain/execution-failures';
 import type { ExecutionPolicy } from '../domain/execution-policy';
-import type { ExecutionAttemptStatus } from '@prisma/client';
+import type { ExecutionAttemptStatus, TaskStatus } from '@prisma/client';
+import { ExecutionPolicyEnforcer } from './execution-policy-enforcer';
+
+export interface ExecutionRuntimeResult {
+  output: { summary: string; content: string };
+  evidence: Array<{
+    artifactType: 'DRAFT' | 'REPORT' | 'DOCUMENT' | 'DATA' | 'OUTPUT';
+    content: string;
+    mimeType: string;
+  }>;
+  tokensUsed: number;
+  costCents: number;
+  toolCallCount: number;
+}
 
 export interface ExecutionContext {
   attemptId: string;
@@ -32,10 +48,8 @@ export interface ExecutionContext {
  */
 @Injectable()
 export class ExecutionOrchestrator {
-  private readonly logger = new Logger(ExecutionOrchestrator.name);
-  private readonly activeExecutions: Map<string, { cancelled: boolean; heartbeatAt: Date }> = new Map();
-  private readonly HEARTBEAT_INTERVAL_MS = 30000;
-  private readonly STALE_THRESHOLD_MS = 120000;
+  private readonly activeExecutions: Map<string, { cancelled: boolean }> =
+    new Map();
 
   constructor(
     @Inject(UNIT_OF_WORK) private readonly uow: IUnitOfWork,
@@ -43,6 +57,7 @@ export class ExecutionOrchestrator {
     private readonly attemptRepo: IExecutionAttemptRepository,
     @Inject(TASK_REPOSITORY) private readonly taskRepo: ITaskRepository,
     @Inject(OUTBOX_REPOSITORY) private readonly outboxRepo: IOutboxRepository,
+    private readonly policyEnforcer: ExecutionPolicyEnforcer,
   ) {}
 
   async requestExecution(
@@ -52,9 +67,19 @@ export class ExecutionOrchestrator {
     metadata: CommandMetadata,
   ): Promise<{ attemptId: string; attemptNumber: number }> {
     return this.uow.execute(async (tx) => {
-      const task = await this.taskRepo.findById(metadata.tenantId, taskId);
+      const task = await this.taskRepo.findById(metadata.tenantId, taskId, tx);
       if (!task) throw new Error('TASK_NOT_FOUND');
-      if (task.tenantId !== metadata.tenantId) throw new Error('CROSS_TENANT_ACCESS_DENIED');
+      if (task.tenantId !== metadata.tenantId)
+        throw new Error('CROSS_TENANT_ACCESS_DENIED');
+      if (task.agentId !== agentId)
+        throw new Error('EXECUTION_AGENT_NOT_ASSIGNED');
+      const eligible = new Set<TaskStatus>([
+        'READY' as TaskStatus,
+        'ASSIGNED' as TaskStatus,
+        'QUEUED' as TaskStatus,
+      ]);
+      if (!eligible.has(task.status))
+        throw new Error('TASK_NOT_ELIGIBLE_FOR_EXECUTION');
 
       const existing = await this.attemptRepo.findByRequestId(
         metadata.tenantId,
@@ -62,16 +87,19 @@ export class ExecutionOrchestrator {
         executionRequestId,
       );
       if (existing) {
-        return { attemptId: existing.id, attemptNumber: existing.attemptNumber };
+        return {
+          attemptId: existing.id,
+          attemptNumber: existing.attemptNumber,
+        };
       }
 
       const lastNumber = await this.attemptRepo.findLastAttemptNumber(taskId);
       const attemptNumber = lastNumber + 1;
       const policy = this.defaultPolicy(task);
+      this.policyEnforcer.validate(policy);
 
-      const initialStatus: ExecutionAttemptStatus = policy.requiresHumanApproval
-        ? ('NEEDS_INPUT' as ExecutionAttemptStatus)
-        : ('QUEUED' as ExecutionAttemptStatus);
+      const initialStatus: ExecutionAttemptStatus =
+        'QUEUED' as ExecutionAttemptStatus;
 
       const attempt = await this.attemptRepo.create(
         {
@@ -82,6 +110,12 @@ export class ExecutionOrchestrator {
           attemptNumber,
           status: initialStatus,
           policy,
+          taskInstructionsSnapshot: task.title,
+          inputSnapshot: {
+            requiredRole: task.requiredRole,
+            requiredCapabilities: task.requiredCapabilities,
+            dataClassification: task.dataClassification,
+          },
         },
         tx,
       );
@@ -89,8 +123,9 @@ export class ExecutionOrchestrator {
       await this.taskRepo.updateStatus(
         {
           id: taskId,
-          expectedVersion: 0,
-          status: policy.requiresHumanApproval ? 'ASSIGNED' : 'QUEUED',
+          tenantId: metadata.tenantId,
+          expectedVersion: task.version,
+          status: 'QUEUED',
           agentId,
         },
         tx,
@@ -118,36 +153,27 @@ export class ExecutionOrchestrator {
     });
   }
 
-  async executeTask(context: ExecutionContext): Promise<{ output: any; evidence: any[] }> {
-    this.activeExecutions.set(context.attemptId, {
-      cancelled: false,
-      heartbeatAt: new Date(),
-    });
+  async executeTask(
+    context: ExecutionContext,
+  ): Promise<ExecutionRuntimeResult> {
+    const policy: ExecutionPolicy = context.policy;
+    this.policyEnforcer.validate(policy);
+    this.activeExecutions.set(context.attemptId, { cancelled: false });
 
-    const heartbeatTimer = setInterval(() => {
-      const exec = this.activeExecutions.get(context.attemptId);
-      if (exec) {
-        exec.heartbeatAt = new Date();
-      }
-    }, this.HEARTBEAT_INTERVAL_MS);
-
+    let timeout: NodeJS.Timeout | undefined;
     try {
-      if (context.policy.timeoutMs) {
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('EXECUTION_TIMEOUT')), context.policy.timeoutMs);
-        });
-
-        const result = await Promise.race([
-          this.runExecution(context),
-          timeoutPromise,
-        ]);
-
-        return result;
-      }
-
-      return await this.runExecution(context);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error('EXECUTION_TIMEOUT')),
+          policy.timeoutMs,
+        );
+      });
+      return await Promise.race([
+        this.runExecution(context, policy),
+        timeoutPromise,
+      ]);
     } finally {
-      clearInterval(heartbeatTimer);
+      if (timeout) clearTimeout(timeout);
       this.activeExecutions.delete(context.attemptId);
     }
   }
@@ -156,16 +182,24 @@ export class ExecutionOrchestrator {
     const message = error.message.toLowerCase();
     if (message.includes('timeout') || message.includes('timed_out'))
       return FailureClassification.TRANSIENT_INFRASTRUCTURE;
-    if (message.includes('rate limit')) return FailureClassification.TRANSIENT_INFRASTRUCTURE;
-    if (message.includes('invalid input')) return FailureClassification.INVALID_INPUT;
+    if (message.includes('rate limit'))
+      return FailureClassification.TRANSIENT_INFRASTRUCTURE;
+    if (message.includes('invalid input'))
+      return FailureClassification.INVALID_INPUT;
     if (message.includes('policy')) return FailureClassification.POLICY_DENIAL;
-    if (message.includes('tool')) return FailureClassification.TOOL_FUNCTIONAL_FAILURE;
-    if (message.includes('budget')) return FailureClassification.BUDGET_EXHAUSTION;
-    if (message.includes('cancelled')) return FailureClassification.CANCELLATION;
+    if (message.includes('tool'))
+      return FailureClassification.TOOL_FUNCTIONAL_FAILURE;
+    if (message.includes('budget'))
+      return FailureClassification.BUDGET_EXHAUSTION;
+    if (message.includes('cancelled'))
+      return FailureClassification.CANCELLATION;
     return FailureClassification.MODEL_QUALITY_FAILURE;
   }
 
-  shouldRetry(classification: FailureClassification, attemptCount: number): boolean {
+  shouldRetry(
+    classification: FailureClassification,
+    attemptCount: number,
+  ): boolean {
     const handling = FAILURE_HANDLING[classification];
     if (!handling.retryable) return false;
     if (handling.withinLimit && attemptCount >= 3) return false;
@@ -178,38 +212,64 @@ export class ExecutionOrchestrator {
       exec.cancelled = true;
     }
 
-    await this.uow.execute(async (tx) => {
-      const attempt = await this.attemptRepo.findById(metadata.tenantId, attemptId);
-      if (!attempt) return;
-      await this.attemptRepo.update(
-        { id: attemptId, status: 'CANCELLED' as ExecutionAttemptStatus },
-        tx,
+    const cancelled = await this.attemptRepo.cancelAtomic(
+      metadata.tenantId,
+      attemptId,
+      'Cancelled by authorized actor',
+    );
+    if (!cancelled) {
+      const attempt = await this.attemptRepo.findById(
+        metadata.tenantId,
+        attemptId,
       );
+      if (!attempt) throw new Error('EXECUTION_ATTEMPT_NOT_FOUND');
+      if (attempt.status !== 'CANCELLED')
+        throw new Error('EXECUTION_ATTEMPT_NOT_CANCELLABLE');
+    }
+  }
+
+  private runExecution(
+    context: ExecutionContext,
+    policy: ExecutionPolicy,
+  ): Promise<ExecutionRuntimeResult> {
+    const active = this.activeExecutions.get(context.attemptId);
+    if (active?.cancelled) throw new Error('EXECUTION_CANCELLED');
+    if (!context.taskInstructions.trim())
+      throw new Error('INVALID_INPUT_MISSING_TASK_INSTRUCTIONS');
+    if (policy.inputSources.length > 0 && context.approvedInputs.length === 0)
+      throw new Error('INVALID_INPUT_MISSING_APPROVED_INPUTS');
+    const content = `Draft execution for: ${context.taskInstructions}`;
+    const tokensUsed = Math.max(1, Math.ceil(content.length / 4));
+    this.policyEnforcer.assertBudget(policy, tokensUsed, 0);
+    return Promise.resolve({
+      output: { summary: 'Draft execution completed', content },
+      evidence: [{ artifactType: 'DRAFT', content, mimeType: 'text/plain' }],
+      tokensUsed,
+      costCents: 0,
+      toolCallCount: 0,
     });
   }
 
-  private async runExecution(
-    context: ExecutionContext,
-  ): Promise<{ output: any; evidence: any[] }> {
-    return {
-      output: { summary: 'Execution completed', instructions: context.taskInstructions },
-      evidence: [],
-    };
-  }
-
-  private defaultPolicy(task: any): ExecutionPolicy {
+  private defaultPolicy(task: { id: string }): ExecutionPolicy {
     return {
       taskId: task.id,
+      policyVersion: 'canonical-v1',
       autonomyLevel: 1,
       allowedTools: [],
       deniedTools: [],
-      maxToolCalls: 50,
+      maxToolCalls: 10,
       maxTokens: 100000,
       maxCost: 1000,
       timeoutMs: 300000,
-      requiresHumanApproval: true,
+      requiresHumanApproval: false,
       externalSideEffectApproval: false,
       inputSources: [],
+      promptVersion: 'draft-v1',
+      graphVersion: 'canonical-v1',
+      modelVersion: 'configured-runtime',
+      toolVersion: 'canonical-v1',
+      redactionPolicy: 'STRICT',
+      sideEffectAllowList: [],
     };
   }
 }

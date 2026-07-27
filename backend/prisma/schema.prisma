@@ -676,8 +676,9 @@ model Tenant {
   // Stage 1: Tenant-scoped templates
   tenantTemplates TenantTemplate[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  LifecycleWaiver LifecycleWaiver[]
 
   @@map("tenants")
 }
@@ -2343,9 +2344,14 @@ model Project {
   executionEngineVersion AwlExecutionEngine    @default(legacy)
   initiation             EnterpriseInitiation? @relation("InitiationProject")
 
-  name        String
-  description String?       @db.Text
-  status      ProjectStatus @default(LEAD)
+  name         String
+  description  String?       @db.Text
+  status       ProjectStatus @default(LEAD)
+  // Phase 6: optimistic concurrency for stage transitions (plan §8.2)
+  // Every status update increments this counter; AdvanceProjectStageHandler
+  // passes the previous value in `expectedVersion` and the write fails if
+  // a concurrent transition has already moved the project forward.
+  stageVersion Int           @default(1)
 
   // Customer (Phase 1)
   customerId String?
@@ -5548,27 +5554,50 @@ model EnterpriseInitiation {
 }
 
 model ExecutionAttempt {
-  id                      String                 @id @default(cuid())
-  tenantId                String
-  tenant                  Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  taskId                  String
-  task                    Task                   @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  agentId                 String
-  agent                   Agent                  @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  executionRequestId      String
-  attemptNumber           Int
-  status                  ExecutionAttemptStatus @default(CREATED)
-  policy                  Json                   @default("{}")
-  outputSummary           String?                @db.Text
-  submittedAt             DateTime?
-  lastError               String?                @db.Text
-  lastErrorClassification String?
-  version                 Int                    @default(1)
-  createdAt               DateTime               @default(now())
-  updatedAt               DateTime               @updatedAt
+  id                       String                 @id @default(cuid())
+  tenantId                 String
+  tenant                   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  taskId                   String
+  task                     Task                   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  agentId                  String
+  agent                    Agent                  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  executionRequestId       String
+  attemptNumber            Int
+  status                   ExecutionAttemptStatus @default(CREATED)
+  policy                   Json                   @default("{}")
+  taskInstructionsSnapshot String?                @db.Text
+  inputSnapshot            Json                   @default("{}")
+  projectContextSnapshot   Json                   @default("{}")
+  promptVersion            String?
+  graphVersion             String?
+  modelVersion             String?
+  toolVersion              String?
+  outputSummary            String?                @db.Text
+  submittedAt              DateTime?
+  startedAt                DateTime?
+  endedAt                  DateTime?
+  heartbeatAt              DateTime?
+  leaseExpiresAt           DateTime?
+  ownerToken               String?
+  fencingToken             Int                    @default(0)
+  cancelledAt              DateTime?
+  cancellationReason       String?                @db.Text
+  tokensUsed               Int                    @default(0)
+  costCents                Int                    @default(0)
+  toolCallCount            Int                    @default(0)
+  lastError                String?                @db.Text
+  lastErrorClassification  String?
+  parentAttemptId          String?
+  parentAttempt            ExecutionAttempt?      @relation("AttemptLineage", fields: [parentAttemptId], references: [id], onDelete: SetNull)
+  childAttempts            ExecutionAttempt[]     @relation("AttemptLineage")
+  version                  Int                    @default(1)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
 
-  reviews  Review[]
-  evidence EvidenceArtifact[]
+  reviews       Review[]
+  evidence      EvidenceArtifact[]
+  toolCalls     ExecutionToolCall[]
+  budgetEntries ExecutionBudgetLedgerEntry[]
 
   @@unique([tenantId, taskId, executionRequestId])
   @@unique([taskId, attemptNumber])
@@ -5576,7 +5605,53 @@ model ExecutionAttempt {
   @@index([taskId])
   @@index([agentId])
   @@index([status])
+  @@index([status, leaseExpiresAt])
   @@map("execution_attempts")
+}
+
+model ExecutionToolCall {
+  id                  String           @id @default(cuid())
+  tenantId            String
+  attemptId           String
+  attempt             ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  toolName            String
+  argumentsChecksum   String
+  resultChecksum      String?
+  sideEffect          Boolean          @default(false)
+  approvedByActorId   String?
+  status              String
+  errorClassification String?
+  occurredAt          DateTime         @default(now())
+
+  @@unique([attemptId, id])
+  @@index([tenantId, attemptId])
+  @@map("execution_tool_calls")
+}
+
+model ExecutionBudgetLedgerEntry {
+  id         String           @id @default(cuid())
+  tenantId   String
+  attemptId  String
+  attempt    ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  kind       String
+  amount     Int
+  unit       String
+  recordedAt DateTime         @default(now())
+
+  @@index([tenantId, attemptId])
+  @@map("execution_budget_ledger")
+}
+
+model ExecutionConcurrencyReservation {
+  id        String   @id @default(cuid())
+  tenantId  String
+  agentId   String
+  attemptId String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, agentId, expiresAt])
+  @@map("execution_concurrency_reservations")
 }
 
 model Review {
@@ -5597,9 +5672,9 @@ model Review {
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
+  @@unique([attemptId])
   @@index([tenantId])
   @@index([taskId])
-  @@index([attemptId])
   @@index([status])
   @@map("reviews")
 }
@@ -5686,3 +5761,39 @@ model FeatureFlagAuditLog {
   @@index([flagKey])
   @@map("feature_flag_audit_logs")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 6 — Human Review, Revision, and Lifecycle
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Phase 6: lifecycle transition waivers (plan §8.2)
+enum LifecycleWaiverScope {
+  PROJECT_STAGE
+  PROJECT_COMPLETION
+}
+
+model LifecycleWaiver {
+  id                 String               @id @default(cuid())
+  tenantId           String
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scope              LifecycleWaiverScope
+  entityType         String
+  entityId           String
+  fromStage          String
+  toStage            String
+  reason             String               @db.Text
+  waivedByActorId    String
+  waivedByActorType  String               @default("HUMAN")
+  guardFailureReason String?              @db.Text
+  occurredAt         DateTime             @default(now())
+  version            Int                  @default(1)
+
+  @@index([tenantId, scope])
+  @@index([tenantId, entityType, entityId])
+  @@index([occurredAt])
+  @@map("lifecycle_waivers")
+}
+
+// Phase 6: revision lineage is already modelled via ExecutionAttempt.parentAttemptId.
+// We add a unique index so the same attempt cannot be both a parent of two distinct
+// child attempts under the same revision request — preventing duplicate revision runs.

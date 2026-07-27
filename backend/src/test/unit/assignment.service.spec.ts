@@ -163,7 +163,15 @@ function buildAgentRepo(agents: FakeAgentRepoRow[]) {
   let loadWorkloadsCalls = 0;
   const workloadsByAgent = new Map<
     string,
-    { active: number; assigned: number; queued: number; inProgress: number; blocked: number }
+    {
+      active: number;
+      assigned: number;
+      queued: number;
+      inProgress: number;
+      blocked: number;
+      inflatedActive?: number;
+      inflateOnCall?: number;
+    }
   >();
   const perfByAgent = new Map<string, { total: number; success: number }>();
   return {
@@ -240,7 +248,9 @@ function buildAgentRepo(agents: FakeAgentRepoRow[]) {
             blocked: 0,
           };
           const useInflated =
-            w.inflatedActive !== undefined && loadWorkloadsCalls >= w.inflateOnCall;
+            w.inflatedActive !== undefined &&
+            w.inflateOnCall !== undefined &&
+            loadWorkloadsCalls >= w.inflateOnCall;
           const activeCount = useInflated ? w.inflatedActive! : w.active;
           return {
             agentId: id,

@@ -1,24 +1,29 @@
 /**
  * Timeline Components Index
  *
- * Central export point for timeline-related components and types.
- * SOLID: Dependency Inversion - Imports depend on this interface
+ * Central export point for Phase 7 unified timeline components and
+ * the legacy impact-timeline components used by the Mission Feed.
  */
 
 export { TimelineEvent as TimelineEventComponent } from './TimelineEvent';
 export { ImpactTimeline } from './ImpactTimeline';
 export { TimelineFilter } from './TimelineFilter';
+export { UnifiedTimeline } from './UnifiedTimeline';
 
-// Also export the component as default for convenience
 export { default as TimelineEvent } from './TimelineEvent';
 
 export type {
-    TimelineEvent as TimelineEventData,
-    TimelineEventType,
-    TimelineEventImpact,
-    TimelineEventAction,
-    TimelineEventMetadata,
-    TimelineFilterType,
-    TimelineState,
-    TimelineResponse,
+  TimelineEvent as TimelineEventData,
+  TimelineEventType,
+  TimelineEventImpact,
+  TimelineEventAction,
+  TimelineEventMetadata,
+  TimelineFilterType,
+  TimelineState,
+  TimelineResponse,
 } from './types';
+
+export type {
+  TimelineEvent as UnifiedTimelineEvent,
+  SupportedEntityType,
+} from '@/services/timeline.service';

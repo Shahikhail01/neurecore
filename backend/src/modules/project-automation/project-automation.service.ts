@@ -106,7 +106,17 @@ export class ProjectAutomationService {
       where: { id: projectId, tenantId },
       include: {
         goals: { select: { id: true, templateKey: true, title: true } },
-        tasks: { select: { id: true, templateKey: true, title: true, status: true } },
+        tasks: {
+          select: {
+            id: true,
+            templateKey: true,
+            title: true,
+            status: true,
+            agentId: true,
+            priority: true,
+            updatedAt: true,
+          },
+        },
       },
     });
 
@@ -145,6 +155,15 @@ export class ProjectAutomationService {
         tasksCreated: project.tasks.length,
         assignmentsCreated: 0,
       },
+      tasks: project.tasks.map((t) => ({
+        id: t.id,
+        templateKey: t.templateKey,
+        title: t.title,
+        status: t.status,
+        agentId: t.agentId,
+        priority: t.priority,
+        updatedAt: t.updatedAt,
+      })),
       history: logs.map((row) => ({
         id: row.id,
         event: row.event,
@@ -174,6 +193,15 @@ export interface AutomationStatusView {
     tasksCreated: number;
     assignmentsCreated: number;
   };
+  tasks: Array<{
+    id: string;
+    templateKey: string | null;
+    title: string;
+    status: string;
+    agentId: string | null;
+    priority: string | null;
+    updatedAt: Date;
+  }>;
   history: Array<{
     id: string;
     event: string;
