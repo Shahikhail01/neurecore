@@ -12,16 +12,20 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type {
   ICustomerRepository,
   Customer,
   CustomerContact,
+  CustomerLifecycleStage,
   CreateCustomerInput,
   UpdateCustomerInput,
   ListCustomersOptions,
 } from './interfaces/customer.interface';
 import { CUSTOMER_REPOSITORY } from './interfaces/customer.interface';
+import { TimelineService } from '../timeline/timeline.service';
 
 @Injectable()
 export class CustomersService {
@@ -30,6 +34,7 @@ export class CustomersService {
   constructor(
     @Inject(CUSTOMER_REPOSITORY)
     private readonly repository: ICustomerRepository,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
 
   async create(
@@ -77,6 +82,79 @@ export class CustomersService {
   async unarchive(id: string, tenantId: string): Promise<Customer> {
     await this.findById(id, tenantId);
     return this.repository.update(id, tenantId, { status: 'ACTIVE' });
+  }
+
+  /**
+   * SIM-04 G-07 — explicit lifecycle-stage transition.
+   *
+   * Bumps lifecycleUpdatedAt, emits a customer:lifecycle-changed timeline
+   * event (via TimelineService.record, lazy-resolved through ModuleRef to
+   * avoid a circular import), and returns the updated customer row.
+   *
+   * Idempotent: a no-op transition (toStage === current) returns the
+   * existing row without emitting a duplicate timeline event.
+   *
+   * @param actorId - the user id of the operator performing the move
+   *                  (recorded on the timeline event for audit).
+   */
+  async moveLifecycleStage(
+    id: string,
+    tenantId: string,
+    toStage: CustomerLifecycleStage,
+    reason: string | undefined,
+    actorId: string | undefined,
+  ): Promise<Customer> {
+    const existing = await this.findById(id, tenantId);
+    if (existing.lifecycleStage === toStage) {
+      this.logger.log(
+        `Customer ${id} lifecycle move is a no-op (already at ${toStage})`,
+      );
+      return existing;
+    }
+    const updated = await this.repository.update(id, tenantId, {
+      lifecycleStage: toStage,
+      lifecycleUpdatedAt: new Date(),
+    });
+
+    // Timeline recording is best-effort — never block the transition on a
+    // timeline failure (mirrors the ProjectsService pattern).
+    if (this.moduleRef) {
+      try {
+        const timeline = this.moduleRef.get<
+          InstanceType<typeof TimelineService>
+        >(TimelineService, { strict: false });
+        if (timeline) {
+          await timeline.record({
+            tenantId,
+            customerId: id,
+            occurredAt: new Date(),
+            category: 'OPERATIONAL',
+            severity: 'LOW',
+            sourceType: 'HUMAN',
+            sourceId: actorId ?? 'system',
+            title: `Customer lifecycle: ${existing.lifecycleStage ?? 'NULL'} → ${toStage}`,
+            description: reason
+              ? `Customer moved from ${existing.lifecycleStage ?? 'NULL'} to ${toStage}. Reason: ${reason}.`
+              : `Customer moved from ${existing.lifecycleStage ?? 'NULL'} to ${toStage}.`,
+            relatedEntityType: 'Customer',
+            relatedEntityId: id,
+            correlationId: `customer.lifecycle.${id}.${Date.now()}`,
+            metadata: {
+              from: existing.lifecycleStage ?? null,
+              to: toStage,
+              reason: reason ?? null,
+              actorId: actorId ?? null,
+            },
+          });
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to record customer lifecycle timeline event (${existing.lifecycleStage ?? 'NULL'} → ${toStage} for ${id}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    return updated;
   }
 
   async addContact(

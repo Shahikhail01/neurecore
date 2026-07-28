@@ -14,7 +14,12 @@ export type SupportedEntityType =
   | 'Goal'
   | 'Task'
   | 'ExecutionAttempt'
-  | 'Review';
+  | 'Review'
+  // SIM-04 G-07 — customer-scoped timeline events (e.g. lifecycle
+  // stage transitions). The TimelineEvent row already carries a
+  // customerId column; adding the type to the supported whitelist
+  // lets the unified timeline /timeline/Customer/{id} route work.
+  | 'Customer';
 
 export type ActorType = 'HUMAN' | 'AI_AGENT' | 'SYSTEM';
 
@@ -79,6 +84,7 @@ export function isSupportedEntityType(
     value === 'Goal' ||
     value === 'Task' ||
     value === 'ExecutionAttempt' ||
-    value === 'Review'
+    value === 'Review' ||
+    value === 'Customer'
   );
 }

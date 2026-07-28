@@ -26,6 +26,7 @@ import {
   UpdateCustomerDto,
   AddCustomerContactDto,
   ListCustomersQueryDto,
+  MoveCustomerLifecycleDto,
 } from './dto/customer.dto';
 
 const PLATFORM_ROLES: ReadonlySet<UserRole> = new Set([
@@ -43,7 +44,7 @@ export class CustomersController {
 
   private resolveTenantId(user: JwtPayload): string {
     if (user.tenantId) return user.tenantId;
-    if (PLATFORM_ROLES.has(user.role as UserRole)) return '*';
+    if (PLATFORM_ROLES.has(user.role)) return '*';
     throw new Error('Tenant ID required');
   }
 
@@ -127,6 +128,32 @@ export class CustomersController {
   @Post(':id/unarchive')
   unarchive(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.customersService.unarchive(id, this.resolveTenantId(user));
+  }
+
+  /**
+   * SIM-04 G-07 — explicit lifecycle-stage transition. Bumps
+   * lifecycleUpdatedAt, emits a customer:lifecycle-changed timeline event
+   * (via the standard event fabric), and records the reason on the
+   * timeline entry. Returns the updated customer row.
+   *
+   * Idempotent: if `toStage === existing.lifecycleStage`, the call is a
+   * no-op and returns the existing row with `lifecycleUpdatedAt`
+   * unchanged. This prevents accidental duplicate timeline events when
+   * a UI button is double-clicked.
+   */
+  @Post(':id/lifecycle')
+  moveLifecycle(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: MoveCustomerLifecycleDto,
+  ) {
+    return this.customersService.moveLifecycleStage(
+      id,
+      this.resolveTenantId(user),
+      dto.toStage,
+      dto.reason,
+      user.sub,
+    );
   }
 
   @Post(':id/contacts')

@@ -105,6 +105,11 @@ export interface UpdateCustomerInput {
   taxId?: string | null;
   financialSubType?: CustomerFinancialSubType | null;
   lifecycleStage?: CustomerLifecycleStage | null;
+  // SIM-04 G-07 — explicit lifecycle-stage transitions also bump
+  // lifecycleUpdatedAt. Internal callers (e.g. moveLifecycleStage service
+  // method) use this; external callers should use the dedicated
+  // /customers/:id/lifecycle subroute.
+  lifecycleUpdatedAt?: Date | null;
 }
 
 export interface ListCustomersOptions {

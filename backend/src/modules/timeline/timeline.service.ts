@@ -14,6 +14,10 @@ export interface TimelineEventInput {
   tenantId: string;
   projectId?: string;
   simulationId?: string;
+  // SIM-04 G-07 — customer-scoped timeline events (e.g. lifecycle
+  // transitions). The prisma model already has a customerId column on
+  // TimelineEvent per the schema, but the input contract was missing it.
+  customerId?: string;
   occurredAt: Date;
   category:
     | 'OPERATIONAL'
@@ -93,6 +97,10 @@ export class TimelineService {
         tenantId: event.tenantId,
         projectId: event.projectId,
         simulationId: event.simulationId,
+        // SIM-04 G-07 — customer-scoped events persist the customerId.
+        // The prisma model column already exists; the input contract and
+        // the create payload were missing it.
+        customerId: event.customerId,
         occurredAt: event.occurredAt,
         category: event.category,
         severity: event.severity,
@@ -226,6 +234,16 @@ export class TimelineService {
       case 'Review':
         return Boolean(
           await this.prisma.review.findFirst({
+            where: { id: entityId, tenantId },
+            select: { id: true },
+          }),
+        );
+      // SIM-04 G-07 — customer-scoped ownership check. Tenant scoping is
+      // enforced by the where clause; this is the existence check the
+      // /timeline/Customer/{id} route uses to refuse cross-tenant reads.
+      case 'Customer':
+        return Boolean(
+          await this.prisma.customer.findFirst({
             where: { id: entityId, tenantId },
             select: { id: true },
           }),

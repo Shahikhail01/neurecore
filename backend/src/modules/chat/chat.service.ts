@@ -731,6 +731,13 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
     conversationId: string,
   ): string | null {
     const msg = dto.message.toLowerCase().trim();
+    // The conversationId is passed in for traceability — we use it as the
+    // logger context so every scripted reply carries the conversation id
+    // without needing the caller to thread the logger context through.
+    void conversationId;
+    this.logger.debug?.(
+      `[chat] handleProjectCreationConversation: conv=${conversationId} message="${msg.slice(0, 80)}"`,
+    );
 
     // Only trigger on the first user message. Once we've answered, the
     // next user messages are interpreted by the model (or routed to the
