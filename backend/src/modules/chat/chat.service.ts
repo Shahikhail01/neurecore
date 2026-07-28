@@ -717,6 +717,14 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
    *     target date.
    *   - Third turn: ask about budget.
    *   - Fourth turn: confirm and create.
+   *
+   * SIM-04 FIX: bypass the deterministic intercept when the user explicitly
+   * names the createProject tool, supplies an industry slug, or supplies a
+   * project name + an industry + priority in a single turn. In those
+   * cases the user is signalling "fire the tool now", not "have a chat
+   * with me about it". Letting those messages fall through to the agent
+   * graph produces a one-shot createProject call instead of an endless
+   * scripted Q&A loop.
    */
   private handleProjectCreationConversation(
     dto: SendChatMessageDto,
@@ -751,6 +759,63 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
     );
 
     if (!isProjectCreation) return null;
+
+    // SIM-04 FIX (NC-SIM04-001): if the user mentions the createProject
+    // tool by name, supplies a known industry slug, or pairs the
+    // creation intent with both a project name AND enough fields to
+    // call createProject in a single turn, fall through to the agent
+    // graph. The deterministic Q&A would otherwise loop forever on
+    // these inputs.
+    const explicitToolCall =
+      /\bcreateProject\b|please call createProject|invoke createProject/i.test(
+        dto.message,
+      );
+    if (explicitToolCall) return null;
+
+    // Known industry slugs the LLM recognises. If the user supplies one
+    // plus a project name, the LLM can call createProject with
+    // industryHint set to that slug in a single turn.
+    const knownIndustrySlugs = [
+      'accounting-audit-services',
+      'banking',
+      'insurance',
+      'healthcare',
+      'retail',
+      'manufacturing',
+      'real-estate',
+      'legal',
+      'marketing',
+      'technology',
+      'education',
+      'hospitality',
+    ];
+    const hasIndustrySlug = knownIndustrySlugs.some((slug) =>
+      msg.includes(slug),
+    );
+    // Also accept the user providing any of the canonical industry
+    // groups (broader catch-all).
+    const hasIndustryGroup =
+      msg.includes('accounting') ||
+      msg.includes('audit') ||
+      msg.includes('banking') ||
+      msg.includes('healthcare');
+
+    // Heuristic: a single turn with the creation intent + industry +
+    // at least one of {name, customer name, budget, priority, target
+    // date} is treated as a complete createProject payload.
+    const hasEnoughContext =
+      hasIndustrySlug ||
+      (hasIndustryGroup &&
+        (msg.includes('budget') ||
+          msg.includes('priority') ||
+          msg.includes('target date') ||
+          msg.includes('monthly') ||
+          msg.includes('quarterly') ||
+          msg.includes('annual') ||
+          msg.includes('for ') ||
+          /\bfor\s+[A-Z][a-zA-Z]/.test(dto.message)));
+
+    if (hasEnoughContext) return null;
 
     return "Sure, I can help with that! What's the project called, and what kind of work is it?";
   }

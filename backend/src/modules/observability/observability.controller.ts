@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Header,
   Inject,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiCommon } from '../../common/decorators/api-common.decorator';
 import { ObservabilityService } from './services/observability.service';
@@ -226,6 +227,96 @@ export class ObservabilityController {
         failed: inboxFailed,
         deadLettered: inboxDeadLettered,
       },
+      observedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * SIM-04 G-03 — calendar surface. Returns tasks whose due date falls
+   * in [from, to] (default: now..+30d). `dueOverride` takes precedence
+   * over `dueDate`. Tasks without a date are excluded. Tenant-scoped by
+   * construction.
+   *
+   * Shape per row: { id, title, status, priority, dueAt, projectId,
+   * projectName, projectTargetDate, isOverdue, daysUntilDue }.
+   */
+  @Get('calendar/tasks')
+  async calendarTasks(
+    @CurrentUser() user: JwtPayload,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+    @Query('projectId') projectId: string | undefined,
+    @Query('limit') limit: string | undefined,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    const now = new Date();
+    const defaultTo = new Date(now);
+    defaultTo.setUTCDate(defaultTo.getUTCDate() + 30);
+    const fromDate = from ? new Date(from) : now;
+    const toDate = to ? new Date(to) : defaultTo;
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      throw new BadRequestException('Invalid from/to ISO timestamp');
+    }
+    const take = Math.min(Math.max(limit ? Number(limit) : 200, 1), 500);
+
+    // We filter on tenantId + projectId at the SQL layer, then
+    // filter by due date in-process because Prisma can't OR two
+    // nullable columns cleanly. Date range is bounded so this is cheap.
+    const rows = await this.prisma.task.findMany({
+      where: {
+        tenantId: user.tenantId,
+        ...(projectId ? { projectId } : {}),
+      },
+      orderBy: [{ createdAt: 'asc' }],
+      take,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+        dueOverride: true,
+        projectId: true,
+        project: { select: { id: true, name: true, targetDate: true } },
+      },
+    });
+
+    const items = rows
+      .map((t) => ({
+        t,
+        dueAt: t.dueOverride ?? t.dueDate ?? null,
+      }))
+      .filter(({ dueAt }) => dueAt != null)
+      .filter(({ dueAt }) => {
+        const d = dueAt as Date;
+        return d >= fromDate && d <= toDate;
+      })
+      .map(({ t, dueAt }) => {
+        const d = dueAt as Date;
+        const daysUntilDue = Math.ceil(
+          (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        return {
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority,
+          dueAt,
+          projectId: t.projectId,
+          projectName: t.project?.name ?? null,
+          projectTargetDate: t.project?.targetDate ?? null,
+          isOverdue:
+            d < now && t.status !== 'COMPLETED' && t.status !== 'APPROVED',
+          daysUntilDue,
+        };
+      });
+
+    return {
+      tenantId: user.tenantId,
+      from: fromDate.toISOString(),
+      to: toDate.toISOString(),
+      count: items.length,
+      items,
       observedAt: new Date().toISOString(),
     };
   }
