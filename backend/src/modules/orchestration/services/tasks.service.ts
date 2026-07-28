@@ -37,12 +37,20 @@ export class TasksService {
       status?: TaskStatus;
       agentId?: string;
       goalId?: string;
+      projectId?: string;
       page?: number;
       limit?: number;
     },
     tenantId?: string,
   ) {
-    const { status, agentId, goalId, page = 1, limit = 20 } = options ?? {};
+    const {
+      status,
+      agentId,
+      goalId,
+      projectId,
+      page = 1,
+      limit = 20,
+    } = options ?? {};
     const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = {
@@ -50,6 +58,7 @@ export class TasksService {
       ...(status && { status }),
       ...(agentId && { agentId }),
       ...(goalId && { goalId }),
+      ...(projectId && { projectId }),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -76,6 +85,156 @@ export class TasksService {
     });
     if (!task) throw new NotFoundException(`Task ${id} not found`);
     return task;
+  }
+
+  /**
+   * SIM-04 G-05 — list eligible agents for a task.
+   *
+   * Eligibility heuristic (matches the AssignmentService rules in the
+   * assignment module; kept narrow on purpose so the SIM-04 picker can
+   * surface a truthful short-list rather than silently assign an
+   * unsuitable agent):
+   *  - tenant ownership enforced
+   *  - agent isActive=true and availability=AVAILABLE
+   *  - agent has capacity (current in-flight task count < maxConcurrency)
+   *  - agent's `config.department` matches task.requiredRole OR
+   *    agent has all of task.requiredCapabilities (best-effort)
+   *
+   * Returns a scored list so the FE can render reasons + scores.
+   * Never returns cross-tenant rows.
+   */
+  async findEligibleAgents(taskId: string, tenantId: string) {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, tenantId },
+      select: {
+        id: true,
+        requiredRole: true,
+        requiredCapabilities: true,
+        agentId: true,
+      },
+    });
+    if (!task) throw new NotFoundException(`Task ${taskId} not found`);
+
+    const candidateAgents = await this.prisma.agent.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        archived: false,
+        availability: 'AVAILABLE',
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        availability: true,
+        maxConcurrency: true,
+        role: true,
+        capabilities: true,
+        config: true,
+        departmentId: true,
+        _count: { select: { tasks: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const reasons = (
+      matched: boolean,
+      capacityOk: boolean,
+      roleMatch: boolean,
+      capMatch: boolean,
+    ): string[] => {
+      const r: string[] = [];
+      if (roleMatch) r.push('role matches task.requiredRole');
+      else if (capMatch) r.push('capabilities match task.requiredCapabilities');
+      else r.push('no role/capability match');
+      r.push(capacityOk ? 'has available concurrency' : 'at concurrency limit');
+      r.push(matched ? 'in good standing' : 'ineligible');
+      return r;
+    };
+
+    return candidateAgents
+      .map((a) => {
+        const cfg = (a.config ?? {}) as Record<string, unknown>;
+        const department =
+          typeof cfg.department === 'string' ? cfg.department : null;
+        const roleMatch =
+          task.requiredRole != null && department === task.requiredRole;
+        const requiredCaps = Array.isArray(task.requiredCapabilities)
+          ? task.requiredCapabilities
+          : [];
+        const agentCaps = Array.isArray(a.capabilities) ? a.capabilities : [];
+        const capMatch =
+          requiredCaps.length > 0 &&
+          requiredCaps.every((c) => agentCaps.includes(c));
+        const inFlight = a._count?.tasks ?? 0;
+        const capacityOk = inFlight < (a.maxConcurrency ?? 1);
+        const eligible =
+          (roleMatch || capMatch || !task.requiredRole) && capacityOk;
+        const score =
+          (roleMatch ? 2 : 0) + (capMatch ? 2 : 0) + (capacityOk ? 1 : 0);
+        return {
+          agentId: a.id,
+          name: a.name,
+          role: a.role,
+          department,
+          status: a.status,
+          availability: a.availability,
+          inFlightTasks: inFlight,
+          maxConcurrency: a.maxConcurrency ?? 1,
+          currentAssignment: a.id === task.agentId,
+          eligible,
+          score,
+          reasons: reasons(eligible, capacityOk, roleMatch, capMatch),
+        };
+      })
+      .sort((x, y) => {
+        if (y.score !== x.score) return y.score - x.score;
+        return x.name.localeCompare(y.name);
+      });
+  }
+
+  /**
+   * SIM-04 G-06 — list execution attempts for a task, in chronological
+   * order. Tenant-scoped by construction; returns attempts whose
+   * `taskId` matches AND `tenantId` matches. Includes minimal attempt
+   * metadata (status, attemptNumber, started/ended, review link) so the
+   * FE task board can render attempt chips without an extra roundtrip.
+   */
+  async findAttemptsForTask(taskId: string, tenantId: string) {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, tenantId },
+      select: { id: true },
+    });
+    if (!task) throw new NotFoundException(`Task ${taskId} not found`);
+
+    const attempts = await this.prisma.executionAttempt.findMany({
+      where: { taskId, tenantId },
+      orderBy: [{ attemptNumber: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        attemptNumber: true,
+        status: true,
+        agentId: true,
+        startedAt: true,
+        endedAt: true,
+        submittedAt: true,
+        tokensUsed: true,
+        costCents: true,
+        toolCallCount: true,
+        outputSummary: true,
+        lastError: true,
+        lastErrorClassification: true,
+        createdAt: true,
+        updatedAt: true,
+        reviews: {
+          select: { id: true, status: true, decision: true, decidedAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    return { taskId, count: attempts.length, attempts };
   }
 
   async create(

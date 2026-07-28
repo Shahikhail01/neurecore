@@ -107,6 +107,52 @@ export class ChatService {
     }
   }
 
+  /**
+   * SIM-04 G-08 — list chat-eligible AI agents for the current tenant.
+   * The chat composer on the FE wants to know which agents exist and
+   * their department/role/availability BEFORE the user starts a thread.
+   * Returns a compact shape (id, name, roleKey, department, availability,
+   * model, maxConcurrency) that the picker can render without a second
+   * round-trip. Archived agents are filtered out so the FE never offers
+   * a dead handle.
+   */
+  async listChatAgents(tenantId: string, take = 50) {
+    const agents = await this.prisma.agent.findMany({
+      where: { tenantId, archived: false, isActive: true },
+      orderBy: [{ name: 'asc' }],
+      take,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        role: true,
+        availability: true,
+        status: true,
+        model: true,
+        maxConcurrency: true,
+        config: true,
+        hermesAgentId: true,
+      },
+    });
+    const data = agents.map((a) => {
+      const cfg = (a.config ?? {}) as Record<string, unknown>;
+      return {
+        id: a.id,
+        name: a.name,
+        description: a.description,
+        role: a.role,
+        roleKey: typeof cfg.roleKey === 'string' ? cfg.roleKey : null,
+        department: typeof cfg.department === 'string' ? cfg.department : null,
+        availability: a.availability,
+        status: a.status,
+        model: a.model,
+        maxConcurrency: a.maxConcurrency,
+        hermesAgentId: a.hermesAgentId,
+      };
+    });
+    return { data, total: data.length };
+  }
+
   async send(
     dto: SendChatMessageDto,
     tenantIdFromJwt?: string,
@@ -153,14 +199,14 @@ export class ChatService {
     });
 
     // REMOVED: MiniMax-not-configured short-circuit.
-// Previously this returned a fake "MiniMax is not configured" reply BEFORE
-// checking AI_GATEWAY_V2. That defeated multi-provider failover: even when
-// the gateway could resolve OpenAI/Anthropic/DeepSeek, this branch returned
-// a fake unconfigured reply. See Critical #8 in
-// memory-bank-new/plans/comprehensive-remediation-plan-2026-07-20.md.
-// The gateway's CapabilityResolver will throw a structured
-// AiGatewayUnconfiguredError if no provider is available — that is the
-// single source of truth and is handled below.
+    // Previously this returned a fake "MiniMax is not configured" reply BEFORE
+    // checking AI_GATEWAY_V2. That defeated multi-provider failover: even when
+    // the gateway could resolve OpenAI/Anthropic/DeepSeek, this branch returned
+    // a fake unconfigured reply. See Critical #8 in
+    // memory-bank-new/plans/comprehensive-remediation-plan-2026-07-20.md.
+    // The gateway's CapabilityResolver will throw a structured
+    // AiGatewayUnconfiguredError if no provider is available — that is the
+    // single source of truth and is handled below.
 
     // Resolve tenantId — prefer the JWT-supplied one (set by JwtAuthGuard)
     const tenantId =
@@ -309,8 +355,7 @@ export class ChatService {
     }
 
     // QUERY: Use MiniMax for natural language response
-    const systemPrompt =
-      `You are a friendly, helpful AI assistant who talks like a real person texting a colleague. Plain sentences only. No markdown, no bullet points, no dashes for lists, no bold, no headers. No internal reasoning. No <think> tags.
+    const systemPrompt = `You are a friendly, helpful AI assistant who talks like a real person texting a colleague. Plain sentences only. No markdown, no bullet points, no dashes for lists, no bold, no headers. No internal reasoning. No <think> tags.
 
 When the user wants to create a project, your reply must be EXACTLY in this conversational form:
 
@@ -363,9 +408,7 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
           ...(dto.temperature !== undefined
             ? { temperature: dto.temperature }
             : {}),
-          ...(dto.maxTokens !== undefined
-            ? { maxTokens: dto.maxTokens }
-            : {}),
+          ...(dto.maxTokens !== undefined ? { maxTokens: dto.maxTokens } : {}),
         });
         replyContent = gwResp.content;
         replyModel = gwResp.model ?? 'gateway';
@@ -630,7 +673,8 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
         if (sentences && sentences.length >= 3) {
           // Find a good break point — take from the sentence that looks like a real reply
           // (starts with capital letter, doesn't contain reasoning markers)
-          const reasoningWords = /the user|system instruction|should|must|need to|according to|looking at/i;
+          const reasoningWords =
+            /the user|system instruction|should|must|need to|according to|looking at/i;
           for (let i = sentences.length - 1; i >= 0; i--) {
             const s = sentences[i].trim();
             if (s.length >= 15 && s.length <= 300 && !reasoningWords.test(s)) {
@@ -738,7 +782,8 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       dto.conversationId ??
       `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-    const userIdForHistory = (dto.context?.['userId'] as string | undefined) ?? 'anonymous';
+    const userIdForHistory =
+      (dto.context?.['userId'] as string | undefined) ?? 'anonymous';
     const tenantIdForHistory = tenantId ?? 'unknown';
 
     void this.chatHistory.saveMessage({
@@ -796,8 +841,7 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       }
     }
 
-    const systemPrompt =
-      `You are a friendly, helpful AI assistant who talks like a real person texting a colleague. Plain sentences only. No markdown, no bullet points, no dashes for lists, no bold, no headers. No internal reasoning. No <think> tags.
+    const systemPrompt = `You are a friendly, helpful AI assistant who talks like a real person texting a colleague. Plain sentences only. No markdown, no bullet points, no dashes for lists, no bold, no headers. No internal reasoning. No <think> tags.
 
 When the user wants to create a project, your reply must be EXACTLY in this conversational form:
 
@@ -858,16 +902,11 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
           resolvedModel = lastResolved.model?.modelId;
           resolvedProvider = lastResolved.provider?.slug;
         }
-        this.saveReply(
-          conversationId,
-          tenantIdForHistory,
-          userIdForHistory,
-          {
-            reply: accumulatedAssistantReply,
-            model: resolvedModel,
-            provider: resolvedProvider,
-          },
-        );
+        this.saveReply(conversationId, tenantIdForHistory, userIdForHistory, {
+          reply: accumulatedAssistantReply,
+          model: resolvedModel,
+          provider: resolvedProvider,
+        });
         yield { delta: '', done: true };
         return;
       }
@@ -894,7 +933,7 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
           // We entered a think block in a prior chunk (already sliced off the
           // opening tag), and now the closing tag has arrived. Flush the content
           // before the closing tag (which is already in buffer).
-          const tail = buffer.slice(0, closeMatch.index!);
+          const tail = buffer.slice(0, closeMatch.index);
           buffer = buffer.slice(closeMatch.index! + closeMatch[0].length);
           thinkClosed = true;
           insideThink = false;

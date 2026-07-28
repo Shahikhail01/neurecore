@@ -5,9 +5,14 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
+import type {
+  AwlReviewStatus,
+  ReviewDecision as PrismaReviewDecision,
+} from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CorrelationService } from '../../common/correlation/correlation.service';
@@ -21,6 +26,14 @@ const VALID_DECISIONS: ReviewDecision[] = [
   ReviewDecision.CANCELLED,
 ];
 
+const VALID_REVIEW_STATUSES: AwlReviewStatus[] = [
+  'PENDING',
+  'APPROVED',
+  'REVISION_REQUESTED',
+  'REJECTED',
+  'CANCELLED',
+];
+
 @Controller('reviews')
 @UseGuards(JwtAuthGuard)
 export class ReviewController {
@@ -32,6 +45,40 @@ export class ReviewController {
   @Get('pending')
   async getPending(@CurrentUser() user: { tenantId: string }) {
     return this.service.getPendingReviews(user.tenantId);
+  }
+
+  /**
+   * SIM-04 G-04 — list reviews for the FE Approved / Revisions / Rejected
+   * history tabs. Tenant-scoped by construction. Status + decision are
+   * optional filters; without them returns the most recent 50 reviews for
+   * the tenant in reverse chronological order.
+   */
+  @Get()
+  async list(
+    @Query('status') status: string | undefined,
+    @Query('decision') decision: string | undefined,
+    @Query('taskId') taskId: string | undefined,
+    @Query('projectId') projectId: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @CurrentUser() user: { tenantId: string },
+  ) {
+    if (status && !VALID_REVIEW_STATUSES.includes(status as AwlReviewStatus)) {
+      throw new BadRequestException(
+        `Invalid status; expected one of ${VALID_REVIEW_STATUSES.join(', ')}`,
+      );
+    }
+    if (decision && !VALID_DECISIONS.includes(decision as ReviewDecision)) {
+      throw new BadRequestException(
+        `Invalid decision; expected one of ${VALID_DECISIONS.join(', ')}`,
+      );
+    }
+    return this.service.listReviews(user.tenantId, {
+      status: status as AwlReviewStatus | undefined,
+      decision: decision as PrismaReviewDecision | undefined,
+      taskId,
+      projectId,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get(':reviewId')

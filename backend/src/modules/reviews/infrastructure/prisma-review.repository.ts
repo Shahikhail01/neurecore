@@ -143,6 +143,60 @@ export class PrismaReviewRepository implements IReviewRepository {
     }));
   }
 
+  /**
+   * SIM-04 G-04 — list reviews with optional status/decision/task/project
+   * filters, returning the same task+attempt enriched shape as the
+   * Pending inbox. Tenant-scoped by construction; limit clamped to a
+   * safe maximum so a FE bug can't drag the whole reviews table.
+   */
+  async listWithContext(
+    tenantId: string,
+    filter: {
+      status?: import('@prisma/client').AwlReviewStatus;
+      decision?: import('@prisma/client').ReviewDecision;
+      taskId?: string;
+      projectId?: string;
+      limit?: number;
+    } = {},
+    tx?: Prisma.TransactionClient,
+  ): Promise<ReviewQueueItem[]> {
+    const client = (tx ?? this.prisma) as TxClient;
+    const where: Record<string, unknown> = { tenantId };
+    if (filter.status) where.status = filter.status;
+    if (filter.decision) where.decision = filter.decision;
+    if (filter.taskId) where.taskId = filter.taskId;
+    if (filter.projectId) where.task = { projectId: filter.projectId };
+    const take = Math.min(Math.max(filter.limit ?? 50, 1), 200);
+    const rows = await client.review.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take,
+      include: {
+        task: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            projectId: true,
+            agentId: true,
+          },
+        },
+        attempt: {
+          select: {
+            id: true,
+            attemptNumber: true,
+            status: true,
+          },
+        },
+      },
+    });
+    return rows.map((row) => ({
+      ...this.toEntity(row),
+      task: row.task,
+      attempt: row.attempt,
+    }));
+  }
+
   async findDetail(
     tenantId: string,
     reviewId: string,

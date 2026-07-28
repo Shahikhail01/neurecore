@@ -46,7 +46,7 @@ export class OrchestrationController {
   private resolveTenantId(user: JwtPayload): string {
     const raw = user.tenantId;
     if (raw) return raw;
-    if (PLATFORM_ROLES.has(user.role as UserRole)) return '*';
+    if (PLATFORM_ROLES.has(user.role)) return '*';
     throw new Error('Tenant ID required');
   }
 
@@ -57,6 +57,8 @@ export class OrchestrationController {
     @CurrentUser() user: JwtPayload,
     @Query('status') status?: TaskStatus,
     @Query('agentId') agentId?: string,
+    @Query('projectId') projectId?: string,
+    @Query('goalId') goalId?: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
@@ -65,6 +67,8 @@ export class OrchestrationController {
       {
         status,
         agentId,
+        projectId,
+        goalId,
         page: Number(page),
         limit: Number(limit),
       },
@@ -80,6 +84,36 @@ export class OrchestrationController {
   ) {
     const tenantId = this.resolveTenantId(user);
     return this.tasksService.findOne(id, tenantId);
+  }
+
+  /**
+   * SIM-04 G-05 — list eligible AI agents for a task. Tenant-scoped;
+   * returns a scored + reason-tagged short-list suitable for the FE
+   * assignment picker. Never exposes cross-tenant agents.
+   */
+  @Get('tasks/:id/eligible-agents')
+  @TenantIsolated()
+  eligibleAgents(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const tenantId = this.resolveTenantId(user);
+    return this.tasksService.findEligibleAgents(id, tenantId);
+  }
+
+  /**
+   * SIM-04 G-06 — list execution attempts for a task in chronological
+   * order. Tenant-scoped; returns the same minimal attempt shape the FE
+   * needs to render attempt chips on the task board.
+   */
+  @Get('tasks/:id/attempts')
+  @TenantIsolated()
+  attemptsForTask(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const tenantId = this.resolveTenantId(user);
+    return this.tasksService.findAttemptsForTask(id, tenantId);
   }
 
   @Post('tasks')

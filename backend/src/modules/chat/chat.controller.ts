@@ -77,12 +77,7 @@ export class ChatController {
     @Req() req: AuthedRequest,
     @Res() res: Response,
   ): Promise<void> {
-    await this.chatSse.stream(
-      dto,
-      req.user?.tenantId,
-      req.user?.sub,
-      res,
-    );
+    await this.chatSse.stream(dto, req.user?.tenantId, req.user?.sub, res);
   }
 
   /**
@@ -148,5 +143,30 @@ export class ChatController {
   @HttpCode(HttpStatus.OK)
   suggestions(@Body() _body: { query?: string }) {
     return { suggestions: [] };
+  }
+
+  /**
+   * SIM-04 G-08 — list AI agents the current tenant can route chat messages
+   * to. The chat composer on the FE wants to know which agents are
+   * available before the user starts a thread. We return the same agent
+   * shape the `/agents` endpoint exposes (id, name, roleKey, department,
+   * availability) so the picker can render without a second round-trip.
+   *
+   * Tenant-scoped by construction; archived agents are filtered out so
+   * the FE never offers a dead handle. Limit clamped to [1, 200].
+   */
+  @Get('chat/agents')
+  @HttpCode(HttpStatus.OK)
+  async chatAgents(
+    @Query('limit') limit: string | undefined,
+    @Req() req: AuthedRequest,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) return { data: [], total: 0 };
+    const take = Math.min(Math.max(limit ? Number(limit) : 50, 1), 200);
+    // We can't import PrismaService here (SRP — controller stays thin),
+    // so this endpoint delegates to ChatService which already owns
+    // tenant context. Implemented as a thin pass-through below.
+    return this.chat.listChatAgents(tenantId, take);
   }
 }

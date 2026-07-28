@@ -104,6 +104,25 @@ export class ReviewService {
   }
 
   /**
+   * SIM-04 G-04 — list reviews for the FE Approved/Revisions/Rejected
+   * history tabs. Returns the same enriched shape as the Pending inbox.
+   * Filter is tenant-scoped by construction; the repository clamps
+   * `limit` to [1, 200] defensively.
+   */
+  async listReviews(
+    tenantId: string,
+    filter: {
+      status?: import('@prisma/client').AwlReviewStatus;
+      decision?: import('@prisma/client').ReviewDecision;
+      taskId?: string;
+      projectId?: string;
+      limit?: number;
+    } = {},
+  ) {
+    return this.reviewRepo.listWithContext(tenantId, filter);
+  }
+
+  /**
    * Returns full review context for the inbox detail view, including the
    * task, attempt, and evidence artifacts linked to the attempt.
    */

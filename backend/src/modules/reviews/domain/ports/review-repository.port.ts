@@ -89,6 +89,20 @@ export interface CreateReviewInput {
   attemptId: string;
 }
 
+/**
+ * SIM-04 G-04 — list-by-status filter. Lets the FE render the Approved /
+ * Revisions / Rejected history tabs alongside the existing Pending inbox.
+ * `status` and `decision` are optional; when omitted, returns the most
+ * recent reviews regardless of state. Tenant-scoped by construction.
+ */
+export interface ListReviewsFilter {
+  status?: AwlReviewStatus;
+  decision?: ReviewDecision;
+  taskId?: string;
+  projectId?: string;
+  limit?: number;
+}
+
 export interface IReviewRepository {
   findById(
     tenantId: string,
@@ -98,12 +112,26 @@ export interface IReviewRepository {
   create(input: CreateReviewInput, tx?: any): Promise<ReviewEntity>;
   update(input: UpdateReviewInput, tx?: any): Promise<ReviewEntity>;
   findPending(tenantId: string, tx?: any): Promise<ReviewEntity[]>;
-  findPendingWithContext(tenantId: string, tx?: any): Promise<ReviewQueueItem[]>;
+  findPendingWithContext(
+    tenantId: string,
+    tx?: any,
+  ): Promise<ReviewQueueItem[]>;
   findDetail(
     tenantId: string,
     reviewId: string,
     tx?: any,
   ): Promise<ReviewDetail | null>;
+  /**
+   * SIM-04 G-04 — list reviews for a tenant with optional status /
+   * decision / task / project filters. Returns enriched rows with task
+   * and attempt context so the FE Approved/Revisions tabs can render
+   * the same shape as the Pending inbox.
+   */
+  listWithContext(
+    tenantId: string,
+    filter?: ListReviewsFilter,
+    tx?: any,
+  ): Promise<ReviewQueueItem[]>;
   upsertForAttempt(
     tenantId: string,
     taskId: string,
