@@ -470,7 +470,23 @@ export const RespondToInboxItemInputSchema = z.object({
 
 // ─── Phase 3D: Project Memory Schemas ──────────────────────────────────────────
 
-const MemoryCategoryEnum = z.enum(['NOTE', 'INSIGHT', 'CONSTRAINT', 'RISK', 'OPPORTUNITY', 'LESSON']);
+// Memory category — accepts case-insensitive input (LLMs typically
+// send lowercase like "note", but the Prisma enum is uppercase). We
+// use a string + refine so the value is preserved for uppercase
+// transformation instead of being rejected by the strict ZodEnum.
+const MemoryCategoryEnum = z
+  .string()
+  .refine(
+    (v) =>
+      ['NOTE', 'INSIGHT', 'CONSTRAINT', 'RISK', 'OPPORTUNITY', 'LESSON'].includes(
+        v.toUpperCase(),
+      ),
+    {
+      message:
+        'Invalid memory category. Expected one of NOTE, INSIGHT, CONSTRAINT, RISK, OPPORTUNITY, LESSON (case-insensitive).',
+    },
+  )
+  .transform((v) => v.toUpperCase() as 'NOTE' | 'INSIGHT' | 'CONSTRAINT' | 'RISK' | 'OPPORTUNITY' | 'LESSON');
 
 export const AddProjectMemoryInputSchema = z.object({
   projectId: z.string().describe('Project ID'),
@@ -2582,6 +2598,7 @@ export class RespondToInboxItemTool extends BaseStructuredTool {
 
 // ─── Phase 3D: Project Memory Tools ────────────────────────────────────────────
 
+@Injectable()
 export class AddProjectMemoryTool extends BaseStructuredTool {
   readonly name = 'project_memory_add';
   readonly description = 'Add a memory entry to a project (append-only log).';
@@ -2591,6 +2608,9 @@ export class AddProjectMemoryTool extends BaseStructuredTool {
   protected async executeImpl(input: AddProjectMemoryInput, context?: Partial<ToolExecutionContext>): Promise<StructuredToolResult> {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
+      this.logger.debug?.(
+        `[AddProjectMemoryTool] calling memoryService.create tenant=${context.tenantId} project=${input.projectId} category=${input.category}`,
+      );
       const entry = await this.memoryService.create(context.tenantId, {
         projectId: input.projectId,
         category: input.category,
@@ -2601,11 +2621,21 @@ export class AddProjectMemoryTool extends BaseStructuredTool {
         isAiGenerated: input.authorType !== 'HUMAN',
         confidence: input.confidence ?? 80,
       });
+      this.logger.debug?.(
+        `[AddProjectMemoryTool] created memoryId=${entry.id}`,
+      );
       return { success: true, data: { memoryId: entry.id, projectId: entry.projectId, category: entry.category, createdAt: entry.createdAt.toISOString() }, metadata: { model: 'neurecore-memory-v1' } };
-    } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Failed to add project memory' }; }
+    } catch (error) {
+      this.logger.error(
+        `[AddProjectMemoryTool] create failed: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to add project memory' };
+    }
   }
 }
 
+@Injectable()
 export class SearchProjectMemoryTool extends BaseStructuredTool {
   readonly name = 'project_memory_search';
   readonly description = 'Search project memory entries by keyword.';
@@ -2633,6 +2663,7 @@ export class SearchProjectMemoryTool extends BaseStructuredTool {
   }
 }
 
+@Injectable()
 export class UpdateMemoryConfidenceTool extends BaseStructuredTool {
   readonly name = 'project_memory_update_confidence';
   readonly description = 'Update the confidence score of a memory entry (0-100).';
