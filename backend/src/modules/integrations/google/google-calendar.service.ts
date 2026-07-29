@@ -84,7 +84,9 @@ export class GoogleCalendarService {
     );
 
     if (!res.ok) {
-      throw new BadRequestException('Failed to fetch calendar events');
+      const errText = await res.text().catch(() => 'unknown');
+      this.logger.error(`Calendar list failed: ${res.status} ${errText}`);
+      throw new BadRequestException(`Calendar API error ${res.status}: ${errText.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as { items?: RawGoogleEvent[] };
@@ -128,7 +130,7 @@ export class GoogleCalendarService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Calendar event create failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to create calendar event');
+      throw new BadRequestException(`Calendar create failed (${res.status}): ${err.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as RawGoogleEvent;
@@ -167,7 +169,9 @@ export class GoogleCalendarService {
     );
 
     if (!res.ok) {
-      throw new BadRequestException('Failed to fetch calendar list');
+      const errText = await res.text().catch(() => 'unknown');
+      this.logger.error(`Calendar list API failed: ${res.status} ${errText}`);
+      throw new BadRequestException(`Calendar list API error ${res.status}: ${errText.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as {

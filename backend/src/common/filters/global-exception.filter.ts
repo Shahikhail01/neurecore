@@ -162,14 +162,30 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         // `error.code === 'VALIDATION_ERROR'`. The status→code table
         // remains the fallback for ad-hoc HttpException throw sites
         // that pass raw `{ message, errors }` validation shapes.
+        //
+        // FIX-CSRF-ERROR-CODE: also accept `code` at the top level of
+        // the response object. Many guards (CsrfProtectionMiddleware,
+        // RolesGuard, EntityLifecycleGuard) throw
+        //   ForbiddenException({ code: 'CSRF_TOKEN_MISSING', message: '…' })
+        // directly — without the nested `{ error: { code } }` wrapper
+        // the TierLimitExceededException uses. Before this fix, every
+        // CSRF rejection surfaced as opaque `{ code: 'PERMISSION_DENIED' }`
+        // which made it impossible for the FE / scripted clients to
+        // distinguish "you forgot the X-CSRF-Token header" from "your
+        // role lacks permission". Now we honour any top-level `code`.
         const nestedError = res.error as
           | { code?: string; details?: Record<string, unknown> }
           | undefined;
+        const topLevelCode = typeof res.code === 'string' ? (res.code as string) : undefined;
         if (nestedError?.code && typeof nestedError.code === 'string') {
           code = nestedError.code as ErrorCodeType;
           if (nestedError.details) {
             details = nestedError.details;
           }
+          message =
+            (res.message as string) ?? (exception.message ?? code);
+        } else if (topLevelCode) {
+          code = topLevelCode as ErrorCodeType;
           message =
             (res.message as string) ?? (exception.message ?? code);
         } else {
@@ -349,6 +365,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       [ErrorCode.PLAN_LIMIT_REACHED]: 'You have reached your plan limit.',
       [ErrorCode.TIER_LIMIT_EXCEEDED]:
         "This selection exceeds your plan's tier limits. Upgrade or pick a smaller option.",
+      // FIX-CSRF-ERROR-CODE: surface a clear CSRF-specific message so
+      // scripted clients (and humans) know to attach X-CSRF-Token.
+      [ErrorCode.CSRF_TOKEN_MISSING]:
+        'Your request is missing the required CSRF token. Include the X-CSRF-Token header matching your __Host-nc_csrf cookie, then retry.',
+      [ErrorCode.CSRF_TOKEN_INVALID]:
+        'The CSRF token provided does not match the session cookie. Refresh the page and try again.',
       [ErrorCode.INTERNAL_ERROR]:
         'Something went wrong. Please try again later.',
       [ErrorCode.SERVICE_UNAVAILABLE]:

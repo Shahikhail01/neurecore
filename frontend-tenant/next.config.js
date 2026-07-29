@@ -77,7 +77,8 @@ const nextConfig = {
       // Tenant sees first dept's workspace if /tasks etc. hit without context.
       { source: "/tasks", destination: "/departments?tab=tasks" },
       { source: "/workflows", destination: "/departments?tab=workflows" },
-      { source: "/projects", destination: "/departments?tab=projects" },
+      // /projects is now a canonical AWL route and must not be masked by
+      // the department workspace compatibility rewrite.
       { source: "/goals", destination: "/departments?tab=goals" },
       { source: "/routines", destination: "/departments?tab=routines" },
 

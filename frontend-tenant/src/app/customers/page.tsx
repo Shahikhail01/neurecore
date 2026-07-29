@@ -31,6 +31,7 @@ export default function CustomersPage() {
   const [sortKey, setSortKey] = useState<'name' | 'industry' | 'status' | 'createdAt' | 'updatedAt'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [createOpen, setCreateOpen] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
   const [active, setActive] = useState<Customer | null>(null);
   const [tenantGroup, setTenantGroup] = useState<string | null>(null);
 
@@ -349,9 +350,22 @@ export default function CustomersPage() {
         </GlassPanel>
       </div>
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="New Customer">
+      <Modal
+        open={createOpen}
+        onClose={() => {
+          // Block backdrop / ESC dismissal while a create is in flight so
+          // the user can't accidentally lose the request mid-submit.
+          if (createSubmitting) return;
+          setCreateOpen(false);
+        }}
+        title="New Customer"
+      >
         <CustomerForm
-          onClose={() => setCreateOpen(false)}
+          onClose={() => {
+            if (createSubmitting) return;
+            setCreateOpen(false);
+          }}
+          onSubmittingChange={setCreateSubmitting}
           onCreated={() => {
             setCreateOpen(false);
             void load();

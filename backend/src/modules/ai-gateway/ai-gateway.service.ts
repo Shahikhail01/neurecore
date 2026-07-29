@@ -26,6 +26,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { SecretProviderService } from '../security/providers/secret.provider';
+import { CryptoService } from '../connectors/services/crypto.service';
 import type { Capability } from './domain/capabilities';
 import {
   AiGatewayAllProvidersFailedError,
@@ -85,6 +86,7 @@ export class AiGatewayService implements OnModuleInit {
     private readonly structuredLogger: StructuredLogger,
     private readonly langSmith: LangSmithSink,
     private readonly secrets: SecretProviderService,
+    private readonly crypto: CryptoService,
   ) {
     this.config = readAiGatewayConfig(this.flattenEnv());
     const cbOptions: CircuitBreakerOptions = {
@@ -201,7 +203,7 @@ export class AiGatewayService implements OnModuleInit {
     }
     const tried: AiGatewayAttemptedModel[] = [];
     for (const link of chain) {
-      const apiKey = this.resolveApiKey(link.apiKeyEnv);
+      const apiKey = await this.resolveApiKey(link.providerSlug, link.apiKeyEnv);
       if (!apiKey) {
         tried.push({
           provider: link.providerSlug,
@@ -360,7 +362,7 @@ export class AiGatewayService implements OnModuleInit {
     let lastError: unknown = undefined;
 
     for (const link of chain) {
-      const apiKey = this.resolveApiKey(link.apiKeyEnv);
+      const apiKey = await this.resolveApiKey(link.providerSlug, link.apiKeyEnv);
       if (!apiKey) {
         tried.push({
           provider: link.providerSlug,
@@ -547,6 +549,7 @@ export class AiGatewayService implements OnModuleInit {
           timeoutMs: this.config.AI_DEFAULT_TIMEOUT_MS,
           signal: opts.signal,
           tools,
+          sourceModule: opts.sourceModule,
         }),
     );
     return {
@@ -630,6 +633,7 @@ export class AiGatewayService implements OnModuleInit {
     }>;
     responseFormatJson?: boolean;
     capability?: Capability;
+    sourceModule?: string;
   }): Promise<{
     content: string;
     toolCalls: Array<{ id: string; name: string; arguments: unknown }>;
@@ -652,6 +656,7 @@ export class AiGatewayService implements OnModuleInit {
           signal: req.signal,
           ...(req.tools ? { tools: req.tools } : {}),
           ...(req.responseFormatJson ? { responseFormatJson: true } : {}),
+          ...(req.sourceModule ? { sourceModule: req.sourceModule } : {}),
         });
       } catch (err) {
         lastErr = err;
@@ -683,9 +688,38 @@ export class AiGatewayService implements OnModuleInit {
     return out;
   }
 
-  private resolveApiKey(envVar: string): string | null {
-    const result = this.secrets.resolve(`env:${envVar}`);
-    return result.value && result.value.length > 0 ? result.value : null;
+  /**
+   * Phase 2.8: resolve an API key with DB-prefer-encrypted > env fallback.
+   * Used by the legacy select()/stream() paths that bypass CapabilityResolver.
+   */
+  private async resolveApiKey(
+    providerSlug: string,
+    envVar: string,
+  ): Promise<string | null> {
+    try {
+      const row = await this.prisma.modelProvider.findUnique({
+        where: { slug: providerSlug },
+        select: { encryptedKey: true },
+      });
+      if (row?.encryptedKey) {
+        const v = this.crypto.decrypt(row.encryptedKey);
+        if (v) return v;
+      }
+    } catch {
+      /* fall through to env */
+    }
+    const envVal = this.secrets.resolve(`env:${envVar}`).value;
+    return envVal && envVal.length > 0 ? envVal : null;
+  }
+
+  /**
+   * Phase 2.8: force the SecretProviderService cache to forget a
+   * single secret reference. Used after admin updates to a provider
+   * key (encryptedKey in DB) so the next invoke picks up the new
+   * value without waiting for the 10s negative TTL.
+   */
+  invalidateSecret(ref: string): void {
+    this.secrets.invalidate(ref);
   }
 
   /**

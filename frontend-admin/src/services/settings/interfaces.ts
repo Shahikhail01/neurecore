@@ -80,6 +80,22 @@ export interface IAISettingsService {
     id: string,
   ): Promise<{ success: boolean; latency: number; error?: string }>;
 
+  // Phase 2.8: discover available models from the provider's
+  // OpenAI-compatible /models endpoint and insert them as disabled
+  // ai_models rows. Admin then chooses which to enable + default.
+  discoverProviderModels(id: string): Promise<{
+    ok: boolean;
+    inserted?: Array<{
+      id: string;
+      modelId: string;
+      displayName: string;
+      capabilities: string[];
+    }>;
+    existing?: string[];
+    message?: string;
+    error?: string;
+  }>;
+
   // AI Routing
   getAIRouting(): Promise<AIRoutingConfig>;
   updateAIRouting(config: Partial<AIRoutingConfig>): Promise<AIRoutingConfig>;

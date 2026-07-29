@@ -91,7 +91,9 @@ export class GoogleDriveService implements IDriveService {
     );
 
     if (!res.ok) {
-      throw new BadRequestException('Failed to search Drive folder');
+      const errText = await res.text().catch(() => 'unknown');
+      this.logger.error(`Drive folder search failed: ${res.status} ${errText}`);
+      throw new BadRequestException(`Drive search failed (${res.status}): ${errText.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as { files?: DriveFile[] };
@@ -271,7 +273,9 @@ export class GoogleDriveService implements IDriveService {
     );
 
     if (!res.ok) {
-      throw new BadRequestException('Failed to list Drive files');
+      const errText = await res.text().catch(() => 'unknown');
+      this.logger.error(`Drive list files failed: ${res.status} ${errText}`);
+      throw new BadRequestException(`Drive list failed (${res.status}): ${errText.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as { files?: DriveFile[] };
@@ -368,7 +372,9 @@ export class GoogleDriveService implements IDriveService {
     );
 
     if (!res.ok) {
-      throw new BadRequestException('Failed to search Drive files');
+      const errText = await res.text().catch(() => 'unknown');
+      this.logger.error(`Drive search failed: ${res.status} ${errText}`);
+      throw new BadRequestException(`Drive search failed (${res.status}): ${errText.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as { files?: DriveFile[] };

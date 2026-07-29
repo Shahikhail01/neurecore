@@ -18,6 +18,8 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { SecretProviderService } from '../../security/providers/secret.provider';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { CryptoService } from '../../connectors/services/crypto.service';
 import type { Capability } from '../domain/capabilities';
 import {
   AiGatewayBudgetExceededError,
@@ -35,6 +37,8 @@ export class CapabilityResolver {
     private readonly chainBuilder: FallbackChainBuilder,
     private readonly secrets: SecretProviderService,
     private readonly modelRepo: AiModelRepository,
+    private readonly prisma: PrismaService,
+    private readonly crypto: CryptoService,
   ) {}
 
   async resolve(
@@ -61,11 +65,15 @@ export class CapabilityResolver {
       chain.sort((a, b) => a.priorityHint - b.priorityHint);
     }
     for (const link of chain) {
-      const apiKey = this.secrets.resolve(`env:${link.apiKeyEnv}`).value;
+      // Phase 2.8: prefer the DB-stored encrypted key for AI providers;
+      // fall back to the env var for legacy / first-deploy setups.
+      const apiKey =
+        (await this.resolveProviderKey(link.providerSlug, link.apiKeyEnv)) ||
+        this.secrets.resolve(`env:${link.apiKeyEnv}`).value;
       if (!apiKey) {
         this.logger.warn(
           `Skipping ${link.providerSlug}/${link.modelId} (capability=${capability}): ` +
-            `env ${link.apiKeyEnv} is not set`,
+            `neither db:${link.providerSlug} nor env ${link.apiKeyEnv} is set`,
         );
         continue;
       }
@@ -115,5 +123,35 @@ export class CapabilityResolver {
         `all lack a configured API key. Set the env var (e.g. ${firstMissing}) ` +
         `in the backend .env to enable routing.`,
     );
+  }
+
+  /**
+   * Phase 2.8: read the provider's encryptedKey from the DB and
+   * decrypt via CryptoService. Returns '' when no key is stored or
+   * decryption fails (we deliberately don't throw — the caller
+   * transparently falls back to the env var).
+   *
+   * Implemented here (rather than inside SecretProviderService) so
+   * that we don't have to introduce a module dependency cycle:
+   * SecurityModule → ConnectorsModule. The AI gateway module already
+   * has both services wired.
+   */
+  private async resolveProviderKey(
+    providerSlug: string,
+    _apiKeyEnv: string,
+  ): Promise<string> {
+    try {
+      const row = await this.prisma.modelProvider.findUnique({
+        where: { slug: providerSlug },
+        select: { encryptedKey: true },
+      });
+      if (!row?.encryptedKey) return '';
+      return this.crypto.decrypt(row.encryptedKey);
+    } catch (err) {
+      this.logger.debug(
+        `db:${providerSlug} decryption failed (${err instanceof Error ? err.message : 'unknown'}); falling back to env`,
+      );
+      return '';
+    }
   }
 }

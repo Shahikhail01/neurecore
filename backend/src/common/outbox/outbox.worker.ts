@@ -91,7 +91,22 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
 
   private outbox: IOutboxRepository;
 
+  // FIX-OUTBOX-RACE: do NOT auto-start in onModuleInit. Modules that depend
+  // on OutboxWorker register their handlers in their own onModuleInit
+  // (or onApplicationBootstrap). If we start here, any handler registered
+  // AFTER OutboxWorker's onModuleInit will miss events that arrive in the
+  // gap. The worker is now started lazily by an explicit bootstrap hook
+  // (see app.module.ts) AFTER all module onModuleInit hooks have run.
   onModuleInit(): void {
+    // Intentionally empty.
+  }
+
+  /**
+   * Start polling the outbox. MUST be called after every consumer module
+   * has had a chance to call registerHandler(). app.module.ts wires this
+   * via OnApplicationBootstrap on the AppModule itself.
+   */
+  bootstrap(): void {
     this.start();
   }
 

@@ -113,7 +113,7 @@ export class GoogleSheetsService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Sheets create failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to create spreadsheet');
+      throw new BadRequestException(`Sheets create failed (${res.status}): ${err.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as RawSpreadsheet;
@@ -144,7 +144,7 @@ export class GoogleSheetsService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Sheets read failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to read spreadsheet range');
+      throw new BadRequestException(`Sheets read failed (${res.status}): ${err.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as {
@@ -189,7 +189,7 @@ export class GoogleSheetsService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Sheets write failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to write to spreadsheet');
+      throw new BadRequestException(`Sheets write failed (${res.status}): ${err.slice(0, 200)}`);
     }
 
     return (await res.json()) as {
@@ -229,7 +229,7 @@ export class GoogleSheetsService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Sheets append failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to append rows to spreadsheet');
+      throw new BadRequestException(`Sheets append failed (${res.status}): ${err.slice(0, 200)}`);
     }
 
     return (await res.json()) as {
@@ -259,7 +259,7 @@ export class GoogleSheetsService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Sheets metadata failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to fetch spreadsheet metadata');
+      throw new BadRequestException(`Sheets metadata failed (${res.status}): ${err.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as RawSpreadsheet;
@@ -290,7 +290,7 @@ export class GoogleSheetsService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Sheets batchUpdate failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to execute batch update');
+      throw new BadRequestException(`Sheets batchUpdate failed (${res.status}): ${err.slice(0, 200)}`);
     }
 
     return (await res.json()) as Record<string, unknown>;
@@ -316,7 +316,7 @@ export class GoogleSheetsService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Sheets copyTo failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to copy sheet');
+      throw new BadRequestException(`Sheets copy failed (${res.status}): ${err.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as {
@@ -350,7 +350,7 @@ export class GoogleSheetsService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Sheets clear failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to clear spreadsheet range');
+      throw new BadRequestException(`Sheets clear failed (${res.status}): ${err.slice(0, 200)}`);
     }
   }
 

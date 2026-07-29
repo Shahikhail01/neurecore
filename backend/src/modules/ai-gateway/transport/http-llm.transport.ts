@@ -56,7 +56,10 @@ const CHOICE_SCHEMA = z.object({
         .optional(),
     })
     .optional(),
-  finish_reason: z.string().optional(),
+  // OpenAI streams include `finish_reason: null` for every non-final
+  // chunk and `finish_reason: "stop"` (or similar) on the last one.
+  // Make it nullable so streaming chunks parse instead of failing.
+  finish_reason: z.string().nullable().optional(),
   delta: z
     .object({
       role: z.string().optional(),
@@ -96,6 +99,7 @@ export interface InvokeHttpRequest {
   temperature: number;
   maxTokens: number;
   signal?: AbortSignal;
+  sourceModule?: string;
   tools?: Array<{
     type: 'function';
     function: { name: string; description: string; parameters: unknown };
@@ -289,7 +293,14 @@ function buildRequestBody(
   if (req.stream) body['stream'] = true;
   if (req.tools && req.tools.length > 0) {
     body['tools'] = req.tools;
-    body['tool_choice'] = 'auto';
+    // When the planner specifically requests a tool be invoked, force-call it.
+    // Without this, smaller LLMs reply in prose ("I cannot do that") instead of
+    // producing a tool_call, which the user perceives as "tool broken". Legacy
+    // /chat/messages prose path is unaffected (no `tools` is sent on that path).
+    body['tool_choice'] =
+      (req as InvokeHttpRequest).sourceModule === 'agent-graph.planner'
+        ? 'required'
+        : 'auto';
   }
   if (req.responseFormatJson) {
     body['response_format'] = { type: 'json_object' };

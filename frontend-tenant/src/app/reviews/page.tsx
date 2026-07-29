@@ -39,8 +39,14 @@ export default function ReviewsInboxPage() {
     void load();
   }, [load]);
 
+  if (!user) {
+    return (
+      <div className="p-8 text-sm text-zinc-500">Loading review inbox…</div>
+    );
+  }
+
   return (
-    <TenantShell>
+    <TenantShell user={user}>
       <div className="mx-auto max-w-6xl px-6 py-8">
         <div className="mb-6 flex items-end justify-between">
           <div>

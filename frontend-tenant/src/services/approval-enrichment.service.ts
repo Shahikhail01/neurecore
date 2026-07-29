@@ -55,6 +55,33 @@ interface StratifiedApprovalsResponse {
     };
 }
 
+function normalizeApprovals(raw: unknown): StratifiedApprovalsResponse {
+    const source =
+        raw && typeof raw === 'object' && 'data' in raw
+            ? (raw as { data: unknown }).data
+            : raw;
+    const data = source && typeof source === 'object'
+        ? (source as Partial<StratifiedApprovalsResponse>)
+        : {};
+    const critical = Array.isArray(data.critical) ? data.critical : [];
+    const high = Array.isArray(data.high) ? data.high : [];
+    const medium = Array.isArray(data.medium) ? data.medium : [];
+    const low = Array.isArray(data.low) ? data.low : [];
+
+    return {
+        critical,
+        high,
+        medium,
+        low,
+        count: {
+            critical: typeof data.count?.critical === 'number' ? data.count.critical : critical.length,
+            high: typeof data.count?.high === 'number' ? data.count.high : high.length,
+            medium: typeof data.count?.medium === 'number' ? data.count.medium : medium.length,
+            low: typeof data.count?.low === 'number' ? data.count.low : low.length,
+        },
+    };
+}
+
 /**
  * Fetch stratified approvals from backend
  * GET /approvals/stratified?status=PENDING&limit=50
@@ -67,7 +94,7 @@ export async function getStratifiedApprovals(
         const response = await api.get('/approvals/stratified', {
             params: { status, limit },
         });
-        return response.data;
+        return normalizeApprovals(response.data);
     } catch (error) {
         console.error('Failed to fetch stratified approvals:', error);
         throw error;

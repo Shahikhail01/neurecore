@@ -81,7 +81,9 @@ export class GoogleGmailService {
     );
 
     if (!listRes.ok) {
-      throw new BadRequestException('Failed to fetch inbox from Gmail');
+      const errText = await listRes.text().catch(() => 'unknown');
+      this.logger.error(`Gmail inbox fetch failed: ${listRes.status} ${errText}`);
+      throw new BadRequestException(`Gmail inbox failed (${listRes.status}): ${errText.slice(0, 200)}`);
     }
 
     const listData = (await listRes.json()) as {
@@ -120,7 +122,9 @@ export class GoogleGmailService {
     );
 
     if (!res.ok) {
-      throw new BadRequestException(`Failed to fetch message ${messageId}`);
+      const errText = await res.text().catch(() => 'unknown');
+      this.logger.error(`Gmail get message failed: ${res.status} ${errText}`);
+      throw new BadRequestException(`Gmail get message failed (${res.status}): ${errText.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as {
@@ -232,7 +236,7 @@ export class GoogleGmailService {
     if (!res.ok) {
       const err = await res.text().catch(() => 'unknown');
       this.logger.error(`Gmail send failed: ${res.status} ${err}`);
-      throw new BadRequestException('Failed to send email via Gmail');
+      throw new BadRequestException(`Gmail send failed (${res.status}): ${err.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as { id: string; threadId: string };

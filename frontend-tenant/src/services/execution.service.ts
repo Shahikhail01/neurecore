@@ -71,6 +71,12 @@ export interface EvidenceArtifact {
 }
 
 export const executionService = {
+  async listAttempts(): Promise<ExecutionAttemptSummary[]> {
+    const res = await api.get('/execution/attempts');
+    const inner = (res as any)?.data?.data ?? (res as any)?.data ?? res;
+    return Array.isArray(inner) ? (inner as ExecutionAttemptSummary[]) : [];
+  },
+
   async getAttempt(attemptId: string): Promise<ExecutionAttemptSummary | null> {
     const res = await api.get(`/execution/attempt/${attemptId}`);
     const inner = (res as any)?.data?.data ?? (res as any)?.data ?? res;

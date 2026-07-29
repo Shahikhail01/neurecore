@@ -38,6 +38,8 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AiModelRepository } from '../selection/ai-model.repository';
 import { AiGatewayService } from '../ai-gateway.service';
 import { CAPABILITIES, isCapability } from '../domain/capabilities';
+import { CryptoService } from '../../connectors/services/crypto.service';
+import { guessCapabilities } from '../selection/capability-heuristic';
 
 /* ------------------------------------------------------------------ */
 /*  DTO types                                                         */
@@ -83,16 +85,24 @@ interface RoutingBody {
 
 function mapProvider(
   row: Prisma.ModelProviderGetPayload<{
-    include: { models: { select: { id: true; modelId: true } } };
+    include: { models: { select: { id: true, modelId: true } } };
   }>,
   modelsFull?: Prisma.AiModelGetPayload<{ include: { provider: { select: { slug: true } } } }>[],
+  decryptedKey?: string,
 ) {
   const ms = (modelsFull ?? []).map(mapModel);
+  const hasKey = !!row.encryptedKey;
+  let keyPreview: string | undefined;
+  if (hasKey && decryptedKey) {
+    keyPreview = maskKeyPreview(decryptedKey);
+  }
   return {
     id: row.id,
     provider: row.slug as 'deepseek' | 'gemini' | 'openrouter' | 'minimax',
     name: row.name,
-    apiKey: '••••••••••••',
+    apiKey: keyPreview ?? (hasKey ? '••••••••••••' : ''),
+    hasKey,
+    keyPreview,
     apiEndpoint: row.apiBaseUrl ?? undefined,
     isEnabled: row.isActive,
     isDefault: false,
@@ -107,6 +117,17 @@ function mapProvider(
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/**
+ * Phase 2.8: render a short, non-reversible preview of the decrypted
+ * key (first 4 + '…' + last 4 chars) so admins can verify which key
+ * is loaded without exposing the full secret. Falls back to a
+ * full-mask when the key is too short to safely truncate.
+ */
+function maskKeyPreview(plaintext: string): string {
+  if (plaintext.length <= 10) return '••••••••';
+  return `${plaintext.slice(0, 4)}…${plaintext.slice(-4)}`;
 }
 
 function mapModel(row: Prisma.AiModelGetPayload<{
@@ -138,6 +159,7 @@ export class AiProvidersController {
     private readonly prisma: PrismaService,
     private readonly repo: AiModelRepository,
     private readonly gateway: AiGatewayService,
+    private readonly crypto: CryptoService,
   ) {}
 
   /* ---- Provider CRUD ---- */
@@ -151,12 +173,27 @@ export class AiProvidersController {
     const models = await this.prisma.aiModel.findMany({
       include: { provider: { select: { slug: true } } },
     });
-    return providers.map((p) =>
+    // Phase 2.8: decrypt each provider's stored key once so the UI
+    // can show a masked preview. Failures silently fall back to a
+    // fully-masked entry — never throw from the list endpoint.
+    const previews = providers.map((p) =>
+      p.encryptedKey ? this.tryDecrypt(p.encryptedKey) : '',
+    );
+    return providers.map((p, i) =>
       mapProvider(
         p,
         models.filter((m) => m.providerId === p.id),
+        previews[i],
       ),
     );
+  }
+
+  private tryDecrypt(blob: string): string {
+    try {
+      return this.crypto.decrypt(blob);
+    } catch {
+      return '';
+    }
   }
 
   @Get('providers/:id')
@@ -169,10 +206,11 @@ export class AiProvidersController {
     return mapProvider(
       { ...p, models: modelsFull.map((m) => ({ id: m.id, modelId: m.modelId })) },
       modelsFull,
+      p.encryptedKey ? this.tryDecrypt(p.encryptedKey) : '',
     );
   }
 
-  @Post('providers')
+@Post('providers')
   async createProvider(
     @Body() body: ProviderBody,
     @CurrentUser() user: { id: string },
@@ -183,16 +221,20 @@ export class AiProvidersController {
         name: body.name,
         apiBaseUrl: body.apiEndpoint ?? '',
         apiKeyEnv: `${body.provider.toUpperCase()}_API_KEY`,
+        encryptedKey: body.apiKey ? this.crypto.encrypt(body.apiKey) : null,
         isActive: body.isEnabled ?? true,
       },
       include: { models: { select: { id: true, modelId: true } } },
     });
-    await this.writeAudit(user.id, 'create', 'ModelProvider', created.id, null, created);
+    await this.writeAudit(user.id, 'create', 'ModelProvider', created.id, null, {
+      ...created,
+      encryptedKey: created.encryptedKey ? '[redacted]' : null,
+    });
     this.repo.invalidate();
-    return mapProvider(created as any, []);
+    return mapProvider(created as any, [], body.apiKey ?? '');
   }
 
-  @Patch('providers/:id')
+@Patch('providers/:id')
   async updateProvider(
     @Param('id') id: string,
     @Body() body: Partial<ProviderBody>,
@@ -203,19 +245,49 @@ export class AiProvidersController {
     if (body.name !== undefined) updateData.name = body.name;
     if (body.apiEndpoint !== undefined) updateData.apiBaseUrl = body.apiEndpoint;
     if (body.isEnabled !== undefined) updateData.isActive = body.isEnabled;
+    // Phase 2.8: apiKey === '' → clear the stored key (rotation-out);
+    // apiKey === non-empty → re-encrypt and store.
+    // Omitting apiKey leaves the existing value untouched.
+    if (body.apiKey === '') {
+      updateData.encryptedKey = null;
+    } else if (body.apiKey) {
+      // Reject non-Latin1 keys before encrypting — Node's undici fetch
+      // throws "Cannot convert argument to a ByteString" when an
+      // outbound Authorization header contains codepoints > 255, and
+      // the resulting undici error message is leaked to operators.
+      if (/[^\x00-\xFF]/.test(body.apiKey)) {
+        const badChar: string | undefined = [...body.apiKey].find((c): c is string => c.charCodeAt(0) > 255);
+        const badIdx = body.apiKey.indexOf(badChar!);
+        throw new BadRequestException(
+          `API key contains a non-ASCII character (U+${badChar!.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} at position ${badIdx}). Re-enter the key with only printable ASCII characters.`,
+        );
+      }
+      updateData.encryptedKey = this.crypto.encrypt(body.apiKey);
+    }
 
     const updated = await this.prisma.modelProvider.update({
       where: { id },
       data: updateData,
       include: { models: { select: { id: true, modelId: true } } },
     });
-    await this.writeAudit(user.id, 'update', 'ModelProvider', id, before, updated);
+    await this.writeAudit(
+      user.id,
+      'update',
+      'ModelProvider',
+      id,
+      { ...before, encryptedKey: before?.encryptedKey ? '[redacted]' : null },
+      { ...updated, encryptedKey: updated.encryptedKey ? '[redacted]' : null },
+    );
     this.repo.invalidate();
+    // Force SecretProviderService negative-cache to expire in ≤10s so
+    // a freshly-saved key is picked up without restart.
+    this.gateway.invalidateSecret(`db:${updated.slug}`);
     const modelsFull = await this.prisma.aiModel.findMany({
       where: { providerId: id },
       include: { provider: { select: { slug: true } } },
     });
-    return mapProvider(updated as any, modelsFull);
+    const decrypted = updated.encryptedKey ? this.tryDecrypt(updated.encryptedKey) : '';
+    return mapProvider(updated as any, modelsFull, decrypted);
   }
 
   @Delete('providers/:id')
@@ -240,8 +312,40 @@ export class AiProvidersController {
   }
 
   @Post('providers/:id/set-default')
-  async setDefaultProvider(@Param('id') _id: string) {
-    return { ok: true, id: _id };
+  async setDefaultProvider(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    // Phase 2.8: take the highest-priority active model of this
+    // provider that advertises 'conversation', then route EVERY
+    // capability that model supports to it. Falls back to the first
+    // active model if no conversation-capable model exists.
+    const provider = await this.prisma.modelProvider.findUniqueOrThrow({
+      where: { id },
+    });
+    const candidate = await this.prisma.aiModel.findFirst({
+      where: {
+        providerId: id,
+        isAvailable: true,
+        capabilities: { has: 'conversation' },
+      },
+      orderBy: [{ isDefault: 'desc' }, { priority: 'asc' }],
+    }) ?? (await this.prisma.aiModel.findFirst({
+      where: { providerId: id, isAvailable: true },
+      orderBy: [{ isDefault: 'desc' }, { priority: 'asc' }],
+    }));
+    if (!candidate) {
+      return { ok: false, error: `Provider "${provider.slug}" has no active models. Add or enable a model first.` };
+    }
+    const routing: Record<string, string> = {};
+    for (const cap of candidate.capabilities) {
+      if (isCapability(cap)) routing[cap] = candidate.modelId;
+    }
+    if (Object.keys(routing).length === 0) {
+      return { ok: false, error: `Model "${candidate.modelId}" advertises no routable capabilities.` };
+    }
+    const result = await this.updateRouting(routing as any, user);
+    return { ok: true, providerId: id, modelId: candidate.modelId, routing: result };
   }
 
   @Post('providers/:id/test')
@@ -277,6 +381,147 @@ export class AiProvidersController {
         error: err instanceof Error ? err.message : 'Connection failed',
       };
     }
+  }
+
+  /* ---- Discovery (Phase 2.8) ---- */
+
+  /**
+   * Call the provider's OpenAI-compatible `GET /models` endpoint,
+   * upsert every returned id into `ai_models` as DISABLED, and return
+   * the resulting list (id + displayName + guessed capabilities) so
+   * the admin UI can render checkboxes for which to enable.
+   *
+   * Resolution order for the API key (mirrors CapabilityResolver):
+   *   1. DB: `db:<slug>` (encryptedKey)
+   *   2. env: `<apiKeyEnv>`
+   *
+   * Capabilities are inferred from the model id with the heuristic
+   * `guessCapabilities()`; admins can override per-model after.
+   */
+  @Post('providers/:id/discover-models')
+  async discoverModels(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    const provider = await this.prisma.modelProvider.findUniqueOrThrow({
+      where: { id },
+    });
+    const apiKey = this.resolveProviderKey(provider);
+    if (!apiKey) {
+      return {
+        ok: false,
+        error: `No API key available for provider "${provider.slug}". Set it via the provider editor or ${provider.apiKeyEnv} env var.`,
+        inserted: [],
+        existing: [],
+      };
+    }
+    // Reject non-Latin1 keys with a clear message — Node's fetch uses
+    // undici which throws "Cannot convert argument to a ByteString" when
+    // a header value contains codepoints > 255. Without this guard the
+    // raw undici message bubbles up and confuses operators.
+    if (/[^\x00-\xFF]/.test(apiKey)) {
+      const badChar: string | undefined = [...apiKey].find((c): c is string => c.charCodeAt(0) > 255);
+      const badIdx = apiKey.indexOf(badChar!);
+      return {
+        ok: false,
+        error: `Stored API key for provider "${provider.slug}" contains a non-ASCII character (U+${badChar!.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} at position ${badIdx}). Clear and re-enter the key.`,
+        inserted: [],
+        existing: [],
+      };
+    }
+    const url = `${provider.apiBaseUrl.replace(/\/+$/, '')}/models`;
+    let payload: { data?: Array<{ id: string }> } | null = null;
+    let httpError: string | undefined;
+    try {
+      const resp = await fetch(url, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!resp.ok) {
+        httpError = `HTTP ${resp.status} ${resp.statusText}`;
+      } else {
+        payload = (await resp.json()) as { data?: Array<{ id: string }> };
+      }
+    } catch (err) {
+      httpError = err instanceof Error ? err.message : 'network error';
+    }
+    if (httpError || !payload?.data) {
+      return {
+        ok: false,
+        error: httpError ?? 'Provider returned no model list',
+        inserted: [],
+        existing: [],
+      };
+    }
+    const incoming = payload.data.map((m) => m.id).filter(Boolean);
+    if (incoming.length === 0) {
+      return { ok: true, inserted: [], existing: [], message: 'Provider returned 0 models' };
+    }
+
+    const existing = await this.prisma.aiModel.findMany({
+      where: { providerId: id, modelId: { in: incoming } },
+      select: { id: true, modelId: true },
+    });
+    const existingIds = new Set(existing.map((m) => m.modelId));
+    const toInsert = incoming.filter((mid) => !existingIds.has(mid));
+
+    const insertedRows: Array<{ id: string; modelId: string; displayName: string; capabilities: string[] }> = [];
+    for (const modelId of toInsert) {
+      const caps = guessCapabilities(modelId);
+      const row = await this.prisma.aiModel.create({
+        data: {
+          providerId: id,
+          modelId,
+          displayName: modelId,
+          capabilities: caps,
+          contextWindow: 32000,
+          costPer1kInput: new Prisma.Decimal(0),
+          costPer1kOutput: new Prisma.Decimal(0),
+          priority: 100,
+          isDefault: false,
+          isAvailable: false, // Phase 2.8: require explicit admin enable
+        },
+      });
+      await this.writeAudit(user.id, 'create', 'AiModel', row.id, null, {
+        modelId,
+        capabilities: caps,
+        via: 'discover',
+      });
+      insertedRows.push({
+        id: row.id,
+        modelId: row.modelId,
+        displayName: row.displayName,
+        capabilities: caps,
+      });
+    }
+    this.repo.invalidate();
+    return {
+      ok: true,
+      inserted: insertedRows,
+      existing: existing.map((m) => m.modelId),
+      message: `Inserted ${insertedRows.length} new model(s); ${existing.length} already existed`,
+    };
+  }
+
+  /**
+   * Phase 2.8: resolve an API key for a provider with the same
+   * precedence as CapabilityResolver (db → env). Returns '' when
+   * neither source has a value.
+   */
+  private resolveProviderKey(provider: {
+    slug: string;
+    apiKeyEnv: string;
+    encryptedKey: string | null;
+  }): string {
+    if (provider.encryptedKey) {
+      try {
+        const v = this.crypto.decrypt(provider.encryptedKey);
+        if (v) return v;
+      } catch {
+        /* fall through to env */
+      }
+    }
+    const envVal = process.env[provider.apiKeyEnv] ?? '';
+    return envVal;
   }
 
   /* ---- Model CRUD ---- */
@@ -364,6 +609,49 @@ export class AiProvidersController {
     @CurrentUser() user: { id: string },
   ) {
     return this.updateModel(_pId, modelId, { isEnabled: enabled }, user);
+  }
+
+  /**
+   * Phase 2.8: mark a single model as the default for every capability
+   * it advertises, clearing isDefault on all sibling models that share
+   * those capabilities. The url param is the database row id (cuid),
+   * matching the discover-models response shape.
+   */
+  @Post('providers/:providerId/models/:modelId/set-default')
+  async setDefaultModel(
+    @Param('providerId') providerId: string,
+    @Param('modelId') modelId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    const target = await this.prisma.aiModel.findUniqueOrThrow({
+      where: { id: modelId },
+    });
+    if (target.providerId !== providerId) {
+      throw new BadRequestException(
+        `Model ${modelId} does not belong to provider ${providerId}`,
+      );
+    }
+    for (const cap of target.capabilities) {
+      if (!isCapability(cap)) continue;
+      await this.prisma.aiModel.updateMany({
+        where: {
+          capabilities: { has: cap },
+          provider: { isActive: true },
+          NOT: { id: target.id },
+        },
+        data: { isDefault: false },
+      });
+    }
+    const updated = await this.prisma.aiModel.update({
+      where: { id: target.id },
+      data: { isDefault: true },
+    });
+    await this.writeAudit(user.id, 'update', 'AiModel', updated.id, target, {
+      isDefault: true,
+      via: 'set-default',
+    });
+    this.repo.invalidate();
+    return updated;
   }
 
   /* ---- Routing ---- */

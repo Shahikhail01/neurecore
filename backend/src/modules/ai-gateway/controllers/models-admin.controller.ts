@@ -26,12 +26,14 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AiModelRepository } from '../selection/ai-model.repository';
+import { CryptoService } from '../../connectors/services/crypto.service';
 
 interface CreateProviderBody {
   slug: string;
   name: string;
   apiBaseUrl: string;
   apiKeyEnv: string;
+  encryptedKey?: string;
   isActive?: boolean;
 }
 
@@ -67,14 +69,20 @@ export class ModelsAdminController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly repo: AiModelRepository,
+    private readonly crypto: CryptoService,
   ) {}
 
   @Get('providers')
   async listProviders() {
-    return this.prisma.modelProvider.findMany({
+    const rows = await this.prisma.modelProvider.findMany({
       orderBy: { name: 'asc' },
       include: { models: { select: { id: true, modelId: true } } },
     });
+    return rows.map((r) => ({
+      ...r,
+      encryptedKey: r.encryptedKey ? '[redacted]' : null,
+      hasKey: !!r.encryptedKey,
+    }));
   }
 
   @Post('providers')
@@ -88,6 +96,7 @@ export class ModelsAdminController {
         name: body.name,
         apiBaseUrl: body.apiBaseUrl,
         apiKeyEnv: body.apiKeyEnv,
+        encryptedKey: body.encryptedKey ? this.crypto.encrypt(body.encryptedKey) : null,
         isActive: body.isActive ?? true,
       },
     });
@@ -97,10 +106,10 @@ export class ModelsAdminController {
       'ModelProvider',
       created.id,
       null,
-      created,
+      { ...created, encryptedKey: created.encryptedKey ? '[redacted]' : null },
     );
     this.repo.invalidate();
-    return created;
+    return { ...created, encryptedKey: created.encryptedKey ? '[redacted]' : null };
   }
 
   @Patch('providers/:id')
@@ -112,20 +121,26 @@ export class ModelsAdminController {
     const before = await this.prisma.modelProvider.findUnique({
       where: { id },
     });
+    const data = this.pickUpdatable(body);
+    if (body.encryptedKey === '') {
+      (data as Prisma.ModelProviderUpdateInput).encryptedKey = null;
+    } else if (body.encryptedKey) {
+      (data as Prisma.ModelProviderUpdateInput).encryptedKey = this.crypto.encrypt(body.encryptedKey);
+    }
     const updated = await this.prisma.modelProvider.update({
       where: { id },
-      data: this.pickUpdatable(body),
+      data,
     });
     await this.writeAudit(
       user.id,
       'update',
       'ModelProvider',
       id,
-      before,
-      updated,
+      { ...before, encryptedKey: before?.encryptedKey ? '[redacted]' : null },
+      { ...updated, encryptedKey: updated.encryptedKey ? '[redacted]' : null },
     );
     this.repo.invalidate();
-    return updated;
+    return { ...updated, encryptedKey: updated.encryptedKey ? '[redacted]' : null };
   }
 
   @Get()

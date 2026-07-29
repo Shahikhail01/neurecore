@@ -278,6 +278,13 @@ export class ChatService {
           // users.id FK on Agent.createdById and broke audit attribution.
           userId: userIdFromJwt ?? 'anonymous',
           sessionId: conversationId,
+          // Hermes-tools F1: pass a curated allowlist. Without this the
+          // graph exposes ALL 119 tools to the LLM, which causes smaller
+          // models to fail to route reliably (LLM refutes tools, picks
+          // similar-named wrong tools, or hallucinates tool names).
+          // Security policy still applies on execution; allowlist is an
+          // *exposure* filter, not a permission grant.
+          allowedTools: this.resolveChatAllowedTools(dto.message),
         });
 
         // Extract reply from final message or tool results
@@ -889,6 +896,8 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
           tenantId,
           userId: userIdFromJwt ?? 'anonymous',
           sessionId: conversationId,
+          // Hermes-tools F1: curated allowlist (see send()).
+          allowedTools: this.resolveChatAllowedTools(dto.message),
         });
         const messages = result.messages ?? [];
         const finalMessage = messages[messages.length - 1];
@@ -1084,6 +1093,10 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
    * Detect if user message is an action request or a query
    */
   private detectIntent(message: string): 'action' | 'query' {
+    // Use word-boundary matching so tokens like "description" don't trigger
+    // an "add" false positive, and "reporting" doesn't trigger "report" via
+    // a different tool. Action verbs route through the agent graph so the
+    // LLM can pick from a curated tool allowlist (see resolveChatAllowedTools).
     const actionKeywords = [
       'create',
       'add',
@@ -1098,15 +1111,292 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       'show',
       'get',
       'find',
+      'search',
       'assign',
       'delegate',
       'set',
       'delete',
       'remove',
       'archive',
+      'unarchive',
+      'mark',
+      'update',
+      'rename',
+      'change',
+      'reopen',
+      'clone',
+      'duplicate',
+      'submit',
+      'approve',
+      'reject',
+      'cancel',
+      'resubmit',
+      'respond',
+      'reply',
+      'configure',
+      'enable',
+      'disable',
+      'bulk',
+      'send',
+      'schedule',
+      'read',
+      'bump',
+      'subtask',
+      'move',
+      'reassign',
     ];
     const lower = message.toLowerCase();
-    return actionKeywords.some((k) => lower.includes(k)) ? 'action' : 'query';
+    if (!actionKeywords.some((k) => new RegExp(`\\b${k}\\b`).test(lower))) {
+      return 'query';
+    }
+    return 'action';
+  }
+
+  /**
+   * Hermes-tools F1: build a capability-aware allowlist of tool names
+   * the LLM should be offered for THIS message. Returning `null` would
+   * expose all 119 tools — which is the current default and the root
+   * cause of "LLM refuses tool" / "LLM picks wrong tool" failures.
+   *
+   * Strategy:
+   *  - Read-only "show me / list / get / find / search" prompts that are
+   *    generic get a broad allowlist of all Hermes-safe read tools.
+   *  - Anything with a write/mutation verb (create/update/delete/mark/
+   *    assign/archive/approve/reject/set/etc.) gets a narrower list
+   *    centred on that capability plus `globalSearch`/`getTenantSnapshot`
+   *    so the LLM can resolve IDs by name.
+   *  - Always include `globalSearch` and `getTenantSnapshot` for ID
+   *    discovery by name (the LLM needs these to bridge
+   *    "the invoices task" → real UUIDs).
+   */
+  private resolveChatAllowedTools(message: string): string[] | null {
+    const lower = message.toLowerCase();
+
+    // Discovery — used as a base allowlist across every intent.
+    const DISCOVERY = [
+      'globalSearch',
+      'getTenantSnapshot',
+      'listProjects',
+      'getProjectByName',
+      'searchProjects',
+      'listAgents',
+      'listDepartments',
+      'listWorkflows',
+      'listGoals',
+      'getDashboardSummary',
+      'getTenantSettings',
+      'getCompanyProfile',
+    ];
+
+    const has = (re: RegExp) => re.test(lower);
+
+    // Project-related
+    if (
+      has(/\bproject\b/) ||
+      has(/\bmilestone\b/) ||
+      has(/\bstage\b/)
+    ) {
+      const set = new Set<string>(DISCOVERY);
+      [
+        'createProject',
+        'getProject',
+        'updateProject',
+        'updateProjectStatus',
+        'addProjectMember',
+        'removeProjectMember',
+        'listProjectMembers',
+        'listProjectStages',
+        'updateProjectStage',
+        'project_memory_add',
+        'searchProjectMemory',
+        'updateMemoryConfidence',
+      ].forEach((t) => set.add(t));
+      return Array.from(set);
+    }
+
+    // Task-related
+    if (
+      has(/\btask\b/) ||
+      has(/\bsubtask\b/) ||
+      has(/\binvoice/) ||
+      has(/\btodo\b/)
+    ) {
+      const set = new Set<string>(DISCOVERY);
+      [
+        'createTask',
+        'getTask',
+        'getMyTasks',
+        'getOverdueTasks',
+        'listSubtasks',
+        'addSubtask',
+        'searchTasks',
+        'getTaskStats',
+        'updateTask',
+        'assignTask',
+        'unassignTask',
+        'markTaskComplete',
+        'markTaskInProgress',
+        'reopenTask',
+        'changeTaskPriority',
+        'deleteTask',
+        'bulkAssignTasks',
+        'bulkChangeStatus',
+        'cloneTask',
+        'getOverdueTaskReport',
+      ].forEach((t) => set.add(t));
+      return Array.from(set);
+    }
+
+    // Customer-related
+    if (
+      has(/\bcustomer\b/) ||
+      has(/\bclient\b/) ||
+      has(/\baccount\b/) ||
+      has(/\bcontact\b/)
+    ) {
+      const set = new Set<string>(DISCOVERY);
+      [
+        'createCustomer',
+        'getCustomer',
+        'listCustomers',
+        'findCustomerByName',
+        'getCustomerProjects',
+        'listCustomerContacts',
+        'updateCustomer',
+        'archiveCustomer',
+        'unarchiveCustomer',
+      ].forEach((t) => set.add(t));
+      return Array.from(set);
+    }
+
+    // Approvals
+    if (
+      has(/\bapprov/) ||
+      has(/\breject/) ||
+      has(/\bpending\b/) ||
+      has(/\binbox\b/)
+    ) {
+      const set = new Set<string>(DISCOVERY);
+      [
+        'listPendingApprovals',
+        'getApproval',
+        'approveRequest',
+        'rejectRequest',
+        'bulkApprove',
+        'bulkReject',
+        'createApprovalRequest',
+        'getMyPendingApprovals',
+        'resubmitApproval',
+        'cancelApprovalRequest',
+        'listMyApprovalHistory',
+        'respondToInboxItem',
+        'getInboxSummary',
+        'listInboxItems',
+        'getInboxItem',
+      ].forEach((t) => set.add(t));
+      return Array.from(set);
+    }
+
+    // Department/agent
+    if (
+      has(/\bdepartment\b/) ||
+      has(/\borgani/) ||
+      has(/\bagent\b/) ||
+      has(/\bmanager\b/) ||
+      has(/\bworkload\b/)
+    ) {
+      const set = new Set<string>(DISCOVERY);
+      [
+        'listDepartments',
+        'getDepartment',
+        'listDepartmentMembers',
+        'listAgents',
+        'getAgent',
+        'searchAgents',
+        'getAgentWorkload',
+        'listAgentsByDepartment',
+        'pauseAgent',
+        'resumeAgent',
+        'updateAgent',
+        'archiveAgent',
+        'assignAgentToDepartment',
+        'bulkCreateAgents',
+        'bulkAssignToDepartment',
+      ].forEach((t) => set.add(t));
+      return Array.from(set);
+    }
+
+    // Cost / finance
+    if (
+      has(/\bcost\b/) ||
+      has(/\bbudget\b/) ||
+      has(/\bexpense\b/) ||
+      has(/\bspend\b/)
+    ) {
+      const set = new Set<string>(DISCOVERY);
+      [
+        'getCostReport',
+        'getCostByDepartment',
+        'getCostByAgent',
+        'getCostByProject',
+        'getTodayCost',
+        'setBudgetAlert',
+        'listBudgetPolicies',
+      ].forEach((t) => set.add(t));
+      return Array.from(set);
+    }
+
+    // Notifications
+    if (has(/\bnotification\b/) || has(/\balert\b/)) {
+      const set = new Set<string>(DISCOVERY);
+      [
+        'getMyNotifications',
+        'markNotificationRead',
+        'markAllNotificationsRead',
+        'listAllNotifications',
+        'getActivityFeed',
+      ].forEach((t) => set.add(t));
+      return Array.from(set);
+    }
+
+    // Goals
+    if (has(/\bgoal\b/) || has(/\bokr\b/)) {
+      const set = new Set<string>(DISCOVERY);
+      ['listGoals', 'updateGoalProgress'].forEach((t) => set.add(t));
+      return Array.from(set);
+    }
+
+    // Generic read-only queries — give the LLM a wide read surface and
+    // a few common writes. Falls back to the policy-enforced allowlist,
+    // which already blocks destructive operations.
+    return [
+      ...DISCOVERY,
+      'createCustomer',
+      'createProject',
+      'createTask',
+      'createApprovalRequest',
+      'respondToInboxItem',
+      'markAllNotificationsRead',
+      'markNotificationRead',
+      'updateGoalProgress',
+      'addProjectMemory',
+      'searchProjectMemory',
+      'updateMemoryConfidence',
+      'listPendingApprovals',
+      'listMyApprovalHistory',
+      'getMyTasks',
+      'getOverdueTasks',
+      'listSubtasks',
+      'addSubtask',
+      'listWorkflows',
+      'listGoals',
+      'listBudgetPolicies',
+      'markTaskComplete',
+      'markTaskInProgress',
+      'changeTaskPriority',
+      'pauseAgent',
+      'resumeAgent',
+    ];
   }
 
   /**

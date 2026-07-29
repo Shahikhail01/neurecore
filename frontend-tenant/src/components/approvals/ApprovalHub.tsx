@@ -112,11 +112,43 @@ export const ApprovalHub: FC<ApprovalHubProps> = ({
     isLoading,
     className,
 }) => {
+    const safeApprovals = {
+        critical: Array.isArray(approvals?.critical) ? approvals.critical : [],
+        high: Array.isArray(approvals?.high) ? approvals.high : [],
+        medium: Array.isArray(approvals?.medium) ? approvals.medium : [],
+        low: Array.isArray(approvals?.low) ? approvals.low : [],
+        count: {
+            critical:
+                typeof approvals?.count?.critical === 'number'
+                    ? approvals.count.critical
+                    : Array.isArray(approvals?.critical)
+                      ? approvals.critical.length
+                      : 0,
+            high:
+                typeof approvals?.count?.high === 'number'
+                    ? approvals.count.high
+                    : Array.isArray(approvals?.high)
+                      ? approvals.high.length
+                      : 0,
+            medium:
+                typeof approvals?.count?.medium === 'number'
+                    ? approvals.count.medium
+                    : Array.isArray(approvals?.medium)
+                      ? approvals.medium.length
+                      : 0,
+            low:
+                typeof approvals?.count?.low === 'number'
+                    ? approvals.count.low
+                    : Array.isArray(approvals?.low)
+                      ? approvals.low.length
+                      : 0,
+        },
+    };
     const totalApprovals =
-        approvals.count.critical +
-        approvals.count.high +
-        approvals.count.medium +
-        approvals.count.low;
+        safeApprovals.count.critical +
+        safeApprovals.count.high +
+        safeApprovals.count.medium +
+        safeApprovals.count.low;
 
     return (
         <div
@@ -132,7 +164,7 @@ export const ApprovalHub: FC<ApprovalHubProps> = ({
                 <div className="grid grid-cols-4 gap-4">
                     {riskSections.map((section) => {
                         const count =
-                            approvals.count[section.level.toLowerCase() as keyof typeof approvals.count];
+                            safeApprovals.count[section.level.toLowerCase() as keyof typeof safeApprovals.count];
                         return (
                             <div key={section.level} className="text-center">
                                 <div className="text-2xl mb-1">{section.icon}</div>
@@ -150,7 +182,7 @@ export const ApprovalHub: FC<ApprovalHubProps> = ({
 
             {/* STRATIFIED SECTIONS */}
             {riskSections.map((section) => {
-                const approvalList = approvals[section.level.toLowerCase() as keyof typeof approvals];
+                const approvalList = safeApprovals[section.level.toLowerCase() as keyof typeof safeApprovals];
 
                 if (!Array.isArray(approvalList) || approvalList.length === 0) {
                     return null;

@@ -101,9 +101,17 @@ export default function ReviewDetailPage() {
     [reviewId, comment, revisionInstructions, load],
   );
 
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-zinc-500">
+        Loading review…
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <TenantShell>
+      <TenantShell user={user}>
         <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-zinc-500">
           Loading review…
         </div>
@@ -113,7 +121,7 @@ export default function ReviewDetailPage() {
 
   if (error || !review) {
     return (
-      <TenantShell>
+      <TenantShell user={user}>
         <div className="mx-auto max-w-5xl px-6 py-8">
           <div
             role="alert"
@@ -134,10 +142,10 @@ export default function ReviewDetailPage() {
 
   const isPending = review.status === 'PENDING';
   const isAIAssigned =
-    !!user && review.task?.agentId && review.task.agentId === user.id;
+    Boolean(review.task?.agentId && review.task.agentId === user.id);
 
   return (
-    <TenantShell>
+    <TenantShell user={user}>
       <div className="mx-auto max-w-5xl px-6 py-8">
         <Link
           href="/reviews"

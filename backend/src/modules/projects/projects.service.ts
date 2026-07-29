@@ -12,6 +12,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { TimelineService } from '../timeline/timeline.service';
 import type {
   IProjectRepository,
   Project,
@@ -32,6 +33,7 @@ import type { ProjectsAdapter } from '../information-engine/clients/projects.ada
 import { ProjectAutomationService } from '../project-automation/project-automation.service';
 import { GoalTemplateService } from '../project-automation/services/goal-template.service';
 import { DerivedShapeApplier } from './services/derived-shape-applier.service';
+import { ExecutionOrchestrator } from '../execution/application/execution-orchestrator';
 import {
   ProjectShapeSchema,
   type ProjectShape,
@@ -48,6 +50,12 @@ export class ProjectsService implements OnModuleInit {
   // after the application is fully booted sidesteps the init-order issue.
   private projectAutomation: ProjectAutomationService | undefined;
   private goalTemplateService: GoalTemplateService | undefined;
+  // AUTO-EXECUTION-ON-ACTIVE: when a project transitions to ACTIVE, we
+  // dispatch every pending project-scoped task to the ExecutionOrchestrator
+  // so the autonomous layer (AI agents) actually runs them. Without this,
+  // tasks created via chat sat in PENDING forever because nothing calls
+  // ExecutionOrchestrator.requestExecution() automatically.
+  private executionOrchestrator: ExecutionOrchestrator | undefined;
 
   constructor(
     @Inject(PROJECT_REPOSITORY) private readonly repository: IProjectRepository,
@@ -62,25 +70,52 @@ export class ProjectsService implements OnModuleInit {
     private readonly derivedShapeApplier?: DerivedShapeApplier,
     @Optional()
     private readonly prisma?: PrismaService,
-  ) {}
+  ) {
+    // FIX-TIMELINE-RECORD: lazy-resolve TimelineService so project
+    // status transitions show up on the unified timeline. Previously
+    // only project-automation events were recorded; ProjectsService
+    // never called timeline.record, so the per-project timeline view
+    // was always empty even after a full lifecycle.
+  }
 
   onModuleInit(): void {
     // Resolve @Global()-exported services via ModuleRef after all modules are loaded.
-    try {
-      this.projectAutomation =
-        this.moduleRef?.get(ProjectAutomationService, { strict: false }) ??
-        undefined;
-      this.goalTemplateService =
-        this.moduleRef?.get(GoalTemplateService, { strict: false }) ??
-        undefined;
-      this.logger.log(
-        `ProjectsService resolved: projectAutomation=${this.projectAutomation ? 'yes' : 'no'}, goalTemplateService=${this.goalTemplateService ? 'yes' : 'no'}`,
-      );
-    } catch (err) {
-      this.logger.warn(
-        `ProjectsService.onModuleInit: lazy resolution failed (${err instanceof Error ? err.message : String(err)})`,
-      );
+    // Each lookup is wrapped individually so one missing service doesn't
+    // suppress the others — otherwise AUTO-EXECUTION-ON-ACTIVE silently
+    // no-ops when an unrelated provider isn't in this context.
+    if (this.moduleRef) {
+      try {
+        this.projectAutomation =
+          this.moduleRef.get(ProjectAutomationService, { strict: false }) ??
+          undefined;
+      } catch (err) {
+        this.logger.warn(
+          `ProjectsService: failed to resolve ProjectAutomationService (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
+      try {
+        this.goalTemplateService =
+          this.moduleRef.get(GoalTemplateService, { strict: false }) ??
+          undefined;
+      } catch (err) {
+        this.logger.warn(
+          `ProjectsService: failed to resolve GoalTemplateService (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
+      // AUTO-EXECUTION-ON-ACTIVE: ExecutionOrchestrator lives in ExecutionModule.
+      try {
+        this.executionOrchestrator =
+          this.moduleRef.get(ExecutionOrchestrator, { strict: false }) ??
+          undefined;
+      } catch (err) {
+        this.logger.warn(
+          `ProjectsService: failed to resolve ExecutionOrchestrator (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
     }
+    this.logger.log(
+      `ProjectsService resolved: projectAutomation=${this.projectAutomation ? 'yes' : 'no'}, goalTemplateService=${this.goalTemplateService ? 'yes' : 'no'}, executionOrchestrator=${this.executionOrchestrator ? 'yes' : 'no'}`,
+    );
   }
 
   async create(input: CreateProjectInput, tenantId: string): Promise<Project> {
@@ -410,10 +445,169 @@ export class ProjectsService implements OnModuleInit {
       );
     }
 
-    return this.repository.setStatus(id, tenantId, to, {
+    const updated = await this.repository.setStatus(id, tenantId, to, {
       lostReason: to === 'LOST' ? (reason ?? null) : undefined,
       completedAt: to === 'COMPLETED' ? new Date() : undefined,
     });
+
+    // FIX-TIMELINE-RECORD: surface the status change on the unified
+    // project timeline. Done after the write so the event reflects the
+    // committed state. Lazy-resolves TimelineService via ModuleRef to
+    // avoid a circular dep (ProjectsModule → TimelineModule is not wired).
+    if (this.moduleRef && this.prisma) {
+      try {
+        const timeline =
+          this.moduleRef.get<InstanceType<typeof TimelineService>>(
+            TimelineService,
+            { strict: false },
+          );
+        if (timeline) {
+          await timeline.record({
+            tenantId,
+            projectId: id,
+            occurredAt: new Date(),
+            category: 'OPERATIONAL',
+            severity: 'LOW',
+            sourceType: 'HUMAN',
+            sourceId: 'system',
+            title: `Project status: ${from} → ${to}`,
+            description: reason
+              ? `Project transitioned from ${from} to ${to}. Reason: ${reason}.`
+              : `Project transitioned from ${from} to ${to}.`,
+            relatedEntityType: 'Project',
+            relatedEntityId: id,
+            correlationId: `project.status.${id}.${Date.now()}`,
+            metadata: { from, to, reason: reason ?? null },
+          });
+        }
+      } catch (err) {
+        // Timeline recording is best-effort — never block the transition
+        // on a timeline failure.
+        this.logger.warn(
+          `Failed to record project status timeline event (${from} → ${to} for ${id}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    // AUTO-EXECUTION-ON-ACTIVE: when a project hits ACTIVE, dispatch every
+    // pending project-scoped task to the ExecutionOrchestrator. Without this
+    // hook, tasks created via chat sat at PENDING indefinitely (the prior
+    // implementation only fired TaskExecutionRequested from inside review
+    // decisions, never from initial lifecycle transitions). Fire-and-forget;
+    // each task dispatch is idempotent.
+    if (to === 'ACTIVE' && from !== 'ACTIVE' && this.executionOrchestrator) {
+      this.dispatchPendingTasks(id, tenantId).catch((err) => {
+        this.logger.error(
+          `AUTO-EXECUTION-ON-ACTIVE: dispatch failed for project ${id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+    }
+
+    return updated;
+  }
+
+  /**
+   * Dispatch every PENDING task linked to a project to the ExecutionOrchestrator.
+   * Best-effort: skips tasks with no eligible agent (orchestrator will throw
+   * internally and we log; we don't block the lifecycle transition).
+   */
+  private async dispatchPendingTasks(
+    projectId: string,
+    tenantId: string,
+  ): Promise<void> {
+    if (!this.executionOrchestrator || !this.prisma) return;
+    // Pull pending tasks with their linked project members so we can pick an
+    // eligible agent. If a task has no project member, fall back to the
+    // tenant's first eligible agent — the orchestrator will validate.
+    const pending = await this.prisma.task.findMany({
+      where: { tenantId, projectId, status: 'PENDING' },
+      select: { id: true, agentId: true, requiredRole: true, requiredCapabilities: true },
+      take: 50,
+    });
+    const members = await this.prisma.projectMember.findMany({
+      where: { projectId },
+      select: { actorId: true, role: true },
+    });
+    const memberAgentIds = members
+      .map((m) => m.actorId)
+      .filter((id): id is string => !!id);
+    this.logger.log(
+      `AUTO-EXECUTION-ON-ACTIVE: dispatching ${pending.length} pending task(s) for project ${projectId} (members=${memberAgentIds.length}) pending=${JSON.stringify(pending.map((p) => ({ id: p.id, agentId: p.agentId })))}`,
+    );
+    for (const t of pending) {
+      // Pick an agent: task's own agentId, else any project member, else skip.
+      let agentId = t.agentId ?? null;
+      if (!agentId && memberAgentIds.length > 0) agentId = memberAgentIds[0];
+      this.logger.log(
+        `AUTO-EXECUTION-ON-ACTIVE: iter task=${t.id}`,
+      );
+      if (!agentId) {
+        this.logger.warn(
+          `AUTO-EXECUTION-ON-ACTIVE: skipping task ${t.id} — no agent assigned and no project members`,
+        );
+        continue;
+      }
+      // The orchestrator rejects requests where the task's stored agentId
+      // doesn't match the dispatching agent. Our auto-created tasks have
+      // agentId=null; patch it to the chosen agent so requestExecution
+      // accepts the call. This is idempotent — re-runs see the same value.
+      if (!t.agentId && agentId) {
+        try {
+          // Verify the agent exists before patching (orchestrator FK requires it)
+          const agentExists = await this.prisma.agent.findUnique({
+            where: { id: agentId },
+            select: { id: true },
+          });
+          if (!agentExists) {
+            this.logger.warn(
+              `AUTO-EXECUTION-ON-ACTIVE: agentId=${agentId} not found in Agent table; skipping task ${t.id}`,
+            );
+            continue;
+          }
+          const upd = await this.prisma.task.update({
+            where: { id: t.id },
+            data: { agentId, status: 'QUEUED' },
+            select: { id: true, agentId: true, status: true },
+          });
+          this.logger.log(
+            `AUTO-EXECUTION-ON-ACTIVE: patched task=${upd.id} agentId=${upd.agentId} status=${upd.status}`,
+          );
+        } catch (err) {
+          // Prisma error objects can have empty message + populated code/meta
+          const e = err as { message?: string; code?: string; meta?: unknown };
+          this.logger.warn(
+            `AUTO-EXECUTION-ON-ACTIVE: failed to assign agentId=${agentId} to task ${t.id}: ${JSON.stringify({ message: e.message, code: e.code, meta: e.meta })}`,
+          );
+        }
+      }
+      try {
+        this.logger.log(
+          `AUTO-EXECUTION-ON-ACTIVE: calling executionOrchestrator.requestExecution task=${t.id} agent=${agentId}`,
+        );
+        const result = await this.executionOrchestrator.requestExecution(
+          t.id,
+          agentId,
+          `auto-exec-${t.id}`,
+          {
+            tenantId,
+            actorId: 'SYSTEM',
+            actorType: 'SYSTEM',
+            correlationId: `auto-exec-${t.id}`,
+            causationId: null,
+            idempotencyKey: `auto-exec-task:${t.id}`,
+            occurredAt: new Date().toISOString(),
+            schemaVersion: 1,
+          },
+        );
+        this.logger.log(
+          `AUTO-EXECUTION-ON-ACTIVE: dispatched task=${t.id} attemptId=${result.attemptId}`,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `AUTO-EXECUTION-ON-ACTIVE: dispatch failed for task ${t.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
   }
 
   async getProjectStats(tenantId: string) {

@@ -189,6 +189,21 @@ const AGENT_POLICY_CONFIGS: Record<
       'listSubtasks',
       'searchTasks',
       'getTaskStats',
+      // Task lifecycle mutations are common Hermes requests ("mark the
+      // X task complete"); allow them but keep the most-destructive ops
+      // (deleteTask, cloneTask) blocked. Hermes-tools F1 routed them
+      // through the agent graph with a curated allowlist — security
+      // policy must permit the allowlist to actually execute.
+      'markTaskComplete',
+      'markTaskInProgress',
+      'reopenTask',
+      'changeTaskPriority',
+      'assignTask',
+      'unassignTask',
+      'addSubtask',
+      'updateTask',
+      'bulkAssignTasks',
+      'bulkChangeStatus',
       // Department operations (read-only)
       'listDepartments',
       'getDepartment',
@@ -236,12 +251,15 @@ const AGENT_POLICY_CONFIGS: Record<
       'getCostByProject',
       'getTodayCost',
       'setBudgetAlert',
-      // Customers (read-only)
+      // Customers (read-only + chat-driven create so "create a new customer"
+      // works through Hermes. Archive / unarchive / delete remain
+      // blocked — those need explicit human approval, not LLM autonomy.)
       'getCustomer',
       'listCustomers',
       'findCustomerByName',
       'getCustomerProjects',
       'listCustomerContacts',
+      'createCustomer',
       // Notifications
       'listAllNotifications',
       // Activity feed
@@ -250,10 +268,24 @@ const AGENT_POLICY_CONFIGS: Record<
       'listMyApprovalHistory',
       // Global search
       'globalSearch',
-      // Project memory
+      // Project memory (allow canonical registry names so LLM tool calls
+      // actually resolve. The security policy used to whitelist the old
+      // "addProjectMemory" name, but the registry exposes
+      // `project_memory_add` etc. — without this fix every chat prompt
+      // that needed project memory silently failed with
+      // "Tool not permitted by the current execution policy".)
       'addProjectMemory',
       'searchProjectMemory',
       'updateMemoryConfidence',
+      'project_memory_add',
+      'project_memory_search',
+      'project_memory_update_confidence',
+      // Google Workspace tools
+      'calendar',
+      'email',
+      'documents',
+      'sheets',
+      'reports',
     ],
     blockedTools: [
       'shell',
@@ -271,23 +303,12 @@ const AGENT_POLICY_CONFIGS: Record<
       'cloneProject',
       'updateProject',
       'deleteTask',
-      'updateTask',
       'cloneTask',
-      'markTaskComplete',
-      'markTaskInProgress',
-      'reopenTask',
-      'changeTaskPriority',
-      'bulkAssignTasks',
-      'bulkChangeStatus',
-      'assignTask',
-      'unassignTask',
-      'addSubtask',
       'deleteDepartment',
       'archiveDepartment',
       'updateDepartment',
       'assignManager',
       'unassignManager',
-      'updateAgent',
       'archiveAgent',
       'assignAgentToDepartment',
       'removeAgentFromProject',

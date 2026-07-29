@@ -16,6 +16,14 @@ interface UseAISettingsState {
   error: string | null;
 }
 
+interface SetDefaultProviderResult {
+  ok: boolean;
+  providerId: string;
+  modelId?: string;
+  routing?: AIRoutingConfig;
+  error?: string;
+}
+
 interface UseAISettingsActions {
   refresh: () => Promise<void>;
   createProvider: (
@@ -27,10 +35,22 @@ interface UseAISettingsActions {
   ) => Promise<AIProviderConfig>;
   deleteProvider: (id: string) => Promise<void>;
   toggleProvider: (id: string, enabled: boolean) => Promise<void>;
-  setDefaultProvider: (id: string) => Promise<void>;
+  setDefaultProvider: (id: string) => Promise<SetDefaultProviderResult>;
   testConnection: (
     id: string,
   ) => Promise<{ success: boolean; latency: number; error?: string }>;
+  discoverProviderModels: (id: string) => Promise<{
+    ok: boolean;
+    inserted?: Array<{
+      id: string;
+      modelId: string;
+      displayName: string;
+      capabilities: string[];
+    }>;
+    existing?: string[];
+    message?: string;
+    error?: string;
+  }>;
   // Model actions
   getModels: (providerId: string) => Promise<AIModel[]>;
   addModel: (providerId: string, model: Partial<AIModel>) => Promise<AIModel>;
@@ -45,6 +65,10 @@ interface UseAISettingsActions {
     modelId: string,
     enabled: boolean,
   ) => Promise<void>;
+  setDefaultModel: (
+    providerId: string,
+    modelId: string,
+  ) => Promise<unknown>;
   // Routing actions
   updateRouting: (config: Partial<AIRoutingConfig>) => Promise<AIRoutingConfig>;
   resetRouting: () => Promise<AIRoutingConfig>;
@@ -119,9 +143,10 @@ export function useAISettings(): UseAISettingsState & UseAISettingsActions {
   );
 
   const setDefaultProvider = useCallback(
-    async (id: string): Promise<void> => {
-      await service.setDefaultProvider(id);
+    async (id: string): Promise<SetDefaultProviderResult> => {
+      const res = await service.setDefaultProvider(id);
       void refresh();
+      return res as unknown as SetDefaultProviderResult;
     },
     [service, refresh],
   );
@@ -129,6 +154,13 @@ export function useAISettings(): UseAISettingsState & UseAISettingsActions {
   const testConnection = useCallback(
     async (id: string) => {
       return service.testProviderConnection(id);
+    },
+    [service],
+  );
+
+  const discoverProviderModels = useCallback(
+    async (id: string) => {
+      return service.discoverProviderModels(id);
     },
     [service],
   );
@@ -178,6 +210,16 @@ export function useAISettings(): UseAISettingsState & UseAISettingsActions {
     [service],
   );
 
+  const setDefaultModel = useCallback(
+    async (
+      providerId: string,
+      modelId: string,
+    ): Promise<unknown> => {
+      return service.setDefaultModel(providerId, modelId);
+    },
+    [service],
+  );
+
   // Routing actions
   const updateRouting = useCallback(
     async (config: Partial<AIRoutingConfig>): Promise<AIRoutingConfig> => {
@@ -206,11 +248,13 @@ export function useAISettings(): UseAISettingsState & UseAISettingsActions {
     toggleProvider,
     setDefaultProvider,
     testConnection,
+    discoverProviderModels,
     getModels,
     addModel,
     updateModel,
     deleteModel,
     toggleModel,
+    setDefaultModel,
     updateRouting,
     resetRouting,
   };

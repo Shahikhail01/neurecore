@@ -39,7 +39,15 @@ import {
 import { getEventContract } from '../contracts/enterprise-event-registry';
 import { validatePublishInput } from '../validation/event-contract.validator';
 
-const LEASE_MS = 30_000; // 30s processing lease
+// Inbox lease. The transport claims a row for at most this long; if the
+// consumer hasn't settled by then, the row is reclaimed and the event is
+// retried. Most consumers (audit, UI projection, knowledge graph sync, etc.)
+// complete in well under a second. The execution consumer drives a real
+// AI run via the ExecutionWorker, which can take 2-3 minutes — so the lease
+// has to be long enough to cover the worst case, otherwise the consumer
+// wakes up, finds the row has been reclaimed, and the AI run is wasted.
+// 180s matches the execution.worker.ts internal leaseMs.
+const LEASE_MS = 180_000; // 180s processing lease (covers long-running AI exec)
 const MAX_RETRIES = 3; // attempts before dead-letter
 const BACKOFF_BASE_MS = 1000; // 1s, 4s, 16s (base^attempt * 1s via 4^n here)
 const DISPATCH_BATCH = 50;

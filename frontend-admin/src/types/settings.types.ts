@@ -20,6 +20,8 @@ export interface AIProviderConfig {
   provider: AIProvider;
   name: string;
   apiKey: string; // Will be masked on display
+  hasKey?: boolean;
+  keyPreview?: string;
   apiEndpoint?: string;
   isEnabled: boolean;
   isDefault: boolean;

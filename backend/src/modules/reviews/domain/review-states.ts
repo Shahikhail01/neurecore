@@ -5,6 +5,8 @@ export enum ReviewDecision {
   REVISION_REQUESTED = 'REVISION_REQUESTED',
   REJECTED = 'REJECTED',
   CANCELLED = 'CANCELLED',
+  NEEDS_REVISION = 'NEEDS_REVISION',
+  ESCALATED = 'ESCALATED',
 }
 
 export enum ReviewStatus {

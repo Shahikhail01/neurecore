@@ -74,6 +74,8 @@ export class ProjectsController {
         targetDate: dto.targetDate,
         startDate: dto.startDate,
         customFieldValues: dto.customFieldValues,
+        derivedShape: dto.derivedShape,
+        derivedShapeVersion: dto.derivedShapeVersion,
       },
       this.resolveTenantId(user),
     );

@@ -378,6 +378,14 @@ export class DecideTaskReviewHandler {
         return 'ReviewCancelled';
       case ReviewDecision.PENDING:
         return 'ReviewCreated';
+      case ReviewDecision.NEEDS_REVISION:
+        // Legacy alias kept for callers that use the older
+        // "needs revision" vocabulary. Maps onto RevisionRequested.
+        return 'RevisionRequested';
+      case ReviewDecision.ESCALATED:
+        // ESCALATED is treated as a high-urgency rejection — the
+        // canonical AwlReviewDecision vocabulary calls this REJECTED.
+        return 'ReviewRejected';
       default: {
         const _exhaustive: never = decision;
         throw new Error(`Unknown review decision: ${String(decision)}`);
@@ -397,6 +405,10 @@ export class DecideTaskReviewHandler {
         return 'TASK_REVIEW_CANCELLED';
       case ReviewDecision.PENDING:
         return 'TASK_REVIEW_CREATED';
+      case ReviewDecision.NEEDS_REVISION:
+        return 'TASK_REVISION_REQUESTED';
+      case ReviewDecision.ESCALATED:
+        return 'TASK_REVIEW_REJECTED';
       default: {
         const _exhaustive: never = decision;
         throw new Error(`Unknown review decision: ${String(decision)}`);

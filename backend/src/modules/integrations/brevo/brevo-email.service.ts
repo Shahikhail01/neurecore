@@ -309,8 +309,9 @@ export class BrevoEmailService {
       );
       const msg = parsed?.message || `Brevo returned HTTP ${res.status}`;
       if (res.status === 401 || res.status === 403) {
+        const brevoMsg = parsed?.message || `Brevo returned HTTP ${res.status}`;
         throw new BadRequestException(
-          `Brevo authentication failed (${res.status}). Verify BREVO_MASTER_API_KEY or reconnect the tenant.`,
+          `Brevo authentication failed (${res.status}): ${brevoMsg}. Verify BREVO_MASTER_API_KEY or reconnect Brevo in Settings → Integrations.`,
         );
       }
       if (res.status === 429) {
@@ -323,7 +324,7 @@ export class BrevoEmailService {
           `Brevo upstream error (${res.status}): ${msg}`,
         );
       }
-      throw new BadRequestException(msg);
+      throw new BadRequestException(`Brevo error (${res.status}): ${msg}`);
     }
 
     const data = (await res.json()) as BrevoSendResponse;

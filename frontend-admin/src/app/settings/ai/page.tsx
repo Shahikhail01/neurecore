@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAISettings } from "@/hooks/useAISettings";
 import type {
   AIProvider,
@@ -70,6 +70,9 @@ export default function AISettingsPage() {
     toggleProvider,
     setDefaultProvider,
     testConnection,
+    discoverProviderModels,
+    toggleModel,
+    setDefaultModel,
     updateRouting,
     resetRouting,
   } = useAISettings();
@@ -78,6 +81,11 @@ export default function AISettingsPage() {
   const [editProvider, setEditProvider] = useState<AIProviderConfig | null>(
     null,
   );
+  // Phase 2.8: row id of the model whose default-flag is being set
+  // right now (used to disable + show an ellipsis on the badge).
+  const [settingDefaultModelId, setSettingDefaultModelId] = useState<
+    string | null
+  >(null);
   const [formData, setFormData] = useState({
     provider: "deepseek" as AIProvider,
     name: "",
@@ -92,6 +100,25 @@ export default function AISettingsPage() {
   const [testResults, setTestResults] = useState<
     Record<string, { success: boolean; latency: number; error?: string }>
   >({});
+
+  // Phase 2.8: discover-models step that appears after a successful
+  // create/edit, letting admin pick which discovered models to enable
+  // and which should be default.
+  const [discoverStep, setDiscoverStep] = useState<{
+    providerId: string;
+    providerName: string;
+    candidates: Array<{
+      id: string;
+      modelId: string;
+      displayName: string;
+      capabilities: string[];
+    }>;
+    selected: Record<string, boolean>;
+    defaultModelId: string | null;
+    busy: boolean;
+    message?: string;
+    error?: string;
+  } | null>(null);
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<AIProviderConfig | null>(
@@ -150,26 +177,91 @@ export default function AISettingsPage() {
         isDefault: editProvider?.isDefault ?? false,
       };
 
+      let savedId: string | undefined;
       if (editProvider) {
-        // Only include apiKey if provided (for security)
-        const updatePayload = formData.apiKey
-          ? { ...payload, apiKey: formData.apiKey }
-          : { ...payload };
-        delete (updatePayload as Record<string, unknown>).apiKey;
-
-        await updateProvider(editProvider.id, updatePayload);
+        // Phase 2.8: when the user leaves apiKey blank, omit the
+        // field entirely so the backend keeps the stored encrypted
+        // value (controller's updateProvider treats `apiKey: ''` as
+        // "clear it" and `apiKey` undefined as "leave untouched").
+        const updatePayload: Record<string, unknown> = { ...payload };
+        if (!formData.apiKey) delete updatePayload.apiKey;
+        const updated = await updateProvider(editProvider.id, updatePayload);
+        savedId = updated.id;
         toast.success(`Provider "${formData.name}" updated successfully`);
       } else {
-        await createProvider(payload);
+        const created = await createProvider(payload);
+        savedId = created.id;
         toast.success(`Provider "${formData.name}" created successfully`);
       }
-      setModalOpen(false);
+
+      // Phase 2.8: when a key was just provided, immediately try to
+      // fetch the provider's available models so admin can pick
+      // which to enable + default.
+      if (formData.apiKey && savedId) {
+        setModalOpen(false);
+        await openDiscoverStep(savedId, formData.name);
+      } else {
+        setModalOpen(false);
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Save failed";
       setSaveError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openDiscoverStep(providerId: string, providerName: string) {
+    setDiscoverStep({
+      providerId,
+      providerName,
+      candidates: [],
+      selected: {},
+      defaultModelId: null,
+      busy: true,
+    });
+    const res = await discoverProviderModels(providerId);
+    setDiscoverStep((cur) => {
+      if (!cur) return cur;
+      if (!res.ok) {
+        return { ...cur, busy: false, error: res.error ?? "Discovery failed" };
+      }
+      const selected: Record<string, boolean> = {};
+      const candidates = res.inserted ?? [];
+      for (const c of candidates) selected[c.id] = true;
+      return {
+        ...cur,
+        busy: false,
+        candidates,
+        selected,
+        message:
+          res.message ??
+          (candidates.length === 0
+            ? "Provider returned 0 new models"
+            : `Found ${candidates.length} model(s)`),
+      };
+    });
+  }
+
+  async function handleApplyDiscover() {
+    if (!discoverStep) return;
+    setDiscoverStep((cur) => (cur ? { ...cur, busy: true } : cur));
+    try {
+      // Enable selected models + mark one as default.
+      for (const c of discoverStep.candidates) {
+        if (!discoverStep.selected[c.id]) continue;
+        await toggleModel(discoverStep.providerId, c.id, true);
+        if (c.id === discoverStep.defaultModelId) {
+          await setDefaultModel(discoverStep.providerId, c.id);
+        }
+      }
+      toast.success("Models enabled");
+      setDiscoverStep(null);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+      setDiscoverStep((cur) => (cur ? { ...cur, busy: false } : cur));
     }
   }
 
@@ -199,7 +291,42 @@ export default function AISettingsPage() {
   }
 
   async function handleSetDefault(id: string) {
-    await setDefaultProvider(id);
+    try {
+      const res = await setDefaultProvider(id);
+      if (res.ok) {
+        toast.success(
+          `Default routing updated → model: ${res.modelId ?? 'n/a'}`,
+        );
+      } else {
+        toast.error(res.error ?? 'Failed to set default');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to set default');
+    }
+  }
+
+  /**
+   * Phase 2.8: click on an available-model badge to promote that
+   * model to the global default for every capability it advertises.
+   * The backend's `setDefaultModel` already clears isDefault on all
+   * sibling models that share those capabilities, so no client-side
+   * iteration is needed.
+   */
+  async function handleSetDefaultModel(
+    providerId: string,
+    modelRowId: string,
+    modelName: string,
+  ) {
+    setSettingDefaultModelId(modelRowId);
+    try {
+      await setDefaultModel(providerId, modelRowId);
+      toast.success(`"${modelName}" is now the default model`);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to set default');
+    } finally {
+      setSettingDefaultModelId(null);
+    }
   }
 
   if (loading) {
@@ -301,6 +428,11 @@ export default function AISettingsPage() {
                             Endpoint: {provider.apiEndpoint}
                           </p>
                         )}
+                        {provider.keyPreview && (
+                          <p className="text-xs text-zinc-600 mt-1 font-mono">
+                            Key: {provider.keyPreview}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -373,16 +505,35 @@ export default function AISettingsPage() {
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {provider.models!.map((model) => (
-                            <span
+                            <button
                               key={model.id}
-                              className={`rounded-full px-2 py-1 text-xs ${
+                              type="button"
+                              onClick={() =>
+                                model.isEnabled &&
+                                handleSetDefaultModel(provider.id, model.id, model.name)
+                              }
+                              disabled={!model.isEnabled || settingDefaultModelId === model.id}
+                              title={
                                 model.isEnabled
-                                  ? "bg-zinc-700 text-zinc-300"
-                                  : "bg-zinc-800 text-zinc-500"
+                                  ? `Make "${model.name}" the default model`
+                                  : `Enable "${model.name}" first`
+                              }
+                              className={`rounded-full px-2 py-1 text-xs transition disabled:cursor-not-allowed ${
+                                model.isDefault
+                                  ? "bg-[color:var(--accent-500)] text-white font-medium ring-1 ring-indigo-400/50"
+                                  : model.isEnabled
+                                  ? "bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white cursor-pointer"
+                                  : "bg-zinc-800 text-zinc-500 opacity-60"
                               }`}
                             >
-                              {model.name} {model.isDefault && "(default)"}
-                            </span>
+                              {model.name}
+                              {model.isDefault && (
+                                <span className="ml-1 text-[10px]">★</span>
+                              )}
+                              {settingDefaultModelId === model.id && (
+                                <span className="ml-1 text-[10px]">…</span>
+                              )}
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -476,8 +627,18 @@ export default function AISettingsPage() {
                       setFormData((f) => ({ ...f, apiKey: e.target.value }))
                     }
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
-                    placeholder={editProvider ? "••••••••••••" : "sk-..."}
+                    placeholder={
+                      editProvider
+                        ? (editProvider.keyPreview ?? "••••••••••••")
+                        : "sk-..."
+                    }
                   />
+                  {editProvider?.keyPreview && (
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      Current: <span className="font-mono">{editProvider.keyPreview}</span>
+                      {" · stored encrypted in DB"}
+                    </p>
+                  )}
                 </div>
 
                 {/* API Endpoint (optional) */}
@@ -619,6 +780,25 @@ export default function AISettingsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Discover Models (Phase 2.8) */}
+      <AnimatePresence>
+        {discoverStep && (
+          <DiscoverModelsModal
+            state={discoverStep}
+            onToggle={(id, v) =>
+              setDiscoverStep((cur) =>
+                cur ? { ...cur, selected: { ...cur.selected, [id]: v } } : cur,
+              )
+            }
+            onDefault={(id) =>
+              setDiscoverStep((cur) => (cur ? { ...cur, defaultModelId: id } : cur))
+            }
+            onApply={handleApplyDiscover}
+            onClose={() => setDiscoverStep(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -632,18 +812,8 @@ const TASK_TYPES = [
   { key: 'reasoning', label: 'Reasoning', description: 'Complex reasoning tasks' },
 ] as const;
 
-const AVAILABLE_MODELS = [
-  { id: 'MiniMax-M2.7-highspeed', name: 'MiniMax M2.7 Highspeed', provider: 'minimax' },
-  { id: 'MiniMax-M2.5', name: 'MiniMax M2.5', provider: 'minimax' },
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai' },
-  { id: 'deepseek-chat', name: 'DeepSeek V3', provider: 'deepseek' },
-  { id: 'deepseek-reasoner', name: 'DeepSeek R1', provider: 'deepseek' },
-  { id: 'claude-3.5-sonnet-20241022', name: 'Claude 3.5 Sonnet', provider: 'anthropic' },
-];
-
 function AIRoutingSection() {
-  const { routing, updateRouting, resetRouting } = useAISettings();
+  const { providers, routing, updateRouting, resetRouting } = useAISettings();
   const [saving, setSaving] = useState(false);
   const [localRouting, setLocalRouting] = useState<AIRoutingConfig | null>(routing);
 
@@ -652,6 +822,22 @@ function AIRoutingSection() {
       setLocalRouting(routing);
     }
   });
+
+  // Phase 2.8: flatten enabled models across all providers so the
+  // dropdown reflects reality instead of the hard-coded list.
+  const routingModels = useMemo(() => {
+    const out: Array<{ id: string; label: string }> = [];
+    for (const p of providers ?? []) {
+      for (const m of p.models ?? []) {
+        if (!m.isEnabled) continue;
+        out.push({
+          id: m.modelId,
+          label: `${m.name} (${p.provider})`,
+        });
+      }
+    }
+    return out;
+  }, [providers]);
 
   if (!localRouting) {
     return null;
@@ -721,9 +907,9 @@ function AIRoutingSection() {
               onChange={(e) => handleModelChange(key, e.target.value)}
               className="rounded-lg border border-zinc-600 bg-zinc-700 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)] min-w-[200px]"
             >
-              {AVAILABLE_MODELS.map((model) => (
+              {routingModels.map((model) => (
                 <option key={model.id} value={model.id}>
-                  {model.name} ({model.provider})
+                  {model.label}
                 </option>
               ))}
             </select>
@@ -731,5 +917,120 @@ function AIRoutingSection() {
         ))}
       </div>
     </div>
+  );
+}
+
+type DiscoverState = {
+  providerId: string;
+  providerName: string;
+  candidates: Array<{
+    id: string;
+    modelId: string;
+    displayName: string;
+    capabilities: string[];
+  }>;
+  selected: Record<string, boolean>;
+  defaultModelId: string | null;
+  busy: boolean;
+  message?: string;
+  error?: string;
+};
+
+function DiscoverModelsModal({
+  state,
+  onToggle,
+  onDefault,
+  onApply,
+  onClose,
+}: {
+  state: DiscoverState | null;
+  onToggle: (id: string, v: boolean) => void;
+  onDefault: (id: string | null) => void;
+  onApply: () => void;
+  onClose: () => void;
+}) {
+  if (!state) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        className="w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl"
+      >
+        <h2 className="text-lg font-semibold text-zinc-100 mb-1">
+          Discover Models — {state.providerName}
+        </h2>
+        <p className="text-xs text-zinc-500 mb-4">
+          Choose which discovered models to enable, and pick a default.
+        </p>
+
+        {state.busy && state.candidates.length === 0 ? (
+          <div className="text-center py-10 text-zinc-500 text-sm">Discovering…</div>
+        ) : state.error ? (
+          <div className="rounded-lg bg-[color:var(--state-danger)] border border-red-800 p-3 text-sm text-red-300">
+            {state.error}
+          </div>
+        ) : state.candidates.length === 0 ? (
+          <div className="text-center py-8 text-zinc-500 text-sm">
+            {state.message ?? 'No new models found.'}
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {state.candidates.map((c) => (
+              <label
+                key={c.id}
+                className="flex items-center gap-3 p-3 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/40 transition"
+              >
+                <input
+                  type="checkbox"
+                  checked={!!state.selected[c.id]}
+                  onChange={(e) => onToggle(c.id, e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-zinc-200">{c.displayName}</div>
+                  <div className="text-xs text-zinc-500">
+                    capabilities: {c.capabilities.join(', ')}
+                  </div>
+                </div>
+                <label className="flex items-center gap-1 text-xs text-zinc-400">
+                  <input
+                    type="radio"
+                    name="discover-default"
+                    checked={state.defaultModelId === c.id}
+                    onChange={() => onDefault(c.id)}
+                    disabled={!state.selected[c.id]}
+                  />
+                  Default
+                </label>
+              </label>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4 mt-4 border-t border-zinc-800">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded-lg border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-800 transition"
+          >
+            Skip
+          </button>
+          <button
+            onClick={onApply}
+            disabled={state.busy || state.candidates.length === 0}
+            className="flex-1 py-2 rounded-lg bg-[color:var(--accent-500)] text-white text-sm font-medium transition disabled:opacity-50"
+          >
+            {state.busy ? 'Applying…' : 'Enable selected'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -43,6 +43,10 @@ export const ErrorCode = {
   INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
   RESOURCE_ACCESS_DENIED: 'RESOURCE_ACCESS_DENIED',
 
+  // CSRF (security hardening, Phase 9)
+  CSRF_TOKEN_MISSING: 'CSRF_TOKEN_MISSING',
+  CSRF_TOKEN_INVALID: 'CSRF_TOKEN_INVALID',
+
   // Not Found Errors (4xxx)
   NOT_FOUND: 'NOT_FOUND',
   USER_NOT_FOUND: 'USER_NOT_FOUND',
@@ -126,6 +130,8 @@ const ErrorCodeCategoryMap: Record<ErrorCodeType, ErrorCategory> = {
   [ErrorCode.FORBIDDEN]: ErrorCategory.AUTHORIZATION,
   [ErrorCode.INSUFFICIENT_PERMISSIONS]: ErrorCategory.AUTHORIZATION,
   [ErrorCode.RESOURCE_ACCESS_DENIED]: ErrorCategory.AUTHORIZATION,
+  [ErrorCode.CSRF_TOKEN_MISSING]: ErrorCategory.AUTHORIZATION,
+  [ErrorCode.CSRF_TOKEN_INVALID]: ErrorCategory.AUTHORIZATION,
   [ErrorCode.NOT_FOUND]: ErrorCategory.NOT_FOUND,
   [ErrorCode.USER_NOT_FOUND]: ErrorCategory.NOT_FOUND,
   [ErrorCode.RESOURCE_NOT_FOUND]: ErrorCategory.NOT_FOUND,
@@ -178,6 +184,8 @@ const ErrorCodeToStatusCode: Record<ErrorCodeType, number> = {
   [ErrorCode.FORBIDDEN]: 403,
   [ErrorCode.INSUFFICIENT_PERMISSIONS]: 403,
   [ErrorCode.RESOURCE_ACCESS_DENIED]: 403,
+  [ErrorCode.CSRF_TOKEN_MISSING]: 403,
+  [ErrorCode.CSRF_TOKEN_INVALID]: 403,
   [ErrorCode.NOT_FOUND]: 404,
   [ErrorCode.USER_NOT_FOUND]: 404,
   [ErrorCode.RESOURCE_NOT_FOUND]: 404,

@@ -40,6 +40,12 @@ interface CustomerFormProps {
   onClose: () => void;
   onCreated?: (c: Customer) => void;
   onUpdated?: (c: Customer) => void;
+  /**
+   * Notified whenever the form's `submitting` flag flips. Lets the
+   * parent disable backdrop/ESC dismissal while a request is in flight
+   * so an accidental click can't lose the submission.
+   */
+  onSubmittingChange?: (submitting: boolean) => void;
 }
 
 function extractIndustryFields(billingInfo?: Record<string, unknown> | null): Record<string, string | boolean> {
@@ -57,7 +63,7 @@ function extractIndustryFields(billingInfo?: Record<string, unknown> | null): Re
   return {};
 }
 
-export function CustomerForm({ customer, onClose, onCreated, onUpdated }: CustomerFormProps) {
+export function CustomerForm({ customer, onClose, onCreated, onUpdated, onSubmittingChange }: CustomerFormProps) {
   const { industry: tenantIndustry } = useTenantIndustryGroup();
   const [name, setName] = useState(customer?.name ?? '');
   const [industry, setIndustry] = useState(customer?.industry ?? '');
@@ -130,6 +136,7 @@ export function CustomerForm({ customer, onClose, onCreated, onUpdated }: Custom
       return;
     }
     setSubmitting(true);
+    onSubmittingChange?.(true);
     setError(null);
     try {
       const tags = tagsInput
@@ -178,9 +185,19 @@ export function CustomerForm({ customer, onClose, onCreated, onUpdated }: Custom
       }
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to save customer');
+      // Surface server-side validation messages cleanly. Axios errors carry
+      // { response: { data: { error: { message } } } } or { response: { data: { message } } }
+      // depending on the layer that rejected. Fall back to the raw error.
+      const message =
+        (e as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response
+          ?.data?.error?.message ??
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        (e instanceof Error ? e.message : 'Failed to save customer');
+      setError(message);
+      // Do NOT close on error — caller stays on the form to fix and retry.
     } finally {
       setSubmitting(false);
+      onSubmittingChange?.(false);
     }
   };
 

@@ -18,6 +18,29 @@ export class TimelineController {
   constructor(private readonly service: TimelineService) {}
 
   /**
+   * Phase 7 — project-wide timeline, used by the project inspector's
+   * "Timeline" tab to render the entire golden path in one stream.
+   *
+   * Keep this route before the generic `:entityType/:entityId` route so
+   * `/timeline/project/:projectId` is not interpreted as entityType=project.
+   */
+  @Get('project/:projectId')
+  async getProjectTimeline(
+    @Param('projectId') projectId: string,
+    @Query('since') since: string,
+    @Query('limit') limit: string,
+    @CurrentUser() user: { tenantId: string },
+  ) {
+    const parsedLimit = limit ? Math.max(1, Math.min(Number(limit), 500)) : 200;
+    return this.service.findProjectTimeline(
+      projectId,
+      user.tenantId,
+      since ? new Date(since) : undefined,
+      parsedLimit,
+    );
+  }
+
+  /**
    * Phase 7 — per-entity timeline.
    *
    * Used by:
@@ -49,23 +72,4 @@ export class TimelineController {
     );
   }
 
-  /**
-   * Phase 7 — project-wide timeline, used by the project inspector's
-   * "Timeline" tab to render the entire golden path in one stream.
-   */
-  @Get('project/:projectId')
-  async getProjectTimeline(
-    @Param('projectId') projectId: string,
-    @Query('since') since: string,
-    @Query('limit') limit: string,
-    @CurrentUser() user: { tenantId: string },
-  ) {
-    const parsedLimit = limit ? Math.max(1, Math.min(Number(limit), 500)) : 200;
-    return this.service.findProjectTimeline(
-      projectId,
-      user.tenantId,
-      since ? new Date(since) : undefined,
-      parsedLimit,
-    );
-  }
 }

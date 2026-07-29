@@ -98,6 +98,14 @@ export class CreateProjectDto {
   @IsOptional()
   @IsObject()
   customFieldValues?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  derivedShape?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsNumber()
+  derivedShapeVersion?: number;
 }
 
 export class UpdateProjectDto {

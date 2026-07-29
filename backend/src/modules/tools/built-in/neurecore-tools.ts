@@ -502,11 +502,19 @@ export type RespondToInboxItemInput = z.infer<typeof RespondToInboxItemInputSche
 
 export const CreateCustomerInputSchema = z.object({
   name: z.string().min(1).max(200).describe('Customer / company name (required)'),
-  industry: z.string().max(120).optional().describe('Industry vertical (e.g. "Healthcare", "Construction")'),
+  industry: z.string().max(120).optional().describe('Industry vertical (e.g. "Healthcare", "Construction"). Defaults to the tenant.industry when omitted.'),
   primaryEmail: z.string().email().optional().describe('Primary contact email for the customer'),
   primaryPhone: z.string().max(40).optional().describe('Primary contact phone'),
   billingInfo: z.record(z.string(), z.unknown()).optional().describe('Free-form billing details (address, tax id, PO number, etc.)'),
   tags: z.array(z.string().min(1).max(40)).max(50).optional().describe('Tags to categorise the customer (e.g. ["vip", "net30"])'),
+  // Phase 4 — F&C fields. Empty strings are coerced to undefined inside
+  // executeImpl so chat-driven calls that haven't normalised their inputs
+  // don't fail the BE validator.
+  kycStatus: z.enum(['PENDING', 'VERIFIED', 'EXPIRED', 'REJECTED']).optional().describe('KYC status (F&C tenants only)'),
+  riskRating: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional().describe('AML / credit risk rating (F&C tenants only)'),
+  taxId: z.string().max(64).optional().describe('Tax ID / EIN (F&C tenants only)'),
+  financialSubType: z.enum(['BANKING', 'INSURANCE', 'WEALTH_MANAGEMENT', 'INVESTMENT', 'FINTECH', 'ACCOUNTING_AUDIT']).optional().describe('Financial sub-type discriminator (F&C tenants only)'),
+  lifecycleStage: z.enum(['PROSPECT', 'KYC_VERIFIED', 'ACTIVE', 'DORMANT', 'CLOSED']).optional().describe('Lifecycle stage (F&C tenants only)'),
 });
 export type CreateCustomerInput = z.infer<typeof CreateCustomerInputSchema>;
 
@@ -519,6 +527,12 @@ export const UpdateCustomerInputSchema = z.object({
   billingInfo: z.record(z.string(), z.unknown()).optional().describe('Updated billing details (replaces existing)'),
   status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']).optional().describe('Updated status'),
   tags: z.array(z.string().min(1).max(40)).max(50).optional().describe('Updated tags (replaces existing)'),
+  // Phase 4 — F&C fields (same shape as CreateCustomerInputSchema).
+  kycStatus: z.enum(['PENDING', 'VERIFIED', 'EXPIRED', 'REJECTED']).optional().describe('Updated KYC status (F&C tenants only)'),
+  riskRating: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional().describe('Updated AML / credit risk rating (F&C tenants only)'),
+  taxId: z.string().max(64).optional().describe('Updated Tax ID / EIN (F&C tenants only)'),
+  financialSubType: z.enum(['BANKING', 'INSURANCE', 'WEALTH_MANAGEMENT', 'INVESTMENT', 'FINTECH', 'ACCOUNTING_AUDIT']).optional().describe('Updated financial sub-type (F&C tenants only)'),
+  lifecycleStage: z.enum(['PROSPECT', 'KYC_VERIFIED', 'ACTIVE', 'DORMANT', 'CLOSED']).optional().describe('Updated lifecycle stage (F&C tenants only)'),
 });
 export type UpdateCustomerInput = z.infer<typeof UpdateCustomerInputSchema>;
 
@@ -2670,14 +2684,47 @@ export class CreateCustomerTool extends BaseStructuredTool {
     if (!context?.tenantId) return { success: false, error: 'Tenant context required' };
     try {
       if (this.customersService) {
+        // INDUSTRY-SETUP-CONCEPT.md §3.1 G3 — mirror the project tool:
+        // when the caller didn't supply an `industry`, fall back to the
+        // tenant's own industry slug so the new customer lands in the
+        // same vertical as the rest of the workspace (downstream
+        // IndustryCustomerFields depends on this matching).
+        let resolvedIndustry: string | undefined =
+          typeof input.industry === 'string' && input.industry.trim().length > 0
+            ? input.industry.trim()
+            : undefined;
+        if (!resolvedIndustry) {
+          try {
+            const tenant = await this.data.tenant.findUnique({
+              where: { id: context.tenantId as string },
+              select: { industry: true },
+            });
+            resolvedIndustry = tenant?.industry ?? undefined;
+          } catch {
+            // Non-fatal — proceed without an industry.
+          }
+        }
+
+        // Coerce empty strings to undefined for F&C fields. Empty strings
+        // would be rejected by the DTO's IsIn validator and 400 the
+        // entire request — turning the chat "create a customer" command
+        // into a silent failure.
+        const empty = (v: unknown) =>
+          typeof v === 'string' && v.trim().length === 0 ? undefined : v;
+
         const customer = await this.customersService.create(
           {
             name: input.name,
-            ...(input.industry !== undefined ? { industry: input.industry } : {}),
+            ...(resolvedIndustry !== undefined ? { industry: resolvedIndustry } : {}),
             ...(input.primaryEmail !== undefined ? { primaryEmail: input.primaryEmail } : {}),
             ...(input.primaryPhone !== undefined ? { primaryPhone: input.primaryPhone } : {}),
             ...(input.billingInfo !== undefined ? { billingInfo: input.billingInfo } : {}),
             ...(input.tags !== undefined ? { tags: input.tags } : {}),
+            ...(empty(input.kycStatus) !== undefined ? { kycStatus: empty(input.kycStatus) as never } : {}),
+            ...(empty(input.riskRating) !== undefined ? { riskRating: empty(input.riskRating) as never } : {}),
+            ...(empty(input.taxId) !== undefined ? { taxId: empty(input.taxId) as string } : {}),
+            ...(empty(input.financialSubType) !== undefined ? { financialSubType: empty(input.financialSubType) as never } : {}),
+            ...(empty(input.lifecycleStage) !== undefined ? { lifecycleStage: empty(input.lifecycleStage) as never } : {}),
           },
           context.tenantId as string,
         );

@@ -2,6 +2,7 @@ import {
   Module,
   MiddlewareConsumer,
   NestModule,
+  OnApplicationBootstrap,
   RequestMethod,
 } from '@nestjs/common';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -46,6 +47,7 @@ import { GovernanceModule } from './modules/governance/governance.module';
 import { ApprovalPortModule } from './modules/approval-port/approval-port.module';
 import { HermesModule } from './modules/hermes/hermes.module';
 import { ObservabilityModule } from './modules/observability/observability.module';
+import { OutboxWorker } from './common/outbox/outbox.worker';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { DepartmentTemplatesModule } from './modules/department-templates/department-templates.module';
@@ -361,7 +363,7 @@ import { CsrfProtectionMiddleware } from './common/auth/csrf.middleware';
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
 })
-export class AppModule implements NestModule {
+export class AppModule implements NestModule, OnApplicationBootstrap {
   configure(consumer: MiddlewareConsumer): void {
     // Nest v11+ uses a newer path-to-regexp which requires named wildcards.
     // Using *path avoids noisy startup warnings like "Unsupported route path: /api/*".
@@ -388,5 +390,15 @@ export class AppModule implements NestModule {
     // consumer
     //   .apply(TenantContextMiddleware)
     //   .forRoutes({ path: '*path', method: RequestMethod.ALL });
+  }
+
+  // FIX-OUTBOX-RACE: Start the OutboxWorker here, AFTER every module has
+  // had a chance to register its handler via onModuleInit. Previously the
+  // worker started in onModuleInit which races with consumer module init
+  // and silently dead-letters events whose handlers hadn't registered yet.
+  constructor(private readonly outboxWorker: OutboxWorker) {}
+
+  onApplicationBootstrap(): void {
+    this.outboxWorker.bootstrap();
   }
 }

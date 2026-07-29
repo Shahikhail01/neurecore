@@ -48,6 +48,13 @@ export class ReviewStateMachine {
         return ReviewStatus.REJECTED;
       case ReviewDecision.CANCELLED:
         return ReviewStatus.CANCELLED;
+      case ReviewDecision.NEEDS_REVISION:
+        // Legacy alias kept for callers that use the older vocabulary.
+        return ReviewStatus.REVISION_REQUESTED;
+      case ReviewDecision.ESCALATED:
+        // ESCALATED is treated as REJECTED in the AwlReviewDecision
+        // vocabulary. High-urgency rejections follow the same flow.
+        return ReviewStatus.REJECTED;
       default: {
         // Exhaustiveness check
         const _exhaustive: never = decision;

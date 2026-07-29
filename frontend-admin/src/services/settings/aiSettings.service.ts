@@ -124,6 +124,38 @@ export class AISettingsService implements IAISettingsService {
     return unwrapItem(response);
   }
 
+  // Phase 2.8: discover available models from the provider.
+  async discoverProviderModels(
+    id: string,
+  ): Promise<{
+    ok: boolean;
+    inserted?: Array<{
+      id: string;
+      modelId: string;
+      displayName: string;
+      capabilities: string[];
+    }>;
+    existing?: string[];
+    message?: string;
+    error?: string;
+  }> {
+    const response = await this.apiClient.post<any>(
+      `/ai/providers/${id}/discover-models`,
+    );
+    return unwrapItem(response) as {
+      ok: boolean;
+      inserted?: Array<{
+        id: string;
+        modelId: string;
+        displayName: string;
+        capabilities: string[];
+      }>;
+      existing?: string[];
+      message?: string;
+      error?: string;
+    };
+  }
+
   // AI Routing
   async getAIRouting(): Promise<AIRoutingConfig> {
     const response = await this.apiClient.get<any>("/ai/routing");

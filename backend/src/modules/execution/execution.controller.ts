@@ -136,6 +136,42 @@ export class ExecutionController {
   }
 
   /**
+   * Phase 7 — execution attempt list for operator screens.
+   */
+  @Get('attempts')
+  async listAttempts(@CurrentUser() user: { tenantId: string }) {
+    return this.prisma.executionAttempt.findMany({
+      where: { tenantId: user.tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        task: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            projectId: true,
+          },
+        },
+        agent: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+        evidence: {
+          select: { id: true },
+        },
+        reviews: {
+          select: { id: true, status: true, decision: true },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+  }
+
+  /**
    * Phase 7 — execution attempt detail (trace + evidence + tool calls).
    */
   @Get('attempt/:attemptId')

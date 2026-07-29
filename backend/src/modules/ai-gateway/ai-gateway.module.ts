@@ -31,9 +31,11 @@ import { ModelsAdminController } from './controllers/models-admin.controller';
 import { ModelsReadController } from './controllers/models-read.controller';
 import { AiProvidersController } from './controllers/ai-providers.controller';
 import { SecretProviderService } from '../security/providers/secret.provider';
+import { ConnectorsModule } from '../connectors/connectors.module';
 
 @Global()
 @Module({
+  imports: [ConnectorsModule],
   controllers: [ModelsAdminController, ModelsReadController, AiProvidersController],
   providers: [
     // OpenClaw + LangSmith are unchanged (per plan §3.1 row S34/S35:

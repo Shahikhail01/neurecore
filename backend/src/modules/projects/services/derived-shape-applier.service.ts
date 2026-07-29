@@ -22,7 +22,7 @@ import { GoalsService } from '../../goals/goals.service';
 import { DeploymentService } from '../../agents/services/deployment.service';
 import { ChiefOfStaffService } from '../../project-automation/services/chief-of-staff.service';
 import type { ProjectShape, ProjectRoleName } from '../../project-shape/project-shape.types';
-import type { ProjectRole } from '@prisma/client';
+import type { ProjectRole, TaskPriority } from '@prisma/client';
 
 /** Map ProjectRoleName (synthesizer output) → Prisma ProjectRole enum (DB). */
 const ROLE_NAME_TO_ENUM: Record<ProjectRoleName, ProjectRole> = {
@@ -43,6 +43,8 @@ export interface ApplyResult {
   stagesSkipped: number;
   goalsCreated: number;
   goalsSkipped: number;
+  tasksCreated: number;
+  tasksSkipped: number;
   membersCreated: number;
   membersSkipped: number;
   chiefOfStaffAssigned: boolean;
@@ -97,6 +99,8 @@ export class DerivedShapeApplier implements OnModuleInit {
       stagesSkipped: 0,
       goalsCreated: 0,
       goalsSkipped: 0,
+      tasksCreated: 0,
+      tasksSkipped: 0,
       membersCreated: 0,
       membersSkipped: 0,
       chiefOfStaffAssigned: false,
@@ -136,19 +140,56 @@ export class DerivedShapeApplier implements OnModuleInit {
           where: { projectId, title: { equals: goal.title, mode: 'insensitive' } },
           select: { id: true },
         });
+        let goalId: string;
         if (existing) {
           result.goalsSkipped += 1;
-          continue;
+          goalId = existing.id;
+        } else {
+          const created = await this.goalsService.create(
+            {
+              title: goal.title,
+              projectId,
+              ...(goal.measurableCriteria ? { measurableCriteria: goal.measurableCriteria } : {}),
+            },
+            tenantId,
+          );
+          goalId = (created as { id: string }).id;
+          result.goalsCreated += 1;
         }
-        await this.goalsService.create(
-          {
-            title: goal.title,
+
+        // Materialize one task per goal so the autonomous layer has something
+        // to execute. Without this, chat-created projects had goals but zero
+        // tasks — the worker/outbox had nothing to drive the project forward.
+        const taskTitle = `Execute: ${goal.title}`;
+        const existingTask = await this.prisma.task.findFirst({
+          where: {
+            tenantId,
             projectId,
-            ...(goal.measurableCriteria ? { measurableCriteria: goal.measurableCriteria } : {}),
+            title: { equals: taskTitle, mode: 'insensitive' },
           },
-          tenantId,
-        );
-        result.goalsCreated += 1;
+          select: { id: true },
+        });
+        if (existingTask) {
+          result.tasksSkipped += 1;
+        } else {
+          await this.prisma.task.create({
+            data: {
+              tenantId,
+              projectId,
+              title: taskTitle,
+              description: goal.measurableCriteria
+                ? `Acceptance: ${goal.measurableCriteria}`
+                : `Auto-generated from goal "${goal.title}"`,
+              status: 'PENDING',
+              priority: 'MEDIUM' as TaskPriority,
+              goalId,
+              automationVersion: 1,
+              templateKey: `derived-goal-${goalId}`,
+              input: {},
+            },
+          });
+          result.tasksCreated += 1;
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         result.errors.push(`goal "${goal.title}": ${msg}`);
@@ -225,7 +266,7 @@ export class DerivedShapeApplier implements OnModuleInit {
     }
 
     this.logger.log(
-      `[DerivedShapeApplier] project=${projectId}: stages=${result.stagesCreated}+${result.stagesSkipped}sk goals=${result.goalsCreated}+${result.goalsSkipped}sk members=${result.membersCreated}+${result.membersSkipped}sk CoS=${result.chiefOfStaffAssigned} errors=${result.errors.length}`,
+      `[DerivedShapeApplier] project=${projectId}: stages=${result.stagesCreated}+${result.stagesSkipped}sk goals=${result.goalsCreated}+${result.goalsSkipped}sk tasks=${result.tasksCreated}+${result.tasksSkipped}sk members=${result.membersCreated}+${result.membersSkipped}sk CoS=${result.chiefOfStaffAssigned} errors=${result.errors.length}`,
     );
     return result;
   }
