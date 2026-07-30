@@ -39,6 +39,7 @@ function makeChatService(): IChatService {
     getHistory: vi.fn(async () => []),
     clearHistory: vi.fn(async () => undefined),
     getSuggestions: vi.fn(async () => []),
+    submitAutonomousApproval: vi.fn(async () => undefined),
   };
 }
 

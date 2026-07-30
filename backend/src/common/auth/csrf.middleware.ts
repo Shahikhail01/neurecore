@@ -49,6 +49,11 @@ const EXEMPT_PATHS = new Set<string>([
   '/api/v1/chat/suggestions',
 ]);
 
+const HMAC_SERVICE_PATHS = [
+  /^\/api\/v1\/hermes-adapter\/executions\/[^/]+\/events$/,
+  /^\/api\/v1\/hermes-adapter\/executions\/[^/]+\/tools\/[^/]+$/,
+];
+
 @Injectable()
 export class CsrfProtectionMiddleware implements NestMiddleware {
   private readonly logger = new Logger(CsrfProtectionMiddleware.name);
@@ -63,7 +68,10 @@ export class CsrfProtectionMiddleware implements NestMiddleware {
     }
 
     // Skip pre-auth endpoints
-    if (EXEMPT_PATHS.has(req.path)) {
+    if (
+      EXEMPT_PATHS.has(req.path) ||
+      HMAC_SERVICE_PATHS.some((pattern) => pattern.test(req.path))
+    ) {
       next();
       return;
     }

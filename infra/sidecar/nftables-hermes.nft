@@ -1,0 +1,32 @@
+#!/usr/sbin/nft -f
+
+table inet hermes_sidecar_egress {
+    set model_provider_ipv4 {
+        type ipv4_addr
+        flags interval
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+
+        # This table must never affect another host process.
+        meta skuid != "hermes-sidecar" accept
+
+        ct state established,related accept
+
+        # Deny data stores everywhere, including loopback.
+        tcp dport { 5432, 5433, 6379 } reject
+
+        # Required local control-plane services only.
+        ip daddr 127.0.0.1 tcp dport { 3003, 8082 } accept
+
+        # DNS is needed to resolve approved model providers.
+        udp dport 53 accept
+        tcp dport 53 accept
+
+        # The loader resolves approved provider names into this address set.
+        ip daddr @model_provider_ipv4 tcp dport 443 accept
+
+        counter reject
+    }
+}

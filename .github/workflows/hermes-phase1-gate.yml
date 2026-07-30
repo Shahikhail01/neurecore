@@ -1,0 +1,59 @@
+name: Hermes Phase 1 gate
+
+on:
+  push:
+    paths:
+      - 'infra/hermes/**'
+      - 'infra/hermes-sidecar/**'
+      - 'infra/hermes-events-bridge/**'
+      - 'infra/sidecar/**'
+      - 'backend/src/modules/hermes-adapter/**'
+      - 'backend/test/unit/hermes-adapter.spec.ts'
+      - '.github/workflows/hermes-phase1-gate.yml'
+  pull_request:
+    paths:
+      - 'infra/hermes/**'
+      - 'infra/hermes-sidecar/**'
+      - 'infra/hermes-events-bridge/**'
+      - 'infra/sidecar/**'
+      - 'backend/src/modules/hermes-adapter/**'
+      - 'backend/test/unit/hermes-adapter.spec.ts'
+
+permissions:
+  contents: read
+
+jobs:
+  phase1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - name: Verify upstream snapshot
+        working-directory: infra/hermes/hermes-agent
+        run: sha256sum -c ../UPSTREAM_VERSION.sha256
+      - name: Install sidecar and bridge
+        run: |
+          python -m pip install -e './infra/hermes-sidecar[dev]'
+          python -m pip install -e './infra/hermes-events-bridge'
+      - name: Sidecar lifecycle and protocol
+        working-directory: infra/hermes-sidecar
+        run: pytest -q tests/test_lifecycle.py tests/test_aiagent_integration.py tests/test_gateway_integration.py tests/test_protocol_lock.py
+      - name: Signed event persistence
+        working-directory: infra/hermes-events-bridge
+        run: pytest -q tests/test_events_bridge.py
+      - name: Backend adapter
+        working-directory: backend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm tsc --noEmit
+          pnpm jest --config jest.config.js --runInBand test/unit/hermes-adapter.spec.ts

@@ -104,6 +104,7 @@ export class RestClient implements IApiClient {
       params: config?.params,
       headers: config?.headers,
       signal: config?.signal,
+      timeout: config?.timeoutMs,
     };
   }
 

@@ -17,6 +17,7 @@ export interface IChatService {
   clearHistory(): Promise<void>;
   getSuggestions(query: string, context?: string): Promise<string[]>;
   isAvailable(): boolean;
+  submitAutonomousApproval(executionId: string, approvalId: string, decision: 'approve' | 'reject'): Promise<ChatResponse['autonomousExecution']>;
 }
 
 export interface ISlashCommandProvider {

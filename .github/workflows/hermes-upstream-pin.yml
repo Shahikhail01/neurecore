@@ -1,0 +1,29 @@
+name: Hermes upstream pin
+
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  detect-upstream-movement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify vendored checksums
+        working-directory: infra/hermes/hermes-agent
+        run: sha256sum -c ../UPSTREAM_VERSION.sha256
+      - name: Compare pinned commit with upstream HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          pinned=$(sed -n 's/^\*\*Pinned commit:\*\* `\([0-9a-f]\{40\}\)`.*/\1/p' infra/hermes/UPSTREAM_VERSION.md)
+          test -n "$pinned"
+          upstream=$(git ls-remote https://github.com/NousResearch/hermes-agent.git HEAD | cut -f1)
+          test "$upstream" = "$pinned" || {
+            echo "Upstream moved: pinned=$pinned upstream=$upstream"
+            exit 1
+          }

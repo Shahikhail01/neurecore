@@ -6,6 +6,7 @@ export interface RequestConfig {
   params?: Record<string, string | number | boolean | undefined>;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 export interface ApiResponse<T = unknown> {

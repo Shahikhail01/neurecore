@@ -23,6 +23,7 @@ import { DeploymentService } from '../../agents/services/deployment.service';
 import { ChiefOfStaffService } from '../../project-automation/services/chief-of-staff.service';
 import type { ProjectShape, ProjectRoleName } from '../../project-shape/project-shape.types';
 import type { ProjectRole, TaskPriority } from '@prisma/client';
+import { certifiedPlatformTemplateWhere } from '../../agent-templates/agent-template-certification';
 
 /** Map ProjectRoleName (synthesizer output) → Prisma ProjectRole enum (DB). */
 const ROLE_NAME_TO_ENUM: Record<ProjectRoleName, ProjectRole> = {
@@ -284,11 +285,9 @@ export class DerivedShapeApplier implements OnModuleInit {
     ];
     for (const candidate of candidates) {
       const found = await this.prisma.agentTemplate.findFirst({
-        where: {
+        where: certifiedPlatformTemplateWhere({
           name: { equals: candidate, mode: 'insensitive' },
-          isPublic: true,
-          tenantId: null,
-        },
+        }),
         select: { id: true, name: true, type: true },
       });
       if (found) return found;
@@ -296,7 +295,7 @@ export class DerivedShapeApplier implements OnModuleInit {
     // No exact match — pick any template with a sensible type. Caller will get a
     // best-effort match; the applier still succeeds, just with a generic agent.
     return this.prisma.agentTemplate.findFirst({
-      where: { isPublic: true, tenantId: null },
+      where: certifiedPlatformTemplateWhere(),
       select: { id: true, name: true, type: true },
     });
   }

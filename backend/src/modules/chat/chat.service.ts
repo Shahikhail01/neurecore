@@ -8,6 +8,8 @@ import { FeatureFlagService } from '../../common/feature-flag/feature-flag.servi
 import { AiGatewayService } from '../ai-gateway/ai-gateway.service';
 import { ChatHistoryService } from './chat-history.service';
 import { LRUCache } from 'lru-cache';
+import { HermesAdapterService, type SidecarExecutionState } from '../hermes-adapter/services/hermes-adapter.service';
+import { NC_TOOL_NAMES } from '../hermes-adapter/tools/scoped-tool.schemas';
 
 // PERF-FIX: in-process LRU cache for the tenant-data snapshot used to
 // ground chat replies. Six parallel Postgres queries per chat message
@@ -51,6 +53,7 @@ export class ChatService {
     private readonly featureFlags: FeatureFlagService,
     private readonly aiGateway: AiGatewayService,
     private readonly chatHistory: ChatHistoryService,
+    private readonly autonomousWork: HermesAdapterService,
   ) {}
 
   private saveReply(
@@ -164,6 +167,7 @@ export class ChatService {
     model?: string;
     provider?: string;
     liveData?: Record<string, unknown>;
+    autonomousExecution?: SidecarExecutionState;
   }> {
     const conversationId =
       dto.conversationId ??
@@ -225,6 +229,35 @@ export class ChatService {
       tenantId && intent !== 'action'
         ? await this.fetchTenantSnapshot(tenantId)
         : { note: 'no tenant context required for this intent' };
+
+    if (tenantId && this.isAutonomousOnboardingIntent(dto.message)) {
+      const execution = await this.autonomousWork.startExecution({
+        executionId: `${conversationId}-autonomous`,
+        tenantId,
+        userId: userIdFromJwt ?? 'anonymous',
+        workspacePath: `/var/lib/neurecore/hermes/tenants/${tenantId}/${conversationId}`,
+        allowedTools: [...NC_TOOL_NAMES],
+        initialMessage: dto.message,
+        approvalThreshold: 'STANDARD',
+      });
+      const pending = execution.pendingApproval;
+      const reply = pending
+        ? `I prepared the next step and need your approval before I run ${pending.toolName}.`
+        : execution.status === 'COMPLETED'
+          ? 'The autonomous onboarding workflow completed.'
+          : `The autonomous workflow is ${execution.status.toLowerCase().replace('_', ' ')}.`;
+      const result = {
+        reply,
+        conversationId,
+        tokens: { input: 0, output: 0, total: 0 },
+        model: 'nous-hermes-agent',
+        provider: 'hermes-sidecar',
+        liveData,
+        autonomousExecution: execution,
+      };
+      this.saveReply(conversationId, tenantIdForHistory, userIdForHistory, result);
+      return result;
+    }
 
     // PROJECT-CREATION INTENT: bypass the model entirely and drive a
     // human-style conversation ourselves. The MiniMax-M2.7-highspeed model
@@ -1092,6 +1125,11 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
   /**
    * Detect if user message is an action request or a query
    */
+  private isAutonomousOnboardingIntent(message: string): boolean {
+    const normalized = message.toLowerCase();
+    return /\bonboard\b/.test(normalized) && /\b(q3|quarter|return|workflow)\b/.test(normalized);
+  }
+
   private detectIntent(message: string): 'action' | 'query' {
     // Use word-boundary matching so tokens like "description" don't trigger
     // an "add" false positive, and "reporting" doesn't trigger "report" via
@@ -1346,8 +1384,8 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       return Array.from(set);
     }
 
-    // Notifications
-    if (has(/\bnotification\b/) || has(/\balert\b/)) {
+    // Notifications (plural matches both 'notification' and 'notifications')
+    if (has(/\bnotification[s]?\b/) || has(/\balert[s]?\b/)) {
       const set = new Set<string>(DISCOVERY);
       [
         'getMyNotifications',
@@ -1363,6 +1401,29 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
     if (has(/\bgoal\b/) || has(/\bokr\b/)) {
       const set = new Set<string>(DISCOVERY);
       ['listGoals', 'updateGoalProgress'].forEach((t) => set.add(t));
+      return Array.from(set);
+    }
+
+    // Google Workspace / integrations — the LLM tends to refuse these
+    // ("I cannot send emails") when they aren't in the allowlist. Expose
+    // them here so the LLM at least attempts to call the tool; the
+    // tool will surface a clean error if the integration isn't
+    // configured for the tenant (e.g. no Google OAuth).
+    if (
+      has(/\bemail\b/) ||
+      has(/\bgmail\b/) ||
+      has(/\bcalendar\b/) ||
+      has(/\bschedule\b/) ||
+      has(/\bsheet[s]?\b/) ||
+      has(/\bspreadsheet\b/) ||
+      has(/\bdocument[s]?\b/) ||
+      has(/\bgoogle drive\b/) ||
+      has(/\breport[s]?\b/)
+    ) {
+      const set = new Set<string>(DISCOVERY);
+      ['email', 'calendar', 'documents', 'sheets', 'reports'].forEach((t) =>
+        set.add(t),
+      );
       return Array.from(set);
     }
 

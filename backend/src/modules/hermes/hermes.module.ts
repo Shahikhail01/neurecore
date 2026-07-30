@@ -4,17 +4,12 @@ import { ToolGatewayService } from './services/tool-gateway.service';
 import { HermesSessionService } from './services/hermes-session.service';
 import { HermesMemoryService } from './services/hermes-memory.service';
 import { HermesContextService } from './services/hermes-context.service';
-import { HermesRuntimeService } from './services/hermes-runtime.service';
-import { HermesNode } from './langgraph/hermes-node';
-import { HermesRouter } from './langgraph/hermes-router';
-import { HermesCheckpointer } from './langgraph/hermes-checkpointer';
 import { HermesTenantGuard } from './guards/hermes-tenant.guard';
 import { ApprovalWorkflowEngine } from './services/approval-workflow.engine';
 import { ThreadService } from './services/thread.service';
 import { THREAD_SERVICE } from './interfaces/IThreadService';
 import { HERMES_EVENT_BUS } from './interfaces/hermes-event-bus.interface';
 import { ACTIVITY_SERVICE } from './interfaces/IActivityService';
-import { HERMES_RUNTIME } from './interfaces/hermes-runtime.interface';
 import { AGENT_MESSAGING_GUARD } from './interfaces/IAgentMessagingGuard';
 import { PARTICIPANT_RESOLVER } from './interfaces/IParticipantResolver';
 import { ActivityService } from './services/activity.service';
@@ -46,7 +41,6 @@ import { ModelsModule } from '../models/models.module';
 import { MissionFeedModule } from '../mission-feed/mission-feed.module';
 import { EventsModule } from '../events/events.module';
 import { ApprovalsModule } from '../approvals/approvals.module';
-import { HermesApprovalResumeConsumer } from './consumers/hermes-approval-resume.consumer';
 
 @Global()
 @Module({
@@ -67,17 +61,12 @@ import { HermesApprovalResumeConsumer } from './consumers/hermes-approval-resume
     HermesSessionService,
     HermesMemoryService,
     HermesContextService,
-    HermesRuntimeService,
-    HermesNode,
-    HermesRouter,
-    HermesCheckpointer,
     HermesTenantGuard,
     ApprovalWorkflowEngine,
     ThreadService,
     { provide: THREAD_SERVICE, useExisting: ThreadService },
     { provide: HERMES_EVENT_BUS, useExisting: HermesActivityBusService },
     { provide: ACTIVITY_SERVICE, useExisting: ActivityService },
-    { provide: HERMES_RUNTIME, useExisting: HermesRuntimeService },
     { provide: AGENT_MESSAGING_GUARD, useExisting: AgentMessagingGuard },
     { provide: PARTICIPANT_RESOLVER, useExisting: ParticipantResolver },
     ActivityService,
@@ -99,7 +88,6 @@ import { HermesApprovalResumeConsumer } from './consumers/hermes-approval-resume
     WorkflowTemplateService,
     NotificationPreferenceService,
     RetentionJobService,
-    HermesApprovalResumeConsumer,
   ],
   exports: [
     HermesRegistryService,
@@ -107,10 +95,6 @@ import { HermesApprovalResumeConsumer } from './consumers/hermes-approval-resume
     HermesSessionService,
     HermesMemoryService,
     HermesContextService,
-    HermesRuntimeService,
-    HermesNode,
-    HermesRouter,
-    HermesCheckpointer,
     HermesTenantGuard,
     ApprovalWorkflowEngine,
     ThreadService,

@@ -27,6 +27,10 @@ export class ChatService implements IChatService {
 
   async sendMessage(request: ChatRequest): Promise<ChatResponse> {
     try {
+      const autonomousTimeout = /\bonboard\b/i.test(request.message)
+        && /\b(q3|quarter|return|workflow)\b/i.test(request.message)
+        ? 120_000
+        : undefined;
       const apiResponse = await this.apiClient.post<{
         reply: string;
         conversationId: string;
@@ -34,13 +38,14 @@ export class ChatService implements IChatService {
         model?: string;
         provider?: string;
         liveData?: Record<string, unknown>;
+        autonomousExecution?: ChatResponse['autonomousExecution'];
       }>(this.config.apiEndpoint, {
         message: request.message,
         conversationId: request.conversationId ?? undefined,
         context: request.context ?? {},
         systemPrompt: request.systemPrompt ?? this.systemPromptBuilder.build(request.context),
         history: request.history ?? [],
-      });
+      }, { timeoutMs: autonomousTimeout });
 
       // Handle backend-level errors (structured error responses)
       if (apiResponse.status === 'error' || !apiResponse.data) {
@@ -100,6 +105,7 @@ export class ChatService implements IChatService {
         chartData,
         chartType,
         suggestions,
+        autonomousExecution: response.autonomousExecution,
       };
     } catch (err) {
       // Network errors, parse errors, or unexpected exceptions.
@@ -126,6 +132,35 @@ export class ChatService implements IChatService {
         suggestions: [],
       };
     }
+  }
+
+  async submitAutonomousApproval(
+    executionId: string,
+    approvalId: string,
+    decision: 'approve' | 'reject',
+  ): Promise<ChatResponse['autonomousExecution']> {
+    const response = await this.apiClient.post<NonNullable<ChatResponse['autonomousExecution']>>(
+      `/hermes-adapter/executions/${encodeURIComponent(executionId)}/approvals/${encodeURIComponent(approvalId)}`,
+      { decision },
+    );
+    if (response.status === 'error') {
+      throw new Error(response.error?.message ?? 'Approval decision failed');
+    }
+    let execution = response.data;
+    for (let attempt = 0; execution?.status === 'RUNNING' && attempt < 90; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      const status = await this.apiClient.get<NonNullable<ChatResponse['autonomousExecution']>>(
+        `/hermes-adapter/executions/${encodeURIComponent(executionId)}`,
+      );
+      if (status.status === 'error' || !status.data) {
+        throw new Error(status.error?.message ?? 'Unable to read autonomous execution status');
+      }
+      execution = status.data;
+    }
+    if (execution?.status === 'RUNNING') {
+      throw new Error('Autonomous execution did not reach a checkpoint in time');
+    }
+    return execution;
   }
 
   /**

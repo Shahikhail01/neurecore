@@ -26,6 +26,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { SolutionPacksService } from '../../solution-packs/services/solution-packs.service';
+import { certifiedPlatformTemplateWhere } from '../../agent-templates/agent-template-certification';
 
 export type MarketplaceTab =
   | 'packs'
@@ -177,7 +178,7 @@ export class MarketplaceService {
     q?: string;
   }): Promise<MarketplaceItem[]> {
     const rows = await this.prisma.agentTemplate.findMany({
-      where: { deprecatedAt: null } as never,
+      where: certifiedPlatformTemplateWhere(),
       orderBy: { name: 'asc' },
       take: 200,
     });

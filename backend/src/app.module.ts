@@ -149,6 +149,10 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { TenantContextGuard } from './common/guards/tenant-context.guard';
 import { CookieAuthModule } from './common/auth/cookie-auth.module';
 import { CsrfProtectionMiddleware } from './common/auth/csrf.middleware';
+// Hermes Adapter — Phase 1.3 (NC-AWL-IMP-2): the gateway that talks to
+// the upstream Hermes execution sidecar. Coexists with the legacy
+// HermesModule for now; the legacy module is removed in Phase A/B.
+import { HermesAdapterModule } from './modules/hermes-adapter/hermes-adapter.module';
 
 @Module({
   imports: [
@@ -190,6 +194,7 @@ import { CsrfProtectionMiddleware } from './common/auth/csrf.middleware';
     GovernanceModule,
     ApprovalPortModule, // Phase 7 — Unified Capability Approval Port (ADR-006)
     HermesModule,
+    HermesAdapterModule, // Phase 1.3 — gateway to upstream Hermes sidecar
     ContextPlaneModule, // Organizational Context Plane (ADR-002, Phase 3) — @Global
     WorkRuntimeModule, // Governed Work Runtime (ADR-003/004, Phase 4)
     EnterpriseCognitionModule, // Enterprise Cognitive Coordination Layer (Phase 5)

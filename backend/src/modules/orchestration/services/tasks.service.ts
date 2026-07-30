@@ -246,6 +246,7 @@ export class TasksService {
       agentId?: string | null;
       workflowId?: string;
       scheduledAt?: string;
+      dueDate?: string;
       createdById?: string | null;
       goalId?: string | null;
       acceptanceCriteria?: string;
@@ -265,6 +266,7 @@ export class TasksService {
         scheduledAt: input.scheduledAt
           ? new Date(input.scheduledAt)
           : undefined,
+        dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
         tenantId,
         createdById: input.createdById ?? null,
         goalId: input.goalId ?? null,

@@ -1,0 +1,84 @@
+# Egress Allowlist — Hermes Sidecar
+#
+# Default-deny posture. The hermes-sidecar process can ONLY reach these
+# hosts. PostgreSQL ports (5432) and the internal 10.0.0.0/8 + 172.16.0.0/12
+# subnets are explicitly denied. Any addition here requires a PR review.
+#
+# Loaded by: infra/sidecar/scripts/load-egress-rules.sh
+# Generated nftables rules: infra/sidecar/nftables-hermes.nft
+# Plan ref: NC-AWL-IMP-2 §6
+
+egress:
+  version: 1
+
+  allow:
+    - id: neurecore-gateway
+      host: 127.0.0.1
+      port: 3000
+      protocol: tcp
+      purpose: scoped_token_mint_and_event_ingest
+      required: true
+
+    - id: openai-api
+      host: api.openai.com
+      port: 443
+      protocol: tcp
+      purpose: model_provider
+      required: false
+
+    - id: anthropic-api
+      host: api.anthropic.com
+      port: 443
+      protocol: tcp
+      purpose: model_provider
+      required: false
+
+    - id: minimax-api
+      host: api.minimax.io
+      port: 443
+      protocol: tcp
+      purpose: model_provider
+      required: false
+
+    - id: deepseek-api
+      host: api.deepseek.com
+      port: 443
+      protocol: tcp
+      purpose: model_provider
+      required: false
+
+    - id: neurecore-event-bridge
+      host: 127.0.0.1
+      port: 8082
+      protocol: tcp
+      purpose: signed_event_forwarding
+      required: true
+
+  deny:
+    - id: postgres-subnet
+      cidr: 10.0.0.0/8
+      ports: [5432, 5433]
+      purpose: postgres_subnet_explicit_deny
+
+    - id: internal-services
+      cidr: 172.16.0.0/12
+      purpose: internal_services_subnet
+
+    - id: postgres-anywhere
+      port: 5432
+      purpose: postgres_protocol_anywhere
+
+    - id: redis-anywhere
+      port: 6379
+      purpose: redis_protocol_anywhere
+
+  # Process identity constraint. The nftables table has host policy accept
+  # and applies restrictions only when the socket owner matches this UID.
+  process:
+    uid: hermes-sidecar
+    gid: hermes-sidecar
+    no_new_privs: true
+
+  # Failure mode
+  on_load_failure: fail_closed
+  on_rule_conflict: deny_wins

@@ -16,6 +16,7 @@ import {
   PoolModelConfig,
   PoolService,
 } from '../../common/pool/pool.service';
+import { certifiedPlatformTemplateWhere } from '../agent-templates/agent-template-certification';
 import type { CreateAgentsPoolDto } from './dto/create-agents-pool.dto';
 import type { UpdateAgentsPoolDto } from './dto/update-agents-pool.dto';
 
@@ -45,11 +46,8 @@ export class AgentsPoolService extends PoolService<
       defaultSortBy: 'updatedAt',
       useSoftDelete: false,
       buildWhere: (opts: PoolListOptions): Prisma.AgentTemplateWhereInput => {
-        const where: Prisma.AgentTemplateWhereInput = {
-          // Pool only shows platform-wide templates.
-          isPublic: true,
-          tenantId: null,
-        };
+        const where: Prisma.AgentTemplateWhereInput =
+          certifiedPlatformTemplateWhere();
         if (opts.status && opts.status !== 'ALL') {
           const upper = opts.status.toUpperCase();
           if (Object.values(AgentType).includes(upper as AgentType)) {

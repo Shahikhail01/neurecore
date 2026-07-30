@@ -34,6 +34,14 @@ export interface SuggestionData {
   confirmationMessage?: string;
 }
 
+export interface AutonomousApprovalData {
+  executionId: string;
+  approvalId: string;
+  toolName: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+}
+
 // ── Messages ────────────────────────────────────────────────────────────────
 export interface ChatMessage {
   id: string;
@@ -47,6 +55,7 @@ export interface ChatMessage {
     table?: TableData;
     suggestions?: SuggestionData[];
     isStreaming?: boolean;
+    autonomousApproval?: AutonomousApprovalData;
   };
 }
 
@@ -76,6 +85,15 @@ export interface ChatResponse {
   chartType?: 'bar';
   chartData?: Array<{ label: string; value: number }>;
   suggestions?: string[];
+  autonomousExecution?: {
+    executionId: string;
+    status: string;
+    pendingApproval?: {
+      approvalId: string;
+      toolName: string;
+      reason: string;
+    } | null;
+  };
 }
 
 // ── Slash Commands ──────────────────────────────────────────────────────────

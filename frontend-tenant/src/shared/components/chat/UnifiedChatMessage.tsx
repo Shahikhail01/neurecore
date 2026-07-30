@@ -6,7 +6,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import type { ChatMessage, SuggestionData } from '@/shared/types/chat.types';
+import type { AutonomousApprovalData, ChatMessage, SuggestionData } from '@/shared/types/chat.types';
+import { ApprovalCard } from './ApprovalCard';
 
 // ── Renderer: Markdown-lite (bold, italic, code, line breaks) ──────────────────
 function MarkdownRenderer({ content }: { content: string }) {
@@ -137,10 +138,11 @@ interface UnifiedChatMessageProps {
   message: ChatMessage;
   onSuggestionSelect: (suggestion: SuggestionData) => void;
   sending: boolean;
+  onApprovalDecision: (approval: AutonomousApprovalData, decision: 'approve' | 'reject') => Promise<AutonomousApprovalData | null>;
 }
 
 // ── Main Component ──────────────────────────────────────────────────────────────
-export function UnifiedChatMessage({ message, onSuggestionSelect, sending }: UnifiedChatMessageProps) {
+export function UnifiedChatMessage({ message, onSuggestionSelect, sending, onApprovalDecision }: UnifiedChatMessageProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
 
@@ -207,6 +209,10 @@ export function UnifiedChatMessage({ message, onSuggestionSelect, sending }: Uni
             onSelect={onSuggestionSelect}
             disabled={sending}
           />
+        )}
+
+        {message.metadata?.autonomousApproval && (
+          <ApprovalCard approval={message.metadata.autonomousApproval} onDecision={onApprovalDecision} />
         )}
 
         {/* Token counter */}

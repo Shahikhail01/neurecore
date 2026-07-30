@@ -1,9 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import {
-  HERMES_RUNTIME,
-  type IHermesRuntime,
-} from '../interfaces/hermes-runtime.interface';
 import { HermesSessionService } from './hermes-session.service';
 import {
   AGENT_MESSAGING,
@@ -43,7 +39,6 @@ export class AgentMessagingService implements IAgentMessaging {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(HERMES_RUNTIME) private readonly runtime: IHermesRuntime,
     @Inject(THREAD_SERVICE) private readonly threadService: IThreadService,
     private readonly session: HermesSessionService,
     @Inject(PARTICIPANT_RESOLVER)
@@ -129,54 +124,13 @@ export class AgentMessagingService implements IAgentMessaging {
       return { delivered: true };
     }
 
-    try {
-      const result = await this.runtime.execute({
-        sessionId: session.id,
-        hermesAgentId: message.toAgentId,
-        task: message.content,
-        context: {
-          tenantId: message.tenantId,
-          threadId: message.threadId,
-          agentId: message.fromAgentId,
-          hopCount: updated,
-        },
-      });
-
-      const reply = result.success
-        ? typeof result.output === 'string'
-          ? result.output
-          : JSON.stringify(result.output)
-        : `Error: ${result.error ?? 'unknown'}`;
-      await this.session.addMessage(
-        session.id,
-        'HERMES',
-        reply,
-        { source: 'agent-messaging-response' },
-        message.threadId,
-      );
-
-      await this.activityService.record({
-        tenantId: message.tenantId,
-        actorType: 'AI_AGENT',
-        actorId: message.toAgentId,
-        type: 'agent:replied',
-        title: `${target.displayName} replied`,
-        threadId: message.threadId,
-        payload: {
-          hopCount: updated,
-          success: result.success,
-          costUsd: result.costUsd,
-        },
-        sourceEventId: `agent-reply:${session.id}:${updated}`,
-        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-      });
-
-      return { delivered: true, response: reply };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Agent execution failed: ${msg}`);
-      return { delivered: false, blocked: msg };
-    }
+    this.logger.warn(
+      `Agent message ${message.id} requested a runtime response, but the legacy in-process runtime was deleted by ADR-0001.`,
+    );
+    return {
+      delivered: true,
+      blocked: 'Legacy in-process runtime responses are disabled by ADR-0001.',
+    };
   }
 
   async createChannel(

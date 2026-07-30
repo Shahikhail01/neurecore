@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DeploymentService } from '../../agents/services/deployment.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { certifiedPlatformTemplateWhere } from '../../agent-templates/agent-template-certification';
 
 export interface CosAssignResult {
   assigned: boolean;
@@ -21,11 +22,9 @@ export class ChiefOfStaffService {
   async autoAssign(projectId: string, tenantId: string, actorId: string): Promise<CosAssignResult> {
     try {
       const cosTemplate = await this.prisma.agentTemplate.findFirst({
-        where: {
+        where: certifiedPlatformTemplateWhere({
           name: { contains: 'chief of staff', mode: 'insensitive' },
-          isPublic: true,
-          tenantId: null,
-        },
+        }),
         select: { id: true, name: true },
       });
 

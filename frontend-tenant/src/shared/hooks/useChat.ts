@@ -75,6 +75,40 @@ export function useChat(
       addMessage(assistantMsg);
 
       const context = slashCommands.getContextForTrigger(content.toLowerCase());
+      const isAutonomousOnboarding = /\bonboard\b/i.test(content) && /\b(q3|quarter|return|workflow)\b/i.test(content);
+      if (isAutonomousOnboarding) {
+        try {
+          const response = await chatService.sendMessage({
+            message: content.trim(),
+            conversationId: conversationId ?? undefined,
+            context: { pageContext, slashContext: context },
+          });
+          const pending = response.autonomousExecution?.pendingApproval;
+          updateMessage(assistantMsg.id, {
+            content: response.reply,
+            timestamp: new Date().toISOString(),
+            metadata: {
+              isStreaming: false,
+              autonomousApproval: pending && response.autonomousExecution
+                ? {
+                    executionId: response.autonomousExecution.executionId,
+                    approvalId: pending.approvalId,
+                    toolName: pending.toolName,
+                    reason: pending.reason,
+                    status: 'PENDING',
+                  }
+                : undefined,
+            },
+          });
+          setConversationId(response.conversationId);
+        } catch (err) {
+          removeMessage(assistantMsg.id);
+          setError(err instanceof Error ? err.message : 'Autonomous workflow failed');
+        } finally {
+          setSending(false);
+        }
+        return;
+      }
       const accumulatedContent: string[] = [];
 
       const cleanup = chatService.sendMessageStream(

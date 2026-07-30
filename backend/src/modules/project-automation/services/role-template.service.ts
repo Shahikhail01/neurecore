@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { certifiedPlatformTemplateWhere } from '../../agent-templates/agent-template-certification';
 import { DeploymentService } from '../../agents/services/deployment.service';
 import { ProjectTypesService } from '../../project-types/project-types.service';
 import type { SpawnAgentsResult, RoleTemplateEntry } from '../interfaces/role-template.interface';
@@ -145,11 +146,9 @@ export class RoleTemplateService {
 
     if (AGENT_TYPE_VALUES.has(agentType.toUpperCase())) {
       const byType = await this.prisma.agentTemplate.findFirst({
-        where: {
+        where: certifiedPlatformTemplateWhere({
           type: agentType.toUpperCase() as never,
-          isPublic: true,
-          tenantId: null,
-        },
+        }),
         select: { id: true, name: true },
       });
       if (byType) return byType;
@@ -157,11 +156,9 @@ export class RoleTemplateService {
 
     // Fallback: match by name (case-insensitive contains)
     const byName = await this.prisma.agentTemplate.findFirst({
-      where: {
+      where: certifiedPlatformTemplateWhere({
         name: { contains: agentType, mode: 'insensitive' },
-        isPublic: true,
-        tenantId: null,
-      },
+      }),
       select: { id: true, name: true },
     });
     if (byName) return byName;
@@ -169,7 +166,7 @@ export class RoleTemplateService {
     // Last fallback: try direct id
     if (/^[a-z0-9]{20,30}$/i.test(agentType)) {
       const byId = await this.prisma.agentTemplate.findFirst({
-        where: { id: agentType, isPublic: true, tenantId: null },
+        where: certifiedPlatformTemplateWhere({ id: agentType }),
         select: { id: true, name: true },
       });
       if (byId) return byId;

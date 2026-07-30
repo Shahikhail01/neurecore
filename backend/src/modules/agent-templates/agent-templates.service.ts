@@ -11,6 +11,10 @@ import type {
   CreateAgentTemplateDto,
   UpdateAgentTemplateDto,
 } from './dto/agent-template.dto';
+import {
+  certifiedPlatformTemplateWhere,
+  tenantVisibleTemplateWhere,
+} from './agent-template-certification';
 
 /**
  * AgentTemplatesService
@@ -34,12 +38,10 @@ export class AgentTemplatesService {
       const { type, page = 1, limit = 20 } = opts ?? {};
       const skip = (page - 1) * limit;
 
-      const where = {
-        // Public templates must be platform-wide (tenantId = null).
-        // Prevents a tenant from marking a tenant-scoped template as public.
-        OR: [{ tenantId }, { isPublic: true, tenantId: null }],
-        ...(type && { type }),
-      };
+      const where = tenantVisibleTemplateWhere(
+        tenantId,
+        type ? { type } : {},
+      );
 
       const [data, total] = await this.prisma.$transaction([
         this.prisma.agentTemplate.findMany({
@@ -73,11 +75,7 @@ export class AgentTemplatesService {
       const { type, page = 1, limit = 20 } = opts ?? {};
       const skip = (page - 1) * limit;
 
-      const where = {
-        tenantId: null,
-        isPublic: true,
-        ...(type && { type }),
-      };
+      const where = certifiedPlatformTemplateWhere(type ? { type } : {});
 
       const [data, total] = await this.prisma.$transaction([
         this.prisma.agentTemplate.findMany({
@@ -105,7 +103,7 @@ export class AgentTemplatesService {
   async findOne(id: string, tenantId: string) {
     try {
       const template = await this.prisma.agentTemplate.findFirst({
-        where: { id, OR: [{ tenantId }, { isPublic: true, tenantId: null }] },
+        where: tenantVisibleTemplateWhere(tenantId, { id }),
       });
       if (!template)
         throw new NotFoundException(`Agent template ${id} not found`);
@@ -193,7 +191,7 @@ export class AgentTemplatesService {
   async findOnePlatform(id: string) {
     try {
       const template = await this.prisma.agentTemplate.findFirst({
-        where: { id, tenantId: null, isPublic: true },
+        where: certifiedPlatformTemplateWhere({ id }),
       });
       if (!template)
         throw new NotFoundException(`Platform agent template ${id} not found`);
@@ -261,7 +259,7 @@ export class AgentTemplatesService {
     opts?: { name?: string },
   ) {
     const template = await this.prisma.agentTemplate.findFirst({
-      where: { id: platformTemplateId, tenantId: null, isPublic: true },
+      where: certifiedPlatformTemplateWhere({ id: platformTemplateId }),
     });
     if (!template)
       throw new NotFoundException(
@@ -345,7 +343,7 @@ export class AgentTemplatesService {
 
   async updatePlatform(id: string, dto: UpdateAgentTemplateDto) {
     const template = await this.prisma.agentTemplate.findFirst({
-      where: { id, tenantId: null, isPublic: true },
+      where: certifiedPlatformTemplateWhere({ id }),
     });
     if (!template)
       throw new NotFoundException(`Platform agent template ${id} not found`);
@@ -386,7 +384,7 @@ export class AgentTemplatesService {
 
   async removePlatform(id: string): Promise<void> {
     const template = await this.prisma.agentTemplate.findFirst({
-      where: { id, tenantId: null, isPublic: true },
+      where: certifiedPlatformTemplateWhere({ id }),
     });
     if (!template)
       throw new NotFoundException(`Platform agent template ${id} not found`);

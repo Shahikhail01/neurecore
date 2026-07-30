@@ -8,7 +8,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { IChatService, ISlashCommandProvider, IJsonExtractor } from '@/core/services/interfaces/IChatService';
-import type { ChatConfig, SuggestionData } from '@/shared/types/chat.types';
+import type { AutonomousApprovalData, ChatConfig, SuggestionData } from '@/shared/types/chat.types';
 import { useChat } from '@/shared/hooks/useChat';
 import { TriggerButton } from './TriggerButton';
 import { UnifiedChatHeader } from './UnifiedChatHeader';
@@ -57,6 +57,26 @@ export function UnifiedChatPanel({
     },
     [sendMessage],
   );
+  const handleApprovalDecision = useCallback(
+    async (approval: AutonomousApprovalData, decision: 'approve' | 'reject') => {
+      const execution = await chatService.submitAutonomousApproval(
+        approval.executionId,
+        approval.approvalId,
+        decision,
+      );
+      const pending = execution?.pendingApproval;
+      return pending && execution
+        ? {
+            executionId: execution.executionId,
+            approvalId: pending.approvalId,
+            toolName: pending.toolName,
+            reason: pending.reason,
+            status: 'PENDING' as const,
+          }
+        : null;
+    },
+    [chatService],
+  );
 
   return (
     <>
@@ -85,7 +105,7 @@ export function UnifiedChatPanel({
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 320, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 280, damping: 30 }}
-              className="fixed bottom-16 right-20 z-40 w-80 max-h-[520px] flex flex-col rounded-2xl border border-surface-border bg-surface-raised shadow-2xl overflow-hidden"
+              className="fixed bottom-28 right-20 z-40 w-80 max-h-[520px] flex flex-col rounded-2xl border border-surface-border bg-surface-raised shadow-2xl overflow-hidden"
               data-testid="chat-panel"
             >
               {/* Header */}
@@ -113,6 +133,7 @@ export function UnifiedChatPanel({
                     message={msg}
                     onSuggestionSelect={handleSuggestionSelect}
                     sending={sending}
+                    onApprovalDecision={handleApprovalDecision}
                   />
                 ))}
                 <div ref={bottomRef} />

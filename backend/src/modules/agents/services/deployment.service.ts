@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { certifiedPlatformTemplateWhere } from '../../agent-templates/agent-template-certification';
 import { EventsGateway } from '../../events/events.gateway';
 import type {
   SpawnAgentFromTemplateDto,
@@ -130,7 +131,7 @@ export class DeploymentService {
 
     // Resolve the platform template
     const template = await this.prisma.agentTemplate.findFirst({
-      where: { id: templateId, isPublic: true, tenantId: null },
+      where: certifiedPlatformTemplateWhere({ id: templateId }),
     });
     if (!template)
       throw new NotFoundException(
@@ -239,7 +240,7 @@ export class DeploymentService {
     // Resolve all template IDs in one query
     const templateIds = [...new Set(dto.agents.map((a) => a.templateId))];
     const templates = await this.prisma.agentTemplate.findMany({
-      where: { id: { in: templateIds }, isPublic: true, tenantId: null },
+      where: certifiedPlatformTemplateWhere({ id: { in: templateIds } }),
     });
     const templateMap = new Map(templates.map((t) => [t.id, t]));
 
@@ -361,7 +362,7 @@ export class DeploymentService {
     let agentCount = 0;
     if (dto.withAgents) {
       const agentTemplates = await this.prisma.agentTemplate.findMany({
-        where: { isPublic: true, tenantId: null },
+        where: certifiedPlatformTemplateWhere(),
       });
 
       const templatesByName = new Map(
@@ -559,7 +560,7 @@ export class DeploymentService {
     if (dto.withHeadAgent) {
       const lead = item.headAgentType ?? 'FUNCTIONAL';
       const agentTemplates = await this.prisma.agentTemplate.findMany({
-        where: { isPublic: true, tenantId: null, type: lead as never },
+        where: certifiedPlatformTemplateWhere({ type: lead as never }),
       });
       const matchTemplate =
         agentTemplates.find((t) => /lead/i.test(t.name)) ??

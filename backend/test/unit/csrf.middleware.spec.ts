@@ -95,6 +95,29 @@ describe('CsrfProtectionMiddleware', () => {
       middleware.use(req, res, next);
       expect(next).toHaveBeenCalled();
     });
+
+    it('exempts the HMAC-authenticated Hermes event callback only', () => {
+      const event = buildMiddleware({
+        path: '/api/v1/hermes-adapter/executions/e-123/events',
+        cookieToken: null,
+        headerToken: null,
+      });
+      event.middleware.use(event.req, event.res, event.next);
+      expect(event.next).toHaveBeenCalled();
+
+      const adjacentRoute = buildMiddleware({
+        path: '/api/v1/hermes-adapter/executions/e-123/resume',
+        cookieToken: null,
+        headerToken: null,
+      });
+      expect(() =>
+        adjacentRoute.middleware.use(
+          adjacentRoute.req,
+          adjacentRoute.res,
+          adjacentRoute.next,
+        ),
+      ).toThrow(ForbiddenException);
+    });
   });
 
   describe('feature flag', () => {

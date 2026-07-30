@@ -23,7 +23,15 @@ describe('AgentsPoolService — Phase 10 AI Employees Pool', () => {
   describe('config.buildWhere', () => {
     it('always scopes to platform-wide (isPublic, tenantId=null)', () => {
       const where = service['config'].buildWhere({});
-      expect(where).toMatchObject({ isPublic: true, tenantId: null });
+      expect(where).toMatchObject({
+        isPublic: true,
+        tenantId: null,
+        enabled: true,
+        config: {
+          path: ['autonomousWorkLayer', 'status'],
+          equals: 'certified',
+        },
+      });
     });
 
     it('maps status=ENABLED/DISABLED to enabled boolean', () => {

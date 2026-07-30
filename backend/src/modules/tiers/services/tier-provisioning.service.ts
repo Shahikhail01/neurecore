@@ -20,6 +20,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { certifiedPlatformTemplateWhere } from '../../agent-templates/agent-template-certification';
 import { Prisma } from '@prisma/client';
 import { resolveDefaultAgentsForIndustry } from '../../industry/tier-industry-matrix';
 
@@ -472,7 +473,7 @@ export class TierProvisioningService implements ITierProvisioningService {
     // skipped, leaving tenants at 0 agents even after
     // onboarding.complete().
     const allTemplates = await this.prisma.agentTemplate.findMany({
-      where: { tenantId: null, enabled: true, deprecatedAt: null },
+      where: certifiedPlatformTemplateWhere(),
       select: {
         id: true,
         name: true,
