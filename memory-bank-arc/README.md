@@ -1,12 +1,13 @@
 # NeureCore — Memory Bank (Single-Page Index)
 
-**Last updated:** 2026-07-31 (FULL SYSTEM AUDIT COMPLETED)
+**Last updated:** 2026-08-02 (P0–P9 Parity v3 Implementation Complete)
 
-**⚠️ CRITICAL DISCREPANCY — DEPLOYMENT STATUS:**
-- **Local git HEAD:** `fe335abb` (NC-AWL-IMP-2 closure, Phase 9 G9 certified)
-- **Contabo deployed backend:** `ad73f3e6` (OLDER — missing Phase 9 G9, NC-AWL-IMP-2, SIM-04 fixes)
-- **Phase 9 G9 APPROVED** (105/105) is LOCAL ONLY, NOT DEPLOYED to production
-- **Deployment required** to bring Contabo current
+**⚠️ DEPLOYMENT STATUS:**
+- **Local git HEAD:** `22c47539` (Creatio AI Parity v3 — P0–P9 complete)
+- **Contabo deployed backend:** `22c47539` (CURRENT — rebuilt and reloaded 2026-08-02)
+- **Phase 9 G9 certification suite:** EXISTS — 73-scenario matrix, 14-rule gate; live evidence collection IN PROGRESS
+- **OOB agent seed:** SUCCESS (6 agents)
+- **Analytics model seed:** SUCCESS (5 models)
 
 **Audience:** Anyone (human or AI) needing the current state of the NeureCore platform.
 
@@ -251,7 +252,7 @@ See [int-features/index.md](int-features/index.md) for full feature index with P
 | Pool departments | 57 |
 | Features | 19 |
 | Disk free | ~45 GB of 96 GB |
-| Backend git HEAD | `fe335abb` (NC-AWL-IMP-2 cert closure — all 8 gates PASS, 2026-07-30) |
+| Backend git HEAD | `22c47539` (Creatio AI Parity v3 — P0–P9 complete, 2026-08-02) |
 
 ---
 

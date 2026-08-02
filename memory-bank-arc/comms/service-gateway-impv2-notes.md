@@ -1,10 +1,15 @@
 # Service Gateway V2 — Implementation Notes
 
 **Document ID:** NC-AI-SG-V2-IMPL
-**Version:** 1.1
+**Version:** 1.2
 **Date:** 2026-08-02
-**Status:** Phases 0-8 implementation complete in source. Local verification: tsc/build green; focused Jest suites 209/210 passing (1 G7 integration DB-bound failure matches the existing skip pattern). Deploy pending. Honest parity verdict: BLOCKED until live G7 DB matrix + browser parity scenario pass on Contabo.
+**Status:** SUPERSEDED — See `service-gateway-impv3-notes.md` for v3 implementation record. This file is retained for historical reference on the v2 foundation work.
 **Source Plan:** `neurecore/memory-bank-arc/comms/service-gateway-impv2-plan.md`
+**Superseded by:** `memory-bank-arc/comms/service-gateway-impv3-notes.md`
+
+---
+
+> ⚠️ **This document is historical.** The v3 implementation (P0–P9 parity) has been completed and is documented in `service-gateway-impv3-notes.md`. All v2 foundation work described here is included in the v3 delivery.
 
 ---
 
