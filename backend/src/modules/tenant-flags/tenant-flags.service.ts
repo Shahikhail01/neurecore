@@ -10,6 +10,7 @@ export enum FeatureFlag {
   HUMAN_REVIEW_WORKFLOW = 'HUMAN_REVIEW_WORKFLOW',
   NEW_LIFECYCLE_GUARDS = 'NEW_LIFECYCLE_GUARDS',
   NEW_TIMELINE = 'NEW_TIMELINE',
+  SERVICE_GATEWAY = 'SERVICE_GATEWAY',
 }
 
 interface FlagConfig {
@@ -54,6 +55,11 @@ export class TenantFlagsService {
     },
     [FeatureFlag.NEW_TIMELINE]: {
       key: FeatureFlag.NEW_TIMELINE,
+      defaultValue: false,
+      killSwitch: false,
+    },
+    [FeatureFlag.SERVICE_GATEWAY]: {
+      key: FeatureFlag.SERVICE_GATEWAY,
       defaultValue: false,
       killSwitch: false,
     },

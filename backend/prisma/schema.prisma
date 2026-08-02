@@ -342,6 +342,19 @@ enum BillingEventType {
 
 // ─── Stage 1: Tenant-Scoped Templates ───────────────────────────────────────
 
+// PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.7.1 (Phase 5.A P13) —
+// DepartmentTemplate.category converted from free-text String to enum.
+// Mirrors the 5 ACTIVE_INDUSTRY_GROUPS.
+enum DepartmentTemplateCategory {
+  FINANCIAL_COMPLIANCE @map("financial-compliance")
+  BUSINESS_TECHNOLOGY  @map("business-technology")
+  CONSUMER_COMMERCE    @map("consumer-commerce")
+  PUBLIC_SOCIAL        @map("public-social")
+  OTHER                @map("other")
+
+  @@map("department_template_category")
+}
+
 enum TemplateType {
   CUSTOMER_LIFECYCLE
   AGENT_ROLE
@@ -563,25 +576,27 @@ model Tenant {
   // agentLimit Int          (use tier.maxAgents)
 
   // Relations
-  users            User[]
-  auditLogs        AuditLog[]
-  sessions         Session[]
-  agents           Agent[]
-  agentTemplates   AgentTemplate[]
-  tasks            Task[]
-  workflows        Workflow[]
-  toolIntegrations ToolIntegration[]
-  memoryEntries    MemoryEntry[]
-  departments      Department[]
-  approvalRequests ApprovalRequest[]
-  governanceRules  GovernanceRule[]
-  notifications    Notification[]
-  apiKeys          ApiKey[]
-  metrics          TenantMetric[]
+  users                   User[]
+  auditLogs               AuditLog[]
+  sessions                Session[]
+  agents                  Agent[]
+  agentTemplates          AgentTemplate[]
+  tasks                   Task[]
+  workflows               Workflow[]
+  toolIntegrations        ToolIntegration[]
+  memoryEntries           MemoryEntry[]
+  departments             Department[]
+  approvalRequests        ApprovalRequest[]
+  governanceRules         GovernanceRule[]
+  notifications           Notification[]
+  apiKeys                 ApiKey[]
+  metrics                 TenantMetric[]
+  workRunContextSnapshots WorkRunContextSnapshot[]
 
   // Phase 4 back-relations
   analyticsModels   AnalyticsModel[]
   analyticsFeatures AnalyticsFeature[]
+  featureSnapshots  FeatureSnapshot[]
   crmConnectors     CrmConnector[]
   tenantLimit       TenantLimit?
   oauthTokens       OAuthToken[]
@@ -680,6 +695,23 @@ model Tenant {
   updatedAt       DateTime          @updatedAt
   LifecycleWaiver LifecycleWaiver[]
 
+  // NC-ACCT-IMP-1: Accounting capability back-relations
+  chartOfAccounts     ChartOfAccount[]
+  accountingPeriods   AccountingPeriod[]
+  userAccountingRoles UserAccountingRole[]
+  journalEntries      JournalEntry[]
+  accountingDatasets  AccountingDataset[]
+  accountingReports   AccountingReport[]
+  auditFindings       AuditFinding[]
+  outboxMerkleRoots   OutboxMerkleRoot[]
+  routingDecisionLogs RoutingDecisionLog[]
+
+  // Phase 4 — agent/skill template lifecycle
+  agentSkillDefinitions       AgentSkillDefinition[]
+  agentTemplateVersions       AgentTemplateVersion[]
+  agentTemplateCertifications AgentTemplateCertification[]
+  agentLifecycleAuditLogs     AgentLifecycleAuditLog[]
+
   @@map("tenants")
 }
 
@@ -732,6 +764,9 @@ model User {
   tasksCreated        Task[]               @relation("TaskCreator")
   approvalsRequested  ApprovalRequest[]    @relation("ApprovalRequests")
   approvalsReviewed   ApprovalRequest[]    @relation("ApprovalReviews")
+
+  // NC-ACCT-IMP-1: Per-tenant accounting roles (POSTING, REVIEWER, etc.)
+  userAccountingRoles UserAccountingRole[]
   notifications       Notification[]
   apiKeys             ApiKey[]
 
@@ -912,6 +947,9 @@ model AgentTemplate {
   supersededByTemplateId String?
   supersededByTemplate   AgentTemplate?  @relation("TemplateSupersession", fields: [supersededByTemplateId], references: [id], onDelete: SetNull)
   supersedesTemplates    AgentTemplate[] @relation("TemplateSupersession")
+
+  // Phase 4 — versioned template lifecycle
+  versions AgentTemplateVersion[] @relation("AgentTemplateVersions")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1331,16 +1369,18 @@ model Department {
 // Platform-wide blueprint (SuperAdmin managed). Tenants deploy from these.
 
 model DepartmentTemplate {
-  id          String  @id @default(uuid())
+  id          String                     @id @default(uuid())
   name        String // e.g. "Startup Org", "E-Commerce Pack"
-  slug        String  @unique
-  description String? @db.Text
+  slug        String                     @unique
+  description String?                    @db.Text
   // JSON array: [{ name, description?, type?, parentSlug? }]
   // type: "EXECUTIVE" | "CORE" | "FUNCTIONAL"
-  structure   Json    @default("[]")
-  isPublic    Boolean @default(true)
-  category    String  @default("general") // "startup" | "enterprise" | "ecommerce" | etc.
-  tags        Json    @default("[]")
+  structure   Json                       @default("[]")
+  isPublic    Boolean                    @default(true)
+  // PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.7.1 (P13): enum aligned with
+  // the 5 ACTIVE_INDUSTRY_GROUPS. Migration phase5a-p13-20260731.
+  category    DepartmentTemplateCategory @default(OTHER)
+  tags        Json                       @default("[]")
 
   // Phase 10 — Business composition
   packages Package[] @relation("PackageDepartments")
@@ -1499,6 +1539,7 @@ model AnalyticsModel {
   tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   analyticsFeatures AnalyticsFeature[]
+  featureSnapshots  FeatureSnapshot[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1521,6 +1562,32 @@ model AnalyticsFeature {
   @@index([tenantId])
   @@index([modelId])
   @@map("analytics_features")
+}
+
+// ─── Phase 5 Models: FeatureSnapshot for Prediction/Recommendation ────────────
+
+/// Immutable feature snapshot pinned to a specific (subject, model) pair.
+/// Predictions reference a snapshot id so the prediction is reproducible
+/// and any abstention can be explained by snapshot staleness / missing
+/// evidence. Tenant-isolated: every read filters by tenantId.
+model FeatureSnapshot {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  subjectType  String
+  subjectId    String
+  featuresJson Json
+  modelId      String?
+  model        AnalyticsModel? @relation(fields: [modelId], references: [id])
+
+  modelVersion String?
+  snapshotHash String
+  recordedAt   DateTime @default(now())
+
+  @@index([tenantId, subjectType, subjectId, recordedAt])
+  @@index([tenantId, modelId])
+  @@map("feature_snapshots")
 }
 
 model CrmConnector {
@@ -4173,6 +4240,14 @@ model Package {
   tierId String
   tier   Tier   @relation(fields: [tierId], references: [id], onDelete: Restrict)
 
+  // PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.8.1 (Phase 5.B T8) —
+  // cross-group Package reference. Allows a Package to inherit
+  // departments/agents from a Package in another industry (e.g. SPO
+  // family-office-reporting inherits accounting-operations).
+  parentPackageId String?
+  parentPackage   Package?  @relation("PackageInheritance", fields: [parentPackageId], references: [id], onDelete: SetNull)
+  childPackages   Package[] @relation("PackageInheritance")
+
   // M2M composition — pool entities only (no tenant-runtime rows)
   departments DepartmentTemplate[] @relation("PackageDepartments")
   aiAgents    AgentTemplate[]      @relation("PackageAgents")
@@ -4187,22 +4262,23 @@ model Package {
   @@unique([industryId, tierId, slug])
   @@index([industryId, tierId])
   @@index([status])
+  @@index([parentPackageId])
   @@map("packages")
 }
 
 // ─── AI Gateway Catalog (ai-gateway-imp-plan.md §4.2) ───────────────────
 
 model ModelProvider {
-  id         String    @id @default(cuid())
-  slug       String    @unique
-  name       String
-  apiBaseUrl    String
-  apiKeyEnv     String
-  encryptedKey  String?
-  isActive      Boolean   @default(true)
-  models        AiModel[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  name         String
+  apiBaseUrl   String
+  apiKeyEnv    String
+  encryptedKey String?
+  isActive     Boolean   @default(true)
+  models       AiModel[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@map("model_providers")
 }
@@ -5112,7 +5188,30 @@ model WorkRun {
   cancelledAt       DateTime? // nullable=True default=None sql=TIMESTAMP(3)
   failedAt          DateTime? // nullable=True default=None sql=TIMESTAMP(3)
 
+  workRunContextSnapshot WorkRunContextSnapshot?
+
   @@map("work_runs")
+}
+
+model WorkRunContextSnapshot {
+  id                       String   @id @default(uuid())
+  workRunId                String   @unique
+  tenantId                 String
+  actorType                String
+  actorId                  String
+  authority                Int
+  governanceBlocked        Boolean  @default(false)
+  organizationSummary      Json
+  policySource             String
+  planVersion              String
+  toolRegistrationsVersion String
+  capturedAt               DateTime @default(now())
+
+  workRun WorkRun @relation(fields: [workRunId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, capturedAt])
+  @@map("work_run_context_snapshots")
 }
 
 // 20260714_work_runtime: work_run_steps
@@ -5822,3 +5921,540 @@ model LifecycleWaiver {
 // Phase 6: revision lineage is already modelled via ExecutionAttempt.parentAttemptId.
 // We add a unique index so the same attempt cannot be both a parent of two distinct
 // child attempts under the same revision request — preventing duplicate revision runs.
+
+// ─── NC-ACCT-IMP-1: Accounting capability (Phase 1) ──────────────────────
+// Adds: COA, Periods, JournalEntry/Posting, Datasets, Reports, Findings,
+// AccountingRole assignment, Merkle-root tamper-evidence over the outbox.
+//
+// All models are ADDITIVE — no changes to existing tables. Migration is
+// non-blocking. Back-relations on Tenant and User are added above.
+// ---------------------------------------------------------------------------
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum AccountNormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  CLOSING
+  CLOSED
+  LOCKED
+}
+
+enum AccountingDatasetKind {
+  INVENTORY_ITEM
+  PAYROLL_EMPLOYEE
+  PAYROLL_RUN
+  LEASE_CONTRACT
+  FIXED_ASSET
+  BANK_ACCOUNT
+  BANK_TRANSACTION
+  INVOICE
+  CUSTOMER_RECEIVABLE
+  FINANCIAL_STATEMENT
+  VENDOR_PAYABLE
+  TAX_RETURN
+  FX_TRANSACTION
+}
+
+enum AccountingRole {
+  VIEWER
+  PREPARER
+  POSTING
+  REVIEWER
+  CONTROLLER
+  CFO
+  AUDITOR
+}
+
+enum AuditFindingSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AuditFindingStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  WAIVED
+}
+
+model ChartOfAccount {
+  id            String               @id @default(uuid())
+  tenantId      String
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code          String
+  name          String
+  type          AccountType
+  normalBalance AccountNormalBalance
+  parentId      String?
+  parent        ChartOfAccount?      @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      ChartOfAccount[]     @relation("AccountHierarchy")
+  currency      String               @default("USD")
+  isLeaf        Boolean              @default(true)
+  isActive      Boolean              @default(true)
+  description   String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  postings AccountingRecord[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, type])
+  @@index([tenantId, isActive])
+  @@index([parentId])
+  @@map("chart_of_accounts")
+}
+
+model AccountingPeriod {
+  id         String                 @id @default(uuid())
+  tenantId   String
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code       String
+  name       String
+  startDate  DateTime
+  endDate    DateTime
+  status     AccountingPeriodStatus @default(OPEN)
+  fiscalYear Int
+  closedAt   DateTime?
+  closedById String?
+  lockedAt   DateTime?
+  lockedById String?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  journalEntries JournalEntry[]
+  reports        AccountingReport[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, fiscalYear])
+  @@index([tenantId, status])
+  @@map("accounting_periods")
+}
+
+model UserAccountingRole {
+  id          String         @id @default(uuid())
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        AccountingRole
+  grantedAt   DateTime       @default(now())
+  grantedById String?
+  revokedAt   DateTime?
+
+  @@unique([tenantId, userId, role])
+  @@index([tenantId, userId])
+  @@index([tenantId, role])
+  @@map("user_accounting_roles")
+}
+
+model JournalEntry {
+  id            String           @id @default(uuid())
+  tenantId      String
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periodId      String
+  period        AccountingPeriod @relation(fields: [periodId], references: [id])
+  txnId         String
+  txnDate       DateTime         @db.Date
+  narration     String           @db.Text
+  source        String           @default("manual") // 'manual' | 'nc.accounting.post_ledger' | 'scenario:N'
+  // SoD: poster and approver are constrained to differ at the DB level.
+  // The CHECK constraint is added in the migration's raw SQL since Prisma
+  // doesn't support CHECK constraints natively.
+  postingUserId String
+  approvalId    String?
+  approvedById  String?
+  approvedAt    DateTime?
+  totalDebit    Decimal          @db.Decimal(18, 4)
+  totalCredit   Decimal          @db.Decimal(18, 4)
+  baseCurrency  String           @default("USD")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  postings AccountingRecord[]
+
+  @@unique([tenantId, txnId])
+  @@index([tenantId, periodId])
+  @@index([tenantId, txnDate])
+  @@index([tenantId, postingUserId])
+  @@index([approvalId])
+  @@map("journal_entries")
+}
+
+model AccountingRecord {
+  id             String             @id @default(uuid())
+  tenantId       String
+  journalEntryId String
+  journalEntry   JournalEntry       @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        ChartOfAccount     @relation(fields: [accountId], references: [id])
+  datasetId      String?
+  dataset        AccountingDataset? @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  amount         Decimal            @db.Decimal(18, 4)
+  currency       String             @default("USD")
+  fxRate         Decimal?           @db.Decimal(12, 8)
+  baseCurrency   String?
+  baseAmount     Decimal?           @db.Decimal(18, 4)
+  postingType    String // 'DEBIT' | 'CREDIT' — required
+  counterparty   String?
+  narration      String?
+  tags           Json               @default("[]")
+  sourceRef      String? // beancount file:line reference
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([tenantId, journalEntryId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, datasetId])
+  @@index([tenantId, postingType])
+  @@map("accounting_records")
+}
+
+model AccountingDataset {
+  id              String                @id @default(uuid())
+  tenantId        String
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scenarioId      String?
+  simulationRunId String?
+  kind            AccountingDatasetKind
+  name            String
+  description     String?
+  schemaVersion   Int                   @default(1)
+  rowCount        Int
+  seedValue       Int?
+  generatedBy     String                @default("manual") // 'np.dataset.generate' | 'manual'
+  payload         Json // row array (first page, max 100 rows)
+  payloadUrl      String? // presigned URL to full data for >100 rows
+  checksum        String // sha256 of full payload (corruption-detection)
+  approvedAt      DateTime?
+  approvedById    String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  records AccountingRecord[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, kind])
+  @@index([tenantId, simulationRunId])
+  @@map("accounting_datasets")
+}
+
+model AccountingReport {
+  id              String            @id @default(uuid())
+  tenantId        String
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periodId        String?
+  period          AccountingPeriod? @relation(fields: [periodId], references: [id])
+  reportType      String // 'BALANCE_SHEET' | 'INCOME_STATEMENT' | 'CASH_FLOW' | 'NPV' | 'IRR' | ...
+  asOf            DateTime?         @db.Date
+  periodStart     DateTime?         @db.Date
+  periodEnd       DateTime?         @db.Date
+  baseCurrency    String            @default("USD")
+  computedBy      String            @default("manual") // 'npf' | 'beancount' | 'manual'
+  inputs          Json              @default("{}")
+  results         Json              @default("{}")
+  beancountExport String?           @db.Text
+  createdAt       DateTime          @default(now())
+
+  @@index([tenantId, reportType])
+  @@index([tenantId, periodId])
+  @@index([tenantId, asOf])
+  @@map("accounting_reports")
+}
+
+model AuditFinding {
+  id              String               @id @default(uuid())
+  tenantId        String
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scenarioId      String?
+  simulationRunId String?
+  severity        AuditFindingSeverity
+  category        String // 'INVENTORY_DISCREPANCY' | 'UNAUTHORIZED_EXPENSE' | ...
+  title           String
+  description     String               @db.Text
+  evidence        Json                 @default("{}")
+  recommendation  String?              @db.Text
+  status          AuditFindingStatus   @default(OPEN)
+  resolvedAt      DateTime?
+  resolvedById    String?
+  resolvedNote    String?              @db.Text
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([tenantId, severity])
+  @@index([tenantId, status])
+  @@index([tenantId, simulationRunId])
+  @@map("audit_findings")
+}
+
+// Append-only Merkle root over outbox events for tamper-evidence.
+// The background job in `accounting-event-emitter.service.ts` computes a
+// new root every N events or at period close. The chain is
+//   rootHash = sha256(prevRoot || leaf_1 || ... || leaf_N)
+// Verifying audit: replay events from a snapshot point, recompute, compare.
+model OutboxMerkleRoot {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rootHash     String   @unique
+  prevRootHash String?
+  leafCount    Int // number of outbox events included
+  firstEventId String?
+  lastEventId  String?
+  periodStart  DateTime
+  periodEnd    DateTime
+  computedAt   DateTime @default(now())
+
+  @@index([tenantId, computedAt])
+  @@map("outbox_merkle_roots")
+}
+
+// ─── Service Gateway V2 — Routing Decision Log (Phase 2) ────────────────────
+//
+// Phase 2 of the service-gateway-v2 plan replaces LLM-selected capability
+// routing with a deterministic classifier. Every classified prompt (READ,
+// MUTATION, AMBIGUOUS, UNSUPPORTED) writes an immutable decision row so the
+// platform can audit routing behavior, detect persistent ambiguity, and
+// reproduce any tool invocation back to its source classifier result.
+//
+// Writing is allowed; updating or deleting is not. The service layer
+// enforces tenant scoping at every read.
+model RoutingDecisionLog {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  actorId             String
+  ruleVersion         String
+  ruleId              String
+  intent              String
+  canonicalCapability String?
+  confidence          Float
+  rawMessageHash      String
+  resolvedActionId    String?
+  sessionId           String?
+  correlationId       String?
+  ambiguous           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, ruleId])
+  @@index([tenantId, canonicalCapability])
+  @@index([tenantId, ambiguous])
+  @@map("routing_decision_logs")
+}
+
+// ─── Phase 4 Enums ────────────────────────────────────────────────────────
+// Lifecycle enums for the persisted agent/skill template system.
+// Distinct from the existing CertificationStatus enum (which is used by the
+// feature-flag system) so that semantics are not overloaded.
+
+enum AgentSkillCertificationStatus {
+  DRAFT
+  CERTIFIED
+  DEPRECATED
+  RETIRED
+}
+
+enum AgentTemplateLifecycleStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  RETIRED
+}
+
+enum AgentLifecycleAuditAction {
+  CREATE
+  UPDATE
+  CERTIFY
+  ACTIVATE
+  SUSPEND
+  RESUME
+  RETIRE
+  ROLLBACK
+}
+
+enum AgentLifecycleAuditSubject {
+  TEMPLATE
+  SKILL
+  VERSION
+}
+
+enum AgentSkillMaxEffect {
+  NONE
+  READ
+  SUGGEST
+  DRAFT
+  EXECUTE_LOCAL
+  EXECUTE_EXTERNAL
+  IRREVERSIBLE
+}
+
+// ─── Phase 4 Models ───────────────────────────────────────────────────────
+// Persisted agent/skill template lifecycle with versioning, certification,
+// activation, suspension, rollback, and tenant-scoped audit history.
+//
+// Tenant isolation: every row carries `tenantId` and is filtered at the
+// Prisma layer via repository helpers. Cross-tenant reads/writes are
+// rejected by `tenantVisibleTemplateWhere`-style predicates.
+
+// AgentSkillDefinition — a single skill (composable building block) that an
+// agent template can reference. Stable identity is `(tenantId, skillKey)`.
+model AgentSkillDefinition {
+  id       String @id @default(uuid())
+  tenantId String
+  skillKey String // stable identifier within the tenant (e.g. "createProject")
+
+  // Versioning (semantic). Combined with skillKey forms the unique key.
+  semanticVersion String @default("1.0.0")
+
+  inputSchema  Json @default("{}")
+  outputSchema Json @default("{}")
+  // Composition graph: array of {skillKey, semanticVersion} references.
+  composedOf   Json @default("[]")
+
+  // SERVER-SIDE DERIVED FIELDS (NEVER accepted from client DTOs):
+  //   - maxEffect         — worst-case side-effect ceiling across composed skills
+  //   - requiredAuthority — actor authority required to invoke
+  //   - approvalSensitive — whether the skill requires human approval
+  maxEffect         AgentSkillMaxEffect @default(NONE)
+  requiredAuthority Int                 @default(0)
+  approvalSensitive Boolean             @default(false)
+
+  preconditions  Json @default("{}")
+  postconditions Json @default("{}")
+
+  timeoutMs   Int  @default(30000)
+  retryPolicy Json @default("{}")
+
+  idempotencyKeyPattern   String? // optional client-supplied pattern
+  responseEnvelopeMapping Json    @default("{}")
+  testExamples            Json    @default("[]")
+
+  certificationStatus AgentSkillCertificationStatus @default(DRAFT)
+  certifiedAt         DateTime?
+  certifiedByActorId  String?
+  certifiedVersion    String?
+
+  // Rollback pointer — a CERTIFIED skill records which prior version it
+  // rolled back over (or null if it is the original).
+  rollbackOfId String?
+
+  lifecycleStatus AgentTemplateLifecycleStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, skillKey, semanticVersion])
+  @@index([tenantId, skillKey])
+  @@index([tenantId, lifecycleStatus])
+  @@index([tenantId, certificationStatus])
+  @@map("agent_skill_definitions")
+}
+
+// AgentTemplateVersion — an immutable revision of an AgentTemplate.
+// DRAFT → CERTIFIED → ACTIVE → SUSPENDED → RETIRED (transitions enforced
+// in AgentTemplateLifecycleService).
+model AgentTemplateVersion {
+  id              String @id @default(uuid())
+  tenantId        String
+  agentTemplateId String
+  version         String // semantic version, unique within template
+
+  // Definition snapshot — the full template definition at this revision.
+  definition Json @default("{}")
+
+  // Composed skill references — array of AgentSkillDefinition ids.
+  composedSkillRefs Json @default("[]")
+
+  // SERVER-SIDE DERIVED from composedSkillRefs (NEVER trusted from DTO):
+  maxEffect        AgentSkillMaxEffect @default(NONE)
+  authorityCeiling Int                 @default(0)
+
+  escalationActorId  String?
+  budgetLimit        Json?
+  rateLimits         Json?
+  channelBindings    Json     @default("[]")
+  approvalPolicyRefs String[] @default([])
+
+  evaluationMinScore  Float?
+  evaluationDatasetId String?
+
+  certificationStatus AgentSkillCertificationStatus @default(DRAFT)
+  certifiedAt         DateTime?
+  certifiedByActorId  String?
+
+  lifecycleStatus AgentTemplateLifecycleStatus @default(DRAFT)
+
+  // Supersession — when a new version replaces this one.
+  supersededByVersionId String?
+
+  createdAt DateTime @default(now())
+
+  agentTemplate  AgentTemplate                @relation("AgentTemplateVersions", fields: [agentTemplateId], references: [id], onDelete: Cascade)
+  tenant         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  certifications AgentTemplateCertification[] @relation("AgentTemplateVersionCertifications")
+
+  @@unique([tenantId, agentTemplateId, version])
+  @@index([tenantId, agentTemplateId])
+  @@index([tenantId, lifecycleStatus])
+  @@index([tenantId, certificationStatus])
+  @@index([agentTemplateId, lifecycleStatus])
+  @@map("agent_template_versions")
+}
+
+// AgentTemplateCertification — the certification event for a specific
+// version. Signs an evaluation report and pins expiry.
+model AgentTemplateCertification {
+  id                     String    @id @default(uuid())
+  tenantId               String
+  agentTemplateVersionId String
+  certifiedByActorId     String
+  certifiedAt            DateTime  @default(now())
+  signatureHash          String // deterministic hash over (versionId, evaluationReport, certifiedByActorId)
+  evaluationReport       Json      @default("{}")
+  expiresAt              DateTime?
+
+  version AgentTemplateVersion @relation("AgentTemplateVersionCertifications", fields: [agentTemplateVersionId], references: [id], onDelete: Cascade)
+  tenant  Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, agentTemplateVersionId])
+  @@index([tenantId, certifiedAt])
+  @@map("agent_template_certifications")
+}
+
+// AgentLifecycleAuditLog — append-only history of every lifecycle
+// transition. Required by Phase 4 §audit history and tenant isolation.
+model AgentLifecycleAuditLog {
+  id            String                     @id @default(uuid())
+  tenantId      String
+  actorId       String
+  action        AgentLifecycleAuditAction
+  subjectType   AgentLifecycleAuditSubject
+  subjectId     String
+  previousState Json
+  newState      Json
+  reason        String
+  occurredAt    DateTime                   @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, subjectType, subjectId, occurredAt])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, actorId])
+  @@map("agent_lifecycle_audit_logs")
+}

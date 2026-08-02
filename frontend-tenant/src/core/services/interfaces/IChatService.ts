@@ -12,6 +12,7 @@ export interface IChatService {
     onDone: (conversationId: string) => void,
     onError: (error: string) => void,
     onFinish: () => void,
+    onEnvelope?: (envelope: Record<string, unknown>) => void,
   ): () => void;
   getHistory(limit?: number): Promise<ChatMessage[]>;
   clearHistory(): Promise<void>;

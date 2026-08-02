@@ -5,7 +5,7 @@
  * Following SOLID principles with proper dependency injection
  */
 
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { CostsController } from './costs.controller';
 import { CostsService } from './services/costs.service';
 import { LangSmithCostProvider } from './providers/langsmith-cost-provider';
@@ -19,7 +19,7 @@ import { EnterpriseEventsModule } from '../enterprise-events/enterprise-events.m
 import { FinanceProjectConsumer } from './consumers/finance-project.consumer';
 
 @Module({
-  imports: [AgentsModule, EnterpriseEventsModule],
+  imports: [forwardRef(() => AgentsModule), EnterpriseEventsModule],
   controllers: [CostsController],
   providers: [
     // Main service

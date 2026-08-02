@@ -23,6 +23,13 @@ import {
   classifyGateG9,
 } from './certification-runner';
 import { createSimulatedScenarioExecutor } from './scenarios/scenario-executor';
+import {
+  TenantIsolationProbeRunner,
+  defaultProbeAdapters,
+  InMemoryChannelMappingStore,
+  PROBE_BOUNDARIES,
+  classifyGateG7,
+} from '../../modules/service-gateway-v2/certification/tenant-isolation-probe';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -184,6 +191,70 @@ describe('Phase 9 G9 — Golden-Path Certification', () => {
     expect(scenarios.length).toBe(5);
     expect(result.gateG9.crossTenantDenialRate).toBe(1);
     expect(result.gateG9.zeroCrossTenantExposure).toBe(true);
+  }, 60_000);
+
+  it('Gate G7 — Phase 7 cross-tenant probe runner produces APPROVED verdict', async () => {
+    const channelStore = new InMemoryChannelMappingStore();
+    channelStore.seed('tenant-b', {
+      internalId: 'agent-b',
+      externalId: 'ext-tenant-b',
+      tenantId: 'tenant-b',
+    });
+    const probeRunner = new TenantIsolationProbeRunner(
+      defaultProbeAdapters(channelStore),
+    );
+    const report = await probeRunner.run({
+      tenantA: { id: 'tenant-a', label: 'Tenant A' },
+      tenantB: { id: 'tenant-b', label: 'Tenant B' },
+      foreignIds: {
+        project: 'prj-b-1',
+        task: 'tsk-b-1',
+        executionAttempt: 'wr-b-1',
+        approvalRequest: 'apr-b-1',
+        agent: 'agt-b-1',
+        analyticsSnapshot: 'snap-b-1',
+        webhook: 'wh-b-1',
+        envelope: 'env-b-1',
+        artifact: 'art-b-1',
+      },
+      collisions: { projectName: 'Colliding Project' },
+    });
+
+    expect(report.gateG7.releaseApproved).toBe(true);
+    expect(report.gateG7.zeroCrossTenantExposure).toBe(true);
+    expect(report.gateG7.denied).toBe(PROBE_BOUNDARIES.length);
+    expect(report.results.every((r) => r.denied)).toBe(true);
+
+    // Surface the G7 report through the runner so it lands on the
+    // machine-readable CertificationRun.
+    const g7Runner = new CertificationRunner();
+    g7Runner.attachGateG7(report);
+    const g7Result = await g7Runner.runCertification(
+      CertificationRunBuilder.buildDefault().filter(
+        (s) => s.type === 'clean_run',
+      ),
+      createSimulatedScenarioExecutor(),
+    );
+
+    expect(g7Result.gateG7).toBeDefined();
+    expect(g7Result.gateG7?.releaseApproved).toBe(true);
+
+    const g7Classification = classifyGateG7(report.gateG7);
+    expect(g7Classification.failing).toEqual([]);
+
+    const evidencePath = `g7.${expect.getState().currentTestName?.replace(/\s+/g, '_') ?? 'g7'}`;
+    (runCertificationEvidence as any)[evidencePath] = {
+      g7: report.gateG7,
+      g7Classification,
+      g9Classification: classifyGateG9(g7Result.gateG9),
+    };
+
+    fs.mkdirSync(REPORT_DIR, { recursive: true });
+    fs.writeFileSync(
+      path.join(REPORT_DIR, 'g7-machine-readable.json'),
+      JSON.stringify(report, null, 2),
+      'utf-8',
+    );
   }, 60_000);
 });
 

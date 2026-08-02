@@ -39,9 +39,15 @@ interface RailCustomizeModalProps {
    * back to the generic 19-link rail.
    */
   industryGroup?: string | null;
+  /**
+   * PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.1 (P3) — the tenant's
+   * industry slug, forwarded to `buildRailSections` so sub-industry
+   * nav filters (e.g. hide Products for media tenants) apply.
+   */
+  industrySlug?: string | null;
 }
 
-export function RailCustomizeModal({ open, onClose, industryGroup }: RailCustomizeModalProps) {
+export function RailCustomizeModal({ open, onClose, industryGroup, industrySlug }: RailCustomizeModalProps) {
   // Read raw state (arrays) so the modal re-renders when toggles change.
 // Calling s.isSectionVisible / s.isItemVisible returns a stable function ref
 // each time, so Zustand wouldn't notify this component on state change.
@@ -57,8 +63,8 @@ export function RailCustomizeModal({ open, onClose, industryGroup }: RailCustomi
   // Industry-aware rail — same builder IconRail uses at runtime, so the
   // toggles the user picks here line up 1:1 with what they actually see.
   const railSections = useMemo(
-    () => buildRailSections(industryGroup ?? null),
-    [industryGroup],
+    () => buildRailSections(industryGroup ?? null, industrySlug),
+    [industryGroup, industrySlug],
   );
 
   // Close on Escape.

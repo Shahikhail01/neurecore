@@ -23,7 +23,7 @@ import {
 export default function TiersPage() {
   const user = useAdminAuth();
   const [search, setSearch] = useState('');
-  const { items, total, page: currentPage, totalPages, loading, refresh, setOpts } = usePoolList<
+  const { items, total, page: currentPage, totalPages, limit, loading, refresh, setOpts } = usePoolList<
     Tier,
     CreateTierPayload
   >(tiersPoolService);
@@ -84,7 +84,7 @@ export default function TiersPage() {
         {loading ? (
           <div className="text-center py-12 text-sm text-zinc-500">Loading…</div>
         ) : filtered.length === 0 ? (
-          <PoolEmptyState label="tiers" />
+          <PoolEmptyState title="No tiers match your filters" hint="Try clearing the search." />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((tier) => (
@@ -103,6 +103,7 @@ export default function TiersPage() {
             page={currentPage}
             totalPages={totalPages}
             total={total}
+            limit={limit}
             onPageChange={(p) => setOpts({ page: p })}
           />
         )}
@@ -212,9 +213,41 @@ function TierEditModal({
   onSaved: () => void;
 }) {
   const isNew = !tier;
-  const [form, setForm] = useState<Partial<CreateTierPayload>>(
-    tier ?? { slug: '', name: '', monthlyPrice: 0, yearlyPrice: 0 },
-  );
+  const [form, setForm] = useState<Partial<CreateTierPayload>>(() => {
+    if (!tier) return { slug: '', name: '', monthlyPrice: 0, yearlyPrice: 0 };
+    // Map Tier → CreateTierPayload (drop server-managed fields like id/createdAt).
+    return {
+      slug: tier.slug,
+      name: tier.name,
+      tagline: tier.tagline ?? undefined,
+      description: tier.description ?? undefined,
+      icon: tier.icon ?? undefined,
+      isActive: tier.isActive,
+      isDefault: tier.isDefault,
+      sortOrder: tier.sortOrder,
+      monthlyPrice: typeof tier.monthlyPrice === 'string' ? Number(tier.monthlyPrice) : tier.monthlyPrice,
+      yearlyPrice: typeof tier.yearlyPrice === 'string' ? Number(tier.yearlyPrice) : tier.yearlyPrice,
+      currency: tier.currency,
+      billingCycle: tier.billingCycle,
+      trialDays: tier.trialDays ?? undefined,
+      maxUsers: tier.maxUsers,
+      maxAgents: tier.maxAgents,
+      maxDepartments: tier.maxDepartments,
+      maxStorageGB: tier.maxStorageGB,
+      maxApiCalls: tier.maxApiCalls,
+      maxConversationMessages: tier.maxConversationMessages,
+      maxFileSizeMB: tier.maxFileSizeMB,
+      maxApprovalStages: tier.maxApprovalStages,
+      allowCustomBranding: tier.allowCustomBranding,
+      allowApiAccess: tier.allowApiAccess,
+      allowSso: tier.allowSso,
+      allowAuditExport: tier.allowAuditExport,
+      allowWhiteLabel: tier.allowWhiteLabel,
+      allowPredictiveAnalytics: tier.allowPredictiveAnalytics,
+      allowCustomDashboards: tier.allowCustomDashboards,
+      allowMultiOffice: tier.allowMultiOffice,
+    };
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

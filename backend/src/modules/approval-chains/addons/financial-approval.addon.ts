@@ -9,6 +9,7 @@
 
 import { Injectable } from '@nestjs/common';
 import type { ApprovalAddon, ApprovalRoute } from './approval-addon.interface';
+import { INDUSTRY_GROUP } from '../../industry/tier-industry-matrix';
 
 @Injectable()
 export class FinancialApprovalAddon implements ApprovalAddon {
@@ -29,7 +30,7 @@ export class FinancialApprovalAddon implements ApprovalAddon {
         triggers: [
           {
             event: 'customer.created',
-            conditions: { industryGroup: 'financial-compliance' },
+            conditions: { industryGroup: INDUSTRY_GROUP.FINANCIAL_COMPLIANCE },
           },
         ],
       },

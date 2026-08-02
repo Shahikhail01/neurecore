@@ -6,9 +6,31 @@
  *
  * Capabilities are computed per (industry group, tier) combination.
  * Update when a new tier or industry group is added.
+ *
+ * PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §4.1 (R1) — this file is the
+ * SINGLE source of truth for industry-group slugs + tier slugs on the
+ * backend. Consumers MUST import from here, never inline literals.
  */
 
 export type TierSlug = 'basic' | 'business' | 'professional' | 'enterprise';
+
+/**
+ * Industry group slug constant object. The string literal value MUST equal
+ * the matching member of the IndustryGroupSlug union below — TypeScript's
+ * literal-type assignment check enforces this at compile time.
+ */
+export const INDUSTRY_GROUP = {
+  // ─── Active (kept, ship to customers) ───────────────────────────────────
+  FINANCIAL_COMPLIANCE: 'financial-compliance',
+  BUSINESS_TECHNOLOGY: 'business-technology',
+  CONSUMER_COMMERCE: 'consumer-commerce',
+  PUBLIC_SOCIAL: 'public-social',
+  OTHER: 'other',
+  // ─── Inactive (cut — DB rows retained for grandfathering) ───────────────
+  HEALTHCARE: 'healthcare',
+  INDUSTRIAL_INFRASTRUCTURE: 'industrial-infrastructure',
+  AGRICULTURE_FOOD: 'agriculture-food',
+} as const satisfies Record<string, IndustryGroupSlug>;
 
 export type IndustryGroupSlug =
   | 'healthcare'
@@ -19,6 +41,22 @@ export type IndustryGroupSlug =
   | 'consumer-commerce'
   | 'agriculture-food'
   | 'other';
+
+/**
+ * Set of group slugs whose Industries are selectable in the onboarding
+ * picker AND show in the Customer Industry dropdown AND surface in marketing.
+ *
+ * Adding a new active Industry group = one entry here + one entry in the
+ * IndustryGroupSlug union + one entry in INDUSTRY_GROUP above + one entry
+ * in INDUSTRY_GROUP_INDUSTRIES below + one entry in CAPABILITY_MATRIX.
+ */
+export const ACTIVE_INDUSTRY_GROUPS: ReadonlySet<IndustryGroupSlug> = new Set([
+  INDUSTRY_GROUP.FINANCIAL_COMPLIANCE,
+  INDUSTRY_GROUP.BUSINESS_TECHNOLOGY,
+  INDUSTRY_GROUP.CONSUMER_COMMERCE,
+  INDUSTRY_GROUP.PUBLIC_SOCIAL,
+  INDUSTRY_GROUP.OTHER,
+]);
 
 export interface IndustryCapabilityRow {
   maxAgents: number; // 9999 = unlimited
@@ -41,7 +79,11 @@ export const INDUSTRY_GROUP_INDUSTRIES: Record<IndustryGroupSlug, string[]> = {
     'education-research',
     'nonprofit-international',
   ],
-  'financial-compliance': ['accounting-audit-services', 'financial-services', 'insurance'],
+  'financial-compliance': [
+    'accounting-audit-services',
+    'financial-services',
+    'insurance',
+  ],
   'business-technology': [
     'professional-business-services',
     'technology-digital-services',
@@ -170,37 +212,46 @@ const INDUSTRY_DEFAULT_AGENTS: Record<string, string[]> = {
  * it via `resolveDefaultAgentsForIndustry()` which falls back to the
  * generic list when no override matches.
  */
-export const SUB_INDUSTRY_AGENT_PRIORITIES: Record<string, readonly string[]> = {
-  // Healthcare: clinical roles prioritise triage + records specialists
-  'healthcare-life-sciences': ['triage', 'records', 'patient', 'pharm'],
-  // Government: compliance + records + permits first
-  'government-public-sector': ['permit', 'records', 'case-', 'compliance'],
-  // Education: registrar + advisor first
-  'education-research': ['registrar', 'advisor', 'admissions'],
-  // Nonprofit: grant + program first
-  'nonprofit-international': ['grant', 'program', 'volunteer'],
-  // Manufacturing: production planner first
-  'manufacturing-industrial': ['production', 'maintenance', 'quality'],
-  // Construction: estimator + site first
-  'construction-engineering-infrastructure': ['estimator', 'site', 'procurement'],
-  // Energy: compliance + incident first
-  'energy-utilities-natural-resources': ['compliance', 'incident', 'plant'],
-  // Logistics: dispatcher + fleet first
-  'logistics-transportation-supply-chain': ['dispatcher', 'fleet', 'warehouse'],
-  // Retail: loyalty + store first
-  'retail-commerce-consumer': ['loyalty', 'store', 'merchandis'],
-  // Media: editor + content first
-  'media-communications-creative': ['editor', 'content', 'campaign'],
-  // Accounting & audit: senior staff before juniors
-  'accounting-audit-services': [
-    'tax-strategist',
-    'audit-coordinator',
-    'compliance-auditor',
-    'risk-manager',
-    'forensic',
-    'quality-reviewer',
-  ],
-};
+export const SUB_INDUSTRY_AGENT_PRIORITIES: Record<string, readonly string[]> =
+  {
+    // Healthcare: clinical roles prioritise triage + records specialists
+    'healthcare-life-sciences': ['triage', 'records', 'patient', 'pharm'],
+    // Government: compliance + records + permits first
+    'government-public-sector': ['permit', 'records', 'case-', 'compliance'],
+    // Education: registrar + advisor first
+    'education-research': ['registrar', 'advisor', 'admissions'],
+    // Nonprofit: grant + program first
+    'nonprofit-international': ['grant', 'program', 'volunteer'],
+    // Manufacturing: production planner first
+    'manufacturing-industrial': ['production', 'maintenance', 'quality'],
+    // Construction: estimator + site first
+    'construction-engineering-infrastructure': [
+      'estimator',
+      'site',
+      'procurement',
+    ],
+    // Energy: compliance + incident first
+    'energy-utilities-natural-resources': ['compliance', 'incident', 'plant'],
+    // Logistics: dispatcher + fleet first
+    'logistics-transportation-supply-chain': [
+      'dispatcher',
+      'fleet',
+      'warehouse',
+    ],
+    // Retail: loyalty + store first
+    'retail-commerce-consumer': ['loyalty', 'store', 'merchandis'],
+    // Media: editor + content first
+    'media-communications-creative': ['editor', 'content', 'campaign'],
+    // Accounting & audit: senior staff before juniors
+    'accounting-audit-services': [
+      'tax-strategist',
+      'audit-coordinator',
+      'compliance-auditor',
+      'risk-manager',
+      'forensic',
+      'quality-reviewer',
+    ],
+  };
 
 /**
  * Resolve the default agents for a tenant's industry, applying sub-industry
@@ -215,7 +266,9 @@ export const SUB_INDUSTRY_AGENT_PRIORITIES: Record<string, readonly string[]> = 
  * SRP: single purpose (sub-industry priority sort). Pure function — no
  * I/O, no state. DRY: this is the only place the priority map is consumed.
  */
-export function resolveDefaultAgentsForIndustry(industrySlug: string): string[] {
+export function resolveDefaultAgentsForIndustry(
+  industrySlug: string,
+): string[] {
   const base = INDUSTRY_DEFAULT_AGENTS[industrySlug] ?? [];
   if (base.length === 0) return [];
 

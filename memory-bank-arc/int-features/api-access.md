@@ -14,10 +14,43 @@ API
 - Rate limiting and throttling can be applied per-tenant when feature is enabled
 - Swagger/OpenAPI docs at `/api/docs`
 
+## Key API Surface Areas
+
+### Integrations API (`/integrations`)
+- `GET/POST /integrations/google/{authorize,callback,disconnect,status}`
+- `GET/POST /integrations/google/platform-status` (admin)
+- `POST /integrations/admin/google/:tenantId/disconnect` (admin)
+- `GET /integrations/gmail/{inbox,messages/:id/body,labels}`
+- `POST /integrations/gmail/send`
+- `GET/POST/DELETE /integrations/calendar/events`
+- `GET/POST /integrations/drive/{folders,files}`
+- `GET /integrations/drive/search?mode=name|fulltext`
+- `POST/GET/DELETE /integrations/drive/files/:id/permissions`
+- `GET/POST /integrations/sheets/:id/values/:range`
+- `POST /integrations/brevo/{connect,disconnect,test-send,sender}`
+- `GET /integrations/brevo/{status,validate,events,usage}`
+- `POST /integrations/brevo/webhook` (public, HMAC-verified)
+- `GET/POST /admin/brevo/{platform-status,tenants,usage-series,health,events,suppressions}`
+
+### Agents API (`/agents`)
+- Full CRUD for agents, tasks, projects
+- Agent execution and status monitoring
+
+### Routines API (`/routines`)
+- `GET/POST /routines` — routine CRUD
+- `POST /routines/:id/execute` — manual trigger
+- `GET /routines/:id/runs` — execution history
+- `POST /webhooks/routines/:path` — webhook trigger (public, secret-verified)
+
+### Auth API (`/auth`)
+- `POST /auth/login`, `/auth/register`, `/auth/logout`
+- `POST /auth/refresh`
+- `POST /auth/google` — Google SSO
+
 ## Tenant Frontend Status
 - ⚠️ **No dedicated "API Access" tenant page**
 - API keys / tokens management UI not built
-- Developers would need to authenticate as a user and use JWT tokens directly
+- Developers authenticate as a user and use JWT tokens directly
 
 ## Admin Frontend Status
 - ✅ **API is inherent** — admin itself consumes the same API via Next.js route handlers (`/app/api/v1/*`)

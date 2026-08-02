@@ -1,8 +1,8 @@
 # Contabo Operations — DOs and DONTs
 
-**Last verified:** 2026-07-28 18:10 PKT — AI Gateway Phase 2.8 deployed (DB-stored encrypted provider keys, Discover Models, clickable model badges, chat streaming Zod fix). New sub-sections added: **§3.8b** env-flag precedence (`.env.production` wins over `.env`), **§3.8c** `model_providers` table ownership caveat.
+**Last verified:** 2026-07-31 — NC-AWL-IMP-2 (G9) certification passed all 8 gates (2026-07-30). hermes-tools 116 tools confirmed callable via chat (138bda6f). Accounting Capability (NC-ACCT-IMP-1) Phase 1 deployed 2026-07-30. 9 new Postgres tables, NestJS `AccountingModule`, Python `accounting-sidecar` (port 8091, systemd-managed). Sibling doc: [sidecar-deploy-procedure.md](sidecar-deploy-procedure.md).
 **Audience:** Anyone working on the Contabo box (`vmi2954830.contaboserver.net`, `109.123.248.253`).
-**Sibling docs:** [system-state.md](system-state.md) · [operations.md](operations.md) · [backend.md](backend.md) · [frontend-admin.md](frontend-admin.md) · [frontend-tenant.md](frontend-tenant.md) · [ai-gateway/ai-gateway-reference.md](ai-gateway/ai-gateway-reference.md) · [pending-tasks.md §0g](pending-tasks.md)
+**Sibling docs:** [system-state.md](system-state.md) · [operations.md](operations.md) · [backend.md](backend.md) · [frontend-admin.md](frontend-admin.md) · [frontend-tenant.md](frontend-tenant.md) · [ai-gateway/ai-gateway-reference.md](ai-gateway/ai-gateway-reference.md) · [pending-tasks.md §0g](pending-tasks.md) · [sidecar-deploy-procedure.md](sidecar-deploy-procedure.md)
 
 ---
 
@@ -14,12 +14,23 @@
 
 | Process | ID | Port | What |
 |---|---|---|---|
-| `neurecore-backend` | 10 | 3003 | NestJS API — **Projects Phases 1–7 + EIE deployed 2026-07-09** |
-| `neurecore-tenant` | 12 | 3001 | Next.js, `hq.neurecore.com` |
-| `neurecore-admin` | 9 | 3002 | Next.js, `cc.neurecore.com` (port `3020` is **deprecated** — see §4.10) |
-| `neurecore-cors-proxy` | 7 | 3004 | dev CORS sidecar → 3003 |
+| `neurecore-backend` | 6 | 3003 | NestJS API — Projects Phases 1–7 + EIE + **Accounting Capability (NC-ACCT-IMP-1) deployed 2026-07-30** |
+| `neurecore-tenant` | 7 | 3001 | Next.js, `hq.neurecore.com` |
+| `neurecore-admin` | 5 | 3020 | Next.js, `cc.neurecore.com` |
+| `neurecore-cors-proxy` | 13 | 3004 | dev CORS sidecar → 3003 |
 
-> ⚠️ **Frontend deploy pending:** `neurecore-tenant` (id 12) and `neurecore-admin` (id 9) have NOT been rebuilt with the Projects code. All new routes (`/projects`, `/projects/new`, `/customers`, `/portal`, `/project-types`, `/question-packs`, `/customers-pool`) will 404 until the frontends are rebuilt and restarted.
+**3 systemd sidecars** (all online, started by `systemctl enable --now`):
+
+| Service | Port | What |
+|---|---|---|
+| `hermes-sidecar` | 8080 | Hermes execution runtime (NousResearch agent + ACP) |
+| `hermes-events-bridge` | 8082 | Signed event webhook receiver |
+| `accounting-sidecar` | **8091** | **NEW** — numpy-financial + Beancount + Pandas accounting compute |
+
+> ⚠️ **Port 8090 is permanently occupied by CyberPanel (`lscpd`). Never use 8090 for a sidecar.**
+> Use 8081, 8083, 8084, 8091, 8092, 8093 etc. for capability sidecars.
+
+> ⚠️ **Frontend deploy pending:** `neurecore-tenant` and `neurecore-admin` have NOT been rebuilt with the Projects code. All new routes (`/projects`, `/projects/new`, `/customers`, `/portal`, `/project-types`, `/question-packs`, `/customers-pool`) will 404 until the frontends are rebuilt and restarted.
 
 **3 public hostnames** (TLS via Let's Encrypt, all healthy):
 
@@ -414,6 +425,42 @@ Without `pm2 save`, the new process layout is not written to `/root/.pm2/dump.pm
 ### 4.14 DON'T bring back Vercel, FTS, or EAOS without product approval
 
 These were retired on purpose. Reversing the decision requires an explicit go-ahead recorded in [future-plans.md](future-plans.md) and a new architecture doc.
+
+---
+
+## 4.11 Capability sidecars (systemd, NOT PM2)
+
+Capability sidecars are Python services that perform tenant-scoped compute
+behind an HMAC-authenticated HTTP boundary. They are NOT managed by PM2.
+
+**Currently running (verified 2026-07-30):**
+
+| Service | Port | Source | Unit file |
+|---|---|---|---|
+| `hermes-sidecar` | 8080 | `/opt/neurecore/infra/hermes-sidecar` | `/etc/systemd/system/hermes-sidecar.service` |
+| `hermes-events-bridge` | 8082 | `/opt/neurecore/infra/hermes-events-bridge` | `/etc/systemd/system/hermes-events-bridge.service` |
+| `accounting-sidecar` | 8091 | `/opt/neurecore/infra/accounting-sidecar` | `/etc/systemd/system/accounting-sidecar.service` |
+
+**Pattern:** All run as user `hermes-sidecar` (uid 997). All bind to
+`127.0.0.1` only (no public exposure). All share the Python venv at
+`/opt/neurecore/infra/venv/`.
+
+**See [sidecar-deploy-procedure.md](sidecar-deploy-procedure.md) for the
+full procedure** to add a new sidecar (synced from the accounting-sidecar
+deploy on 2026-07-30).
+
+**Quick health check:**
+```bash
+ssh contabo 'systemctl is-active hermes-sidecar hermes-events-bridge accounting-sidecar; ss -tlnp | grep -E "(8080|8082|8091)"'
+```
+
+**Common failure mode: sidecar crashes after NestJS deploy.**
+If you `rsync` source for a sidecar that has an import error, the sidecar
+will hit `StartLimitBurst=5` and refuse to restart for 60 seconds. Fix:
+fix the code, `rsync`, then:
+```bash
+ssh contabo 'systemctl reset-failed <name>-sidecar && systemctl restart <name>-sidecar'
+```
 
 ---
 

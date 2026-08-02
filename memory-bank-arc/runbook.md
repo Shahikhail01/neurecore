@@ -457,3 +457,4 @@ for p in json.load(sys.stdin):
 - [plans/auth-hardening-refactor.md](plans/auth-hardening-refactor.md) — The 10-phase FIX-020 plan (now ✅ SHIPPED 2026-07-07).
 - [fixes.md](fixes.md) — FIX-014 (Auth Hardening Batch 1), FIX-015-016 (auth-hardening audit), FIX-019 (defensive patterns), FIX-020 (✅ shipped auth refactor).
 - `scripts/auth-lint.sh` — Banned-pattern CI check. Run before any auth-related PR.
+- [future-plans.md](future-plans.md) — Phase 9 G9 APPROVED status (commit fe335abb, 2026-07-30).

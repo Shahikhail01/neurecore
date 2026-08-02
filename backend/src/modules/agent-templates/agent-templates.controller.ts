@@ -15,11 +15,18 @@ import {
 } from '@nestjs/common';
 import { ApiCommon } from '../../common/decorators/api-common.decorator';
 import { AgentTemplatesService } from './agent-templates.service';
+import { AgentTemplateLifecycleService } from './agent-template-lifecycle.service';
 import {
   CreateAgentTemplateDto,
   UpdateAgentTemplateDto,
   CloneAgentTemplateDto,
 } from './dto/agent-template.dto';
+import {
+  CreateVersionDto,
+  CertifyVersionDto,
+  LifecycleTransitionDto,
+  RollbackDto,
+} from './dto/agent-template-lifecycle.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
@@ -35,7 +42,10 @@ import { UserRole } from '@prisma/client';
 @Controller({ path: 'agent-templates', version: '1' })
 @ApiCommon('agent_templates')
 export class AgentTemplatesController {
-  constructor(private readonly templatesService: AgentTemplatesService) {}
+  constructor(
+    private readonly templatesService: AgentTemplatesService,
+    private readonly lifecycle: AgentTemplateLifecycleService,
+  ) {}
 
   // ─── Platform (SUPER_ADMIN) ──────────────────────────────────────────────
 
@@ -204,5 +214,143 @@ export class AgentTemplatesController {
   ) {
     if (!user.tenantId) throw new ForbiddenException('Tenant context required');
     return this.templatesService.remove(id, user.tenantId);
+  }
+
+  // ─── Phase 4 — versioned lifecycle endpoints ────────────────────────────
+  //
+  // Every endpoint is tenant-scoped via `req.user.tenantId` (JWT). The
+  // actor identity is taken from `req.user.sub` — NEVER from the request
+  // body — and passed to the lifecycle service.
+
+  @Post(':id/versions')
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  createVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateVersionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.createVersion(user.tenantId, user.sub, {
+      agentTemplateId: id,
+      version: dto.version,
+      definition: dto.definition as never,
+      composedSkillRefs: dto.composedSkillRefs,
+      escalationActorId: dto.escalationActorId,
+      budgetLimit: dto.budgetLimit as never,
+      rateLimits: dto.rateLimits as never,
+      channelBindings: dto.channelBindings as never,
+      approvalPolicyRefs: dto.approvalPolicyRefs,
+      evaluationMinScore: dto.evaluationMinScore,
+      evaluationDatasetId: dto.evaluationDatasetId,
+    });
+  }
+
+  @Post(':id/versions/:version/certify')
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  certifyVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('version') version: string,
+    @Body() dto: CertifyVersionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.certify(user.tenantId, user.sub, {
+      agentTemplateId: id,
+      version,
+      evaluationReport: dto.evaluationReport as never,
+      expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+      reason: dto.reason,
+    });
+  }
+
+  @Post(':id/versions/:version/activate')
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  activateVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('version') version: string,
+    @Body() dto: LifecycleTransitionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.activate(user.tenantId, user.sub, {
+      agentTemplateId: id,
+      version,
+      reason: dto.reason,
+    });
+  }
+
+  @Post(':id/versions/:version/suspend')
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  suspendVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('version') version: string,
+    @Body() dto: LifecycleTransitionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.suspend(user.tenantId, user.sub, {
+      agentTemplateId: id,
+      version,
+      reason: dto.reason,
+    });
+  }
+
+  @Post(':id/versions/:version/resume')
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  resumeVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('version') version: string,
+    @Body() dto: LifecycleTransitionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.resume(user.tenantId, user.sub, {
+      agentTemplateId: id,
+      version,
+      reason: dto.reason,
+    });
+  }
+
+  @Post(':id/versions/:version/retire')
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  retireVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('version') version: string,
+    @Body() dto: LifecycleTransitionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.retire(user.tenantId, user.sub, {
+      agentTemplateId: id,
+      version,
+      reason: dto.reason,
+    });
+  }
+
+  @Post(':id/rollback')
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  rollbackVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RollbackDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.rollback(user.tenantId, user.sub, {
+      agentTemplateId: id,
+      targetVersion: dto.targetVersion,
+      reason: dto.reason,
+    });
+  }
+
+  @Get(':id/audit')
+  listAudit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.listAudit({
+      tenantId: user.tenantId,
+      templateId: id,
+    });
   }
 }

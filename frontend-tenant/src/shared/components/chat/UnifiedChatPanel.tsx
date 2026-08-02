@@ -9,6 +9,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { IChatService, ISlashCommandProvider, IJsonExtractor } from '@/core/services/interfaces/IChatService';
 import type { AutonomousApprovalData, ChatConfig, SuggestionData } from '@/shared/types/chat.types';
+import type { IEnvelopeParser } from '@/core/services/chat/envelope/interfaces/IEnvelopeParser';
 import { useChat } from '@/shared/hooks/useChat';
 import { TriggerButton } from './TriggerButton';
 import { UnifiedChatHeader } from './UnifiedChatHeader';
@@ -20,6 +21,7 @@ interface UnifiedChatPanelProps {
   chatService: IChatService;
   slashCommands: ISlashCommandProvider;
   jsonExtractor: IJsonExtractor;
+  envelopeParser: IEnvelopeParser;
   config: ChatConfig;
   pageContext?: string;
 }
@@ -28,6 +30,7 @@ export function UnifiedChatPanel({
   chatService,
   slashCommands,
   jsonExtractor,
+  envelopeParser,
   config,
   pageContext,
 }: UnifiedChatPanelProps) {
@@ -41,7 +44,7 @@ export function UnifiedChatPanel({
     setOpen,
     toggleOpen,
     setError,
-  } = useChat(chatService, slashCommands, jsonExtractor, config, pageContext);
+  } = useChat(chatService, slashCommands, jsonExtractor, envelopeParser, config, pageContext);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +137,7 @@ export function UnifiedChatPanel({
                     onSuggestionSelect={handleSuggestionSelect}
                     sending={sending}
                     onApprovalDecision={handleApprovalDecision}
+                    envelopeParser={envelopeParser}
                   />
                 ))}
                 <div ref={bottomRef} />

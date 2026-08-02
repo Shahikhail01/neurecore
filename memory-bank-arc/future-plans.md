@@ -1,6 +1,47 @@
 # Future Plans & Feature Roadmap
 
-**Last updated:** 2026-07-25 11:20 PKT (Industry Verification Run-3 closed every accounting-audit-services defect filed in Run-1 + Run-2; production-ready for accounting. Prior rev: Enterprise Communication Platform Phases 1-9 IMPLEMENTED + AUDIT-PASSED — see [enterprise-comms-chat.md](enterprise-comms-chat.md) rev 3 for the implementation reference. Rev 2 closed 10 spec gaps; rev 3 deep-audit closed 17 runtime/DI/WS gaps (ActivityModule shadow provider, HermesModule missing EventsModule import, 6 services with broken `import type` interface DI converted to symbol-based `@Inject(...)` + `useExisting` aliases, `thread:participant_added` room-name typo, missing `thread:join`/`thread:leave` WS handlers, `useActivityFeed` backfill fixed with new `since` param, 3 orphan test specs deleted). All 10 `COMM_*` feature flags + `AGENT_MESSAGING_ENABLED` default `false` — zero prod behavior change until flags flipped.)
+**Last updated:** 2026-07-31 22:00 PKT
+**Phase 9 G9 Certification:** ✅ APPROVED (NC-AWL-IMP-2, commit fe335abb, 2026-07-30)
+**SIM-05:** Deployed (6 COMPUTE + 14 JUDGMENT scenarios, NC-SIM05-IMP-2)
+**SIM-04:** ❌ FAIL — S1+S2 failed; NC-SIM04-002 (FE modal z-index), NC-SIM05-005 (chat agent graph tool binding) remain open
+
+---
+
+## Phase 9 G9 — Golden-Path Certification ✅ APPROVED
+
+**Commit:** `fe335abb` (2026-07-30)
+**Gate verdict:** APPROVED
+**Run:** `pnpm certify:phase9` — 105-scenario matrix
+
+Key metrics:
+- 100% critical-path pass rate
+- Zero duplicate effects
+- Zero cross-tenant exposure
+- All runs preserve evidence trail
+- ≥ 98% clean runs without engineering intervention
+- Duplicate suppression ≥ 99%
+- Worker recovery ≥ 99%
+- Transient recovery ≥ 90%
+- Revision cycle reliability ≥ 99%
+- Session expiry resilience ≥ 99%
+- Socket-disabled recovery ≥ 99%
+- Cross-tenant denial = 100%
+
+Mandatory invariants (10/10 enforced in `src/test/certification/invariants/mandatory-invariants.spec.ts`):
+1. Same idempotency key cannot create two projects
+2. Same event cannot create duplicate tasks
+3. Same execution request cannot create two active attempts
+4. AI cannot approve its own task
+5. Cross-tenant IDs are rejected
+6. Project cannot complete with mandatory unapproved tasks
+7. Failed transaction creates neither aggregate nor outbox event
+8. Committed aggregate always has required outbox event
+9. Worker retry cannot overwrite approved artifact
+10. Revision never mutates prior attempt evidence
+
+---
+
+**Prior update:** 2026-07-25 11:20 PKT (Industry Verification Run-3 closed every accounting-audit-services defect filed in Run-1 + Run-2; production-ready for accounting. Prior rev: Enterprise Communication Platform Phases 1-9 IMPLEMENTED + AUDIT-PASSED — see [enterprise-comms-chat.md](enterprise-comms-chat.md) rev 3 for the implementation reference. Rev 2 closed 10 spec gaps; rev 3 deep-audit closed 17 runtime/DI/WS gaps (ActivityModule shadow provider, HermesModule missing EventsModule import, 6 services with broken `import type` interface DI converted to symbol-based `@Inject(...)` + `useExisting` aliases, `thread:participant_added` room-name typo, missing `thread:join`/`thread:leave` WS handlers, `useActivityFeed` backfill fixed with new `since` param, 3 orphan test specs deleted). All 10 `COMM_*` feature flags + `AGENT_MESSAGING_ENABLED` default `false` — zero prod behavior change until flags flipped.)
 **Audience:** Product + engineering — what's coming next.
 **Sibling docs:** [fixes.md](fixes.md) · [backend.md](backend.md) · [frontend-tenant.md](frontend-tenant.md) · [frontend-admin.md](frontend-admin.md) · [contabo-ops.md](contabo-ops.md) · [enterprise-comms-chat.md](enterprise-comms-chat.md)
 

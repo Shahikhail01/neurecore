@@ -1,5 +1,6 @@
 # NeureCore — Deployment Procedure
 
+**Last verified:** 2026-07-31 — NC-AWL-IMP-2 (G9) certification deployed; hermes-tools 116-tool chat surface live.
 **Audience:** Anyone pushing a change to Contabo.
 **Sibling docs:** [operations.md](operations.md), [disaster-recovery.md](disaster-recovery.md).
 

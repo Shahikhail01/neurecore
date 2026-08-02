@@ -300,6 +300,24 @@ export const HERMES_TOOL_SETS: Record<HermesAgentType, HermesToolDescriptor[]> =
         { name: 'query', description: 'Query data', permission: ToolPermissionLevel.READ_ONLY },
         { name: 'sheets', description: 'Spreadsheet operations', permission: ToolPermissionLevel.ALLOW },
         { name: 'calendar', description: 'Calendar operations', permission: ToolPermissionLevel.ALLOW },
+        // Phase 9: required. Chat uses agentId='ai-assistant' which maps to
+        // CUSTOM in getHermesToolSet(). Without this descriptor,
+        // ToolGatewayService.validate() returns { allowed: false } for every
+        // service.gateway call and the chat silently never executes it.
+        // See implementation-plan §3.7.
+        //
+        // NOTE: the tool's runtime name is `service-gateway` (hyphen, not
+        // dot). OpenAI's tool schema requires `^[a-zA-Z0-9_-]+$` — a dot
+        // breaks the function-call payload (`tools[0].function.name` is
+        // rejected by the provider with HTTP 400). The hyphenated form is
+        // registered under the SAME Hermes descriptor so the chat's
+        // allowlist (`resolveChatAllowedTools` returning
+        // ['service-gateway']) lines up.
+        {
+            name: 'service-gateway',
+            description: 'Invoke any tenant-scoped backend capability (service gateway)',
+            permission: ToolPermissionLevel.ALLOW,
+        },
     ],
 };
 

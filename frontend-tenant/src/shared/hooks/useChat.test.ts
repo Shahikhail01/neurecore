@@ -18,6 +18,7 @@ import type {
   ISlashCommandProvider,
   IJsonExtractor,
 } from '@/core/services/interfaces/IChatService';
+import type { IEnvelopeParser } from '@/core/services/chat/envelope/interfaces/IEnvelopeParser';
 import type { ChatConfig } from '@/shared/types/chat.types';
 import { useChatStore } from '@/core/services/chat/chat.factory';
 
@@ -29,6 +30,10 @@ const mockSlashCommands: ISlashCommandProvider = {
 
 const mockJsonExtractor: IJsonExtractor = {
   extract: (raw: string) => ({ cleaned: raw }),
+};
+
+const mockEnvelopeParser: IEnvelopeParser = {
+  parse: (raw: string) => ({ text: raw }),
 };
 
 function makeChatService(): IChatService {
@@ -77,7 +82,13 @@ describe('useChat — external message consumption', () => {
     const chatService = makeChatService();
 
     const { rerender } = renderHook(() =>
-      useChat(chatService, mockSlashCommands, mockJsonExtractor, dummyConfig),
+      useChat(
+        chatService,
+        mockSlashCommands,
+        mockJsonExtractor,
+        mockEnvelopeParser,
+        dummyConfig,
+      ),
     );
 
     // Allow mount effect to run.
@@ -105,7 +116,13 @@ describe('useChat — external message consumption', () => {
     const chatService = makeChatService();
 
     renderHook(() =>
-      useChat(chatService, mockSlashCommands, mockJsonExtractor, dummyConfig),
+      useChat(
+        chatService,
+        mockSlashCommands,
+        mockJsonExtractor,
+        mockEnvelopeParser,
+        dummyConfig,
+      ),
     );
 
     await act(async () => {
@@ -113,5 +130,43 @@ describe('useChat — external message consumption', () => {
     });
 
     expect(chatService.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('preserves an SSE envelope on the completed assistant message', async () => {
+    const chatService = makeChatService();
+    const stream = chatService.sendMessageStream as ReturnType<typeof vi.fn>;
+    stream.mockImplementation((_request, onDelta, onDone, _onError, onFinish, onEnvelope) => {
+      onDelta('Here are your projects.');
+      onEnvelope({
+        text: '(1 total)',
+        components: [{
+          type: 'table',
+          props: { headers: ['name'], rows: [{ name: 'Project A' }] },
+        }],
+      });
+      onDone('conv-envelope');
+      onFinish();
+      return () => {};
+    });
+
+    const { result } = renderHook(() =>
+      useChat(
+        chatService,
+        mockSlashCommands,
+        mockJsonExtractor,
+        mockEnvelopeParser,
+        dummyConfig,
+      ),
+    );
+
+    await act(async () => {
+      await result.current.sendMessage('show my projects');
+    });
+
+    const assistant = useChatStore.getState().messages.find((m) => m.role === 'assistant');
+    expect(assistant?.content).toBe('Here are your projects.');
+    expect(assistant?.metadata?.isStreaming).toBe(false);
+    expect(assistant?.metadata?.envelope?.components?.[0]?.type).toBe('table');
+    expect(useChatStore.getState().conversationId).toBe('conv-envelope');
   });
 });

@@ -1,0 +1,56 @@
+#!/usr/sbin/nft -f
+#
+# nftables egress rules for the accounting-sidecar (uid=hermes-sidecar).
+#
+# Plan ref: NC-ACCT-IMP-1 §3 (capability-sidecar posture).
+#
+# Threat model: the sidecar reads .beancount files written by NestJS, runs
+# numpy-financial/Beancount/Pandas over them, and returns results. It must
+# NOT reach PostgreSQL (5432), Redis (6379), Redis cluster, or anything
+# other than the local NestJS gateway (3003) for HMAC validation calls.
+#
+# The accounting sidecar shares the hermes-sidecar uid because it needs
+# the same egress lockdown; we use the same egress table.
+#
+# Allowed outbound:
+#   - 127.0.0.1:3003  (NestJS gateway, for HMAC validation only — though
+#                     our model is HMAC-token stateless, so this is unused;
+#                     kept for symmetry with the Hermes rule)
+#   - 127.0.0.1:8082  (hermes-events-bridge — only if we ever emit webhook
+#                     events from the sidecar)
+#   - DNS (53)        (required for the systemd unit's name resolution)
+#   - Nothing else.
+#
+# Denied:
+#   - PostgreSQL (5432, 5433)
+#   - Redis (6379)
+#   - Any provider IPs (accounting sidecar NEVER calls out to providers)
+#   - Any other destination.
+
+table inet hermes_sidecar_egress {
+    chain output {
+        type filter hook output priority 0; policy accept;
+
+        # This table must never affect another host process.
+        meta skuid != "hermes-sidecar" accept
+
+        ct state established,related accept
+
+        # Deny data stores everywhere, including loopback.
+        tcp dport { 5432, 5433, 6379 } reject
+
+        # Required local control-plane services only.
+        ip daddr 127.0.0.1 tcp dport { 3003, 8082 } accept
+
+        # DNS is needed for name resolution (even though the sidecar
+        # should never need DNS once running — systemd's journald may).
+        udp dport 53 accept
+        tcp dport 53 accept
+
+        # No provider egress for accounting-sidecar.
+        # The accounting workload NEVER calls out to model providers.
+        # All computation is local.
+
+        counter reject
+    }
+}

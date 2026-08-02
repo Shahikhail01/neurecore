@@ -8,8 +8,23 @@ import { FeatureFlagService } from '../../common/feature-flag/feature-flag.servi
 import { AiGatewayService } from '../ai-gateway/ai-gateway.service';
 import { ChatHistoryService } from './chat-history.service';
 import { LRUCache } from 'lru-cache';
-import { HermesAdapterService, type SidecarExecutionState } from '../hermes-adapter/services/hermes-adapter.service';
+import {
+  HermesAdapterService,
+  type SidecarExecutionState,
+} from '../hermes-adapter/services/hermes-adapter.service';
 import { NC_TOOL_NAMES } from '../hermes-adapter/tools/scoped-tool.schemas';
+import type { IResponseEnvelope } from './responses/interfaces/response-envelope.interface';
+import {
+  FeatureFlag as TenantFeatureFlag,
+  TenantFlagsService,
+} from '../tenant-flags/tenant-flags.service';
+import {
+  DeterministicIntentClassifier,
+  IntentRuleRegistry,
+} from '../service-gateway-v2/router/intent-router';
+import { TypedParameterExtractor } from '../service-gateway-v2/router/parameter-extractor';
+import { RoutingDecisionsService } from '../routing-decisions/routing-decisions.service';
+import { createHash } from 'crypto';
 
 // PERF-FIX: in-process LRU cache for the tenant-data snapshot used to
 // ground chat replies. Six parallel Postgres queries per chat message
@@ -21,6 +36,42 @@ const tenantSnapshotCache = new LRUCache<string, Record<string, unknown>>({
   max: 500,
   ttl: TENANT_SNAPSHOT_TTL_MS,
 });
+
+interface ChatRoute {
+  canonicalCapability?: string;
+  intent: string;
+  ruleId: string;
+  confidence: number;
+  ambiguous?: boolean;
+  ruleVersion: string;
+  rawMessageHash: string;
+}
+
+function hashMessage(message: string): string {
+  return createHash('sha256').update(message).digest('hex');
+}
+
+/**
+ * Reduce a classification decision to a single canonical capability name.
+ * The classifier either sets `intent=READ` with a recognized capability
+ * (explicitContext or matched rules) or returns `candidates`. We map:
+ *   explicitContext → use the explicit capability directly,
+ *   matched entity-operation rule → use `rule.capability` if set,
+ *   UNSUPPORTED with candidates → leave undefined (ambiguous),
+ *   otherwise → undefined (no route).
+ */
+function extractCapabilityFromDecision(
+  decision: ReturnType<DeterministicIntentClassifier['classify']>,
+): string | undefined {
+  if (decision.ruleId === 'explicit_context' && decision.candidates) {
+    const hit = decision.candidates.find((c) => c.entity);
+    if (hit?.entity) return hit.entity;
+  }
+  if (decision.ruleId && decision.ruleId.startsWith('builtIn:')) {
+    return decision.ruleId.slice('builtIn:'.length);
+  }
+  return undefined;
+}
 
 /**
  * Chat Service
@@ -54,6 +105,11 @@ export class ChatService {
     private readonly aiGateway: AiGatewayService,
     private readonly chatHistory: ChatHistoryService,
     private readonly autonomousWork: HermesAdapterService,
+    private readonly tenantFlags: TenantFlagsService,
+    private readonly intentClassifier: DeterministicIntentClassifier,
+    private readonly intentRegistry: IntentRuleRegistry,
+    private readonly typingExtractor: TypedParameterExtractor,
+    private readonly routingDecisions: RoutingDecisionsService,
   ) {}
 
   private saveReply(
@@ -65,6 +121,7 @@ export class ChatService {
       tokens?: { input: number; output: number; total: number };
       model?: string;
       provider?: string;
+      envelope?: IResponseEnvelope | null;
     },
   ): void {
     void this.chatHistory.saveMessage({
@@ -76,6 +133,7 @@ export class ChatService {
       ...(payload.tokens ? { tokens: payload.tokens } : {}),
       ...(payload.model ? { model: payload.model } : {}),
       ...(payload.provider ? { provider: payload.provider } : {}),
+      ...(payload.envelope ? { metadata: { envelope: payload.envelope } } : {}),
     });
   }
 
@@ -168,6 +226,7 @@ export class ChatService {
     provider?: string;
     liveData?: Record<string, unknown>;
     autonomousExecution?: SidecarExecutionState;
+    envelope?: IResponseEnvelope | null;
   }> {
     const conversationId =
       dto.conversationId ??
@@ -255,7 +314,12 @@ export class ChatService {
         liveData,
         autonomousExecution: execution,
       };
-      this.saveReply(conversationId, tenantIdForHistory, userIdForHistory, result);
+      this.saveReply(
+        conversationId,
+        tenantIdForHistory,
+        userIdForHistory,
+        result,
+      );
       return result;
     }
 
@@ -302,6 +366,10 @@ export class ChatService {
           `[chat] Routing action request to agent graph: ${dto.message}`,
         );
 
+        const resolved = await this.resolveAndRecordChatAllowedTools(
+          dto.message,
+          tenantId,
+        );
         const result = await this.agentGraph.run({
           goal: dto.message,
           agentId: 'ai-assistant',
@@ -317,7 +385,16 @@ export class ChatService {
           // similar-named wrong tools, or hallucinates tool names).
           // Security policy still applies on execution; allowlist is an
           // *exposure* filter, not a permission grant.
-          allowedTools: this.resolveChatAllowedTools(dto.message),
+          allowedTools: resolved.tools,
+          // Phase 2: when the deterministic classifier picked a single
+          // canonical capability, force it through to the service-gateway
+          // tool instead of letting the LLM pick. The graph's own
+          // service-gateway wrapper applies this as a runtime override.
+          forcedCapability: resolved.route?.canonicalCapability,
+          route: resolved.route,
+        } as Parameters<OfficialAgentGraph['run']>[0] & {
+          forcedCapability?: string;
+          route?: ChatRoute | null;
         });
 
         // Extract reply from final message or tool results
@@ -328,6 +405,11 @@ export class ChatService {
           (result.toolResults?.length > 0
             ? `Executed ${result.toolResults.length} tool(s).`
             : 'Action completed.');
+        // Phase 9: surface the agent graph's response envelope (built
+        // from tool results) so callers can ship it over SSE / store it
+        // in chat history. May be null when the tool run was multi-tool
+        // or failed — the legacy "executed N tool(s)" path then runs.
+        const envelope = result.envelope ?? null;
 
         this.recordChatActivitySafe({
           tenantId,
@@ -345,13 +427,22 @@ export class ChatService {
           sourceEventId: `chat:${conversationId}:assistant`,
         });
 
-        const replyPayload = {
+        const replyPayload: {
+          reply: string;
+          conversationId: string;
+          tokens: { input: number; output: number; total: number };
+          model: string;
+          provider: string;
+          liveData: Record<string, unknown>;
+          envelope: IResponseEnvelope | null;
+        } = {
           reply: this.sanitizeReply(reply),
           conversationId,
           tokens: { input: 0, output: 0, total: 0 },
           model: this.minimax.model,
           provider: 'minimax',
           liveData,
+          envelope,
         };
         this.saveReply(
           conversationId,
@@ -408,7 +499,7 @@ For all other questions, answer using the LIVE TENANT DATA below in plain conver
 When relevant, include a JSON block (no markdown fences) with keys: chartType, chartData [{label, value}].`;
 
     const historyText = (dto.history ?? [])
-      .slice(-10)
+      .slice(-3)
       .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
       .join('\n');
 
@@ -881,7 +972,12 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
     dto: SendChatMessageDto,
     tenantIdFromJwt?: string,
     userIdFromJwt?: string,
-  ): AsyncGenerator<{ delta: string; done: boolean }> {
+  ): AsyncGenerator<{
+    delta: string;
+    done: boolean;
+    envelope?: IResponseEnvelope | null;
+    route?: ChatRoute | null;
+  }> {
     const tenantId =
       tenantIdFromJwt ??
       (dto.context?.['tenantId'] as string | undefined) ??
@@ -923,6 +1019,10 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
         this.logger.log(
           `[chat.stream] Routing action request to agent graph: ${dto.message}`,
         );
+        const resolved = await this.resolveAndRecordChatAllowedTools(
+          dto.message,
+          tenantId,
+        );
         const result = await this.agentGraph.run({
           goal: dto.message,
           agentId: 'ai-assistant',
@@ -930,7 +1030,12 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
           userId: userIdFromJwt ?? 'anonymous',
           sessionId: conversationId,
           // Hermes-tools F1: curated allowlist (see send()).
-          allowedTools: this.resolveChatAllowedTools(dto.message),
+          allowedTools: resolved.tools,
+          forcedCapability: resolved.route?.canonicalCapability,
+          route: resolved.route,
+        } as Parameters<OfficialAgentGraph['run']>[0] & {
+          forcedCapability?: string;
+          route?: ChatRoute | null;
         });
         const messages = result.messages ?? [];
         const finalMessage = messages[messages.length - 1];
@@ -939,11 +1044,21 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
           (result.toolResults?.length > 0
             ? `Executed ${result.toolResults.length} tool(s).`
             : 'Action completed.');
+        // Phase 9: surface the agent graph's response envelope on the
+        // SSE delta so the frontend's EnvelopeRenderer can replace the
+        // generic "executed N tool(s)" text with chart / table / metrics.
+        const envelope = result.envelope ?? null;
         accumulatedAssistantReply = reply;
         this.saveReply(conversationId, tenantIdForHistory, userIdForHistory, {
           reply,
+          envelope,
         });
-        yield { delta: reply, done: false };
+        yield {
+          delta: reply,
+          done: false,
+          envelope,
+          route: resolved.route ?? undefined,
+        };
         yield { delta: '', done: true };
         return;
       } catch (err) {
@@ -970,7 +1085,7 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       ? await this.fetchTenantSnapshot(tenantId)
       : { note: 'no tenant context available' };
     const historyText = (dto.history ?? [])
-      .slice(-10)
+      .slice(-3)
       .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
       .join('\n');
     const prompt = [
@@ -1127,7 +1242,10 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
    */
   private isAutonomousOnboardingIntent(message: string): boolean {
     const normalized = message.toLowerCase();
-    return /\bonboard\b/.test(normalized) && /\b(q3|quarter|return|workflow)\b/.test(normalized);
+    return (
+      /\bonboard\b/.test(normalized) &&
+      /\b(q3|quarter|return|workflow)\b/.test(normalized)
+    );
   }
 
   private detectIntent(message: string): 'action' | 'query' {
@@ -1206,10 +1324,99 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
    *  - Always include `globalSearch` and `getTenantSnapshot` for ID
    *    discovery by name (the LLM needs these to bridge
    *    "the invoices task" → real UUIDs).
+   *
+   * Service-gateway fast path (Phase 9):
+   *  When CHAT_USE_SERVICE_GATEWAY=true, return just `['service.gateway']`.
+   *  This collapses 119 tool names to one and routes everything through
+   *  the gateway's capability map. The flag defaults OFF because v1
+   *  only ships READ capabilities; turning it on globally would silently
+   *  turn every "create project" prompt into "Unknown capability" until
+   *  write capabilities land in W3.
    */
-  private resolveChatAllowedTools(message: string): string[] | null {
-    const lower = message.toLowerCase();
+  private async resolveChatAllowedTools(
+    message: string,
+    tenantId?: string | null,
+  ): Promise<string[] | null> {
+    const result = await this.resolveAndRecordChatAllowedTools(
+      message,
+      tenantId,
+    );
+    return result.tools;
+  }
 
+  /**
+   * Variant of resolveChatAllowedTools that also returns the deterministic
+   * routing decision so callers can pass the forced capability down to the
+   * service-gateway tool. Every classified prompt (READ, MUTATION,
+   * AMBIGUOUS, UNSUPPORTED) is persisted via RoutingDecisionsService.
+   */
+  private async resolveAndRecordChatAllowedTools(
+    message: string,
+    tenantId?: string | null,
+  ): Promise<{
+    tools: string[] | null;
+    route: ChatRoute | null;
+  }> {
+    // Phase 9: service-gateway feature flag (default OFF — see plan §3.6).
+    // Honoured ONLY when env var literally equals the string "true" so an
+    // unset env does not silently enable the gateway in production.
+    const mutationIntent =
+      /\b(create|add|update|edit|delete|remove|archive|assign|unassign|mark|rename|change|reopen|clone|duplicate|submit|approve|reject|cancel|resubmit|configure|enable|disable|bulk|send|schedule|bump|move|reassign)\b/i.test(
+        message,
+      );
+
+    const useServiceGateway =
+      process.env.CHAT_USE_SERVICE_GATEWAY === 'true' &&
+      !!tenantId &&
+      !mutationIntent &&
+      (await this.tenantFlags.isEnabled(
+        TenantFeatureFlag.SERVICE_GATEWAY,
+        tenantId,
+      ));
+
+    if (useServiceGateway && tenantId) {
+      const decision = this.intentClassifier.classify({
+        message,
+      });
+      const rawMessageHash = hashMessage(message);
+      const route: ChatRoute = {
+        canonicalCapability: extractCapabilityFromDecision(decision),
+        intent: decision.intent,
+        ruleId: decision.ruleId ?? 'no_match',
+        confidence: decision.confidence,
+        ambiguous: decision.candidates && decision.candidates.length > 0,
+        ruleVersion: this.intentRegistry.getVersion(),
+        rawMessageHash,
+      };
+      try {
+        await this.routingDecisions.record(tenantId, 'chat-service', {
+          ruleVersion: route.ruleVersion,
+          ruleId: route.ruleId,
+          intent: route.intent,
+          canonicalCapability: route.canonicalCapability ?? undefined,
+          confidence: route.confidence,
+          rawMessageHash,
+          ambiguous: !!route.ambiguous,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Routing decision persistence failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      return {
+        tools: ['service-gateway'],
+        route,
+      };
+    }
+
+    const lower = message.toLowerCase();
+    const tools = await this.resolveLegacyChatAllowedTools(lower);
+    return { tools, route: null };
+  }
+
+  private async resolveLegacyChatAllowedTools(
+    lower: string,
+  ): Promise<string[] | null> {
     // Discovery — used as a base allowlist across every intent.
     const DISCOVERY = [
       'globalSearch',
@@ -1229,11 +1436,7 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
     const has = (re: RegExp) => re.test(lower);
 
     // Project-related
-    if (
-      has(/\bproject\b/) ||
-      has(/\bmilestone\b/) ||
-      has(/\bstage\b/)
-    ) {
+    if (has(/\bproject\b/) || has(/\bmilestone\b/) || has(/\bstage\b/)) {
       const set = new Set<string>(DISCOVERY);
       [
         'createProject',

@@ -286,6 +286,12 @@ const AGENT_POLICY_CONFIGS: Record<
       'documents',
       'sheets',
       'reports',
+      // Phase 9 — Service Gateway. The chat-composer resolves this
+      // capability name when CHAT_USE_SERVICE_GATEWAY=true. Without
+      // this entry the security interceptor denies every service.gateway
+      // call. The gateway itself enforces strict param keys via the
+      // per-capability paramsSchema (see ServiceGatewayTool.executeImpl).
+      'service-gateway',
     ],
     blockedTools: [
       'shell',
@@ -368,6 +374,8 @@ const AGENT_POLICY_CONFIGS: Record<
   },
 };
 
+const SECURITY_POLICY_VERSION = '1.0.0';
+
 @Injectable()
 export class SecurityPolicyProvider implements ISecurityPolicyProvider {
   private readonly logger = new Logger(SecurityPolicyProvider.name);
@@ -375,7 +383,7 @@ export class SecurityPolicyProvider implements ISecurityPolicyProvider {
   /**
    * Get security policy for an agent type and tenant
    */
-  async getPolicy(
+  getPolicy(
     agentType: string,
     tenantId: string,
   ): Promise<ISecurityPolicy | null> {
@@ -388,6 +396,10 @@ export class SecurityPolicyProvider implements ISecurityPolicyProvider {
     const policy: ISecurityPolicy = {
       agentType: normalizedAgentType,
       tenantId,
+      policySource: {
+        name: 'agents-security-policy',
+        policyVersion: SECURITY_POLICY_VERSION,
+      },
       ...config,
     };
 
@@ -395,7 +407,7 @@ export class SecurityPolicyProvider implements ISecurityPolicyProvider {
       `Security policy retrieved for agent=${normalizedAgentType}, tenant=${tenantId}`,
     );
 
-    return policy;
+    return Promise.resolve(policy);
   }
 
   /**
@@ -431,6 +443,10 @@ export class SecurityPolicyProvider implements ISecurityPolicyProvider {
     return {
       agentType: 'default',
       tenantId: 'default',
+      policySource: {
+        name: 'agents-security-policy',
+        policyVersion: SECURITY_POLICY_VERSION,
+      },
       ...AGENT_POLICY_CONFIGS['default'],
     };
   }

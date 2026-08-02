@@ -21,6 +21,7 @@ import { SecurityModule } from './security/security.module';
 import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { TenantTemplatesModule } from '../tenant-templates/tenant-templates.module';
+import { ChatResponseModule } from '../chat/responses/chat-response.module';
 
 /**
  * AgentsModule
@@ -39,6 +40,7 @@ import { TenantTemplatesModule } from '../tenant-templates/tenant-templates.modu
     AIGatewayModule,
     MetricsModule,
     TenantTemplatesModule,
+    forwardRef(() => ChatResponseModule),
   ],
   controllers: [
     AgentsController,

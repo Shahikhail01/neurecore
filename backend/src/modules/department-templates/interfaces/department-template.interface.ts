@@ -2,6 +2,8 @@
 // Interface-segregation: only the methods this service must honour.
 // Consumers depend on this interface, never on the concrete service.
 
+import type { DepartmentTemplateCategory } from '@prisma/client';
+
 export interface DeptTemplateStructureItem {
   /** Display name of the department */
   name: string;
@@ -15,7 +17,7 @@ export interface DeptTemplateStructureItem {
 
 export interface IDepartmentTemplateService {
   findAll(opts?: {
-    category?: string;
+    category?: DepartmentTemplateCategory;
     page?: number;
     limit?: number;
   }): Promise<unknown>;
@@ -30,7 +32,7 @@ export interface CreateDeptTemplateInput {
   slug: string;
   description?: string;
   structure: DeptTemplateStructureItem[];
-  category?: string;
+  category?: DepartmentTemplateCategory;
   tags?: string[];
   isPublic?: boolean;
 }

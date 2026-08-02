@@ -266,6 +266,8 @@ More themes across all majors are the subject of the pending composition seeder.
 
 ---
 
-_Last updated: 2026-07-25 11:20 PKT — Industry pool = 16 majors, **15 Accounting packages with composition shipped**._
+_Last updated: 2026-07-31 22:00 PKT — Industry pool = 16 majors, **15 Accounting packages with composition shipped**._
 
+> **2026-07-31 update:** Phase 9 G9 APPROVED (commit fe335abb, NC-AWL-IMP-2 certification). SIM-05 deployed (6 COMPUTE + 14 JUDGMENT scenarios). See [future-plans.md](future-plans.md) for full Phase 9 status.
+>
 > **2026-07-25 update:** Industry Verification Run-3 closed every defect filed in Run-1 + Run-2. The Accounting & Audit Services tenant (`sara.ahmed+verify-2026-07-24r4post@demo.neurecore.com`) is now production-ready end-to-end. See [audits/2026-07-25-industry-verification-3-remediation/REPORT.md](audits/2026-07-25-industry-verification-3-remediation/REPORT.md) for the full evidence matrix and the live Brevo SMTP delivery proof (`messageId: <202607250454.93699028513@smtp-relay.mailin.fr>`).

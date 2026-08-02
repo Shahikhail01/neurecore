@@ -5,20 +5,41 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { DepartmentTemplateCategory } from '@prisma/client';
 import type {
   IDepartmentTemplateService,
   CreateDeptTemplateInput,
 } from './interfaces/department-template.interface';
+import { INDUSTRY_GROUP } from '../industry/tier-industry-matrix';
 
 const INDUSTRY_GROUP_INDUSTRIES: Record<string, string[]> = {
-  healthcare: ['healthcare-life-sciences'],
-  'public-social': ['government-public-sector', 'education-research', 'nonprofit-international'],
-  'financial-compliance': ['accounting-audit-services', 'financial-services', 'insurance'],
-  'business-technology': ['technology-digital-services', 'professional-business-services'],
-  'industrial-infrastructure': ['manufacturing-industrial', 'construction-engineering-infrastructure', 'energy-utilities-natural-resources', 'logistics-transportation-supply-chain'],
-  'consumer-commerce': ['retail-commerce-consumer', 'media-communications-creative'],
-  'agriculture-food': ['agriculture-food-systems'],
-  other: ['special-purpose-organizations'],
+  [INDUSTRY_GROUP.HEALTHCARE]: ['healthcare-life-sciences'],
+  'public-social': [
+    'government-public-sector',
+    'education-research',
+    'nonprofit-international',
+  ],
+  [INDUSTRY_GROUP.FINANCIAL_COMPLIANCE]: [
+    'accounting-audit-services',
+    'financial-services',
+    'insurance',
+  ],
+  [INDUSTRY_GROUP.BUSINESS_TECHNOLOGY]: [
+    'technology-digital-services',
+    'professional-business-services',
+  ],
+  [INDUSTRY_GROUP.INDUSTRIAL_INFRASTRUCTURE]: [
+    'manufacturing-industrial',
+    'construction-engineering-infrastructure',
+    'energy-utilities-natural-resources',
+    'logistics-transportation-supply-chain',
+  ],
+  [INDUSTRY_GROUP.CONSUMER_COMMERCE]: [
+    'retail-commerce-consumer',
+    'media-communications-creative',
+  ],
+  [INDUSTRY_GROUP.AGRICULTURE_FOOD]: ['agriculture-food-systems'],
+  [INDUSTRY_GROUP.OTHER]: ['special-purpose-organizations'],
 };
 
 /**
@@ -133,7 +154,7 @@ export class DepartmentTemplatesService implements IDepartmentTemplateService {
         slug: dto.slug,
         description: dto.description,
         structure: (dto.structure ?? []) as never,
-        category: dto.category ?? 'general',
+        category: dto.category ?? DepartmentTemplateCategory.OTHER,
         tags: (dto.tags ?? []) as never,
         isPublic: dto.isPublic ?? true,
       },

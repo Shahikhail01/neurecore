@@ -14,11 +14,12 @@ import type {
   ComplianceChecklistDef,
   ChecklistConditionData,
 } from './interfaces/compliance.interface';
+import { INDUSTRY_GROUP } from '../industry/tier-industry-matrix';
 
 export const COMPLIANCE_CHECKLISTS: Record<string, ComplianceChecklistDef> = {
   // ─── Financial & Compliance ────────────────────────────────────────────
-  'financial-compliance': {
-    industryGroup: 'financial-compliance',
+  [INDUSTRY_GROUP.FINANCIAL_COMPLIANCE]: {
+    industryGroup: INDUSTRY_GROUP.FINANCIAL_COMPLIANCE,
     items: [
       {
         id: 'kyc-current',
@@ -100,7 +101,7 @@ export const COMPLIANCE_CHECKLISTS: Record<string, ComplianceChecklistDef> = {
 
   // ─── Accounting & Audit Services ───────────────────────────────────────
   'accounting-audit-services': {
-    industryGroup: 'financial-compliance',
+    industryGroup: INDUSTRY_GROUP.FINANCIAL_COMPLIANCE,
     items: [
       {
         id: 'cpe-compliance',

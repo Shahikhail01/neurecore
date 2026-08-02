@@ -9,7 +9,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { DepartmentTemplate, Prisma } from '@prisma/client';
+import { DepartmentTemplate, DepartmentTemplateCategory, Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { PoolListOptions } from '../../common/pool/pool.types';
 import {
@@ -46,10 +46,14 @@ export class DepartmentsPoolService extends PoolService<
       useSoftDelete: false,
       buildWhere: (opts: PoolListOptions): Prisma.DepartmentTemplateWhereInput => {
         const where: Prisma.DepartmentTemplateWhereInput = {
-          // Pool UI hides legacy-tier rows from the default list.
-          NOT: { category: 'legacy-tier' },
+          // Pool UI hides the legacy "OTHER" bucket from the default list.
+          // phase5a-p13 collapsed all pre-enum values (including
+          // 'legacy-tier') into OTHER, so excluding OTHER here is the
+          // correct post-migration filter.
+          NOT: { category: DepartmentTemplateCategory.OTHER },
         };
-        if (opts.status) where.category = opts.status;
+        if (opts.status)
+          where.category = opts.status as DepartmentTemplateCategory;
         if (opts.search) {
           where.OR = [
             { slug: { contains: opts.search, mode: 'insensitive' } },

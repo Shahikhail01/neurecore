@@ -1,13 +1,15 @@
 # NeureCore — Tier System: Refactored Concept
 
-**Status:** 📋 Draft for review — 4 Logical Tiers proposed
+**Status:** 📋 Draft for review — 4 Logical Tiers proposed (aligned with INDUSTRY-GROUPS-CONCEPT.md naming)
 **Date:** 2026-07-21
+**Last Updated:** 2026-07-31 (tier names aligned: Basic / Business / Professional / Enterprise — no changes)
 **Owner:** Platform team
 **Related docs:**
-- [INDUSTRY-GROUPS-CONCEPT.md](./INDUSTRY-GROUPS-CONCEPT.md) — Industry side
+- [INDUSTRY-GROUPS-CONCEPT.md](./INDUSTRY-GROUPS-CONCEPT.md) — Industry side (tier names aligned)
 - [pools-taxonomy.md §4](../pools-taxonomy.md#4-tiers-pool) — current TierTemplate pool
 - [left-rail-icon.md](../left-rail-icon.md) — navigation that Tier constrains
 - [system-state.md](../system-state.md) — current production state
+- [PRUNED-INDUSTRIES-PROGRESS-2026-07-31.md](./PRUNED-INDUSTRIES-PROGRESS-2026-07-31.md) — industry cut-down status
 
 ---
 
@@ -558,8 +560,9 @@ If migration fails at any step:
 | Auth service tier resolution | `neurecore/backend/src/modules/auth/services/auth.service.ts:120` |
 | Action authorization guard | `neurecore/backend/src/modules/ai-actions/guards/action-authorization.guard.ts:203` |
 | Onboarding tier selector | `neurecore/backend/src/modules/onboarding/onboarding.service.ts:109` |
-| Industry Groups doc | `neurecore/memory-bank-new/industries/INDUSTRY-GROUPS-CONCEPT.md` |
-| Pools taxonomy | `neurecore/memory-bank-new/pools-taxonomy.md` |
+| Industry Groups doc | `neurecore/memory-bank-arc/industries/INDUSTRY-GROUPS-CONCEPT.md` |
+| INDUSTRY_GROUP constants (backend canonical) | `neurecore/backend/src/modules/industry/tier-industry-matrix.ts` |
+| Pools taxonomy | `neurecore/memory-bank-arc/pools-taxonomy.md` |
 
 ---
 
@@ -569,3 +572,4 @@ If migration fails at any step:
 |---|---|---|
 | 2026-07-21 | Initial draft — 4 Logical Tiers proposed (Free/Starter/Growth/Enterprise), full refactor plan | Kilo |
 | 2026-07-21 | Renamed tiers per user: **Basic** (free) / **Business** / **Professional** / **Enterprise** | Kilo |
+| 2026-07-31 | No changes needed — tier names already aligned with INDUSTRY-GROUPS-CONCEPT.md; verified `ACTIVE_INDUSTRY_GROUPS` constant uses correct tier slugs (basic/business/professional/enterprise) in capability matrix | Kilo |

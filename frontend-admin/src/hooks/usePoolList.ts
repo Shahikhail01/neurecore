@@ -47,6 +47,7 @@ export function usePoolList<T, C>(
     total,
     page: page?.page ?? 1,
     totalPages: page?.totalPages ?? 1,
+    limit: page?.limit ?? (initialOpts.limit ?? 20),
     loading,
     error,
     opts,

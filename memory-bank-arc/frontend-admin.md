@@ -1,9 +1,14 @@
 # Frontend-Admin (NeureCore admin console)
 
-**Last verified:** 2026-07-17 — All 14 enterprise integration phases complete. Admin console manages phases 7-14 backend capabilities (Six Pools administration, Platform Operations dashboard, Cloud Platform, Application Framework, AI Governance, Platform Evolution). RBAC enforced — SUPER_ADMIN only; see [user-roles.md](user-roles.md). See [backend.md §18](backend.md#18-enterprise-integration-phases-714).
+**Last verified:** 2026-07-31 — **FULL SYSTEM AUDIT COMPLETED**
+
+**⚠️ DEPLOYMENT STATUS:** Local is `fe335abb`; Contabo deployed is `ad73f3e6` — **deployment required to get latest**
+
 **Live URL:** `https://cc.neurecore.com` (under `/admin/` basePath)
 **Internal port:** 3020
+**PM2:** `neurecore-admin` (pid 583314, online)
 **Source:** `/home/najeeb/Linux-Dev/neurecore-2026/neurecore/frontend-admin/`
+**RBAC:** SUPER_ADMIN only (per [user-roles.md](user-roles.md))
 **Sibling docs:** [system-state.md](system-state.md) · [operations.md](operations.md) · [backend.md](backend.md) · [contabo-ops.md](contabo-ops.md) · [user-roles.md](user-roles.md)
 
 ---

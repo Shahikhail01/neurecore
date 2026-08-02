@@ -1,8 +1,14 @@
 # Frontend-Tenant (NeureCore tenant app)
 
-**Last verified:** 2026-07-17 — All 14 enterprise integration phases complete. Simulation-5 AEIC score: 83/100 (B+, Production Ready). Backend phases 7-14 provide API capabilities consumed by tenant UI (Enterprise OS, Platform Operations, Knowledge Graph, Cloud Platform, Application Framework, AI Governance, Platform Evolution). See [backend.md §18](backend.md#18-enterprise-integration-phases-714).
+**Last verified:** 2026-07-31 — **FULL SYSTEM AUDIT COMPLETED**
+
+**⚠️ DEPLOYMENT STATUS:** Local is `fe335abb`; Contabo deployed is `ad73f3e6` — **deployment required to get latest Phase 9 G9 + NC-AWL-IMP-2**
+
+**Production routes (30 dirs):** accounting, customers, departments, execution, finance, help, home, intelligence, marketplace, onboarding, portal, projects, reviews, service-desk, settings, strategy, users, workspace + auth pages (forgot-password, login, register, reset-password)
+
 **Live URL:** `https://hq.neurecore.com`
 **Internal port:** 3001
+**PM2:** `neurecore-tenant` (pid 580402, online)
 **Source:** `/home/najeeb/Linux-Dev/neurecore-2026/neurecore/frontend-tenant/`
 **Sibling docs:** [system-state.md](system-state.md) · [operations.md](operations.md) · [backend.md](backend.md) · [contabo-ops.md](contabo-ops.md) · [frontend-admin.md](frontend-admin.md)
 

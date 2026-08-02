@@ -13,6 +13,11 @@
  * - Crop planning, quality tracking
  *
  * Templates follow the same structure as Routine definitions:
+ */
+
+import { INDUSTRY_GROUP } from '../industry/tier-industry-matrix';
+
+/**
  * trigger, action, channels, and optional conditions.
  *
  * SOLID:
@@ -54,7 +59,7 @@ export const INDUSTRY_WORKFLOW_TEMPLATES: Record<
   IndustryWorkflowTemplate[]
 > = {
   // ─── Financial & Compliance ────────────────────────────────────────────
-  'financial-compliance': [
+  [INDUSTRY_GROUP.FINANCIAL_COMPLIANCE]: [
     {
       slug: 'daily-kyc-verification',
       name: 'Daily KYC Document Verification',

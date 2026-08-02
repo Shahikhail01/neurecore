@@ -31,6 +31,12 @@ import {
   FailureMode,
 } from './fixtures/failure-injection';
 import { generateSyntheticDataset } from './synthetic/accounting-synthetic-data';
+import {
+  GateG7Summary,
+  TenantIsolationProbeReport,
+  computeGateG7,
+  classifyGateG7 as classifyGateG7Summary,
+} from '../../modules/service-gateway-v2/certification/tenant-isolation-probe';
 
 export type ScenarioType =
   | 'clean_run'
@@ -89,6 +95,8 @@ export interface CertificationRun {
   scenarios: CertificationScenario[];
   results: CertificationResult[];
   gateG9: GateG9Summary;
+  gateG7?: GateG7Summary;
+  gateG7Report?: TenantIsolationProbeReport;
 }
 
 export interface GateG9Summary {
@@ -295,6 +303,18 @@ export class CertificationRunBuilder {
 export class CertificationRunner {
   private readonly runs: CertificationRun[] = [];
   readonly harness = new CertificationHarness();
+  private latestGateG7Report: TenantIsolationProbeReport | null = null;
+
+  /**
+   * Attach a Phase 7 cross-tenant report to the runner. The next
+   * `runCertification` call will surface it on the returned
+   * CertificationRun (gateG7 / gateG7Report). Calling this between
+   * runs lets the integration spec feed a real DB-backed G7 report
+   * into the machine-readable output.
+   */
+  attachGateG7(report: TenantIsolationProbeReport): void {
+    this.latestGateG7Report = report;
+  }
 
   /**
    * Executes the certification run. The provided executor is the
@@ -320,6 +340,10 @@ export class CertificationRunner {
     }
 
     run.gateG9 = computeGateG9(run.results);
+    if (this.latestGateG7Report) {
+      run.gateG7 = computeGateG7(this.latestGateG7Report.results);
+      run.gateG7Report = this.latestGateG7Report;
+    }
     this.runs.push(run);
     return run;
   }
@@ -587,4 +611,25 @@ export function classifyGateG9(g: GateG9Summary): {
     (ok_ ? ok : failing).push(label);
   }
   return { ok, failing };
+}
+
+/**
+ * G9 verdict augmented with the Phase 7 G7 verdict. The combined
+ * verdict is APPROVED only when BOTH gates pass.
+ */
+export function classifyGateG9WithG7(
+  g9: GateG9Summary,
+  g7: GateG7Summary | undefined,
+): { ok: string[]; failing: string[]; releaseApproved: boolean } {
+  const base = classifyGateG9(g9);
+  if (!g7) {
+    return { ...base, releaseApproved: base.failing.length === 0 };
+  }
+  const g7v = classifyGateG7Summary(g7);
+  const combined = {
+    ok: [...base.ok, ...g7v.ok],
+    failing: [...base.failing, ...g7v.failing],
+    releaseApproved: base.failing.length === 0 && g7v.failing.length === 0,
+  };
+  return combined;
 }

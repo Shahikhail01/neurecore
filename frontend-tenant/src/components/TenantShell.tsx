@@ -32,7 +32,7 @@ import { ActivityStream } from '@/components/layout/ActivityStream';
 import { InspectorPanel } from '@/components/layout/InspectorPanel';
 import { CommandPalette } from '@/components/command-palette/CommandPalette';
 import { UnifiedChatPanel } from '@/shared/components/chat/UnifiedChatPanel';
-import { chatService, slashCommands, jsonExtractor, tenantChatConfig } from '@/core/services/chat/chat.factory';
+import { chatService, slashCommands, jsonExtractor, envelopeParser, tenantChatConfig } from '@/core/services/chat/chat.factory';
 import { ThingsToDoPanel } from '@/components/checklist/ThingsToDoPanel';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { useActivityStream } from '@/hooks/useActivityStream';
@@ -132,6 +132,7 @@ export default function TenantShell({
           chatService={chatService}
           slashCommands={slashCommands}
           jsonExtractor={jsonExtractor}
+          envelopeParser={envelopeParser}
           config={tenantChatConfig}
         />
       </div>

@@ -3,12 +3,14 @@ import {
   IsOptional,
   IsBoolean,
   IsArray,
+  IsEnum,
   MinLength,
   MaxLength,
   Matches,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { DepartmentTemplateCategory } from '@prisma/client';
 
 // ─── Nested DTO ────────────────────────────────────────────────────────────
 
@@ -65,8 +67,8 @@ export class CreateDepartmentTemplateDto {
   structure!: DeptStructureItemDto[];
 
   @IsOptional()
-  @IsString()
-  category?: string;
+  @IsEnum(DepartmentTemplateCategory)
+  category?: DepartmentTemplateCategory;
 
   @IsOptional()
   @IsArray()
@@ -98,8 +100,8 @@ export class UpdateDepartmentTemplateDto {
   structure?: DeptStructureItemDto[];
 
   @IsOptional()
-  @IsString()
-  category?: string;
+  @IsEnum(DepartmentTemplateCategory)
+  category?: DepartmentTemplateCategory;
 
   @IsOptional()
   @IsArray()

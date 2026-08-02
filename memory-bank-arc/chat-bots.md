@@ -995,7 +995,23 @@ See [pending-tasks.md §0h F3](pending-tasks.md) for the full backlog item.
 
 ---
 
-## 14. Maintenance Notes
+## 14. Hermes Tools Fix (commit 138bda6f)
+
+**Issue:** `createCustomer` tool silently failed for `ai-assistant` agent type (default-deny policy).
+
+**Fix:** Added `createCustomer` to `allowedTools` in `SecurityPolicyProvider` for `ai-assistant` agent type. Backend logs now show `Tool createCustomer allowed by policy`.
+
+**Verification:**
+```bash
+ssh contabo 'pm2 logs neurecore-backend --lines 50 --nostream | grep -i "createCustomer"'
+# Expected: "Tool createCustomer allowed by policy"
+```
+
+See [future-plans.md](future-plans.md) §Phase 9 for G9 certification context.
+
+---
+
+## 15. Maintenance Notes
 
 - The `ConversationalAIService` applies a **balanced-brace JSON extractor** (`_extractFirstJsonObject`) to parse chart data from LLM replies. If the LLM changes its output format, this parser will need updating.
 - The `chatService` uses a **fallback response** when the backend returns nothing usable (`fallbackResponse()`). This is a last-resort UX — backend should always return a meaningful reply.

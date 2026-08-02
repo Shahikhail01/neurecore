@@ -10,6 +10,7 @@ import { Modal } from '@/components/creatio/Modal';
 import { StatusBadge } from '@/components/creatio/StatusBadge';
 import { EntityTable, type ColumnDef } from '@/components/creatio/EntityTable';
 import { CustomerForm } from '@/components/customers/CustomerForm';
+import { isFinancialComplianceGroup } from '@/lib/industryGroups';
 import { customersService } from '@/services/customers.service';
 import { tenantsService } from '@/services/tenants.service';
 import type { Customer } from '@/types/customers.types';
@@ -51,7 +52,7 @@ export default function CustomersPage() {
       cancelled = true;
     };
   }, []);
-  const isFinancialTenant = tenantGroup === 'financial-compliance';
+  const isFinancialTenant = isFinancialComplianceGroup(tenantGroup);
 
   const load = useCallback(async () => {
     setLoading(true);

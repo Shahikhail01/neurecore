@@ -17,6 +17,7 @@ import { featuresPoolService, type Feature, type FeatureCategory } from '@/servi
 import { departmentsPoolService, type DepartmentPoolEntry } from '@/services/departmentsPool.service';
 import { agentsPoolService, type AgentsPoolEntry } from '@/services/agentsPool.service';
 import { PackagePreview } from '@/components/package/PackagePreview';
+import { PackageInheritanceBanner } from '@/components/packages/PackageInheritanceBanner';
 
 const EMPTY_PREVIEW = {
   totals: { departments: 0, agents: 0, features: 0 },
@@ -162,6 +163,15 @@ export default function EditPackagePage() {
             Composition changes apply atomically.
           </p>
         </div>
+
+        {/* PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.8.1 (P9) — cross-group
+            inheritance banner. Only renders when this package inherits from
+            another via T8 (Phase 5.B). */}
+        <PackageInheritanceBanner
+          packageSlug={pkg?.slug ?? ''}
+          industrySlug={pkg?.industry?.slug}
+          tierSlug={pkg?.tier?.slug}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           <div className="rounded-xl border border-surface-border bg-surface-raised p-5 space-y-4">

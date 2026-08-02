@@ -6,6 +6,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsOptional,
   IsString,
   Length,
@@ -13,6 +14,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { DepartmentTemplateCategory } from '@prisma/client';
 import { DeptPoolStructureItemDto } from './create-department-pool.dto';
 
 export class UpdateDepartmentPoolDto {
@@ -33,9 +35,8 @@ export class UpdateDepartmentPoolDto {
   structure?: DeptPoolStructureItemDto[];
 
   @IsOptional()
-  @IsString()
-  @Length(0, 60)
-  category?: string;
+  @IsEnum(DepartmentTemplateCategory)
+  category?: DepartmentTemplateCategory;
 
   @IsOptional()
   @IsArray()

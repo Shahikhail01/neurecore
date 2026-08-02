@@ -253,9 +253,16 @@ export class ChatService implements IChatService {
    * Returns a cleanup function that aborts the request.
    *
    * Events from /chat/stream:
-   *   event: delta  data: {"text":"..."}
+   *   event: delta  data: {"text":"...", "envelope":{...}?}
    *   event: done   data: {"conversationId":"...","tokens":{...}}
    *   event: error  data: {"message":"..."}
+   *
+   * Phase 9: accepts an optional `onEnvelope` callback. When the SSE delta
+   * carries an `envelope` field (service-gateway single-tool response), the
+   * callback receives the raw envelope object so the UI can render chart /
+   * table / metrics components without re-parsing the text content. The
+   * callback is optional — callers that omit it keep the legacy text-only
+   * behaviour and are backward-compatible.
    */
   sendMessageStream(
     request: ChatRequest,
@@ -263,6 +270,7 @@ export class ChatService implements IChatService {
     onDone: (conversationId: string) => void,
     onError: (error: string) => void,
     onFinish: () => void,
+    onEnvelope?: (envelope: Record<string, unknown>) => void,
   ): () => void {
     const baseUrl = (typeof window !== 'undefined' && (window as unknown as { env?: { NEXT_PUBLIC_API_URL?: string } }).env?.NEXT_PUBLIC_API_URL)
       ?? process.env.NEXT_PUBLIC_API_URL
@@ -326,8 +334,17 @@ export class ChatService implements IChatService {
               if (!rawData) continue;
               try {
                 const data = JSON.parse(rawData) as Record<string, unknown>;
-                if (eventType === 'delta' && 'text' in data && typeof data.text === 'string') {
-                  onDelta(data.text);
+                if (eventType === 'delta') {
+                  if ('text' in data && typeof data.text === 'string') {
+                    onDelta(data.text);
+                  }
+                  // Phase 9: forward the response envelope so the UI
+                  // can render chart / table / metrics without parsing
+                  // the text content. Absent when the SSE path is a
+                  // plain conversation reply (query intent).
+                  if ('envelope' in data && data.envelope && onEnvelope) {
+                    onEnvelope(data.envelope as Record<string, unknown>);
+                  }
                 } else if (eventType === 'done' && 'conversationId' in data) {
                   onDone(String(data.conversationId));
                   finish();

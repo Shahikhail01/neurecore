@@ -18,7 +18,6 @@ import type {
   ISecurityInterceptor,
   ISecurityValidationResult,
   ISecurityContext,
-  ISecurityPolicy,
   IPromptInjectionValidator,
   ICommandPatternValidator,
   IResourceAccessValidator,
@@ -112,7 +111,7 @@ export class SecurityInterceptorService implements ISecurityInterceptor {
         tool.name,
         'BLOCKED',
         'TOOL_NOT_ALLOWED',
-        { policy: policy.agentType },
+        { policy: policy.agentType, policySource: policy.policySource },
       );
       return this.createBlockedResult(
         tool.name,
@@ -285,7 +284,7 @@ export class SecurityInterceptorService implements ISecurityInterceptor {
   private createAllowedResult(
     toolName: string,
     input: Record<string, unknown>,
-    durationMs: number,
+    _durationMs: number,
   ): ISecurityValidationResult {
     return {
       allowed: true,

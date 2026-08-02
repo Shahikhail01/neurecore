@@ -5194,3 +5194,62 @@ finish_reason: z.string().nullable().optional(),
 - **Every env-flag change must set BOTH `.env` and `.env.production`.** Doc'd in [contabo-ops.md §3.8b](contabo-ops.md). Add a CI check: parse the active env file and verify the required keys exist when `NODE_ENV=production`.
 - **`model_providers` ownership caveat.** Add `GRANT ALL ON ALL TABLES IN SCHEMA public TO neurecore_app` to the bootstrap script so future `prisma migrate deploy` succeeds. Otherwise, document the manual `postgres` superuser workaround (already in [contabo-ops.md §3.8c](contabo-ops.md)).
 - **Zod schema for OpenAI-compatible streaming must accept nullable `finish_reason` and `content`** — these are legitimately `null` on intermediate chunks. The `HttpLlmTransport` fix is the canonical example.
+
+---
+
+## FIX-050 — HQ AI Chat Disconnected (AI_GATEWAY_V2=false + MiniMax provider inactive)
+**Date:** 2026-07-31
+**Severity:** high
+**Component:** contabo (backend)
+**Status:** fixed
+**Reporter:** platform owner (chat UI showing disconnected)
+**Resolver:** Kilo
+
+### Symptom
+AI Chat on `hq.neurecore.com` showed a disconnected state. The chat was not routing to the AI provider.
+
+### Root cause
+Two compounding issues:
+1. `AI_GATEWAY_V2=false` in both `.env` and `.env.production` on Contabo. The NestJS `ConfigurationModule` loads `envFilePath: ['.env.production', '.env']` when `NODE_ENV=production`, and `.env.production` wins. This flag controls whether chat uses the legacy `MiniMaxClient` (direct env-var API key) or routes through `AiGatewayService` (database-stored providers).
+2. The `minimax` provider in `model_providers` table had `isActive=false`.
+
+### Fix
+```bash
+# 1. Enable AI_GATEWAY_V2 in BOTH .env and .env.production (per contabo-ops.md §3.8b)
+ssh contabo 'cd /opt/neurecore/backend/backend && sed -i "s/^AI_GATEWAY_V2=false/AI_GATEWAY_V2=true/" .env .env.production'
+
+# 2. Enable DeepSeek provider in database (user requested DeepSeek-only)
+ssh contabo 'cd /opt/neurecore/backend/backend && psql -h 127.0.0.1 -U neurecore_app -d neurecore_prod -c "UPDATE model_providers SET \"isActive\" = true WHERE slug = '\''deepseek'\'';"'
+
+# 3. Disable MiniMax (user requested DeepSeek-only)
+ssh contabo 'cd /opt/neurecore/backend/backend && psql -h 127.0.0.1 -U neurecore_app -d neurecore_prod -c "UPDATE model_providers SET \"isActive\" = false WHERE slug = '\''minimax'\'';"'
+
+# 4. Add DEEPSEEK_API_KEY to .env (compiled capability-resolver.js skips DB decryption due to source/dist drift)
+ssh contabo 'echo "DEEPSEEK_API_KEY=[REDACTED]" >> /opt/neurecore/backend/backend/.env'
+
+# 5. Restart backend
+ssh contabo 'pm2 restart neurecore-backend && pm2 save'
+```
+
+### Verification
+```bash
+# Backend health
+curl -sk https://brain.neurecore.com/api/v1/health  # 200
+
+# Verify AI_GATEWAY_V2 is true in both files
+ssh contabo 'cd /opt/neurecore/backend/backend && grep "^AI_GATEWAY_V2" .env .env.production'
+
+# Verify providers
+ssh contabo 'cd /opt/neurecore/backend/backend && psql -h 127.0.0.1 -U neurecore_app -d neurecore_prod -c "SELECT slug, name, \"isActive\" FROM model_providers;"'
+#   slug   |   name   | isActive
+# deepseek | Deepseek | t
+# minimax  | MiniMax  | f
+
+# Boot probe should show [ok] for all capabilities
+ssh contabo 'pm2 logs neurecore-backend --lines 30 --nostream | grep -E "\[boot\].*\[ok\]"'
+```
+
+### Prevention
+- **Always set runtime flags in BOTH `.env` and `.env.production`** — the NestJS `ConfigurationModule` reads `.env.production` when `NODE_ENV=production`. Editing only `.env` has no effect in production. This is documented in [contabo-ops.md §3.8b](contabo-ops.md).
+- **AI provider activation must be done via DB update** — `model_providers.isActive=false` disables the provider at the catalog level regardless of env vars.
+- **Source/dist drift** — The compiled `capability-resolver.js` is missing the `resolveProviderKey()` database decryption call that exists in the local source. This causes the system to skip DB-stored keys and only look for env vars. Proper rebuild needed to fix properly (blocked by schema validation errors).

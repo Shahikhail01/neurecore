@@ -1,7 +1,9 @@
 # Unified Chat Widget — Implementation Status
 
-**Date:** 2026-07-06 17:15 PKT
+**Date:** 2026-07-31 22:00 PKT
 **Status:** Phase 0–3 IMPLEMENTED ✅ — Phases 4–6 PENDING
+**Phase 9:** G9 APPROVED (chat tool policy enforced via `SecurityPolicyProvider.isToolAllowed()`)
+**Hermes tools fix:** 138bda6f — `createCustomer` added to `ai-assistant` allowedTools
 **Implemented by:** Kilo (audit + code)
 
 ---

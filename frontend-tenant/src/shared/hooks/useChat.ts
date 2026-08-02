@@ -13,6 +13,7 @@ import type {
 } from '@/core/services/interfaces/IChatService';
 import type { ChatMessage, ChatConfig } from '@/shared/types/chat.types';
 import { useChatStore } from '@/core/services/chat/chat.factory';
+import type { IEnvelopeParser, Envelope } from '@/core/services/chat/envelope/interfaces/IEnvelopeParser';
 
 let _msgId = 0;
 function generateId(): string {
@@ -23,6 +24,7 @@ export function useChat(
   chatService: IChatService,
   slashCommands: ISlashCommandProvider,
   jsonExtractor: IJsonExtractor,
+  envelopeParser: IEnvelopeParser,
   _config: ChatConfig,
   pageContext?: string,
 ) {
@@ -45,6 +47,7 @@ export function useChat(
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
   const sendMessageRef = useRef<((content: string) => Promise<void>) | null>(null);
+  const storedEnvelopeRef = useRef<Envelope | undefined>(undefined);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -110,6 +113,7 @@ export function useChat(
         return;
       }
       const accumulatedContent: string[] = [];
+      storedEnvelopeRef.current = undefined;
 
       const cleanup = chatService.sendMessageStream(
         {
@@ -123,19 +127,25 @@ export function useChat(
         },
         (newConversationId) => {
           const finalContent = accumulatedContent.join('');
-          const parsed = jsonExtractor.extract(finalContent);
+          const parsedChart = jsonExtractor.extract(finalContent);
           updateMessage(assistantMsg.id, {
-            content: parsed?.cleaned ?? finalContent,
+            content: parsedChart?.cleaned ?? finalContent,
             timestamp: new Date().toISOString(),
             metadata: {
               isStreaming: false,
               chart:
-                parsed?.chartData && parsed.chartType
+                parsedChart?.chartData && parsedChart.chartType
                   ? {
-                      chartType: parsed.chartType as 'bar',
-                      chartData: parsed.chartData as Array<{ label: string; value: number }>,
+                      chartType: parsedChart.chartType as 'bar',
+                      chartData: parsedChart.chartData as Array<{ label: string; value: number }>,
                     }
                   : undefined,
+              // Phase 9: preserve envelope from SSE delta so
+              // UnifiedChatMessage can render chart/table/metrics
+              // without re-parsing the content.
+              ...(storedEnvelopeRef.current
+                ? { envelope: storedEnvelopeRef.current }
+                : {}),
             },
           });
           setConversationId(newConversationId);
@@ -147,6 +157,18 @@ export function useChat(
         () => {
           setSending(false);
         },
+        (envelope) => {
+          // Envelope arrives as a sibling of `text` in the SSE delta
+          // (Phase 9 wire format). Store it on the message metadata
+          // so EnvelopeRenderer picks it up on the next render.
+          storedEnvelopeRef.current = envelope as Envelope | undefined;
+          updateMessage(assistantMsg.id, {
+            metadata: {
+              isStreaming: true,
+              envelope: storedEnvelopeRef.current,
+            },
+          });
+        },
       );
 
       abortRef.current = cleanup ?? null;
@@ -155,6 +177,7 @@ export function useChat(
       chatService,
       slashCommands,
       jsonExtractor,
+      envelopeParser,
       pageContext,
       sending,
       conversationId,

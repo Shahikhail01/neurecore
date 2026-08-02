@@ -1,7 +1,41 @@
 # NeureCore — System State (live inventory)
 
-**Last verified:** 2026-07-28 18:10 PKT — **AI Gateway Phase 2.8 shipped + critical chat streaming Zod-schema fix.** (a) DB-stored encrypted provider keys (`model_providers.encryptedKey`, AES-256-GCM, key resolved DB-prefer > env fallback) — SUPER_ADMIN now adds/edits AI providers + rotates keys entirely from `cc.neurecore.com/settings/ai` with no SSH required. (b) Discover Models button auto-fetches `<provider>/v1/models` and lets admin pick which to enable + default. (c) Clickable model badges on each provider card promote that model to default. (d) **Real root-cause bug fix:** `HttpLlmTransport.CHOICE_SCHEMA.finish_reason` was `z.string()` (not nullable), so every DeepSeek/OpenAI streaming chunk with `finish_reason: null` was silently rejected by Zod, the transport skipped the yield, the gateway emitted only `event: done` to the browser — both cc and hq chat bots were unresponsive. Now `nullable`, content streams as designed. Both portals verified end-to-end: `POST /chat/stream` returns `event: delta: "The capital of France is Paris."` + `event: done`. (e) Non-ASCII API-key guard prevents future undici `ByteString` leaks. Boot probe 7/7 capabilities green against DeepSeek (778–1065 ms each). `AI_GATEWAY_V2=true` set in BOTH `.env` and `.env.production` (NestJS `ConfigurationModule` loads `.env.production` first when `NODE_ENV=production` — see [contabo-ops.md §3.8b](contabo-ops.md)). Operationally: `model_providers` table is owned by `postgres` role — future Prisma migrations on these tables must be applied manually as superuser (see [contabo-ops.md §3.8c](contabo-ops.md)). Full entry at [pending-tasks.md §0g](pending-tasks.md#0g-2026-07-28-ai-gateway-phase-28-db-stored-keys--discover-models--chat-streaming-fix-kilo). Prior verification runs preserved below.
+**Last verified:** 2026-07-31 — **FULL SYSTEM AUDIT COMPLETED**
 
+**⚠️ CRITICAL — DEPLOYMENT GAP:**
+| Item | Local (audited) | Contabo (deployed) | Delta |
+|------|-----------------|---------------------|-------|
+| Git HEAD | `fe335abb` | `ad73f3e6` | **8 commits behind** |
+| Backend modules | 106 | N/A (no git) | — |
+| Controllers | 119 | N/A | — |
+| Services | 250 | N/A | — |
+| Prisma models | 174 | 175 tables* | ✅ |
+| AI providers | 2 (Deepseek, MiniMax) | 2 (same) | ✅ |
+| DB tenants | 54 | 54 | ✅ |
+| DB users | 63 | 63 | ✅ |
+| DB projects | 181 | 181 | ✅ |
+| DB tasks | 694 | 694 | ✅ |
+
+*175 = 174 Prisma models + _prisma_migrations table
+
+**Phase 9 G9 (105/105) and NC-AWL-IMP-2 closure exist LOCAL ONLY — NOT DEPLOYED**
+
+**2026-07-31 20:10 PKT — DeepSeek AI Chat Activated (FIX-050 follow-up):**
+- DeepSeek is now the active AI provider (MiniMax disabled)
+- `DEEPSEEK_API_KEY` added to `.env` on Contabo
+- All 7 boot capabilities pass: conversation, planning, execution, evaluation, tools, reasoning, coding
+- Root cause: compiled `capability-resolver.js` missing `resolveProviderKey()` DB decryption (source/dist drift); DB key encryption was correct but compiled code skipped it
+- Full entry: [fixes.md §FIX-050](fixes.md#fix-050--hq-ai-chat-disconnected-ai_gateway_v2false--minimax-provider-inactive)
+
+**2026-07-31 19:40 PKT — HQ AI Chat Disconnected Fix (FIX-050):**
+- Root cause: `AI_GATEWAY_V2=false` in both `.env` and `.env.production` on Contabo + `minimax` provider had `isActive=false` in DB
+- Fix: Set `AI_GATEWAY_V2=true` in both env files, enabled MiniMax in `model_providers` DB table, restarted backend
+- Backend healthy: `https://brain.neurecore.com/api/v1/health` → 200
+- PM2 saved; all 7 processes online
+- Full entry: [fixes.md §FIX-050](fixes.md#fix-050--hq-ai-chat-disconnected-ai_gateway_v2false--minimax-provider-inactive)
+
+**Previously:** 2026-07-31 01:30 PKT — **NC-ACCT-IMP-1 fully complete.****Previously:** 2026-07-30 22:10 PKT — **NC-ACCT-IMP-1 Phase 1 deployed end-to-end.
+**Previously:** 
 **Previously:** 2026-07-28 11:00 PKT — Customer Creation Remediation: closed 3 customer-creation defects found by the platform owner — (1) DTO `IsIn` validator rejected `""` for unset F&C enum fields on `POST /api/v1/customers`, silently 400-ing the New Customer modal; (2) modal could be dismissed by backdrop click mid-submit + axios error envelopes weren't unwrapped so users saw no message; (3) Hermes chat `createCustomer` tool was default-deny under the `ai-assistant` security policy (missing from `allowedTools`). Fixed + deployed to Contabo (`neurecore-backend` PID 27954, `neurecore-tenant` PID 13904). All three pinned with new regression specs: `customer.dto.spec.ts` (10 cases) + `security-policy.provider.spec.ts` (3 cases). Live e2e on `https://brain.neurecore.com`: empty-enum POST → HTTP 201, populated-F&C POST → HTTP 201. Tests: 98/98 pass across `customers | tools | security-policy`. Full entry at [fixes.md §FIX-CUSTOMER-MODAL-CHAT](fixes.md#fix-customer-modal-chat--create-customer-modal-doesnt-work--hermes-chat-create-new-customer-not-working-2026-07-28-1100-pkt).
 
 ---
@@ -367,6 +401,8 @@ comprehensive-fix.md                                               [new]
 | P14 | Platform Evolution | ✅ Source complete | Technology Radar; Benchmark; Experiment; Feature Lifecycle; event emissions |
 
 **Architecture:** P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10 → P11 → P12 → P13 → P14
+
+> **Phase 9 Certification (G9 — NC-AWL-IMP-1 §11):** G9 APPROVED (105/105 scenarios, 100% pass rate, 2026-07-27). See [`docs/reconstruction/phase-9/G9-EVIDENCE.md`](docs/reconstruction/phase-9/G9-EVIDENCE.md). All 10 mandatory invariants enforced. Runner: `pnpm certify:phase9`. Dashboard: `src/test/certification/reports/g9-dashboard.html`.
 
 ---
 

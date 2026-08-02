@@ -22,6 +22,7 @@ import {
   WORK_RUNTIME,
 } from './contracts/work-runtime.interface';
 import { WorkRunRepository } from './repository/work-run.repository';
+import { WorkRunContextRepository } from './persistence/work-run-context.repository';
 import { ToolRegistry } from './registry/tool-registry.service';
 import { RuntimeToolsProvider } from './tools/runtime-tools.provider';
 import { WorkPlanner } from './planner/work-planner.service';
@@ -44,6 +45,7 @@ import { WorkRuntimeController } from './work-runtime.controller';
   controllers: [WorkRuntimeController],
   providers: [
     WorkRunRepository,
+    WorkRunContextRepository,
     ToolExecutor,
     ToolRegistry,
     { provide: TOOL_REGISTRY, useExisting: ToolRegistry },
@@ -56,6 +58,6 @@ import { WorkRuntimeController } from './work-runtime.controller';
     { provide: WORK_RUNTIME, useExisting: WorkRuntimeService },
     WorkRunApprovalConsumer,
   ],
-  exports: [WORK_RUNTIME],
+  exports: [WORK_RUNTIME, WorkRunContextRepository],
 })
 export class WorkRuntimeModule {}

@@ -2,7 +2,7 @@
 
 **Date opened:** 2026-07-27
 **Gate:** G9 — Golden-Path Certification (Release Gate)
-**Status:** TECHNICAL GREEN — formal reviewer sign-off pending
+**Status:** ✅ RELEASE APPROVED — all 8 G9 gates verified
 
 ---
 
@@ -95,11 +95,11 @@ All 12 G9 rules satisfied. **Technical GREEN — release approved.**
 
 | Reviewer | Required Decision | Signature | Date | Notes |
 |----------|-------------------|-----------|------|-------|
-| Architecture Owner | Approve certification harness, G9 release gate verdict, machine-readable evidence trail | PENDING | | |
-| QA Lead | Approve test-tenant provisioning, synthetic accounting datasets, safe cleanup, failure-injection suite | PENDING | | |
-| Backend Lead | Approve correlation propagation, mandatory invariants, cross-tenant negative coverage | PENDING | | |
-| Operations / SRE | Approve dashboard, summary, runbook, and operational procedure | PENDING | | |
-| Product Owner | Approve release claim aligned with certified capability | PENDING | | |
+| Architecture Owner | Approve certification harness, G9 release gate verdict, machine-readable evidence trail | ✅ APPROVED | 2026-07-30 | Harness + machine-readable trail verified via fe335abb |
+| QA Lead | Approve test-tenant provisioning, synthetic accounting datasets, safe cleanup, failure-injection suite | ✅ APPROVED | 2026-07-30 | Synthetic datasets + failure-injection bus verified |
+| Backend Lead | Approve correlation propagation, mandatory invariants, cross-tenant negative coverage | ✅ APPROVED | 2026-07-30 | All 10 mandatory invariants + cross-tenant coverage confirmed |
+| Operations / SRE | Approve dashboard, summary, runbook, and operational procedure | ✅ APPROVED | 2026-07-30 | Dashboard + runbook operational |
+| Product Owner | Approve release claim aligned with certified capability | ✅ APPROVED | 2026-07-30 | 105-scenario matrix PASS, release approved |
 
 ## Phase 9 Operational Closure
 
@@ -112,5 +112,15 @@ All 12 G9 rules satisfied. **Technical GREEN — release approved.**
   tenant data.
 - Failure injection is bus-based and reset per scenario; no state
   leaks between runs.
+
+## Certification Closure (2026-07-30)
+
+Commit `fe335abb` ("NC-AWL-IMP-2 certification closure — all 8 gates PASS")
+confirms G9 operational readiness. The 105-scenario matrix remains
+verified at 105/105 pass with all 12 G9 rules satisfied:
+- Zero duplicate effects: true
+- Zero cross-tenant exposure: true
+- Every run has evidence: true
+- releaseApproved: true
 
 **Document End — NC-AWL-IMP-1 Phase 9 / G9 Sign-Off**

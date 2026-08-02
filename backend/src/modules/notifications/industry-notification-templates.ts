@@ -9,7 +9,11 @@
  * when sending industry-specific notifications.
  *
  * Each template includes title, body, and recommended channel preferences.
- *
+ */
+
+import { INDUSTRY_GROUP } from '../industry/tier-industry-matrix';
+
+/**
  * SOLID:
  * - OCP: New industry = add entry to this registry.
  * - ISP: NotificationTemplate is a focused type.
@@ -42,7 +46,7 @@ export const INDUSTRY_NOTIFICATION_TEMPLATES: Record<
   NotificationTemplate[]
 > = {
   // ─── Financial & Compliance ────────────────────────────────────────────
-  'financial-compliance': [
+  [INDUSTRY_GROUP.FINANCIAL_COMPLIANCE]: [
     {
       slug: 'kyc-expiry-reminder',
       category: 'compliance',
@@ -394,7 +398,6 @@ export const INDUSTRY_NOTIFICATION_TEMPLATES: Record<
     },
   ],
 };
-
 
 export function getNotificationTemplates(
   industryGroup: string,

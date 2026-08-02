@@ -33,6 +33,10 @@ import { GovernanceModule } from '../governance/governance.module';
 import { ProjectMembersModule } from '../project-members/project-members.module';
 import { ProjectStagesModule } from '../project-stages/project-stages.module';
 import { GoalsModule } from '../goals/goals.module';
+import { AccountingModule } from '../accounting/accounting.module';
+import {
+  NpvTool, IrrTool, MirrTool, AmortizeLoanTool,
+} from '../accounting/tools/accounting-tools.providers';
 import {
   CreateTaskTool,
   CreateProjectTool,
@@ -144,7 +148,7 @@ import {
 import type { IStructuredTool } from './interfaces/structured-tool.interface';
 
 @Module({
-  imports: [forwardRef(() => IntegrationsModule), ModelsModule, MemoryModule, ProjectMemoryModule, ProjectsModule, OrchestrationModule, ProjectShapeModule, CustomersModule, DepartmentsModule, forwardRef(() => AgentsModule), ApprovalsModule, NotificationsModule, TenantsModule, GovernanceModule, ProjectMembersModule, ProjectStagesModule, GoalsModule],
+  imports: [forwardRef(() => IntegrationsModule), ModelsModule, MemoryModule, ProjectMemoryModule, ProjectsModule, OrchestrationModule, ProjectShapeModule, CustomersModule, DepartmentsModule, forwardRef(() => AgentsModule), ApprovalsModule, NotificationsModule, TenantsModule, GovernanceModule, ProjectMembersModule, ProjectStagesModule, GoalsModule, AccountingModule],
   controllers: [ToolsController],
   providers: [
     ToolDataAccessService,
@@ -255,6 +259,10 @@ import type { IStructuredTool } from './interfaces/structured-tool.interface';
     ListGoalsTool,
     UpdateGoalProgressTool,
     ListBudgetPoliciesTool,
+    NpvTool,
+    IrrTool,
+    MirrTool,
+    AmortizeLoanTool,
     GetDepartmentTool,
     ListDepartmentMembersTool,
     ListAgentsByDepartmentTool,
@@ -394,6 +402,10 @@ export class ToolsModule implements OnModuleInit {
     private readonly searchTasks: SearchTasksTool,
     private readonly getTaskStats: GetTaskStatsTool,
     private readonly globalSearch: GlobalSearchTool,
+    private readonly npvTool: NpvTool,
+    private readonly irrTool: IrrTool,
+    private readonly mirrTool: MirrTool,
+    private readonly amortizeTool: AmortizeLoanTool,
   ) {
     this.logger = new Logger(ToolsModule.name);
   }
@@ -521,6 +533,10 @@ export class ToolsModule implements OnModuleInit {
       this.searchTasks,
       this.getTaskStats,
       this.globalSearch,
+      this.npvTool,
+      this.irrTool,
+      this.mirrTool,
+      this.amortizeTool,
     ].filter((t) => t !== null && t !== undefined) as IStructuredTool[];
 
     this.logger.log(`[ToolsModule] filtered tools count: ${tools.length}`);

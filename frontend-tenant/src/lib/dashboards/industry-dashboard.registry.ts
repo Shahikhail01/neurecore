@@ -12,6 +12,7 @@
  */
 
 import type { StatusColor } from '@/types/ui.types';
+import { INDUSTRY_GROUP } from '@/lib/industryGroups';
 
 export interface KpiWidgetDef {
   metric: string;
@@ -52,8 +53,8 @@ export interface DashboardTemplate {
 export const INDUSTRY_DASHBOARDS: Record<string, DashboardTemplate> = {
 
   // ─── Financial & Compliance ──────────────────────────────────────────
-  'financial-compliance': {
-    groupSlug: 'financial-compliance',
+  [INDUSTRY_GROUP.FINANCIAL_COMPLIANCE]: {
+    groupSlug: INDUSTRY_GROUP.FINANCIAL_COMPLIANCE,
     kpiWidgets: [
       { metric: 'totalClients', label: 'Total Clients', color: 'neutral' },
       { metric: 'complianceScore', label: 'Compliance Score', color: 'profit', target: 95, format: 'percent' },

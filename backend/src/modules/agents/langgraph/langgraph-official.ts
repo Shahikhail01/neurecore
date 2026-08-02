@@ -24,6 +24,8 @@ import type { ISecurityContext } from '../security/interfaces/security.interface
 import { FeatureFlagService } from '../../../common/feature-flag/feature-flag.service';
 import { AiGatewayService } from '../../ai-gateway/ai-gateway.service';
 import { LLMFactory } from '../../models/services/llm-factory.service';
+import { ResponseEnvelopeBuilder } from '../../chat/responses/builders/response-envelope.builder';
+import type { IResponseEnvelope } from '../../chat/responses/interfaces/response-envelope.interface';
 
 // Node name constants to satisfy TypeScript
 const PLANNER_NODE = 'planner';
@@ -103,6 +105,19 @@ const AgentStateAnnotation = Annotation.Root({
     default: () => null,
   }),
 
+  // Phase 2 — service-gateway-v2 deterministic routing.
+  // `forcedCapability` is the canonical capability the chat orchestrator
+  // pre-classified; the service-gateway tool uses it to override whatever
+  // the LLM named. `route` carries the full decision for SSE metadata.
+  forcedCapability: Annotation<string | null>({
+    reducer: (_left, right) => right ?? null,
+    default: () => null,
+  }),
+  route: Annotation<Record<string, unknown> | null>({
+    reducer: (_left, right) => right ?? null,
+    default: () => null,
+  }),
+
   // Evaluation
   evaluation: Annotation<{
     score: number;
@@ -157,6 +172,15 @@ const AgentStateAnnotation = Annotation.Root({
     reducer: (_left, right) => right,
     default: () => null,
   }),
+
+  // Response envelope (Phase 9 — Service Gateway + Response Envelope).
+  // toolNode populates this on a single-tool success so chat-sse.service
+  // can ship `{ text, envelope }` to the frontend. Multi-tool runs fall
+  // back to the legacy "executed N tool(s)" rendering (see plan §3.5).
+  envelope: Annotation<IResponseEnvelope | null>({
+    reducer: (_left, right) => right ?? null,
+    default: () => null,
+  }),
 });
 
 type AgentGraphState = typeof AgentStateAnnotation.State;
@@ -187,6 +211,8 @@ export class OfficialAgentGraph {
     private readonly securityInterceptor: SecurityInterceptorService,
     private readonly featureFlags: FeatureFlagService,
     @Optional() private readonly legacyFactory?: LLMFactory,
+    @Optional()
+    private readonly envelopeBuilder?: ResponseEnvelopeBuilder,
   ) {
     this.initializeGraph();
   }
@@ -525,7 +551,13 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
             // Pass the user's goal into the tool context so tools like
             // CreateProjectTool can use it as synthesis input when the user
             // didn't supply a projectTypeId.
-            metadata: { goal: state.goal },
+            // Phase 2: also pass the deterministic routing override and a
+            // route summary so service-gateway can apply it at execution.
+            metadata: {
+              goal: state.goal,
+              forcedCapability: state.forcedCapability,
+              route: state.route,
+            },
           };
 
           const result = await tool.execute(validatedInput, toolContext);
@@ -534,12 +566,14 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
           // just happens to look like an error. Surface it as
           // `error` so the retry / shouldContinue logic treats it
           // correctly and the user sees an honest failure message.
-          const toolResult = (result ?? null) as
-            | { success?: boolean; error?: string; data?: unknown }
-            | null;
+          const toolResult = (result ?? null) as {
+            success?: boolean;
+            error?: string;
+            data?: unknown;
+          } | null;
           const failed =
             !!toolResult && toolResult.success === false
-              ? toolResult.error ?? 'Tool returned success=false'
+              ? (toolResult.error ?? 'Tool returned success=false')
               : undefined;
           toolResults.push({
             toolName: toolCall.name,
@@ -565,27 +599,44 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
       const failCount = toolResults.filter((r) => r.error).length;
 
       let responseMessage = '';
+      // Phase 9: build a response envelope ONLY for single-tool success.
+      // Multi-tool runs keep the legacy "executed N tool(s)" rendering
+      // because each tool returns its own payload shape and the FE
+      // EnvelopeRenderer can only show one component set at a time.
+      let envelope: IResponseEnvelope | null = null;
       if (failCount === 0) {
         responseMessage = `Successfully executed ${successCount} tool(s): `;
         responseMessage += toolResults.map((r) => `${r.toolName}`).join(', ');
-        // Add key result data
-        for (const r of toolResults) {
-          if (
-            r.output &&
-            typeof r.output === 'object' &&
-            !Array.isArray(r.output)
-          ) {
-            const output = r.output as Record<string, unknown>;
-            if (output.taskId)
-              responseMessage += `. Created ${output.title ?? 'task'} with ID ${output.taskId}`;
-            if (output.projectId)
-              responseMessage += `. Created project with ID ${output.projectId}`;
-            if (output.agentId)
-              responseMessage += `. Agent ${output.name ?? output.agentId} is now ${output.newStatus ?? 'updated'}`;
-          }
+        if (
+          successCount === 1 &&
+          this.envelopeBuilder &&
+          toolResults[0].output !== undefined &&
+          toolResults[0].output !== null
+        ) {
+          envelope = this.envelopeBuilder.buildToolResponse(
+            toolResults[0].toolName,
+            toolResults[0].output,
+          );
+        }
+        // Structured results belong in the envelope. Only fall back to a
+        // compact text rendering when no component could be built.
+        if (!envelope?.components?.length) {
+          const rendered = toolResults
+            .map((r) => this.renderToolOutput(r.output))
+            .filter(Boolean)
+            .join(' ');
+          if (rendered) responseMessage += `. ${rendered}`;
         }
       } else {
-        responseMessage = `Executed ${successCount} tool(s) successfully, ${failCount} failed.`;
+        const errors = toolResults
+          .filter((result) => result.error)
+          .map((result) => result.error)
+          .filter(Boolean)
+          .join('; ');
+        responseMessage =
+          successCount > 0
+            ? `Completed ${successCount} action(s), but ${failCount} failed: ${errors}`
+            : `I couldn't complete that request: ${errors || 'the tool call failed'}`;
       }
 
       return {
@@ -600,6 +651,7 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
         ],
         currentNode: EVALUATOR_NODE,
         shouldContinue: false, // Done after execution
+        envelope,
       };
     } catch (error) {
       this.logger.error('[tool_node] Error executing tools', error);
@@ -649,8 +701,9 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
       // Security/policy blocks are permanent — retrying won't help and just
       // burns LangGraph recursion budget. Break the loop in that case so the
       // user gets the failure message instead of a recursion limit error.
-      const hasSecurityBlock = state.toolResults.some((r) =>
-        typeof r.error === 'string' && r.error.startsWith('Security blocked'),
+      const hasSecurityBlock = state.toolResults.some(
+        (r) =>
+          typeof r.error === 'string' && r.error.startsWith('Security blocked'),
       );
 
       const success = allStepsComplete && !hasErrors && !hasToolErrors;
@@ -676,7 +729,8 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
               ? 'Tool blocked by security policy'
               : 'Some steps failed or incomplete',
           suggestions: success ? [] : ['Retry failed steps'],
-          shouldRetry: !success && !hasSecurityBlock && iteration < maxIterations,
+          shouldRetry:
+            !success && !hasSecurityBlock && iteration < maxIterations,
         },
         currentNode: EVALUATOR_NODE,
         // Phase 4.4 fix: properly increment iteration so maxIterations
@@ -798,8 +852,7 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
         ? {
             toolCalls: r.toolCalls.map((tc) => ({
               name: tc.name,
-              arguments:
-                (tc.arguments as Record<string, unknown>) ?? {},
+              arguments: (tc.arguments as Record<string, unknown>) ?? {},
             })),
           }
         : {}),
@@ -823,7 +876,10 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
     toolCalls?: Array<{ name: string; arguments: Record<string, unknown> }>;
   }> {
     if (!this.legacyFactory) {
-      return { content: 'Legacy LLMFactory not available; set AI_GATEWAY_V2=true or ensure ModelsModule is imported.' };
+      return {
+        content:
+          'Legacy LLMFactory not available; set AI_GATEWAY_V2=true or ensure ModelsModule is imported.',
+      };
     }
     return this.legacyFactory.invokeWithTools(
       [
@@ -835,6 +891,73 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
       2048,
       overrideModel,
     );
+  }
+
+  /**
+   * Render a tool result into a short, human-readable summary that surfaces
+   * the actual data (arrays, nested `data` payloads, entity fields) instead of
+   * a generic "executed N tool(s)" acknowledgement. Returns '' when there is
+   * nothing meaningful to show.
+   */
+  private renderToolOutput(output: unknown): string {
+    if (output === null || output === undefined || output === '') return '';
+    if (typeof output !== 'object') return `Result: ${String(output)}`;
+
+    // Unwrap the common `{ success, data }` envelope.
+    const payload: unknown = (output as Record<string, unknown>).data ?? output;
+
+    // If the payload is an object, surface a named array payload first
+    // (e.g. { projects: [...], total }, { data: [...], total }).
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      const p = payload as Record<string, unknown>;
+      const arrayKeys = Object.keys(p).filter((k) => Array.isArray(p[k]));
+      const arrayKey = arrayKeys.find((k) => k !== 'data') ?? arrayKeys[0];
+      if (arrayKey) {
+        const items = p[arrayKey] as unknown[];
+        const total = p.total ?? items.length;
+        const summary = items
+          .map((it) => this.summarizeToolItem(it))
+          .filter(Boolean)
+          .join('; ');
+        return `${arrayKey}: (${total}) ${summary}`;
+      }
+      // Scalar summary object — compact JSON, dropping envelope noise.
+      const clean: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(p)) {
+        if (k === 'success' || k === 'metadata') continue;
+        clean[k] = v;
+      }
+      const json = JSON.stringify(clean);
+      if (json && json !== '{}') return `Result: ${json}`;
+      return '';
+    }
+
+    // Direct array payload.
+    if (Array.isArray(payload)) {
+      const summary = payload
+        .map((it) => this.summarizeToolItem(it))
+        .filter(Boolean)
+        .join('; ');
+      return summary ? `Result: ${summary}` : '';
+    }
+
+    return '';
+  }
+
+  /** Format a single list/array item into a short label. */
+  private summarizeToolItem(item: unknown): string {
+    if (item === null || item === undefined) return '';
+    if (typeof item !== 'object') return String(item);
+    const o = item as Record<string, unknown>;
+    const name = o.name ?? o.title ?? o.id;
+    if (name === undefined) {
+      const json = JSON.stringify(o);
+      return json && json !== '{}' ? json : '';
+    }
+    const status = o.status;
+    return status !== undefined && status !== null
+      ? `${name} (${status})`
+      : String(name);
   }
 
   /**
@@ -896,6 +1019,10 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
 
     // If no checkpoint, create fresh state
     if (!initialState) {
+      const forced =
+        ((params as Record<string, unknown>)['forcedCapability'] as
+          | string
+          | undefined) ?? null;
       initialState = {
         goal: params.goal,
         agentId: params.agentId,
@@ -915,7 +1042,14 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
         shouldContinue: true,
         model: null,
         allowedTools,
-      };
+        envelope: null,
+        forcedCapability: forced,
+        route:
+          ((params as Record<string, unknown>)['route'] as
+            | Record<string, unknown>
+            | null
+            | undefined) ?? null,
+      } as AgentGraphState;
     }
 
     this.logger.log(`[run] Starting agent execution for goal: ${params.goal}`);
@@ -963,6 +1097,20 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
       error: state.error ?? null,
       shouldContinue: state.shouldContinue ?? true,
       model: null,
+      envelope: null,
+      forcedCapability:
+        (state as unknown as { forcedCapability?: string | null })
+          .forcedCapability ?? null,
+      route:
+        (state as unknown as { route?: Record<string, unknown> | null })
+          .route ?? null,
+    };
+  }
+
+  /**
+   * Saontinue ?? true,
+      model: null,
+      envelope: null,
     };
   }
 
@@ -1037,6 +1185,16 @@ Keep responses concise. Use tools whenever the user asks for an action.`;
       shouldContinue: true,
       model: params.model ?? null,
       allowedTools,
+      envelope: null,
+      forcedCapability:
+        ((params as Record<string, unknown>)['forcedCapability'] as
+          | string
+          | undefined) ?? null,
+      route:
+        ((params as Record<string, unknown>)['route'] as
+          | Record<string, unknown>
+          | null
+          | undefined) ?? null,
     };
 
     this.logger.log(

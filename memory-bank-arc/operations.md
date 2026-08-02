@@ -1,5 +1,6 @@
 # NeureCore — Operations Reference
 
+**Last verified:** 2026-07-31 — G9 certification deployed (2026-07-30); hermes-tools fixes confirmed callable.
 **Audience:** Anyone operating or debugging the 3 services on Contabo.
 **Sibling docs:** [system-state.md](system-state.md) for current inventory, [deployment.md](deployment.md) for deploys, [runbook.md](runbook.md) for quick health checks, [disaster-recovery.md](disaster-recovery.md) for restores.
 

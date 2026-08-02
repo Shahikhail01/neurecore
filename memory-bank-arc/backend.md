@@ -1,16 +1,27 @@
 # Backend (NeureCore NestJS API)
 
-**Last verified:** 2026-07-17 — All 14 enterprise integration phases complete. Simulation-5 AEIC score: 83/100 (B+, Production Ready). All phases deployed (Phase 14 source complete, pending Contabo pnpm stabilization).
+**Last verified:** 2026-07-31 — FULL AUDIT COMPLETED
+
+**⚠️ DEPLOYMENT DISCREPANCY:**
+- **Local git HEAD:** `fe335abb` (Phase 9 G9 APPROVED, NC-AWL-IMP-2 closed)
+- **Contabo deployed:** `ad73f3e6` (MISSING: Phase 9 G9, NC-AWL-IMP-2, SIM-04 fixes)
+- **Production DB:** `neurecore_prod` on Contabo PostgreSQL (54 tenants, 63 users, 181 projects, 694 tasks, 175 tables)
+- **AI Providers:** 2 active (Deepseek primary, MiniMax inactive)
+
 **Live URL:** `https://brain.neurecore.com/api/v1/`
 **Internal port:** 3003
-**Repo:** `git@github.com:Shahikhail01/neurecore.git` @ `a1bcfd8` (Phase 14 honest remediation — PlatformEvolution event emissions; all phase audit fixes committed)
-**Sibling docs:** [system-state.md](system-state.md) · [operations.md](operations.md) · [frontend-tenant.md](frontend-tenant.md) · [contabo-ops.md](contabo-ops.md) · [pools-taxonomy.md](pools-taxonomy.md)
+**Repo:** `git@github.com:Shahikhail01/neurecore.git`
+**Contabo deployed commit:** `ad73f3e6` (NOT fe335abb — deployment required)
 
 ---
 
 ## TL;DR
 
-A NestJS 11 / Prisma 5 / PostgreSQL (Contabo) / Redis / Socket.IO monolith that serves the public API for both frontends and an internal AI agent runtime. **Local count:** ~60 modules, 63 controllers, 141 services, 83 Prisma models. Listens on `:3003` and is reverse-proxied by OLS at `brain.neurecore.com`. Started via PM2 `neurecore-backend`.
+A NestJS 11 / Prisma 5 / PostgreSQL (Contabo) / Redis / Socket.IO monolith that serves the public API for both frontends and an internal AI agent runtime.
+- **Local count:** 106 modules, 119 controllers, 250 services, 174 Prisma models, 69 interfaces, 2 gateways, 132 enums
+- **Deployed count:** 175 DB tables (matches 174 Prisma models + _prisma_migrations)
+- **Listens on:** `:3003` reverse-proxied by OLS at `brain.neurecore.com`
+- **PM2 process:** `neurecore-backend` (pid 614404, uptime shows running)
 
 > **Architecture:** 14-layer governed enterprise platform:
 > P1 (EIE) → P2 (Event Fabric) → P3 (Context Plane) → P4 (Runtime) → P5 (Cognition) → P6 (Autonomy) → P7 (Enterprise OS) → P8 (Platform Operations) → P9 (Enterprise Intelligence) → P10 (Platform SDK) → P11 (Cloud Platform) → P12 (Application Framework) → P13 (AI Governance) → P14 (Platform Evolution)
@@ -78,7 +89,7 @@ Rebuild: `bash /opt/neurecore/rebuild.sh backend` — see [deployment.md §1](de
 
 ---
 
-## 3. Module map (35 modules in prod; 55 local — drift documented in §13)
+## 3. Module map (104 modules total — see §13 for prod drift)
 
 ```
 src/modules/
@@ -292,7 +303,7 @@ Errors (via `GlobalExceptionFilter`):
 | Migrations location | `/opt/neurecore/backend/backend/prisma/migrations/` |
 | **Migration note** | Migration files have ordering bugs (duplicate CREATE TABLE). Use `prisma db push` instead of `prisma migrate deploy` for schema sync. |
 
-**~80 Prisma models** (groups):
+**~174 Prisma models** (groups):
 - Identity: `User`, `Session`, `RefreshToken`, `OAuthToken`, `ApiKey`, `AuditLog`
 - Tenancy: `Tenant`, `Tier` (billing), **`TierTemplate`** (Phase 10 Pool #4), `TierAgentPool`, `TenantLimit`, `TenantMetric`, `QuotaUsage`, `BillingEvent`, `Invoice`, `Expense`, `BudgetPolicy`, `BudgetIncident`, **`OnboardingChecklistEntry`** (WS-2.1)
 - Org: `Department`, `DepartmentTemplate`, `Agent`, `AgentTemplate` (+`enabled`), `Task`, `Workflow`, `GovernanceRule`, `ApprovalRequest`

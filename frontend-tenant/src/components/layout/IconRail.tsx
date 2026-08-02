@@ -187,8 +187,17 @@ interface RailSection {
  *
  * INDUSTRY-GROUPS-CONCEPT.md §7 — the Workspace section's items are
  * augmented with industry-specific extras based on the tenant's industryGroup.
+ *
+ * PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.1 (P3) — accepts the tenant's
+ * `industry.slug` so sub-industry nav filters (e.g. hide Products/Orders/
+ * Inventory for media tenants) can be applied at render time without
+ * editing component code. Items declaring `subIndustries: [...]` only render
+ * when the tenant's industry is in that list.
  */
-export function buildRailSections(industryGroup: string | null | undefined): RailSection[] {
+export function buildRailSections(
+  industryGroup: string | null | undefined,
+  industrySlug?: string | null,
+): RailSection[] {
   const navConfig = getIndustryNavConfig(industryGroup);
 
   // Resolve industry-specific Customer label/icon (defaults: "Customers" + UserCircle).
@@ -201,7 +210,7 @@ export function buildRailSections(industryGroup: string | null | undefined): Rai
     if (!navConfig.customersIcon) return UserCircle;
     const resolved = INDUSTRY_ICON_MAP[navConfig.customersIcon];
     if (!resolved && process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
+       
       console.error(
         `[IconRail] unknown customersIcon "${navConfig.customersIcon}" — falling back to UserCircle. ` +
           `Add it to INDUSTRY_ICON_MAP.`,
@@ -210,16 +219,26 @@ export function buildRailSections(industryGroup: string | null | undefined): Rai
     return resolved ?? UserCircle;
   })();
 
-  // Industry-specific workspace extras
-  const industryExtras: RailItem[] = navConfig.workspaceExtras.map((item) => ({
-    id: item.id as ItemId,
-    label: item.label,
-    href: item.href,
+  // Industry-specific workspace extras — filtered by sub-industry visibility (P3).
+  // PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.1 (P3): if a RailItem declares
+  // `subIndustries: [...]`, it only renders when the tenant's industry slug
+  // is in that list. Items without the field render for all tenants in the
+  // group (backward-compatible).
+  const industryExtras: RailItem[] = navConfig.workspaceExtras
+    .filter((item) => {
+      if (!item.subIndustries || item.subIndustries.length === 0) return true;
+      if (!industrySlug) return true; // industry not yet loaded; show all
+      return item.subIndustries.includes(industrySlug);
+    })
+    .map((item) => ({
+      id: item.id as ItemId,
+      label: item.label,
+      href: item.href,
       // Phase 9 N4 — same dev-only assertion pattern as customersIcon above.
       icon: (() => {
         const resolved = INDUSTRY_ICON_MAP[item.iconName];
         if (!resolved && process.env.NODE_ENV !== 'production') {
-          // eslint-disable-next-line no-console
+           
           console.error(
             `[IconRail] unknown iconName "${item.iconName}" — falling back to BriefcaseIcon. ` +
               `Add it to INDUSTRY_ICON_MAP.`,
@@ -227,7 +246,7 @@ export function buildRailSections(industryGroup: string | null | undefined): Rai
         }
         return resolved ?? BriefcaseIcon;
       })(),
-  }));
+    }));
 
   return [
     {
@@ -300,7 +319,7 @@ export function IconRail({ className = '' }: IconRailProps) {
   // Part 9 N3 — single fetch via TenantStore. Hook fires once on mount
   // regardless of how many components call it (store is idempotent +
   // TTL-guarded). Multiple consumers share the cached value.
-  const { industryGroup: tenantIndustryGroup } = useTenantIndustryGroup();
+  const { industryGroup: tenantIndustryGroup, industry: tenantIndustrySlug } = useTenantIndustryGroup();
   useRailInvalidationOnIndustryChange();
   const user = useTenantAuth();
 
@@ -316,7 +335,10 @@ export function IconRail({ className = '' }: IconRailProps) {
   const collapsedSections = useRailPreferencesStore((s) => s.collapsedSections);
   const toggleSectionCollapsed = useRailPreferencesStore((s) => s.toggleSectionCollapsed);
 
-  const railSections = useMemo(() => buildRailSections(tenantIndustryGroup), [tenantIndustryGroup]);
+  const railSections = useMemo(
+  () => buildRailSections(tenantIndustryGroup, tenantIndustrySlug),
+  [tenantIndustryGroup, tenantIndustrySlug],
+);
 
   const visibleSections = railSections
     .filter((section) => !hiddenSections.includes(section.id))
@@ -563,6 +585,7 @@ export function IconRail({ className = '' }: IconRailProps) {
         open={customizeOpen}
         onClose={() => setCustomizeOpen(false)}
         industryGroup={tenantIndustryGroup}
+        industrySlug={tenantIndustrySlug}
       />
     </aside>
   );

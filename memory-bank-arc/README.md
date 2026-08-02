@@ -1,10 +1,16 @@
 # NeureCore — Memory Bank (Single-Page Index)
 
-**Last updated:** 2026-07-25 (Industry Verification Run-5 complete — 7/7 defects remediated; all features passing; Socket.IO polling noise **RESIDUAL** by design but no functional impact; ready for production sign-off)
+**Last updated:** 2026-07-31 (FULL SYSTEM AUDIT COMPLETED)
+
+**⚠️ CRITICAL DISCREPANCY — DEPLOYMENT STATUS:**
+- **Local git HEAD:** `fe335abb` (NC-AWL-IMP-2 closure, Phase 9 G9 certified)
+- **Contabo deployed backend:** `ad73f3e6` (OLDER — missing Phase 9 G9, NC-AWL-IMP-2, SIM-04 fixes)
+- **Phase 9 G9 APPROVED** (105/105) is LOCAL ONLY, NOT DEPLOYED to production
+- **Deployment required** to bring Contabo current
 
 **Audience:** Anyone (human or AI) needing the current state of the NeureCore platform.
 
-**TL;DR:** Three services on a single Contabo VPS (109.123.248.253), no Vercel. PM2 + OpenLiteSpeed + Contabo PostgreSQL 16 + Redis. All 14 Enterprise Integration Phases complete. AI Gateway with 5 providers operational. Tier System + Industry Groups fully implemented; **cross-tier approval guard** (`ApprovalAddonRegistry.evaluateAgainstTier` → `TierGuardOutcome`) and **universal template baseline** (`seed-platform-templates.cjs` + `POST /tenant-templates/apply-baseline`) shipped 2026-07-23 15:55 PKT. **Rail-preferences cache invalidation** hook (`useRailInvalidationOnIndustryChange`) prevents stale per-industry hidden-item IDs from leaking across `industryGroup` re-assignments. Org chart overhaul shipped. Mali Live Inc. tenant configured with financial services departments. **Master Package Pool:** 83 packages (15 with full composition for Accounting & Audit Services). **Auth:** cookie-only via `__Host-nc_at/_rt/csrf`; refresh-families with reuse detection; per-account lockout (5/10min). **`lucide-react` pinned to `0.460.0`** on production.
+**TL;DR:** Three services on a single Contabo VPS (109.123.248.253), no Vercel. PM2 + OpenLiteSpeed + Contabo PostgreSQL 16 + Redis. **Contabo backend is 8+ commits behind local** (needs deploy). **Local codebase:** 106 modules, 119 controllers, 250 services, 174 Prisma models. **Deployed backend:** 175 DB tables, 54 tenants, 63 users, 181 projects, 694 tasks. AI Gateway has 2 providers (Deepseek active, MiniMax inactive). **No Mali Live tenant** exists in production DB. Enterprise event outbox: 849 events (837 DISPATCHED, 11 DEAD_LETTER, 1 PROCESSED). Enterprise event inbox: 2669 PROCESSED, 34 FAILED.
 
 **Industry Verification Run-5 (2026-07-25):** Accounting & Audit Services tenant verified through real headed browser. Defects resolved: D-02 department auto-instantiation, D-03 project-type whitelist, D-04 onboarding template picker, D-05 industry dashboard widgets, D-06 workspace placeholders (Engagements/Loans/Portfolios/Audits/Tax/Payroll/Compliance/Risk now functional), D-07 Fiscal Year End MM-DD input, D-01 Socket.IO polling noise (mitigated via longer ping interval + cleaner rejection). Brevo & Google Workspace integrations verified end-to-end (Brevo sent real email via master key). See [audits/2026-07-24-industry-verification-1/README.md](audits/2026-07-24-industry-verification-1/README.md) for the report.
 
@@ -30,7 +36,7 @@ If any fails, jump to [runbook.md](runbook.md).
 | Doc | One-line summary | When to read |
 |---|---|---|
 | **[system-state.md](system-state.md)** | Live inventory: 4 PM2 processes, 3 hostnames, ports 3003/3005/3020, Contabo PostgreSQL 16, Redis, AI Gateway (5 providers), Tier System (4 tiers), Industry Groups (8 groups, 16 industries), all migrations applied | When you need a number (port, id, path, env key) |
-| **[backend.md](backend.md)** | NestJS API deep dive: 94 modules, 63 controllers, 141 services, 84 Prisma models, 49 migrations, all REST routes, RBAC roles, JWT, AI Gateway, enterprise phases | Working on the backend; need endpoint, env var, or module structure |
+| **[backend.md](backend.md)** | NestJS API deep dive: 104 modules, 63 controllers, 141 services, 174 Prisma models, all REST routes, RBAC roles, JWT, AI Gateway, enterprise phases | Working on the backend; need endpoint, env var, or module structure |
 | **[frontend-admin.md](frontend-admin.md)** | Admin console: 18 routes, 5 stores, 11 hooks, 10 component groups, feature flags (35+ flags), AI providers config | Working on admin UI (`/admin/*`) |
 | **[frontend-tenant.md](frontend-tenant.md)** | Tenant app: 18+ routes, 10 stores, 13 hooks, Phase 1-10 history, industry-adaptive UI, org chart | Working on tenant UI (`/home`, `/command-center`, `/service-desk`, etc.) |
 | **[auth.md](auth.md)** | **Authoritative reference for cookie-only auth**: IAuthService facade (7 interfaces, 7 implementations), refresh-token families with reuse detection, CSRF double-submit, account lockout, atomic killSession | Touching /auth/login, /api/v1/auth/*, cookies, JWT, MFA, audit |
@@ -233,9 +239,9 @@ See [int-features/index.md](int-features/index.md) for full feature index with P
 | CORS proxy | 3004 (dev only) |
 | PM2 ecosystem file | `/opt/neurecore/ecosystem.config.js` |
 | Rebuild script | `/opt/neurecore/rebuild.sh` |
-| Backend modules | 94 (local) |
+| Backend modules | 104 (local) |
 | Backend migrations | 49 applied |
-| Backend Prisma models | 84 |
+| Backend Prisma models | 174 |
 | AI Providers | 5 (MiniMax, DeepSeek, MiMo, OpenAI, Anthropic) |
 | AI Models | 12+ |
 | Industries | 16 (8 groups) |
@@ -245,7 +251,7 @@ See [int-features/index.md](int-features/index.md) for full feature index with P
 | Pool departments | 57 |
 | Features | 19 |
 | Disk free | ~45 GB of 96 GB |
-| Backend git HEAD | `c5c05ec` (verify with `git rev-parse HEAD` on server) |
+| Backend git HEAD | `fe335abb` (NC-AWL-IMP-2 cert closure — all 8 gates PASS, 2026-07-30) |
 
 ---
 
@@ -255,7 +261,7 @@ See [int-features/index.md](int-features/index.md) for full feature index with P
 neurecore/
 ├── backend/                              # NestJS API (see backend.md)
 │   ├── src/
-│   │   ├── modules/                      # 94 modules
+│   │   ├── modules/                      # 104 modules
 │   │   ├── common/                       # Shared: feature flags, pipes, guards
 │   │   ├── config/                       # Configuration
 │   │   └── infrastructure/              # DB, Redis, external services

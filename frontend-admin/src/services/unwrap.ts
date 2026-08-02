@@ -1,5 +1,13 @@
 // Utility to normalize API responses which may be wrapped inconsistently
-export function unwrapList(res: any): { items: any[]; total?: number } {
+export interface UnwrappedList<T = any> {
+  items: T[];
+  total?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
+}
+
+export function unwrapList<T = any>(res: any): UnwrappedList<T> {
   const data = res?.data ?? res ?? {};
 
   const getItems = (v: any): any[] => {
@@ -12,14 +20,21 @@ export function unwrapList(res: any): { items: any[]; total?: number } {
 
   const root = data?.data ?? data;
   const items = getItems(root);
-  const total =
-    root?.total ??
-    root?.pagination?.total ??
-    root?.data?.total ??
-    root?.data?.pagination?.total ??
-    data?.total ??
-    data?.pagination?.total;
-  return { items, total };
+  // Walk all the places pagination metadata could live so callers don't have to.
+  const candidates = [root, root?.pagination, root?.meta, root?.data, root?.data?.pagination, data, data?.pagination, data?.meta];
+  const pick = (key: string) => {
+    for (const c of candidates) {
+      if (c && c[key] !== undefined) return c[key];
+    }
+    return undefined;
+  };
+  return {
+    items,
+    total: pick('total'),
+    page: pick('page'),
+    limit: pick('limit'),
+    totalPages: pick('totalPages'),
+  };
 }
 
 export function unwrapItem(res: any): any | null {

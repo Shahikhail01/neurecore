@@ -100,7 +100,10 @@ const BUSINESS_TECHNOLOGY_PACKAGES = [
   { slug: 'it-product-development', name: 'Product Development', scope: 'FUNCTIONAL', tierSlug: 'professional', industrySlug: 'technology-digital-services', description: 'End-to-end product development lifecycle from spec to launch.' },
   { slug: 'professional-consulting', name: 'Professional Consulting', scope: 'FUNCTIONAL', tierSlug: 'starter', industrySlug: 'professional-business-services', description: 'Management consulting engagement delivery and client management.' },
   { slug: 'professional-business-dev', name: 'Business Development', scope: 'FUNCTIONAL', tierSlug: 'starter', industrySlug: 'professional-business-services', description: 'Prospect qualification, proposal development, and pipeline management.' },
-  { slug: 'professional-legal', name: 'Legal Practice Management', scope: 'INDUSTRY', tierSlug: 'professional', industrySlug: 'professional-business-services', description: 'Legal matter tracking, document management, and compliance.' },
+  // T3 (PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.4): professional-legal REMOVED.
+  // Legal services = cut criteria #1 violation (malpractice + jurisdiction-bound
+  // regulation). Removed from seeder so it won't re-materialize on re-run.
+  // If a row exists in DB from a prior seed, archive via /packages admin UI.
   { slug: 'professional-recruiting', name: 'Recruiting & Talent', scope: 'INDUSTRY', tierSlug: 'professional', industrySlug: 'professional-business-services', description: 'Recruiting assignments, candidate tracking, and placement management.' },
 ];
 

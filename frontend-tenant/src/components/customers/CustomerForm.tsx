@@ -27,6 +27,7 @@ import { customersService } from '@/services/customers.service';
 import { tenantsService } from '@/services/tenants.service';
 import { industriesService } from '@/services/industries.service';
 import { useTenantIndustryGroup } from '@/stores/tenantStore';
+import { INDUSTRY_GROUP, isFinancialComplianceGroup } from '@/lib/industryGroups';
 import type {
   Customer,
   CustomerFinancialSubType,
@@ -158,7 +159,7 @@ export function CustomerForm({ customer, onClose, onCreated, onUpdated, onSubmit
       // would otherwise persist `kycStatus: ''` which the BE rejects
       // because the enum doesn't include '').
       const fcPayload: Record<string, unknown> = {};
-      if (tenantGroup === 'financial-compliance') {
+      if (isFinancialComplianceGroup(tenantGroup)) {
         if (kycStatus) fcPayload.kycStatus = kycStatus;
         if (riskRating) fcPayload.riskRating = riskRating;
         if (taxId.trim()) fcPayload.taxId = taxId.trim();
@@ -201,7 +202,7 @@ export function CustomerForm({ customer, onClose, onCreated, onUpdated, onSubmit
     }
   };
 
-  const showFcFields = tenantGroup === 'financial-compliance';
+  const showFcFields = isFinancialComplianceGroup(tenantGroup);
 
   return (
     <div className="space-y-4">

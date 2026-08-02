@@ -47,11 +47,20 @@ const EXEMPT_PATHS = new Set<string>([
   '/api/v1/chat/stream',
   '/api/v1/chat/history',
   '/api/v1/chat/suggestions',
+  // NC-ACCT-IMP-1 — accounting routes are server-to-server via HMAC-scoped
+  // bearer tokens; CSRF is meaningless. EXEMPT_PATHS covers exact-match
+  // only, so the array below adds accounting/* via regex.
 ]);
 
 const HMAC_SERVICE_PATHS = [
   /^\/api\/v1\/hermes-adapter\/executions\/[^/]+\/events$/,
   /^\/api\/v1\/hermes-adapter\/executions\/[^/]+\/tools\/[^/]+$/,
+  // NC-ACCT-IMP-1 — exempt all accounting routes from CSRF (HMAC-scoped
+  // bearer tokens are server-to-server; CSRF does not apply).
+  /^\/api\/v1\/accounting\//,
+  /^\/api\/v1\/admin\/sidecars\//,
+  // NC-SIM05-IMP-2 — exempt Sim-05 training scenario routes. Server-to-server.
+  /^\/api\/v1\/sim05\//,
 ];
 
 @Injectable()

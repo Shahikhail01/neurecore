@@ -1,0 +1,213 @@
+name: Pruned Industries CI
+
+# PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §10.7 (test matrix) + §4.4 (R4 SOLID guard).
+#
+# Runs every gate that must be green before any of the 8 phases can ship:
+#   1. SOLID guard (R4) — re-introduction of duplication fails CI
+#   2. Backend typecheck (entire workspace)
+#   3. Backend matrix invariant spec (P5)
+#   4. Pruned-industry isolation spec (P6)
+#   5. SIM-XX runners syntax (all 7 — P2 base class consumers)
+#   6. R2 helpers load (project-types metadata loader exercises all 16 industries)
+#   7. Frontend typecheck (tenant + admin)
+#
+# No DB needed (all unit-level). PR-time gate.
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/prisma/seed-helpers/**'
+      - 'backend/src/modules/industry/**'
+      - 'backend/src/test/integration/pruned-industry-isolation.integration.spec.ts'
+      - 'backend/src/modules/industry/__tests__/tier-industry-matrix.unit.spec.ts'
+      - 'frontend-tenant/src/lib/industryGroups.ts'
+      - 'frontend-tenant/src/lib/industry-workspace-models.ts'
+      - 'frontend-tenant/src/lib/industryWorkspaceKpi.ts'
+      - 'frontend-tenant/src/components/industry/**'
+      - 'frontend-tenant/src/app/workspace/**'
+      - 'frontend-admin/src/components/packages/**'
+      - 'frontend-admin/src/app/packages/**'
+      - 'simulations/_lib/**'
+      - 'simulations/SIM-0*/**'
+      - 'simulations/SIM-1*/**'
+      - 'scripts/solid-guard.sh'
+      - 'scripts/verify-deploy.sh'
+      - '.github/workflows/pruned-industries-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/prisma/seed-helpers/**'
+      - 'frontend-tenant/src/lib/industryGroups.ts'
+      - 'frontend-admin/src/components/packages/**'
+      - 'simulations/SIM-1*/**'
+      - '.github/workflows/pruned-industries-ci.yml'
+
+jobs:
+  solid-guard:
+    name: R4 — SOLID guard (single source of truth)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash — SOLID guard
+        run: |
+          chmod +x scripts/solid-guard.sh
+          bash scripts/solid-guard.sh
+        shell: bash
+
+  backend-typecheck:
+    name: Backend — TypeScript noEmit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - run: npm install -g pnpm@9
+      - run: pnpm install --frozen-lockfile
+      - name: tsc --noEmit
+        run: pnpm exec tsc --noEmit -p tsconfig.json
+
+  matrix-invariant-spec:
+    name: P5 — tier × industry matrix invariants
+    needs: backend-typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - run: npm install -g pnpm@9
+      - run: pnpm install --frozen-lockfile
+      - name: Jest — tier-industry-matrix
+        run: pnpm exec jest --config jest.config.js --testPathPatterns="tier-industry-matrix" --no-coverage
+
+  project-types-metadata:
+    name: R2 — project-types metadata loader (all 16 industries)
+    needs: backend-typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - run: npm install -g pnpm@9
+      - run: pnpm install --frozen-lockfile
+      - name: Node — loadProjectTypesForIndustry (all 16)
+        run: |
+          node -e "
+            const {loadProjectTypesForIndustry, listIndustriesWithProjectTypes} = require('./prisma/seed-helpers/seed-project-types.cjs');
+            const slugs = listIndustriesWithProjectTypes();
+            if (slugs.length !== 16) { console.error('expected 16, got', slugs.length); process.exit(1); }
+            for (const s of slugs) {
+              const defs = loadProjectTypesForIndustry(s);
+              if (defs.length === 0) { console.error(s, 'returned 0'); process.exit(1); }
+            }
+            console.log('PASS — 16 industries ×', slugs.map(s => loadProjectTypesForIndustry(s).length).join(','), 'project types');
+          "
+
+  sim-runners-syntax:
+    name: P2 — SIM-XX runners syntax (7 runners)
+    needs: backend-typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node --check each SIM runner
+        run: |
+          for runner in simulations/SIM-{05,06,07,08,09,10,11}*/certify-sim*.mjs; do
+            if [ -f "$runner" ]; then
+              node --check "$runner" || { echo "SYNTAX FAIL: $runner"; exit 1; }
+              echo "  ✓ $runner"
+            fi
+          done
+
+  sim-base-runner-syntax:
+    name: P2 — SIM base class syntax
+    needs: backend-typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node --check base-runner.mjs
+        run: node --check simulations/_lib/base-runner.mjs
+
+  tenant-frontend-typecheck:
+    name: Frontend tenant — TypeScript noEmit
+    needs: backend-typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-tenant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend-tenant/package.json
+      - run: npm install -g pnpm@9
+      - run: pnpm install --frozen-lockfile
+      - name: tsc --noEmit
+        run: pnpm exec tsc --noEmit -p tsconfig.json
+
+  admin-frontend-typecheck:
+    name: Frontend admin — TypeScript noEmit
+    needs: backend-typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend-admin/package.json
+      - run: npm install -g pnpm@9
+      - run: pnpm install --frozen-lockfile
+      - name: tsc --noEmit
+        run: pnpm exec tsc --noEmit -p tsconfig.json
+
+  all-green:
+    name: Pruned Industries CI — all gates PASS
+    needs:
+      - solid-guard
+      - backend-typecheck
+      - matrix-invariant-spec
+      - project-types-metadata
+      - sim-runners-syntax
+      - sim-base-runner-syntax
+      - tenant-frontend-typecheck
+      - admin-frontend-typecheck
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          if [ "${{ needs.solid-guard.result }}" != "success" ] || \
+             [ "${{ needs.backend-typecheck.result }}" != "success" ] || \
+             [ "${{ needs.matrix-invariant-spec.result }}" != "success" ] || \
+             [ "${{ needs.project-types-metadata.result }}" != "success" ] || \
+             [ "${{ needs.sim-runners-syntax.result }}" != "success" ] || \
+             [ "${{ needs.sim-base-runner-syntax.result }}" != "success" ] || \
+             [ "${{ needs.tenant-frontend-typecheck.result }}" != "success" ] || \
+             [ "${{ needs.admin-frontend-typecheck.result }}" != "success" ]; then
+            echo "One or more gates FAILED — see upstream jobs."
+            exit 1
+          fi
+          echo "ALL PRUNED INDUSTRIES GATES GREEN"

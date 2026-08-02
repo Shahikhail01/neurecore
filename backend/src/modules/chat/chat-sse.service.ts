@@ -93,7 +93,21 @@ export class ChatSseService {
           continue;
         }
         if (chunk.delta.length === 0) continue;
-        writeEvent('delta', { text: chunk.delta });
+        // Phase 9: forward the response envelope as a sibling of `text`
+        // in the SSE delta payload. Strictly additive — old clients
+        // that only read `text` ignore the new field; new clients
+        // (EnvelopeRenderer) consume it. Absent envelope ⇒ legacy
+        // rendering path (no envelope → FE renderer falls back).
+        // Phase 2: also forward the deterministic routing decision
+        // (`route`) so observability / debugging clients can show which
+        // rule fired. Missing `route` ⇒ legacy clients are unaffected.
+        writeEvent('delta', {
+          text: chunk.delta,
+          ...(chunk.envelope ? { envelope: chunk.envelope } : {}),
+          ...((chunk as { route?: unknown }).route
+            ? { route: (chunk as { route?: unknown }).route }
+            : {}),
+        });
       }
     } catch (err) {
       // Phase 3.9: classify the error and emit a stable, public-safe

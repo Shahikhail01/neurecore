@@ -8,6 +8,8 @@
  *   Layer 4: Visualization — how is the result shown?
  */
 
+import { IndustryGroupSlug } from '../industry/tier-industry-matrix';
+
 export type WidgetCapability =
   | 'FINANCIAL_PERFORMANCE'
   | 'WORKFORCE_STATUS'
@@ -97,7 +99,21 @@ export interface WidgetDefinition {
 
   // Layer 1 — Capability
   capability: WidgetCapability;
-  capabilityDomain: 'financial' | 'workforce' | 'operational' | 'ai' | 'risk' | 'customer' | 'predictive' | 'document' | 'knowledge' | 'collaboration' | 'automation' | 'compliance' | 'inventory' | 'quality';
+  capabilityDomain:
+    | 'financial'
+    | 'workforce'
+    | 'operational'
+    | 'ai'
+    | 'risk'
+    | 'customer'
+    | 'predictive'
+    | 'document'
+    | 'knowledge'
+    | 'collaboration'
+    | 'automation'
+    | 'compliance'
+    | 'inventory'
+    | 'quality';
 
   // Layer 2 — Data Source
   dataSources: DataSourceRef[];
@@ -131,8 +147,10 @@ export interface WidgetDefinition {
   category: 'CORE' | 'CONTEXTUAL' | 'INDUSTRY_SPECIFIC';
 
   // Phase 7 G2 — when set, this widget is only registered for tenants in
-  // the named industry group (e.g. 'financial-compliance'). When omitted,
-  // the widget is available to every tenant regardless of industry.
+  // the named industry group (e.g. INDUSTRY_GROUP.FINANCIAL_COMPLIANCE).
+  // When omitted, the widget is available to every tenant regardless of industry.
   // The runtime filter lives in WidgetRegistry.listForIndustryGroup().
-  industryGroup?: 'financial-compliance' | 'business-technology' | 'consumer-commerce' | 'industrial-infrastructure' | 'healthcare' | 'public-social' | 'agriculture-food' | 'other';
+  // PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §4.1 (R1) — typed against the
+  // single-source constant from tier-industry-matrix.ts.
+  industryGroup?: IndustryGroupSlug;
 }

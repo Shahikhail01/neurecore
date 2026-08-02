@@ -297,10 +297,20 @@ function buildRequestBody(
     // Without this, smaller LLMs reply in prose ("I cannot do that") instead of
     // producing a tool_call, which the user perceives as "tool broken". Legacy
     // /chat/messages prose path is unaffected (no `tools` is sent on that path).
-    body['tool_choice'] =
-      (req as InvokeHttpRequest).sourceModule === 'agent-graph.planner'
-        ? 'required'
-        : 'auto';
+    //
+    // PHASE-9 GATEWAY FIX (2026-08-01): DeepSeek's API rejects
+    // `tool_choice=required` for chat models in thinking mode with HTTP 400
+    // "Thinking mode does not support this tool_choice". We fall back to
+    // `auto` for DeepSeek providers; the planner's system prompt still
+    // strongly directs tool use. OpenAI/MiniMax providers keep `required`
+    // because they support it.
+    const providerSlug = extractProviderSlug(req.url);
+    const isPlanner = req.sourceModule === 'agent-graph.planner';
+    if (providerSlug === 'deepseek') {
+      body['tool_choice'] = 'auto';
+    } else {
+      body['tool_choice'] = isPlanner ? 'required' : 'auto';
+    }
   }
   if (req.responseFormatJson) {
     body['response_format'] = { type: 'json_object' };

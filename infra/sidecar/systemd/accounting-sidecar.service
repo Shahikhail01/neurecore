@@ -1,0 +1,51 @@
+[Unit]
+Description=NeureCore accounting-sidecar (numpy-financial + Beancount + Pandas)
+Documentation=https://github.com/neurecore/neurecore/blob/main/neurecore/infra/accounting-sidecar/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes-sidecar
+Group=hermes-sidecar
+
+# Working dir + env
+WorkingDirectory=/opt/neurecore/infra/accounting-sidecar
+EnvironmentFile=/opt/neurecore/backend/backend/.env
+Environment=ACCOUNTING_SNAPSHOT_DIR=/var/lib/neurecore/accounting/snapshots
+
+# Pre-start: ensure the snapshot directory exists and is owned by us.
+ExecStartPre=/usr/bin/install -d -o hermes-sidecar -g hermes-sidecar -m 0750 /var/lib/neurecore/accounting/snapshots
+
+# Run the sidecar. Single worker is sufficient (stateless compute + cached mmap).
+ExecStart=/opt/neurecore/infra/venv/bin/python -m uvicorn accounting_sidecar.main:app \
+    --host 127.0.0.1 \
+    --port 8090 \
+    --workers 1 \
+    --log-level info
+
+# Resource limits — match Hermes-sidecar posture.
+MemoryMax=512M
+CPUQuota=200%
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/neurecore/infra/accounting-sidecar /var/lib/neurecore/accounting/snapshots
+ReadWritePaths=/var/lib/neurecore/accounting/snapshots
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+
+[Install]
+WantedBy=multi-user.target

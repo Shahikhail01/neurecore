@@ -13,6 +13,8 @@ import { BraceBalancedJsonExtractor } from '@/core/services/chat/fallback/BraceB
 import { KeywordFallbackReply } from '@/core/services/chat/fallback/KeywordFallbackReply';
 import { TenantSystemPromptBuilder } from '@/core/services/chat/fallback/TenantSystemPromptBuilder';
 import { TenantSlashCommands } from '@/core/services/chat/slash-commands/TenantSlashCommands';
+import { BraceBalancedEnvelopeExtractor } from '@/core/services/chat/envelope/BraceBalancedEnvelopeExtractor';
+import { MessageEnvelopeParser } from '@/core/services/chat/envelope/MessageEnvelopeParser';
 import type { ChatConfig } from '@/shared/types/chat.types';
 
 // ── Tenant Chat Config ──────────────────────────────────────────────────────
@@ -42,6 +44,12 @@ const tenantChatConfig: ChatConfig = {
 
 // ── Wired Singletons ────────────────────────────────────────────────────────
 export const jsonExtractor = new BraceBalancedJsonExtractor();
+
+// Phase 9: a NEW envelope-aware extractor + parser. The legacy chart-only
+// `jsonExtractor` is preserved for backward compatibility (some legacy code
+// paths still call it directly for chart-only payloads).
+export const envelopeJsonExtractor = new BraceBalancedEnvelopeExtractor();
+export const envelopeParser = new MessageEnvelopeParser(envelopeJsonExtractor);
 
 export const chatService = new ChatService(
   restClient,

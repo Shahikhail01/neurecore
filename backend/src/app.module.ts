@@ -18,7 +18,9 @@ import { IdempotencyInterceptor } from './common/idempotency/idempotency.interce
 import { ServiceIdentitiesModule } from './modules/service-identities/service-identities.module';
 import { TimelineEventsModule } from './modules/timeline-events/timeline-events.module';
 import { DecisionEvaluationsModule } from './modules/decision-evaluations/decision-evaluations.module';
+import { RoutingDecisionsModule } from './modules/routing-decisions/routing-decisions.module';
 import { SimulationsModule } from './simulations/simulations.module';
+import { Sim05Module } from './simulations/sim05/sim05.module';
 import { SimulationVisibilityModule } from './common/simulation/simulation-visibility.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
@@ -46,6 +48,7 @@ import { OrchestrationModule } from './modules/orchestration/orchestration.modul
 import { GovernanceModule } from './modules/governance/governance.module';
 import { ApprovalPortModule } from './modules/approval-port/approval-port.module';
 import { HermesModule } from './modules/hermes/hermes.module';
+import { AccountingModule } from './modules/accounting/accounting.module';
 import { ObservabilityModule } from './modules/observability/observability.module';
 import { OutboxWorker } from './common/outbox/outbox.worker';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -55,6 +58,7 @@ import { ModelsModule } from './modules/models/models.module';
 import { AIGatewayModule } from './modules/ai-gateway/ai-gateway.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
@@ -153,6 +157,8 @@ import { CsrfProtectionMiddleware } from './common/auth/csrf.middleware';
 // the upstream Hermes execution sidecar. Coexists with the legacy
 // HermesModule for now; the legacy module is removed in Phase A/B.
 import { HermesAdapterModule } from './modules/hermes-adapter/hermes-adapter.module';
+import { ServiceGatewayV2Module } from './modules/service-gateway-v2/service-gateway-v2.module';
+import { ServiceGatewayFlagsModule } from './modules/service-gateway-v2/rollout/service-gateway-flags.module';
 
 @Module({
   imports: [
@@ -195,8 +201,13 @@ import { HermesAdapterModule } from './modules/hermes-adapter/hermes-adapter.mod
     ApprovalPortModule, // Phase 7 — Unified Capability Approval Port (ADR-006)
     HermesModule,
     HermesAdapterModule, // Phase 1.3 — gateway to upstream Hermes sidecar
+    ServiceGatewayV2Module,
+    ServiceGatewayFlagsModule, // Phase 8 — feature flags, kill switch, SLO counters
+
+    AccountingModule, // NC-ACCT-IMP-1 — gateway to accounting-sidecar (numpy-financial + Beancount)
     ContextPlaneModule, // Organizational Context Plane (ADR-002, Phase 3) — @Global
     WorkRuntimeModule, // Governed Work Runtime (ADR-003/004, Phase 4)
+    RoutingDecisionsModule, // Phase 2 — deterministic routing decision log
     EnterpriseCognitionModule, // Enterprise Cognitive Coordination Layer (Phase 5)
     EnterpriseAutonomyModule, // Governed Autonomous Operations (Phase 6)
     EnterpriseOperatingSystemModule, // Enterprise OS / Digital Twin (Phase 7)
@@ -339,7 +350,9 @@ import { HermesAdapterModule } from './modules/hermes-adapter/hermes-adapter.mod
     TimelineEventsModule,    // first-class event log
     DecisionEvaluationsModule, // immutable scores snapshot
     SimulationsModule,       // simulation lifecycle + day-run
+    Sim05Module,             // NC-SIM05-IMP-2 — 20 training scenarios over accounting capability
     SimulationVisibilityModule, // @Global — default exclusion of simulation artifacts
+    AdminModule,            // platform-admin endpoints (sidecar health proxy)
   ],
   providers: [
     // Global rate-limit guard

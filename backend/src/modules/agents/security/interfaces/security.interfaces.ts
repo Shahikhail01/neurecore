@@ -91,6 +91,10 @@ export interface IResourceAccessValidator {
 export interface ISecurityPolicy {
   agentType: string;
   tenantId: string;
+  policySource: {
+    name: string;
+    policyVersion: string;
+  };
   allowedTools: string[];
   blockedTools: string[];
   allowedPaths: string[];

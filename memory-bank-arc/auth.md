@@ -1,8 +1,14 @@
 # NeureCore — Auth & Login System (Authoritative Reference)
 
-**Last updated:** 2026-07-17 (RBAC update — Frontend Admin restricted to SUPER_ADMIN only; see [user-roles.md](user-roles.md))
+**Last updated:** 2026-07-31 — **FULL SYSTEM AUDIT COMPLETED**
+
+**⚠️ DEPLOYMENT STATUS:** Local is `fe335abb` (Phase 9 G9 + NC-AWL-IMP-2 done); Contabo deployed is `ad73f3e6` — **deployment required**
+
 **Audience:** Anyone (human or AI) modifying or debugging login, sessions, or cookies in the NeureCore platform.
+
 **TL;DR:** Both frontends (admin + tenant) and the NestJS backend use **cookie-only authentication** (HttpOnly `__Host-nc_at` + `__Host-nc_rt` + `__Host-nc_csrf`). API calls are **same-origin** (Next.js `rewrites()` proxy `/api/v1/*` → backend on `127.0.0.1:3003`). Refresh tokens are tracked in **families** with reuse detection. Per-account **lockout** after 5 failures in 10 minutes. CSRF double-submit on all state-changing requests. Password changes invalidate all outstanding tokens. **Frontend Admin (cc.neurecore.com) is SUPER_ADMIN only** — all other roles are redirected.
+
+**Production auth verified:** Login attempts correctly return 401 for invalid credentials (per API test 2026-07-31)
 
 > ## ⚠️ DO NOT CORRUPT THE AUTH SYSTEM
 >

@@ -99,6 +99,8 @@ export interface RuntimeGovernanceDecision {
   outcome: RuntimeGovernanceOutcome;
   reason: string;
   policySource: string;
+  policyVersion: string;
+  toolRegistrationsVersion: string;
   actorId: string;
   scope: { tenantId: string; capability: string; toolName: string };
   decidedAt: string;
@@ -136,7 +138,10 @@ export interface RuntimeTool {
   /** Validate input; throw on invalid. */
   validateInput(input: Record<string, unknown>): void;
   /** Execute against the owning capability's public command. */
-  execute(input: Record<string, unknown>, ctx: ToolContext): Promise<RuntimeToolResult>;
+  execute(
+    input: Record<string, unknown>,
+    ctx: ToolContext,
+  ): Promise<RuntimeToolResult>;
 }
 
 export interface ToolMetadata {
@@ -207,7 +212,11 @@ export interface CreateAndRunParams {
   workspaceId?: string | null;
   threadId?: string | null;
   request: string;
-  scope?: { projectId?: string; customerId?: string; includeCapabilities?: string[] };
+  scope?: {
+    projectId?: string;
+    customerId?: string;
+    includeCapabilities?: string[];
+  };
 }
 export interface IWorkRuntime {
   createRun(params: CreateAndRunParams): Promise<WorkRunView>;

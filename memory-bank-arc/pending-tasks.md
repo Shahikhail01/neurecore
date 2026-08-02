@@ -1,10 +1,24 @@
 # Pending Tasks & Issues
 
-> Source: comprehensive review of `memory-bank-new/` (16 .md files) on 2026-07-08.
-> Last updated: 2026-07-28 PKT — **AI Gateway Phase 2.8 shipped:** DB-persisted encrypted provider keys, discover-models endpoint, set-default-model endpoint, clickable model badges in admin UI, non-ASCII key guard, **chat streaming Zod-schema bug fixed** (the bug that made `/chat/stream` silently emit only `event: done` with no deltas).
-> Previous milestones: 2026-07-24 PKT — **Industry Groups release verification (Round-1 + Round-2) deployed.** See [fixes.md §FIX-COMPREHENSIVE](fixes.md#fix-comprehensive--industry-release-comprehensive-defects-2026-07-23) (commit `6957b10` + `261f157` + `c78ad25`, 14:56 PKT) and [fixes.md §FIX-COMPREHENSIVE-R2](fixes.md#fix-comprehensive-r2--universal-template-baseline--rail-invalidation--approval-cross-tier-guard-2026-07-23-1730-pkt) (commit `e5ceb45`, 15:55 PKT). Round-1: P0 backend + P1 frontend + P2 fixtures + P3 workspace honesty. Round-2: universal template baseline + rail invalidation hook + cross-tier approval guard + pnpm toolchain.
-> This document consolidates every outstanding task, known issue, and doc drift item
-> across Hermes, the tenant/admin UIs, the platform backend, and operations.
+> **Last updated:** 2026-07-31 — **FULL SYSTEM AUDIT COMPLETED**
+
+**⚠️ CRITICAL — DEPLOYMENT GAP (2026-07-31):**
+| Item | Local | Contabo Deployed | Status |
+|------|-------|------------------|--------|
+| Git HEAD | `fe335abb` | `ad73f3e6` | **NOT DEPLOYED** |
+| Phase 9 G9 (105/105) | ✅ Done | ❌ NOT DEPLOYED | **Deploy required** |
+| NC-AWL-IMP-2 closure | ✅ Done | ❌ NOT DEPLOYED | **Deploy required** |
+| SIM-04 fixes | ✅ Done | ❌ NOT DEPLOYED | **Deploy required** |
+| hermes-tools fixes | ✅ Done | ❌ NOT DEPLOYED | **Deploy required** |
+
+**Production health (2026-07-31):**
+- Backend: `https://brain.neurecore.com/api/v1/health` → 200 ✅
+- Tenant UI: `https://hq.neurecore.com/` → 200 ✅
+- Admin UI: `https://cc.neurecore.com/` → 200 ✅
+- PM2: 7 processes online (neurecore-backend, neurecore-tenant, neurecore-admin, shahisoft-nextjs, cookie-refresher, gfcportal, neurecore-cors-proxy)
+- DB: `neurecore_prod` — 54 tenants, 63 users, 181 projects, 694 tasks, 175 tables
+- AI Providers: 2 (Deepseek active ✅, MiniMax inactive)
+- Enterprise events: 849 outbox (837 DISPATCHED, 11 DEAD_LETTER, 1 PROCESSED)
 
 Status legend: 🔴 Not started · 🟡 In progress / partial / scaffold only · 🟢 Done · ✅ Resolved · ⚠️ Active/recurring issue · 🧹 Doc drift · 🛡️ Local mitigation shipped, prod deploy pending
 

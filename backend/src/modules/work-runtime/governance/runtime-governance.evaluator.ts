@@ -11,6 +11,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   GOVERNANCE_EVALUATOR,
+  type GovernanceEvaluation,
   type IGovernanceEvaluator,
 } from '../../governance/interfaces/governance-evaluator.interface';
 import type {
@@ -21,6 +22,9 @@ import type {
 
 @Injectable()
 export class RuntimeGovernanceEvaluator implements IRuntimeGovernanceEvaluator {
+  private static readonly POLICY_VERSION = '1.0.0';
+  private static readonly TOOL_REGISTRATIONS_VERSION = '1.0.0';
+
   constructor(
     @Inject(GOVERNANCE_EVALUATOR)
     private readonly governance: IGovernanceEvaluator,
@@ -42,10 +46,18 @@ export class RuntimeGovernanceEvaluator implements IRuntimeGovernanceEvaluator {
         toolName: params.tool.name,
       },
       decidedAt: new Date().toISOString(),
+      policyVersion: RuntimeGovernanceEvaluator.POLICY_VERSION,
+      toolRegistrationsVersion:
+        RuntimeGovernanceEvaluator.TOOL_REGISTRATIONS_VERSION,
     };
 
     if (params.governanceBlocked) {
-      return { ...base, outcome: 'DENY', reason: 'governance policy blocked actor', policySource: 'governance:blocked' };
+      return {
+        ...base,
+        outcome: 'DENY',
+        reason: 'governance policy blocked actor',
+        policySource: 'governance:blocked',
+      };
     }
 
     if (params.effectiveAuthority < params.tool.requiredAuthority) {
@@ -58,7 +70,7 @@ export class RuntimeGovernanceEvaluator implements IRuntimeGovernanceEvaluator {
     }
 
     // Delegate to governance rules (capability-owned).
-    let evalResult;
+    let evalResult: GovernanceEvaluation;
     try {
       evalResult = await this.governance.evaluate(params.tenantId, {
         'actor.id': params.actorId,
@@ -71,13 +83,28 @@ export class RuntimeGovernanceEvaluator implements IRuntimeGovernanceEvaluator {
       // Fail safe: unknown governance result → require approval for any write,
       // deny nothing silently, allow reads.
       if (params.tool.effect === 'READ') {
-        return { ...base, outcome: 'ALLOW', reason: 'read allowed; governance eval unavailable', policySource: 'work-runtime:failsafe-read' };
+        return {
+          ...base,
+          outcome: 'ALLOW',
+          reason: 'read allowed; governance eval unavailable',
+          policySource: 'work-runtime:failsafe-read',
+        };
       }
-      return { ...base, outcome: 'REQUIRE_APPROVAL', reason: 'governance eval unavailable; write requires approval', policySource: 'work-runtime:failsafe-write' };
+      return {
+        ...base,
+        outcome: 'REQUIRE_APPROVAL',
+        reason: 'governance eval unavailable; write requires approval',
+        policySource: 'work-runtime:failsafe-write',
+      };
     }
 
     if (!evalResult.allowed) {
-      return { ...base, outcome: 'DENY', reason: `governance denied: ${evalResult.triggeredRules.join(',') || 'policy'}`, policySource: 'governance:rule' };
+      return {
+        ...base,
+        outcome: 'DENY',
+        reason: `governance denied: ${evalResult.triggeredRules.join(',') || 'policy'}`,
+        policySource: 'governance:rule',
+      };
     }
 
     // Approval-sensitive tools ALWAYS require approval; or governance may.
@@ -94,6 +121,11 @@ export class RuntimeGovernanceEvaluator implements IRuntimeGovernanceEvaluator {
       };
     }
 
-    return { ...base, outcome: 'ALLOW', reason: 'authorized', policySource: 'work-runtime:allow' };
+    return {
+      ...base,
+      outcome: 'ALLOW',
+      reason: 'authorized',
+      policySource: 'work-runtime:allow',
+    };
   }
 }

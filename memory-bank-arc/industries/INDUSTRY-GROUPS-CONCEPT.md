@@ -1,9 +1,11 @@
 # NeureCore — Industry Groups & Industries: Concept and Implementation Plan
 
-**Status:** 📋 Draft for review
+**Status:** ✅ Implemented (5 active groups, 3 cut)
 **Date:** 2026-07-21
+**Last verified:** 2026-07-31 (audit)
 **Owner:** Product + Platform team
 **First vertical to ship:** Financial & Compliance Group
+**Database:** 54 tenants, 175 tables (per production audit)
 **Related docs:** [pools-taxonomy.md §3](../pools-taxonomy.md#3-industries-pool--canonical-16-majors-), [system-state.md](../system-state.md), [left-rail-icon.md](../left-rail-icon.md), [TENANT-GUIDE-project-creation.md](../TENANT-GUIDE-project-creation.md), [fixes.md §FIX-039](../fixes.md)
 
 ---
@@ -30,27 +32,35 @@ After review, the following are agreed:
 |---|---|---|
 | **D1** | Rename **Major Industry** → **Industry** | The 16 rows are the canonical taxonomy. "Major" was internal jargon; users don't need that distinction. |
 | **D2** | Introduce a new top-level concept: **Industry Group** | An Industry Group is a folder containing 1-3 Industries. Used in onboarding picker and grouping logic. |
-| **D3** | **8 Industry Groups**, 16 Industries | Healthcare, Public & Social, Financial & Compliance, Business & Technology, Industrial & Infrastructure, Consumer & Commerce, Agriculture & Food, Other |
+| **D3** | **8 Industry Groups**, 16 Industries (5 Active, 3 Cut) | Healthcare*, Public & Social*, Financial & Compliance, Business & Technology, Industrial & Infrastructure*, Consumer & Commerce, Agriculture & Food*, Other |
+
+*Marked industries are CUT — DB rows archived 2026-07-31. See `PRUNED-INDUSTRIES-PROGRESS-2026-07-31.md` for details.
 | **D4** | Onboarding picker is a **single expandable list**, not a 3-step wizard | Click a Group to expand its Industries; click an Industry to select it. No separate sub-industry step. |
 | **D5** | Sub-industries remain as **descriptive metadata** in `Industry.description` | No new `SubIndustry` table. Users see them as bullets under the Industry they pick. |
 | **D6** | Tenant stores both `industryGroup` (slug) and `industry` (slug) | Group is for filtering/bundling; Industry is the precise anchor for packages, project types, and nav. |
-| **D7** | Only **Financial & Compliance Group** ships in Phase 1 | Proof-of-concept. Other Groups follow the same pattern once D7 lands. |
+| **D7** | **5 Industry Groups ship in Phase 1** (2026-07-31 cut-down) | Financial & Compliance, Business & Technology, Consumer & Commerce, Public & Social, Other. Healthcare, Industrial & Infrastructure, and Agriculture & Food are CUT (archived). Insurance added to Financial & Compliance. |
 | **D8** | **80/20 navigation principle** | 80% of the IconRail is identical across all Industries. Only Workspace + Customers change. |
 
 ---
 
-## 3. The 8 Industry Groups
+## 3. The 8 Industry Groups (5 Active, 3 Cut)
 
-| # | Group slug | Group label | Industries in group | Industry slugs |
-|---|---|---|---|---|
-| 1 | `healthcare` | Healthcare | Healthcare & Life Sciences | `healthcare-life-sciences` |
-| 2 | `public-social` | Public & Social | Government & Public Sector, Education & Research, Non-Profit & International | `government-public-sector`, `education-research`, `nonprofit-international` |
-| 3 | `financial-compliance` | Financial & Compliance | Financial Services, Accounting & Audit Services | `financial-services`, `accounting-audit-services` |
-| 4 | `business-technology` | Business & Technology | Technology & Digital Services, Professional & Business Services | `technology-digital-services`, `professional-business-services` |
-| 5 | `industrial-infrastructure` | Industrial & Infrastructure | Manufacturing & Industrial, Construction/Engineering/Infrastructure, Energy/Utilities/Natural Resources, Logistics/Transportation/Supply Chain | `manufacturing-industrial`, `construction-engineering-infrastructure`, `energy-utilities-natural-resources`, `logistics-transportation-supply-chain` |
-| 6 | `consumer-commerce` | Consumer & Commerce | Retail/Commerce/Consumer, Media/Communications/Creative | `retail-commerce-consumer`, `media-communications-creative` |
-| 7 | `agriculture-food` | Agriculture & Food | Agriculture & Food Systems | `agriculture-food-systems` |
-| 8 | `other` | Other | Special Purpose Organizations | `special-purpose-organizations` |
+> ⚠️ **Status as of 2026-07-31:** Three groups have been CUT (archived) per `PRUNED-INDUSTRIES-PROGRESS-2026-07-31.md`. The 5 **ACTIVE** groups are: Financial & Compliance, Business & Technology, Consumer & Commerce, Public & Social, Other. The 3 **CUT** groups retain DB rows (grandfathered tenants unaffected) but are hidden from the onboarding picker and customer dropdown.
+
+| # | Group slug | Group label | Status | Industries in group | Industry slugs |
+|---|---|---|---|---|---|
+| 1 | `healthcare` | Healthcare | 🔴 CUT | Healthcare & Life Sciences | `healthcare-life-sciences` |
+| 2 | `public-social` | Public & Social | ✅ ACTIVE | Government & Public Sector, Education & Research, Non-Profit & International | `government-public-sector`, `education-research`, `nonprofit-international` |
+| 3 | `financial-compliance` | Financial & Compliance | ✅ ACTIVE | Financial Services, Accounting & Audit Services, Insurance | `financial-services`, `accounting-audit-services`, `insurance` |
+| 4 | `business-technology` | Business & Technology | ✅ ACTIVE | Technology & Digital Services, Professional & Business Services | `technology-digital-services`, `professional-business-services` |
+| 5 | `industrial-infrastructure` | Industrial & Infrastructure | 🔴 CUT | Manufacturing & Industrial, Construction/Engineering/Infrastructure, Energy/Utilities/Natural Resources, Logistics/Transportation/Supply Chain | `manufacturing-industrial`, `construction-engineering-infrastructure`, `energy-utilities-natural-resources`, `logistics-transportation-supply-chain` |
+| 6 | `consumer-commerce` | Consumer & Commerce | ✅ ACTIVE | Retail/Commerce/Consumer, Media/Communications/Creative | `retail-commerce-consumer`, `media-communications-creative` |
+| 7 | `agriculture-food` | Agriculture & Food | 🔴 CUT | Agriculture & Food Systems | `agriculture-food-systems` |
+| 8 | `other` | Other | ✅ ACTIVE | Special Purpose Organizations | `special-purpose-organizations` |
+
+**8 KEPT Industries (selectable):** `accounting-audit-services`, `financial-services`, `insurance`, `technology-digital-services`, `professional-business-services`, `retail-commerce-consumer`, `media-communications-creative`, `nonprofit-international`, `special-purpose-organizations`
+
+**8 CUT Industries (archived, hidden from picker):** `healthcare-life-sciences`, `manufacturing-industrial`, `construction-engineering-infrastructure`, `energy-utilities-natural-resources`, `logistics-transportation-supply-chain`, `government-public-sector`, `education-research`, `agriculture-food-systems`
 
 ---
 
@@ -424,20 +434,25 @@ The `IconRail` reads `tenant.industryGroup` from the user store, looks up the co
 
 ---
 
-## 9. Phase 1: Financial & Compliance Group (First Vertical)
+## 9. Phase 1: 5 Active Industry Groups (2026-07-31)
 
-The user explicitly chose this Group as the first full implementation. Reasons:
+> **Updated 2026-07-31:** Phase 1 now covers 5 active groups. The picker cut-down archived 3 groups (Healthcare, Industrial & Infrastructure, Agriculture & Food) per `PRUNED-INDUSTRIES-PROGRESS-2026-07-31.md`. Insurance was added to Financial & Compliance (Run-5 D13 fix).
 
-1. **Accounting already has 15 packages with full composition** (per `pools-taxonomy.md` §6.5). It's the only Industry with non-empty packages.
-2. **The `mali@live.com` tenant** is already in this Group — real production usage to validate against.
-3. **Workload coverage** — Finance, Audit, Tax all have heavy compliance / approval workflows, which exercise the most platform capabilities.
+The user originally chose Financial & Compliance as the first vertical. With the 2026-07-31 cut-down, 5 groups are now active:
 
-### 9.1 Group shape
+### 9.1 Active Groups Shape
 
 | Industry | Slug | Sub-industries |
 |---|---|---|
 | Financial Services | `financial-services` | Banking, Islamic Banking, Insurance, Takaful, Wealth Management, Investment Firms, FinTech, Payment Providers, Microfinance |
 | Accounting & Audit Services | `accounting-audit-services` | Public Accounting Firms, Audit & Assurance, Tax Advisory, Bookkeeping, Forensic Audit, Payroll, Financial Advisory, CPA Practices, Chartered Accounting Firms |
+| Insurance | `insurance` | (added 2026-07-25) |
+| Technology & Digital Services | `technology-digital-services` | SaaS, IT Consulting, Dev Shops, Software Products |
+| Professional & Business Services | `professional-business-services` | Management Consulting, Marketing Agencies, Architecture Studios |
+| Retail/Commerce/Consumer | `retail-commerce-consumer` | DTC Brands, E-Commerce, Multi-location Retail |
+| Media/Communications/Creative | `media-communications-creative` | Content Studios, Digital Media, PR Agencies |
+| Non-Profit & International | `nonprofit-international` | NGOs, Foundations, Grant-making Orgs |
+| Special Purpose Organizations | `special-purpose-organizations` | Family Offices, Holding Companies, Religious Orgs, Cooperatives |
 
 ### 9.2 Phase 1 scope
 
@@ -581,7 +596,9 @@ Tier doesn't restrict which Industry a tenant can pick, but it caps how much of 
 | 7 | Tier limits storage | `maxStorageGB` is Tier-specific (1 GB starter → 1 TB enterprise). Affects document-heavy industries (Healthcare records, Legal contracts). |
 | 8 | Industry doesn't change Tier limits | Picking `manufacturing-industrial` doesn't give more storage than picking `financial-services` at the same Tier. |
 
-### 10.5 Tier × Industry Matrix — Financial & Compliance
+### 10.5 Tier × Industry Matrix — Financial & Compliance (and all 5 Active Groups)
+
+> **Note:** Healthcare, Industrial & Infrastructure, and Agriculture & Food groups are CUT (archived). Their agent definitions and templates still exist in the DB for grandfathered tenants. The `ACTIVE_INDUSTRY_GROUPS` constant in `tier-industry-matrix.ts` controls which groups appear in the picker.
 
 Concrete values for Phase 1 implementation. Tier names use the refactored [TIER-SYSTEM-CONCEPT.md](./TIER-SYSTEM-CONCEPT.md) (Basic / Business / Professional / Enterprise):
 
@@ -636,26 +653,27 @@ Before Phase 1 ships, the following must be added to the implementation:
 
 ---
 
-## 11. Implementation Sequence (Phase 1, Financial & Compliance)
+## 11. Implementation Sequence (Phase 1 — 5 Active Groups, 2026-07-31)
 
-| Step | Task | Touches | Estimate |
+| Step | Task | Touches | Status |
 |---|---|---|---|
-| 1 | Schema migration: add `industryGroup`, `groupSortOrder` to `Industry`; add `industryGroup` to `Tenant` | DB | 0.5 day |
-| 2 | Data migration script: populate `industryGroup` + `groupSortOrder` for the 16 existing rows | DB | 0.5 day |
-| 3 | Backfill script: populate `Tenant.industryGroup` from existing `Tenant.industry` | DB | 0.5 day |
-| 4 | Update `seed-industries-majors.cjs` + `add-industry-accounting.cjs` to write new fields | Seeder | 0.5 day |
-| 5 | Update both `frontend-tenant/src/lib/industries.ts` and `frontend-admin/src/lib/industries.ts`; add `industryGroups.ts` | FE | 0.5 day |
-| 6 | Build `<IndustryGroupPicker>` component; replace `<select>` in `CompanyStep.tsx` | FE | 1.5 days |
-| 7 | Backend: accept `industryGroup` in `OnboardingStateDto` | BE | 0.5 day |
-| 8 | Add `industryNavigation.ts` config file with all 8 Group entries (stubs for non-Phase-1 Groups) | FE | 1 day |
-| 9 | Modify `IconRail.tsx` to read `industryGroup` from user store and inject extras | FE | 1 day |
-| 10 | Create 8 stub pages for Financial & Compliance routes | FE | 0.5 day |
-| 11 | Customer model migration: add 4 financial fields | DB + BE | 1 day |
-| 12 | Customer list page: filter by `financialSubType` when Group = Financial & Compliance | FE | 1 day |
-| 13 | Seed 5 Financial & Compliance project types | DB | 0.5 day |
-| 14 | Seed 3 approval chain templates | DB | 0.5 day |
-| 15 | End-to-end test: new tenant picks Financial & Compliance → sees correct nav → creates audit project → routes work | QA | 1 day |
-| **Total** | | | **~11 days** |
+| 1 | Schema migration: add `industryGroup`, `groupSortOrder` to `Industry`; add `industryGroup` to `Tenant` | DB | ✅ Done |
+| 2 | Data migration script: populate `industryGroup` + `groupSortOrder` for the 16 existing rows | DB | ✅ Done |
+| 3 | Backfill script: populate `Tenant.industryGroup` from existing `Tenant.industry` | DB | ✅ Done |
+| 4 | Update `seed-industries-majors.cjs` + `add-industry-accounting.cjs` to write new fields | Seeder | ✅ Done |
+| 5 | Update both `frontend-tenant/src/lib/industries.ts` and `frontend-admin/src/lib/industries.ts`; add `industryGroups.ts` | FE | ✅ Done |
+| 6 | Build `<IndustryGroupPicker>` component; replace `<select>` in `CompanyStep.tsx` | FE | ✅ Done |
+| 7 | Backend: accept `industryGroup` in `OnboardingStateDto` | BE | ✅ Done |
+| 8 | Add `industryNavigation.ts` config file with all 8 Group entries (stubs for non-Phase-1 Groups) | FE | ✅ Done |
+| 9 | Modify `IconRail.tsx` to read `industryGroup` from user store and inject extras | FE | ✅ Done |
+| 10 | Create 8 stub pages for Financial & Compliance routes | FE | ✅ Done |
+| 11 | Customer model migration: add 4 financial fields | DB + BE | ✅ Done |
+| 12 | Customer list page: filter by `financialSubType` when Group = Financial & Compliance | FE | ✅ Done |
+| 13 | Seed 5 Financial & Compliance project types | DB | ✅ Done |
+| 14 | Seed 3 approval chain templates | DB | ✅ Done |
+| 15 | End-to-end test: new tenant picks Financial & Compliance → sees correct nav → creates audit project → routes work | QA | ✅ Done |
+| 16 | **2026-07-31 cut-down: archive 8 cut Industries, add Insurance to F&C, add `ACTIVE_INDUSTRY_GROUPS` constant** | DB + BE + FE | ✅ Done |
+| **Total** | | | **~11 days (completed)** |
 
 ### Rollout
 
@@ -670,32 +688,37 @@ Before Phase 1 ships, the following must be added to the implementation:
 
 Phase 1 ships when:
 
-- [ ] All 8 Industry Groups selectable in onboarding picker
-- [ ] Clicking a Group expands its Industries; clicking an Industry selects it
-- [ ] Tenant record stores both `industryGroup` and `industry`
-- [ ] Financial & Compliance tenants see 8 extra Workspace items + "Clients & Accounts" Customers label
-- [ ] All 8 stub routes return 200 (no 404s)
-- [ ] Existing 15 Accounting packages still resolvable for `accounting-audit-services` Industry
-- [ ] 5 new project types filter correctly by industry
-- [ ] `mali@live.com` tenant shows correct nav after migration (regression test)
-- [ ] Tenant with no `industryGroup` (legacy) sees generic Workspace items only
-- [ ] Onboarding still completable in <60 seconds with the new picker
+- [x] All 5 active Industry Groups selectable in onboarding picker (3 cut groups hidden)
+- [x] Clicking a Group expands its Industries; clicking an Industry selects it
+- [x] Tenant record stores both `industryGroup` and `industry`
+- [x] Financial & Compliance tenants see 8 extra Workspace items + "Clients & Accounts" Customers label
+- [x] All 8 stub routes return 200 (no 404s)
+- [x] Existing 15 Accounting packages still resolvable for `accounting-audit-services` Industry
+- [x] 5 new project types filter correctly by industry
+- [x] `mali@live.com` tenant shows correct nav after migration (regression test)
+- [x] Tenant with no `industryGroup` (legacy) sees generic Workspace items only
+- [x] Onboarding still completable in <60 seconds with the new picker
+- [x] 8 cut Industries hidden from picker (status = ARCHIVED)
+- [x] Insurance industry visible in F&C group (added 2026-07-25)
+- [x] `INDUSTRY_GROUP` constants in `tier-industry-matrix.ts` updated with 5 active groups + 3 cut
+- [x] Sub-industry nav filter applies `subIndustries` filter in IconRail (P3 feature)
 
 ---
 
 ## 13. What defers to Phase 2+
 
-| Item | Phase |
-|---|---|
-| Real implementations of the 8 stub pages (Loans, Audits, Tax, etc.) | Phase 2 (next quarter) |
-| Healthcare Group (Patient model, Appointment scheduling, Medical Records) | Phase 3 |
-| Public & Social Group (Program/Grant/Beneficiary model) | Phase 4 |
-| Business & Technology extras (Tickets, Releases, Contracts) | Phase 5 |
-| Industrial & Infrastructure extras (Sites, Work Orders, Fleet) | Phase 6 |
-| Consumer & Commerce extras (Products, Orders, Promotions) | Phase 7 |
-| Agriculture & Food extras (Fields, Livestock, Harvest) | Phase 8 |
-| Per-sub-industry AI agent specialisation | Continuous |
-| Industry-aware pricing or billing | Not planned |
+| Item | Phase | Status |
+|---|---|---|
+| Real implementations of the 8 stub pages (Loans, Audits, Tax, etc.) | Phase 2 | Pending |
+| **Healthcare Group** — Patient model, Appointment scheduling, Medical Records | **CUT (2026-07-31)** | Archived; not in active picker |
+| **Industrial & Infrastructure extras** (Sites, Work Orders, Fleet) | **CUT (2026-07-31)** | Archived; not in active picker |
+| **Agriculture & Food extras** (Fields, Livestock, Harvest) | **CUT (2026-07-31)** | Archived; not in active picker |
+| Public & Social Group (Program/Grant/Beneficiary model) | Phase 4 | ✅ Active (nonprofit-international only in picker) |
+| Business & Technology extras (Tickets, Releases, Contracts) | Phase 5 | ✅ Active (tech + professional services) |
+| Consumer & Commerce extras (Products, Orders, Promotions) | Phase 7 | ✅ Active (retail-commerce-consumer + media-communications-creative) |
+| Per-sub-industry AI agent specialisation | Continuous | Ongoing |
+| Industry-aware pricing or billing | Not planned | Not planned |
+| Re-activating cut groups (healthcare, industrial, agriculture-food) | TBD | Requires new Phase + stakeholder approval |
 
 ---
 
@@ -748,3 +771,4 @@ Phase 1 ships when:
 | 2026-07-21 | Initial draft for review | Kilo |
 | 2026-07-21 | Added §9 Tier × Industry Interaction Model — clarifies Industry vs Tier distinction, codifies the Tier × Industry matrix for Financial & Compliance, defines default-agent selection algorithm, adds "Plan impact" onboarding panel requirement | Kilo |
 | 2026-07-21 | Aligned Tier names with [TIER-SYSTEM-CONCEPT.md](./TIER-SYSTEM-CONCEPT.md) refactor: Basic / Business / Professional / Enterprise | Kilo |
+| 2026-07-31 | Updated to reflect 2026-07-31 industry cut-down: 5 active groups (financial-compliance, business-technology, consumer-commerce, public-social, other), 3 cut groups archived (healthcare, industrial-infrastructure, agriculture-food); Insurance added to F&C; updated §3 table, §11 implementation sequence, §12 success criteria, §13 deferred items; Insurance industry included in INDUSTRY_GROUP_INDUSTRIES; updated PRUNED-INDUSTRIES-PROGRESS-2026-07-31.md as primary status doc | Kilo |

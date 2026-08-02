@@ -1,21 +1,28 @@
 # CRM Integration
 
 ## Overview
-Synchronize NeureCore AI employees with Customer Relationship Management (CRM) platforms. Currently supports HubSpot, Salesforce, and Pipedrive via the connectors system.
+Synchronize NeureCore AI employees with Customer Relationship Management (CRM) platforms. Currently supports HubSpot, Salesforce, Pipedrive, Shopify, and Square via the connectors system.
+
+**Note:** The connectors module has adapters for these providers, but the tenant-facing OAuth connect flow and agent tools are not yet built.
 
 ## Category
 INTEGRATION (integrationKey: `crm`)
 
 ## Backend Status
 - ⚠️ **Partial implementation** — connector framework exists
-- `backend/src/modules/connectors/` — `connectors.service.ts`, `oauth.service.ts`, `oauth-token.service.ts`
-- Providers: HubSpot, Salesforce, Pipedrive (provider list from backend)
-- OAuth token storage in `OAuthToken` model (generic, keyed by `provider` string)
-- Sync operations: Sync Contacts, Sync Leads per connector
+- `backend/src/modules/connectors/` — connector registry, adapters
+- **Connector adapters** (`backend/src/modules/connectors/adapters/`):
+  - `hubspot.adapter.ts` — HubSpot CRM adapter
+  - `pipedrive.adapter.ts` — Pipedrive CRM adapter
+  - `salesforce.adapter.ts` — Salesforce CRM adapter
+  - `shopify.adapter.ts` — Shopify e-commerce adapter
+  - `square.adapter.ts` — Square payments adapter
+- `OAuthToken` model for credential storage per provider
+- No tenant-facing OAuth connect flow for CRM providers yet
 
 ## Tenant Frontend Status
-- ⚠️ **Partial** — callable from admin UI but tenant-facing CRM pages TBD
-- No dedicated tenant CRM integration page in the tenant frontend
+- ❌ **No tenant CRM integration page**
+- CRM settings not exposed to tenants
 
 ## Admin Frontend Status
 - ⚠️ **Admin has `/connectors` page** — register new connectors, trigger sync, delete
@@ -23,8 +30,8 @@ INTEGRATION (integrationKey: `crm`)
 - No detailed per-tenant CRM status view
 
 ## AI Employee Integration
-- ⚠️ **No dedicated agent tools** for CRM operations
-- Agents may access CRM data indirectly if the backend exposes it, but no structured `CrmTool` exists
+- ❌ **No dedicated agent tools** for CRM operations
+- No CRM tools in the agent tool registry
 - Potential: agents could query contact/lead data, create records, update deals
 
 ## Package/Tier Integration

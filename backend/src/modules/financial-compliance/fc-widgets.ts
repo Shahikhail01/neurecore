@@ -23,6 +23,7 @@
  *   - ISP — each widget exposes only the data + visualization it needs.
  */
 import type { WidgetDefinition } from '../widgets/widget-definition';
+import { INDUSTRY_GROUP } from '../industry/tier-industry-matrix';
 
 /**
  * Audit engagement completion rate — % of active audit engagements
@@ -64,7 +65,7 @@ export const AUDIT_COMPLETION_RATE: WidgetDefinition = {
   icon: 'clipboard-check',
   entityTypes: ['PROJECT'],
   category: 'INDUSTRY_SPECIFIC',
-  industryGroup: 'financial-compliance',
+  industryGroup: INDUSTRY_GROUP.FINANCIAL_COMPLIANCE,
 };
 
 /**
@@ -95,7 +96,7 @@ export const KYC_VERIFICATION_RATE: WidgetDefinition = {
   icon: 'shield-check',
   entityTypes: ['CUSTOMER'],
   category: 'INDUSTRY_SPECIFIC',
-  industryGroup: 'financial-compliance',
+  industryGroup: INDUSTRY_GROUP.FINANCIAL_COMPLIANCE,
 };
 
 /**
@@ -138,7 +139,7 @@ export const HIGH_RISK_CUSTOMER_EXPOSURE: WidgetDefinition = {
   icon: 'alert-triangle',
   entityTypes: ['CUSTOMER'],
   category: 'INDUSTRY_SPECIFIC',
-  industryGroup: 'financial-compliance',
+  industryGroup: INDUSTRY_GROUP.FINANCIAL_COMPLIANCE,
 };
 
 /**
@@ -180,7 +181,7 @@ export const TAX_FILING_CALENDAR: WidgetDefinition = {
   icon: 'calendar',
   entityTypes: ['PROJECT'],
   category: 'INDUSTRY_SPECIFIC',
-  industryGroup: 'financial-compliance',
+  industryGroup: INDUSTRY_GROUP.FINANCIAL_COMPLIANCE,
 };
 
 /**

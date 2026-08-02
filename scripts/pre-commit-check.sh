@@ -52,6 +52,18 @@ else
   echo "  OK: Prisma schema valid"
 fi
 
+# PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §4.4 (R4) — SOLID guard.
+# Catches re-introduction of string-literal slugs, tier-slug legacy values,
+# and switch(tenant.industry) branches that violate Law 2 (Open/Closed).
+echo "[pre-commit]   SOLID guard..."
+if ! bash "$ROOT/scripts/solid-guard.sh" > /tmp/precommit-solid.log 2>&1; then
+  echo "  FAIL: SOLID guard violations:"
+  cat /tmp/precommit-solid.log
+  FAIL=1
+else
+  echo "  OK: SOLID guard green"
+fi
+
 echo "[pre-commit]   @@map() enforcement..."
 if ! bash scripts/enforce-prisma-map.sh > /tmp/precommit-map.log 2>&1; then
   echo "  FAIL: @@map() enforcement failed:"

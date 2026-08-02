@@ -22,7 +22,7 @@ export interface Tier {
   id: string;
   slug: string;
   name: string;
-  tagline?: string | null;
+  tagline?: string;
   description?: string | null;
   icon?: string | null;
   isActive: boolean;

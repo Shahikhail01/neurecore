@@ -26,6 +26,14 @@ export interface TableData {
   rows: Array<Record<string, string | number | boolean>>;
 }
 
+export interface EnvelopeData {
+  text?: string;
+  components?: Array<{
+    type: 'chart' | 'table' | 'metrics';
+    props: Record<string, unknown>;
+  }>;
+}
+
 export interface SuggestionData {
   label: string;
   action?: string;
@@ -53,6 +61,7 @@ export interface ChatMessage {
     chart?: ChartData;
     metrics?: MetricsData;
     table?: TableData;
+    envelope?: EnvelopeData;
     suggestions?: SuggestionData[];
     isStreaming?: boolean;
     autonomousApproval?: AutonomousApprovalData;

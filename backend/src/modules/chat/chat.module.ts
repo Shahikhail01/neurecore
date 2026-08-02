@@ -9,9 +9,22 @@ import { AgentsModule } from '../agents/agents.module';
 import { HermesModule } from '../hermes/hermes.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { HermesAdapterModule } from '../hermes-adapter/hermes-adapter.module';
+import { ChatResponseModule } from './responses/chat-response.module';
+import { ServiceGatewayV2Module } from '../service-gateway-v2/service-gateway-v2.module';
+import { RoutingDecisionsModule } from '../routing-decisions/routing-decisions.module';
 
 @Module({
-  imports: [ModelsModule, DatabaseModule, AgentsModule, HermesModule, MetricsModule, HermesAdapterModule],
+  imports: [
+    ModelsModule,
+    DatabaseModule,
+    AgentsModule,
+    HermesModule,
+    MetricsModule,
+    HermesAdapterModule,
+    ChatResponseModule,
+    ServiceGatewayV2Module,
+    RoutingDecisionsModule,
+  ],
   controllers: [ChatController],
   providers: [ChatService, ChatSseService, ChatHistoryService],
   exports: [ChatService, ChatHistoryService],

@@ -1,86 +1,47 @@
 // ─── UnifiedChatMessage.tsx ─────────────────────────────────────────────────────
 // SRP: Renders a single chat message bubble with all supported inline renderers.
-// OCP: New inline types added via conditional rendering blocks — no modification
-//      to existing renderers. Markdown, chart, metrics, table, suggestions, tokens.
+// OCP: New inline types added via the EnvelopeRenderer routing layer — no
+//      modification to this file for new component types.
+//
+// Phase 9 — Response Envelope: the inline chart/metrics/table blocks that
+// used to live at lines 188–203 are replaced by a single `EnvelopeRenderer`
+// invocation. The renderer reads `{ text, components }` from the parsed
+// envelope. Conversational text is rendered from `parsed.text`. The parser
+// is memoised per-content so streaming deltas do not re-parse 5KB blobs on
+// every keystroke.
 
 'use client';
 
 import { motion } from 'framer-motion';
-import type { AutonomousApprovalData, ChatMessage, SuggestionData } from '@/shared/types/chat.types';
+import { useMemo } from 'react';
+import type {
+  AutonomousApprovalData,
+  ChatMessage,
+  SuggestionData,
+} from '@/shared/types/chat.types';
 import { ApprovalCard } from './ApprovalCard';
+import { EnvelopeRenderer } from '@/core/services/chat/envelope/EnvelopeRenderer';
+import type { IEnvelopeParser, EnvelopeComponent } from '@/core/services/chat/envelope/interfaces/IEnvelopeParser';
 
 // ── Renderer: Markdown-lite (bold, italic, code, line breaks) ──────────────────
 function MarkdownRenderer({ content }: { content: string }) {
+  // Assistant content is model-controlled. Escape HTML before applying the
+  // deliberately small markdown subset so tags/event handlers cannot reach
+  // dangerouslySetInnerHTML.
   const html = content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code class="bg-surface-overlay px-1 rounded text-xs text-violet-300">$1</code>')
+    .replace(
+      /`(.*?)`/g,
+      '<code class="bg-surface-overlay px-1 rounded text-xs text-violet-300">$1</code>',
+    )
     .replace(/\n/g, '<br/>');
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
-
-// ── Renderer: Mini Bar Chart ────────────────────────────────────────────────────
-function MiniChart({ data }: { data: Array<{ label: string; value: number }> }) {
-  const max = Math.max(...data.map((d) => d.value), 1);
-  const items = data.slice(0, 8);
-  return (
-    <div className="mt-2 flex items-end gap-1 h-20">
-      {items.map((d, i) => (
-        <div key={i} className="flex flex-col items-center flex-1 min-w-0">
-          <div
-            className="w-full rounded-t bg-[color:var(--accent-500)]/70 transition-all"
-            style={{ height: `${Math.max((d.value / max) * 100, 4)}%` }}
-          />
-          <span className="text-[8px] text-zinc-500 mt-0.5 truncate w-full text-center">
-            {d.label}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Renderer: Metrics Badges ────────────────────────────────────────────────────
-function MetricsRenderer({ items }: { items: Array<{ label: string; value: string | number; color?: string }> }) {
-  return (
-    <div className="mt-2 flex flex-wrap gap-2">
-      {items.map((item) => (
-        <span key={item.label} className="rounded-md bg-surface-raised px-2 py-0.5 text-[10px] text-zinc-300">
-          <span className="text-zinc-500">{item.label}:</span> {item.value}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-// ── Renderer: Inline Table ──────────────────────────────────────────────────────
-function TableRenderer({ headers, rows }: { headers: string[]; rows: Array<Record<string, string | number | boolean>> }) {
-  return (
-    <div className="mt-2 overflow-x-auto">
-      <table className="text-[10px] w-full border-collapse">
-        <thead>
-          <tr>
-            {headers.map((h) => (
-              <th key={h} className="text-left text-zinc-500 px-1.5 py-0.5 border-b border-surface-border">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-b border-surface-border/50">
-              {headers.map((h) => (
-                <td key={h} className="px-1.5 py-0.5 text-zinc-300">
-                  {String(row[h] ?? '')}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 // ── Renderer: Suggestion Chips ──────────────────────────────────────────────────
@@ -138,13 +99,51 @@ interface UnifiedChatMessageProps {
   message: ChatMessage;
   onSuggestionSelect: (suggestion: SuggestionData) => void;
   sending: boolean;
-  onApprovalDecision: (approval: AutonomousApprovalData, decision: 'approve' | 'reject') => Promise<AutonomousApprovalData | null>;
+  onApprovalDecision: (
+    approval: AutonomousApprovalData,
+    decision: 'approve' | 'reject',
+  ) => Promise<AutonomousApprovalData | null>;
+  envelopeParser: IEnvelopeParser;
 }
 
 // ── Main Component ──────────────────────────────────────────────────────────────
-export function UnifiedChatMessage({ message, onSuggestionSelect, sending, onApprovalDecision }: UnifiedChatMessageProps) {
+export function UnifiedChatMessage({
+  message,
+  onSuggestionSelect,
+  sending,
+  onApprovalDecision,
+  envelopeParser,
+}: UnifiedChatMessageProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
+
+  // useMemo: envelope comes from metadata (SSE delta, primary) or from
+  // content parsing (legacy / query-path fallback). The parser is small
+  // (linear in JSON block size) but content can be 5KB+ during streaming
+  // — caching the parse result per content prevents redundant work.
+  const parsedEnvelope = useMemo(() => {
+    // Primary: metadata.envelope arrives from SSE delta (Phase 9).
+    if (message.metadata?.envelope) {
+      const metaEnv = message.metadata.envelope;
+      const components: EnvelopeComponent[] | undefined =
+        metaEnv.components
+          ? (metaEnv.components as unknown as EnvelopeComponent[])
+          : undefined;
+      return {
+        text: message.content,
+        envelope: {
+          text: metaEnv.text,
+          components,
+        },
+      };
+    }
+    // Fallback: parse content for inline envelope JSON (legacy messages
+    // persisted before Phase 9, plus hand-crafted chart payloads).
+    if (message.content) {
+      return envelopeParser.parse(message.content);
+    }
+    return null;
+  }, [message.content, message.metadata?.envelope, envelopeParser]);
 
   if (message.content === '' && message.metadata?.isStreaming) {
     return (
@@ -160,6 +159,8 @@ export function UnifiedChatMessage({ message, onSuggestionSelect, sending, onApp
       </motion.div>
     );
   }
+
+  const displayText = parsedEnvelope?.text ?? message.content ?? '';
 
   return (
     <motion.div
@@ -178,28 +179,19 @@ export function UnifiedChatMessage({ message, onSuggestionSelect, sending, onApp
       >
         {/* Avatar label */}
         {isAssistant && (
-          <div className="text-[10px] text-[color:var(--accent-400)] mb-1 font-medium">✦ HeadQuarter AI</div>
+          <div className="text-[10px] text-[color:var(--accent-400)] mb-1 font-medium">
+            ✦ HeadQuarter AI
+          </div>
         )}
 
-        {/* Markdown content */}
-        {message.content && <MarkdownRenderer content={message.content} />}
+        {/* Markdown content (uses envelope text when present, plain content otherwise) */}
+        {displayText && <MarkdownRenderer content={displayText} />}
 
-        {/* Inline chart */}
-        {message.metadata?.chart && (
-          <MiniChart data={message.metadata.chart.chartData} />
-        )}
-
-        {/* Inline metrics */}
-        {message.metadata?.metrics && (
-          <MetricsRenderer items={message.metadata.metrics.items} />
-        )}
-
-        {/* Inline table */}
-        {message.metadata?.table && (
-          <TableRenderer
-            headers={message.metadata.table.headers}
-            rows={message.metadata.table.rows}
-          />
+        {/* Phase 9: EnvelopeRenderer replaces the legacy metadata.chart/metrics/table
+            blocks. Strictly additive — old messages without envelopes render the
+            same text-only path. */}
+        {parsedEnvelope?.envelope?.components && (
+          <EnvelopeRenderer components={parsedEnvelope.envelope.components} />
         )}
 
         {/* Suggestion chips */}
@@ -212,7 +204,10 @@ export function UnifiedChatMessage({ message, onSuggestionSelect, sending, onApp
         )}
 
         {message.metadata?.autonomousApproval && (
-          <ApprovalCard approval={message.metadata.autonomousApproval} onDecision={onApprovalDecision} />
+          <ApprovalCard
+            approval={message.metadata.autonomousApproval}
+            onDecision={onApprovalDecision}
+          />
         )}
 
         {/* Token counter */}
@@ -223,7 +218,10 @@ export function UnifiedChatMessage({ message, onSuggestionSelect, sending, onApp
         {/* Timestamp */}
         {isAssistant && (
           <div className="mt-1 text-[9px] text-zinc-600">
-            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {new Date(message.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
           </div>
         )}
       </div>

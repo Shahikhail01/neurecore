@@ -35,6 +35,20 @@ export interface RailItem {
    * it directly on the item.
    */
   plannedPhase: string;
+  /**
+   * PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.1 (P3) — sub-industry visibility filter.
+   *
+   * When set, this item is shown ONLY for tenants whose `industry.slug`
+   * is in this list. When omitted, the item shows for ALL tenants in the
+   * parent group (default — backward-compatible).
+   *
+   * Used by the `consumer-commerce` group to hide Products/Orders/Inventory/
+   * Stores/Promotions for `media-communications-creative` tenants.
+   *
+   * Tenant filter happens at render time in IconRail.tsx — this is data,
+   * not code (SOLID: OCP).
+   */
+  subIndustries?: string[];
 }
 
 export interface IndustryNavConfig {
@@ -140,11 +154,14 @@ export const INDUSTRY_NAV_CONFIGS: Record<string, IndustryNavConfig> = {
     customersLabel: 'Customers & Members',
     customersIcon: 'Heart',
     workspaceExtras: [
-      { id: 'products',    label: 'Products',    href: '/workspace/products',    iconName: 'Box',           description: 'Product catalog, inventory levels, pricing, promotion status.',       plannedPhase: 'Phase 2 (placeholder)' },
-      { id: 'orders',      label: 'Orders',      href: '/workspace/orders',      iconName: 'ShoppingCart',  description: 'Order pipeline, fulfillment status, returns tracking, customer service.', plannedPhase: 'Phase 2 (placeholder)' },
-      { id: 'inventory',   label: 'Inventory',   href: '/workspace/inventory',   iconName: 'Package',       description: 'Stock levels, reorder points, supplier performance, inventory turnover.', plannedPhase: 'Phase 2 (placeholder)' },
-      { id: 'stores',      label: 'Stores',      href: '/workspace/stores',      iconName: 'Store',         description: 'Store performance dashboard, sales by store, inventory by location.', plannedPhase: 'Phase 2 (placeholder)' },
-      { id: 'promotions',  label: 'Promotions',  href: '/workspace/promotions',  iconName: 'Tag',           description: 'Active promotions, discount tracking, ROI analysis, campaign calendar.', plannedPhase: 'Phase 2 (placeholder)' },
+      // PRUNED-INDUSTRIES-IMPLEMENTATION-PLAN §5.1 (P3): Products/Orders/
+      // Inventory/Stores/Promotions are retail-only. Campaigns + Content
+      // are shared across both consumer-commerce sub-industries.
+      { id: 'products',    label: 'Products',    href: '/workspace/products',    iconName: 'Box',           description: 'Product catalog, inventory levels, pricing, promotion status.',       plannedPhase: 'Phase 2 (placeholder)', subIndustries: ['retail-commerce-consumer'] },
+      { id: 'orders',      label: 'Orders',      href: '/workspace/orders',      iconName: 'ShoppingCart',  description: 'Order pipeline, fulfillment status, returns tracking, customer service.', plannedPhase: 'Phase 2 (placeholder)', subIndustries: ['retail-commerce-consumer'] },
+      { id: 'inventory',   label: 'Inventory',   href: '/workspace/inventory',   iconName: 'Package',       description: 'Stock levels, reorder points, supplier performance, inventory turnover.', plannedPhase: 'Phase 2 (placeholder)', subIndustries: ['retail-commerce-consumer'] },
+      { id: 'stores',      label: 'Stores',      href: '/workspace/stores',      iconName: 'Store',         description: 'Store performance dashboard, sales by store, inventory by location.', plannedPhase: 'Phase 2 (placeholder)', subIndustries: ['retail-commerce-consumer'] },
+      { id: 'promotions',  label: 'Promotions',  href: '/workspace/promotions',  iconName: 'Tag',           description: 'Active promotions, discount tracking, ROI analysis, campaign calendar.', plannedPhase: 'Phase 2 (placeholder)', subIndustries: ['retail-commerce-consumer'] },
       { id: 'campaigns',   label: 'Campaigns',   href: '/workspace/campaigns',   iconName: 'Megaphone',     description: 'Marketing campaigns, audience targeting, performance, budget tracking.', plannedPhase: 'Phase 2 (placeholder)' },
       { id: 'content',     label: 'Content',     href: '/workspace/content',     iconName: 'FileEdit',      description: 'Content calendar, production schedule, publishing pipeline, performance.', plannedPhase: 'Phase 2 (placeholder)' },
     ],

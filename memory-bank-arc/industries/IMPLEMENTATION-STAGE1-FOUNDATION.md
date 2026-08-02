@@ -1,8 +1,9 @@
 # Stage 1 Implementation Plan: Foundation & Launch Ready
 
-**Status:** ✅ Completed  
+**Status:** ✅ Completed (with 2026-07-31 cut-down applied)  
 **Date:** 2026-07-21 (planned)  
 **Completed:** 2026-07-22 (all 4 phases finished in 1 day)  
+**Updated:** 2026-07-31 (cut-down: 3 groups archived, 5 active groups remain)  
 **Target:** Months 1-2  
 **Source:** [INDUSTRY-REQUIREMENTS-STAGED.md §3](./INDUSTRY-REQUIREMENTS-STAGED.md#3-stage-1--foundation--launch-ready)  
 **Depends on:** [INDUSTRY-SETUP-CONCEPT.md Phase 0](./INDUSTRY-SETUP-CONCEPT.md#phase-0-fix-critical-gaps-this-sprint) (critical infra fixes)
@@ -844,7 +845,22 @@ All endpoints filter by `tenantId` from JWT — a tenant can only see/edit their
 
 ---
 
-## 12. What Defers to Stage 2
+## 12. What Defers to Stage 2 (Post-2026-07-31 Cut-Down)
+
+> **As of 2026-07-31:** Healthcare, Industrial & Infrastructure, and Agriculture & Food groups are CUT. Only the 5 active groups (Financial & Compliance, Business & Technology, Consumer & Commerce, Public & Social, Other) are in scope for Stage 2+.
+
+| Feature | Reason |
+|---------|--------|
+| Compliance checklist engine | Stage 2 introduces cross-cutting compliance module |
+| Approval routing addons | Stage 2 introduces role-based escalation chains |
+| Integration presets | Stage 2 introduces connector recommendations |
+| Dashboard templates | Stage 2 introduces KPI packs |
+| Advanced workflow automation (multi-step) | Stage 2 enhances routine engine |
+| Predictive analytics | Stage 3 — needs data from Stage 1-2 usage |
+| Regulatory tracking | Stage 3 — needs monitoring infrastructure |
+| Industry-specific LLM fine-tuning | Stage 3 — needs training data |
+| Sub-industry deep specialization | Stage 3 — builds on proven industry groups |
+| Re-activating cut groups (healthcare, industrial, agriculture-food) | Requires new Phase + stakeholder approval + new SIM runners |
 
 | Feature | Reason |
 |---------|--------|
@@ -895,18 +911,20 @@ All endpoints filter by `tenantId` from JWT — a tenant can only see/edit their
 | Backend deployed | `brain.neurecore.com`, PM2 process 0 (online) |
 | Frontend deployed | `hq.neurecore.com`, PM2 process 2 (online) |
 
-### 13.3 Industry Group Coverage
+### 13.3 Industry Group Coverage (2026-07-31 Cut-Down)
 
-| # | Group | Industries | Templates | Status |
-|---|-------|-----------|-----------|--------|
-| 1 | Financial & Compliance | financial-services, accounting-audit-services, insurance | 21 | ✅ |
-| 2 | Business & Technology | technology-digital-services, professional-business-services | 32 | ✅ |
-| 3 | Consumer & Commerce | retail-commerce-consumer, media-communications-creative | 30 | ✅ |
-| 4 | Industrial & Infrastructure | manufacturing-industrial, construction-engineering-infrastructure, energy-utilities-natural-resources, logistics-transportation-supply-chain | 53 | ✅ |
-| 5 | Healthcare & Life Sciences | healthcare-life-sciences | 19 | ✅ |
-| 6 | Public & Social | government-public-sector, education-research, nonprofit-international | 38 | ✅ |
-| 7 | Agriculture & Food | agriculture-food-systems | 0 | Deferred |
-| 8 | Other | special-purpose-organizations | 0 | Deferred |
+| # | Group | Status | Industries (selectable in picker) | Templates | Notes |
+|---|-------|--------|---|-----------|---|
+| 1 | Financial & Compliance | ✅ ACTIVE | financial-services, accounting-audit-services, insurance | 21 | Insurance added 2026-07-25 |
+| 2 | Business & Technology | ✅ ACTIVE | technology-digital-services, professional-business-services | 32 | |
+| 3 | Consumer & Commerce | ✅ ACTIVE | retail-commerce-consumer, media-communications-creative | 30 | |
+| 4 | Industrial & Infrastructure | 🔴 CUT | (archived — hidden from picker) | 53 | Grandfathered; see PRUNED-INDUSTRIES-PROGRESS |
+| 5 | Healthcare & Life Sciences | 🔴 CUT | (archived — hidden from picker) | 19 | Grandfathered; see PRUNED-INDUSTRIES-PROGRESS |
+| 6 | Public & Social | ✅ ACTIVE | nonprofit-international (gov/edu archived) | 38 | govt-public-sector + education-research archived |
+| 7 | Agriculture & Food | 🔴 CUT | (archived — hidden from picker) | 0 | Grandfathered; see PRUNED-INDUSTRIES-PROGRESS |
+| 8 | Other | ✅ ACTIVE | special-purpose-organizations | 0 | |
+
+**Summary:** 5 active groups, 3 cut groups. All 8 KEPT industries are selectable: `accounting-audit-services`, `financial-services`, `insurance`, `technology-digital-services`, `professional-business-services`, `retail-commerce-consumer`, `media-communications-creative`, `nonprofit-international`, `special-purpose-organizations`.
 
 ### 13.4 Audit Results
 
@@ -920,7 +938,18 @@ All endpoints filter by `tenantId` from JWT — a tenant can only see/edit their
 - `hq.neurecore.com/workspace/tickets` (dynamic): **200**
 - All 9 REST endpoints: **Implemented and deployed**
 
-### 13.5 Deferred to Next Phase
+### 13.5 2026-07-31 Cut-Down Impact
+
+As of 2026-07-31, 3 industry groups are CUT (archived):
+- **Healthcare** (`healthcare-life-sciences`) — archived; picker hides it
+- **Industrial & Infrastructure** (4 industries) — archived; picker hides them
+- **Agriculture & Food** (`agriculture-food-systems`) — archived; picker hides it
+
+5 groups remain ACTIVE: Financial & Compliance, Business & Technology, Consumer & Commerce, Public & Social (nonprofit-international only), Other.
+
+`set-cut-industries-archived.cjs` flips 8 industries to `status = ARCHIVED`. The `industries.controller.ts` filters ACTIVE only in `getByGroup` and `listByGroup`. See `PRUNED-INDUSTRIES-PROGRESS-2026-07-31.md` for deploy steps.
+
+### 13.6 Deferred to Next Phase
 
 | Item | Reason |
 |---|---|

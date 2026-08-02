@@ -9,9 +9,10 @@ This directory documents the atomic platform capabilities (Features) managed in 
 |-----|-----|---------|
 | [ms365-integration.md](./ms365-integration.md) | `ms365_integration` | Microsoft 365 (Outlook, Teams, SharePoint, OneDrive) |
 | [google-workspace.md](./google-workspace.md) | `google_workspace` | Google Workspace (Gmail, Drive, Calendar, Sheets) |
+| [brevo.md](./brevo.md) | `brevo_email` | Brevo transactional email relay (Phase 1-6 shipped) |
 | [whatsapp.md](./whatsapp.md) | `whatsapp` | WhatsApp Business messaging |
 | [erp-integration.md](./erp-integration.md) | `erp_integration` | ERP system connectivity |
-| [crm-integration.md](./crm-integration.md) | `crm_integration` | CRM platform sync (HubSpot, Salesforce, Pipedrive) |
+| [crm-integration.md](./crm-integration.md) | `crm_integration` | CRM platform sync (HubSpot, Salesforce, Pipedrive, Shopify, Square) |
 
 ### API
 | Doc | Key | Summary |

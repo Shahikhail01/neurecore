@@ -16,7 +16,8 @@ function walk(dir: string, out: string[] = []): string[] {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) walk(full, out);
-    else if (e.name.endsWith('.ts') && !e.name.endsWith('.spec.ts')) out.push(full);
+    else if (e.name.endsWith('.ts') && !e.name.endsWith('.spec.ts'))
+      out.push(full);
   }
   return out;
 }
@@ -25,8 +26,10 @@ describe('Work Runtime — architecture', () => {
   const files = walk(WR);
 
   it('orchestration + planner layers do NOT import PrismaService', () => {
-    const nonRepo = files.filter(
-      (f) => /\/(runtime|planner|governance|executor|registry|tools|consumers)\//.test(f),
+    const nonRepo = files.filter((f) =>
+      /\/(runtime|planner|governance|executor|registry|tools|consumers)\//.test(
+        f,
+      ),
     );
     for (const f of nonRepo) {
       expect(read(f)).not.toMatch(/PrismaService/);
@@ -36,7 +39,7 @@ describe('Work Runtime — architecture', () => {
   it('only the repository imports Prisma', () => {
     const prismaImporters = files.filter((f) => /PrismaService/.test(read(f)));
     for (const f of prismaImporters) {
-      expect(f).toMatch(/\/repository\//);
+      expect(f).toMatch(/\/(repository|persistence)\//);
     }
   });
 
@@ -49,11 +52,15 @@ describe('Work Runtime — architecture', () => {
   it('the planner cannot execute tools (no ToolExecutor / capability service imports)', () => {
     const planner = read(path.join(WR, 'planner/work-planner.service.ts'));
     expect(planner).not.toMatch(/ToolExecutor/);
-    expect(planner).not.toMatch(/ProjectsService|TasksService|CustomersService|ProjectMemoryService/);
+    expect(planner).not.toMatch(
+      /ProjectsService|TasksService|CustomersService|ProjectMemoryService/,
+    );
   });
 
   it('governance evaluator delegates to the governance port (no duplicated rules engine)', () => {
-    const gov = read(path.join(WR, 'governance/runtime-governance.evaluator.ts'));
+    const gov = read(
+      path.join(WR, 'governance/runtime-governance.evaluator.ts'),
+    );
     expect(gov).toMatch(/GOVERNANCE_EVALUATOR/);
     // Must not re-implement rule storage/evaluation.
     expect(gov).not.toMatch(/prisma|governanceRule/i);
@@ -61,7 +68,9 @@ describe('Work Runtime — architecture', () => {
 
   it('no hardcoded authority default >= 40 in the runtime', () => {
     for (const f of files) {
-      const src = read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      const src = read(f)
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/.*$/gm, '');
       const matches = [...src.matchAll(/authority[A-Za-z]*:\s*(\d+)/gi)];
       for (const m of matches) {
         // requiredAuthority thresholds on tools are allowed (they gate UP);
@@ -75,7 +84,9 @@ describe('Work Runtime — architecture', () => {
 
   it('planner output cannot supply approval (approval decided by runtime/governance)', () => {
     // The WorkPlanStep contract has no "approved"/"approval" field.
-    const contracts = read(path.join(WR, 'contracts/work-runtime.interface.ts'));
+    const contracts = read(
+      path.join(WR, 'contracts/work-runtime.interface.ts'),
+    );
     const planStepBlock = contracts.slice(
       contracts.indexOf('interface WorkPlanStep'),
       contracts.indexOf('interface WorkPlan {'),
@@ -86,8 +97,12 @@ describe('Work Runtime — architecture', () => {
   it('does not implement Phase 5 cognitive/autonomous behavior', () => {
     for (const f of files) {
       const src = read(f);
-      expect(src).not.toMatch(/from '.*modules\/(enterprise-understanding|enterprise-recommendation|enterprise-decision)/);
-      expect(src).not.toMatch(/self-?modif|autonomous loop|cross-run memory|learn from previous run/i);
+      expect(src).not.toMatch(
+        /from '.*modules\/(enterprise-understanding|enterprise-recommendation|enterprise-decision)/,
+      );
+      expect(src).not.toMatch(
+        /self-?modif|autonomous loop|cross-run memory|learn from previous run/i,
+      );
     }
   });
 

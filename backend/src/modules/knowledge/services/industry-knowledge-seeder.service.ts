@@ -26,6 +26,7 @@
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import type { KnowledgeType } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { INDUSTRY_GROUP } from '../../industry/tier-industry-matrix';
 
 const INDUSTRY_KNOWLEDGE_CORPUS: Record<
   string,
@@ -38,14 +39,15 @@ const INDUSTRY_KNOWLEDGE_CORPUS: Record<
   }>
 > = {
   // ─── Financial & Compliance ────────────────────────────────────────────
-  'financial-compliance': [
+  [INDUSTRY_GROUP.FINANCIAL_COMPLIANCE]: [
     {
       title: 'Know Your Customer (KYC) — Customer Identification Program',
       content:
         'The Customer Identification Program (CIP) requires financial institutions to verify the identity of every customer at account opening. Required elements: (1) name, (2) date of birth, (3) residential address, (4) government-issued ID number. For non-US persons: passport + visa or similar. Records must be retained for 5 years after account closure. Re-verify every 3 years for high-risk customers; every 5 years for standard.',
       type: 'POLICY',
       tags: ['kyc', 'cip', 'identity-verification', 'compliance'],
-      sourceUrl: 'https://www.ffiec.gov/bsa_aml_infobase/pages_manual/OLM_013.htm',
+      sourceUrl:
+        'https://www.ffiec.gov/bsa_aml_infobase/pages_manual/OLM_013.htm',
     },
     {
       title: 'Anti-Money Laundering (AML) — Suspicious Activity Reporting',
@@ -60,7 +62,8 @@ const INDUSTRY_KNOWLEDGE_CORPUS: Record<
         'The Bank Secrecy Act requires financial institutions to maintain records of all financial transactions. Retention: 5 years for most records (CTR / SAR); funds transfer records (Travel Rule) require full originator/beneficiary info for transfers ≥ $3,000. Record format must be retrievable on demand by FinCEN. Records must include: amount, parties, account numbers, execution time, and any payment instructions.',
       type: 'REGULATION',
       tags: ['bsa', 'fincen', 'travel-rule', 'compliance'],
-      sourceUrl: 'https://www.fincen.gov/resources/statutes-regulations/bank-secrecy-act',
+      sourceUrl:
+        'https://www.fincen.gov/resources/statutes-regulations/bank-secrecy-act',
     },
     {
       title: 'OFAC Sanctions Screening — Required Frequency',
@@ -79,7 +82,7 @@ const INDUSTRY_KNOWLEDGE_CORPUS: Record<
     {
       title: 'Audit Engagement Quality Control (PCAOB AS 1220)',
       content:
-        'PCAOB Auditing Standard 1220 requires engagement quality reviews for all audits of public companies. The engagement quality reviewer (EQR) must be independent of the engagement team, possess the expertise and authority to evaluate the engagement, and review the engagement team\'s significant judgments and conclusions. Documentation of EQR procedures is required. For non-public audits, AICPA SAS 1220 provides similar peer review requirements. The review must be completed BEFORE the audit report is released.',
+        "PCAOB Auditing Standard 1220 requires engagement quality reviews for all audits of public companies. The engagement quality reviewer (EQR) must be independent of the engagement team, possess the expertise and authority to evaluate the engagement, and review the engagement team's significant judgments and conclusions. Documentation of EQR procedures is required. For non-public audits, AICPA SAS 1220 provides similar peer review requirements. The review must be completed BEFORE the audit report is released.",
       type: 'REGULATION',
       tags: ['pcaob', 'audit', 'as-1220', 'eqr', 'compliance'],
     },
@@ -103,7 +106,11 @@ export const KNOWLEDGE_CORPUS = INDUSTRY_KNOWLEDGE_CORPUS;
 export class IndustryKnowledgeSeeder {
   private readonly logger = new Logger(IndustryKnowledgeSeeder.name);
 
-  constructor(@Optional() @Inject('PrismaService') private readonly prisma?: PrismaService) {}
+  constructor(
+    @Optional()
+    @Inject('PrismaService')
+    private readonly prisma?: PrismaService,
+  ) {}
 
   /**
    * Seed the knowledge corpus for a tenant's industry. Idempotent —

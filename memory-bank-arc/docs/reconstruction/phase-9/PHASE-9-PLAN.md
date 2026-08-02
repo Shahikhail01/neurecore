@@ -234,6 +234,8 @@ Outputs land in `src/test/certification/reports/`:
 - **TypeScript:** clean for all Phase 9 files.
 - **ESLint:** 0 errors on all Phase 9 files.
 - **Dashboard verdict:** APPROVED.
+- **Formal sign-off:** All 5 reviewers APPROVED (2026-07-30).
+- **Release approved:** ✅ (commit `fe335abb`)
 
 See `G9-EVIDENCE.md` for the full evidence record and
 `G9-SIGN-OFF.md` for the formal gate decision.

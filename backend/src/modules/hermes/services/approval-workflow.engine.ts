@@ -183,6 +183,7 @@ export class ApprovalWorkflowEngine {
     } else {
       await this.notifyApprover({
         id: updated.id,
+        tenantId: updated.tenantId,
         currentStep: updated.currentStep,
         steps: wf.steps,
       }).catch((err) =>
@@ -302,6 +303,7 @@ export class ApprovalWorkflowEngine {
 
   private async notifyApprover(workflow: {
     id: string;
+    tenantId: string;
     steps: Array<{ approverId: string | null; approverRole: UserRole[] }>;
     currentStep: number;
   }): Promise<void> {
@@ -309,7 +311,7 @@ export class ApprovalWorkflowEngine {
     const step = workflow.steps[workflow.currentStep];
     if (!step) return;
     await this.notifications.create({
-      tenantId: '',
+      tenantId: workflow.tenantId,
       userId: step.approverId ?? undefined,
       type: 'APPROVAL_REQUEST',
       title: 'Approval requested',
@@ -320,12 +322,13 @@ export class ApprovalWorkflowEngine {
 
   private async notifyCompletion(workflow: {
     id: string;
+    tenantId: string;
     status: ApprovalStatus;
   }): Promise<void> {
     if (!this.notifications) return;
     const ok = workflow.status === ApprovalStatus.APPROVED;
     await this.notifications.create({
-      tenantId: '',
+      tenantId: workflow.tenantId,
       type: ok ? 'SUCCESS' : 'WARNING',
       title: `Approval ${String(workflow.status).toLowerCase()}`,
       message: `Workflow ${workflow.id} finished with status ${workflow.status}`,
