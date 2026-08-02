@@ -40,7 +40,9 @@ async function main(): Promise<void> {
     `Gate G9 verdict: ${run.gateG9.releaseApproved ? 'APPROVED' : 'BLOCKED'}`,
   );
   // eslint-disable-next-line no-console
-  console.log(`Machine-readable report: ${written}`);
+  console.log(
+    `Parity inventory: ${run.parity?.capabilityCount ?? 0} capabilities, ${run.parity?.certifiedCapabilityCount ?? 0} baseline-certified, ${run.parity?.mappedScenarioCount ?? 0} mapped scenarios.`,
+  );
 }
 
 if (require.main === module) {

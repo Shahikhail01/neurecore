@@ -27,7 +27,7 @@ export const ncToolSchemas: Record<NcToolName, z.ZodTypeAny> = {
       tool: z.string().optional(),
       rationale: z.string().optional(),
     })).min(1),
-  }).passthrough(),
+  }).strict(),
   'nc.list_customers': z.object({ query: z.string().default(''), limit: z.number().int().min(1).max(50).default(10) }).strict(),
   'nc.create_customer': z.object({
     name: text,

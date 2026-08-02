@@ -28,29 +28,66 @@ import { InitiationStatus } from '../../modules/enterprise-initiation/domain/ini
 
 const RECONSTRUCTION_TENANT = 'reconstruction-integration-test';
 const REQUIRE_DB = process.env.AWL_REQUIRE_INTEGRATION_DB === 'true';
-const DB_AVAILABLE = !!process.env.DATABASE_URL;
 
-const skipIfNoDb = () => {
-  if (DB_AVAILABLE) return false;
+// Probe the database for actual reachability rather than just trusting the
+// presence of DATABASE_URL in the environment. The env var may be set by
+// .env but the database server may be unreachable (e.g. local dev on a
+// laptop without Postgres). A live probe avoids spurious test failures
+// in those environments while still failing hard under
+// AWL_REQUIRE_INTEGRATION_DB.
+function probeDbAvailable(): Promise<boolean> {
+  if (!process.env.DATABASE_URL) return Promise.resolve(false);
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    let probe: { $disconnect: () => Promise<void> } | null = null;
+    const finish = (v: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (probe)
+        (probe as unknown as { $disconnect: () => Promise<void> })
+          .$disconnect()
+          .catch(() => undefined);
+      resolve(v);
+    };
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
+      const { PrismaClient: ProbeClient } = require('@prisma/client');
+      probe = new ProbeClient();
+    } catch {
+      finish(false);
+      return;
+    }
+    const timer = setTimeout(() => finish(false), 1500);
+    (probe as unknown as { $queryRaw: (q: unknown) => Promise<unknown> })
+      .$queryRaw`SELECT 1`
+      .then(() => finish(true))
+      .catch(() => finish(false));
+  });
+}
+
+const DB_AVAILABLE_PROMISE = probeDbAvailable();
+
+const skipIfNoDb = async () => {
+  const ok = await DB_AVAILABLE_PROMISE;
+  if (ok) return false;
   if (REQUIRE_DB) {
     throw new Error(
-      'INTEGRATION_DB_REQUIRED: AWL_REQUIRE_INTEGRATION_DB=true but DATABASE_URL is not set. ' +
+      'INTEGRATION_DB_REQUIRED: AWL_REQUIRE_INTEGRATION_DB=true but DATABASE_URL is not reachable. ' +
         'Provision PostgreSQL or unset AWL_REQUIRE_INTEGRATION_DB to skip.',
     );
   }
   return true;
 };
 
-const describeOrSkip = REQUIRE_DB || DB_AVAILABLE ? describe : describe.skip;
-
-describeOrSkip('G1.1 — Real PostgreSQL Invariant Tests', () => {
+describe('G1.1 — Real PostgreSQL Invariant Tests', () => {
   let prisma: PrismaClient;
   let uow: PrismaUnitOfWork;
   let idempotency: PrismaIdempotencyRepository;
   let outbox: PrismaOutboxRepository;
 
   beforeAll(async () => {
-    if (skipIfNoDb()) {
+    if (await skipIfNoDb()) {
       return;
     }
     prisma = new PrismaClient();
@@ -67,7 +104,7 @@ describeOrSkip('G1.1 — Real PostgreSQL Invariant Tests', () => {
 
   describe('Invariant 1: Idempotency table has correct unique constraint', () => {
     it('rejects duplicate (tenantId, key) inserts', async () => {
-      if (skipIfNoDb()) return;
+      if (await skipIfNoDb()) return;
       const tenantId = RECONSTRUCTION_TENANT;
       const key = `test-${Date.now()}`;
       const scope = 'TestScope';
@@ -103,7 +140,7 @@ describeOrSkip('G1.1 — Real PostgreSQL Invariant Tests', () => {
 
   describe('Invariant 2: Outbox has correct unique constraint', () => {
     it('rejects duplicate (tenantId, idempotencyKey) outbox events', async () => {
-      if (skipIfNoDb()) return;
+      if (await skipIfNoDb()) return;
       const tenantId = RECONSTRUCTION_TENANT;
       const idempotencyKey = `outbox-test-${Date.now()}-${Math.random()}`;
 
@@ -145,7 +182,7 @@ describeOrSkip('G1.1 — Real PostgreSQL Invariant Tests', () => {
 
   describe('Invariant 3: EnterpriseInitiation persists with version', () => {
     it('round-trips and supports optimistic lock', async () => {
-      if (skipIfNoDb()) return;
+      if (await skipIfNoDb()) return;
       const tenantId = RECONSTRUCTION_TENANT;
       const id = `init-${Date.now()}`;
 
@@ -198,7 +235,7 @@ describeOrSkip('G1.1 — Real PostgreSQL Invariant Tests', () => {
 
   describe('Invariant 5: Idempotency replay returns cached result', () => {
     it('first reserves, second returns existing', async () => {
-      if (skipIfNoDb()) return;
+      if (await skipIfNoDb()) return;
       const tenantId = RECONSTRUCTION_TENANT;
       const key = `replay-${Date.now()}`;
       const scope = 'TestScope';
@@ -237,7 +274,7 @@ describeOrSkip('G1.1 — Real PostgreSQL Invariant Tests', () => {
 
   describe('Invariant 6: Idempotency payload mismatch rejected', () => {
     it('throws IDEMPOTENCY_KEY_REUSE_WITH_DIFFERENT_PAYLOAD', async () => {
-      if (skipIfNoDb()) return;
+      if (await skipIfNoDb()) return;
       const tenantId = RECONSTRUCTION_TENANT;
       const key = `reuse-${Date.now()}-${Math.random()}-${process.pid}`;
       const scope = 'TestScope';
@@ -275,7 +312,7 @@ describeOrSkip('G1.1 — Real PostgreSQL Invariant Tests', () => {
 
   describe('Invariant 7: Durable record has NULL expiresAt (no short TTL)', () => {
     it('completed record persists with NULL expiry', async () => {
-      if (skipIfNoDb()) return;
+      if (await skipIfNoDb()) return;
       const tenantId = RECONSTRUCTION_TENANT;
       const key = `durable-${Date.now()}`;
       const scope = 'TestScope';
@@ -309,7 +346,7 @@ describeOrSkip('G1.1 — Real PostgreSQL Invariant Tests', () => {
 
   describe('Invariant 8: Transaction atomicity via UoW', () => {
     it('rolls back all writes on error', async () => {
-      if (skipIfNoDb()) return;
+      if (await skipIfNoDb()) return;
       const tenantId = RECONSTRUCTION_TENANT;
       const initId = `init-uow-${Date.now()}`;
 
@@ -343,7 +380,7 @@ describeOrSkip('G1.1 — Real PostgreSQL Invariant Tests', () => {
 
   describe('Invariant 9: PrismaExecutionEngine enum persists', () => {
     it('Project accepts PrismaExecutionEngine values', async () => {
-      if (skipIfNoDb()) return;
+      if (await skipIfNoDb()) return;
       const tenantId = RECONSTRUCTION_TENANT;
       const customerName = `Test Customer ${Date.now()}-${Math.random()}`;
       const customer = await prisma.customer.create({

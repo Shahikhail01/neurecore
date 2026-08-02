@@ -71,7 +71,10 @@ export class SquareConnector implements IRetailConnector {
   }
 
   // Square-specific helper, used by the retail sync service.
-  async listPayments(_tenantId: string, _since: Date): Promise<SquarePayment[]> {
+  async listPayments(
+    _tenantId: string,
+    _since: Date,
+  ): Promise<SquarePayment[]> {
     if (!this.accessToken) return [];
     // Real: POST /v2/payments/search
     return [];

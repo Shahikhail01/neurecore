@@ -97,6 +97,7 @@ export function UnifiedChatInput({
           onKeyDown={onKey}
           disabled={disabled}
           placeholder={placeholder}
+          aria-label="Message"
           className="flex-1 resize-none bg-surface-overlay rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 border border-surface-border focus:outline-none focus:border-violet-600 transition min-h-[32px] max-h-[80px]"
           style={{ height: 'auto' }}
           data-testid="chat-input"
@@ -104,6 +105,7 @@ export function UnifiedChatInput({
         <button
           onClick={submit}
           disabled={disabled || !value.trim()}
+          aria-label="Send message"
           className="shrink-0 rounded-lg bg-[color:var(--accent-500)] hover:bg-[color:var(--accent-500)] disabled:opacity-40 text-white px-3 py-2 text-xs transition"
           data-testid="chat-submit"
         >

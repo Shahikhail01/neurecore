@@ -277,8 +277,21 @@ export class ChatService {
       (dto.context?.['tenantId'] as string | undefined) ??
       null;
 
-    // Detect if this is an action request or a query
+    // Classify every prompt and persist the routing decision. The deterministic
+    // router runs for both query and action intents so audit/replay has a
+    // full evidence trail (NC-AI-SG-V2 §2). The action path persists the
+    // decision through `resolveAndRecordChatAllowedTools`; for the query
+    // path we persist here directly.
     const intent = this.detectIntent(dto.message);
+    if (tenantId && intent !== 'action') {
+      void this.classifyAndRecord(dto.message, tenantId).catch((err: unknown) =>
+        this.logger.warn(
+          `Routing decision persistence failed (query path): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        ),
+      );
+    }
 
     // PERF-FIX: skip the tenant-snapshot fan-out for action intents.
     // The agent graph already gathers the context it needs from its
@@ -1375,34 +1388,7 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       ));
 
     if (useServiceGateway && tenantId) {
-      const decision = this.intentClassifier.classify({
-        message,
-      });
-      const rawMessageHash = hashMessage(message);
-      const route: ChatRoute = {
-        canonicalCapability: extractCapabilityFromDecision(decision),
-        intent: decision.intent,
-        ruleId: decision.ruleId ?? 'no_match',
-        confidence: decision.confidence,
-        ambiguous: decision.candidates && decision.candidates.length > 0,
-        ruleVersion: this.intentRegistry.getVersion(),
-        rawMessageHash,
-      };
-      try {
-        await this.routingDecisions.record(tenantId, 'chat-service', {
-          ruleVersion: route.ruleVersion,
-          ruleId: route.ruleId,
-          intent: route.intent,
-          canonicalCapability: route.canonicalCapability ?? undefined,
-          confidence: route.confidence,
-          rawMessageHash,
-          ambiguous: !!route.ambiguous,
-        });
-      } catch (err) {
-        this.logger.warn(
-          `Routing decision persistence failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+      const route = await this.classifyAndRecord(message, tenantId);
       return {
         tools: ['service-gateway'],
         route,
@@ -1412,6 +1398,46 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
     const lower = message.toLowerCase();
     const tools = await this.resolveLegacyChatAllowedTools(lower);
     return { tools, route: null };
+  }
+
+  /**
+   * Classify the prompt and persist the routing decision for every classified
+   * message — even when the service-gateway fast path is gated off. The plan
+   * §2 mandates that the deterministic router runs on every prompt and the
+   * RoutingDecisionsService receives every verdict (READ, MUTATION, AMBIGUOUS,
+   * UNSUPPORTED) so future audits and replays have the evidence trail.
+   */
+  private async classifyAndRecord(
+    message: string,
+    tenantId: string,
+  ): Promise<ChatRoute> {
+    const decision = this.intentClassifier.classify({ message });
+    const rawMessageHash = hashMessage(message);
+    const route: ChatRoute = {
+      canonicalCapability: extractCapabilityFromDecision(decision),
+      intent: decision.intent,
+      ruleId: decision.ruleId ?? 'no_match',
+      confidence: decision.confidence,
+      ambiguous: !!(decision.candidates && decision.candidates.length > 0),
+      ruleVersion: this.intentRegistry.getVersion(),
+      rawMessageHash,
+    };
+    try {
+      await this.routingDecisions.record(tenantId, 'chat-service', {
+        ruleVersion: route.ruleVersion,
+        ruleId: route.ruleId,
+        intent: route.intent,
+        canonicalCapability: route.canonicalCapability ?? undefined,
+        confidence: route.confidence,
+        rawMessageHash,
+        ambiguous: !!route.ambiguous,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Routing decision persistence failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    return route;
   }
 
   private async resolveLegacyChatAllowedTools(

@@ -50,6 +50,32 @@ export interface AutonomousApprovalData {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
 }
 
+// P1 — provenance metadata attached to assistant messages by the server.
+// The FE never invents a provenance source from free text; the field is
+// server-attested. See `ProvenanceBadge` for the typed source union.
+export type ProvenanceSource =
+  | 'record'
+  | 'knowledge'
+  | 'uploaded_file'
+  | 'prediction'
+  | 'generated';
+
+export interface ChatCitation {
+  id: string;
+  label: string;
+  source: ProvenanceSource;
+  href?: string;
+  excerptHash?: string;
+  confidence?: number;
+}
+
+export interface ChatProvenance {
+  source: ProvenanceSource;
+  confidence?: number;
+  excerptHash?: string;
+  citations?: ChatCitation[];
+}
+
 // ── Messages ────────────────────────────────────────────────────────────────
 export interface ChatMessage {
   id: string;
@@ -65,6 +91,7 @@ export interface ChatMessage {
     suggestions?: SuggestionData[];
     isStreaming?: boolean;
     autonomousApproval?: AutonomousApprovalData;
+    provenance?: ChatProvenance;
   };
 }
 
@@ -103,6 +130,7 @@ export interface ChatResponse {
       reason: string;
     } | null;
   };
+  provenance?: ChatProvenance;
 }
 
 // ── Slash Commands ──────────────────────────────────────────────────────────

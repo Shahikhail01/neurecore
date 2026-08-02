@@ -61,6 +61,7 @@ import { EmailProviderFactory } from './email/email-provider.factory';
     GoogleSlidesService,
     DriveCleanupService,
     EmailProviderFactory,
+    PrismaIntegrationCredentialStore,
   ],
 })
 export class IntegrationsModule {}

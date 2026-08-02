@@ -22,6 +22,11 @@ import type {
 import { ApprovalCard } from './ApprovalCard';
 import { EnvelopeRenderer } from '@/core/services/chat/envelope/EnvelopeRenderer';
 import type { IEnvelopeParser, EnvelopeComponent } from '@/core/services/chat/envelope/interfaces/IEnvelopeParser';
+import {
+  ProvenanceBadge,
+  type Citation,
+  type ProvenanceSource,
+} from './ProvenanceBadge';
 
 // ── Renderer: Markdown-lite (bold, italic, code, line breaks) ──────────────────
 function MarkdownRenderer({ content }: { content: string }) {
@@ -104,6 +109,7 @@ interface UnifiedChatMessageProps {
     decision: 'approve' | 'reject',
   ) => Promise<AutonomousApprovalData | null>;
   envelopeParser: IEnvelopeParser;
+  onCitationClick?: (citation: Citation) => void;
 }
 
 // ── Main Component ──────────────────────────────────────────────────────────────
@@ -113,6 +119,7 @@ export function UnifiedChatMessage({
   sending,
   onApprovalDecision,
   envelopeParser,
+  onCitationClick,
 }: UnifiedChatMessageProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
@@ -192,6 +199,19 @@ export function UnifiedChatMessage({
             same text-only path. */}
         {parsedEnvelope?.envelope?.components && (
           <EnvelopeRenderer components={parsedEnvelope.envelope.components} />
+        )}
+
+        {/* P1 — provenance display. The provenance is server-attested via
+            the message metadata; the FE never accepts a free-text source
+            from the LLM. */}
+        {isAssistant && message.metadata?.provenance && (
+          <ProvenanceBadge
+            source={message.metadata.provenance.source as ProvenanceSource}
+            confidence={message.metadata.provenance.confidence}
+            excerptHash={message.metadata.provenance.excerptHash}
+            citations={message.metadata.provenance.citations as Citation[] | undefined}
+            onCitationClick={onCitationClick}
+          />
         )}
 
         {/* Suggestion chips */}

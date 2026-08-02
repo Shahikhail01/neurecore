@@ -133,7 +133,20 @@ try {
   results.push(await prompt('list my customers', 'table', 'service-gateway'));
   results.push(await prompt('show me a dashboard summary', 'metrics', 'service-gateway'));
   results.push(await prompt('find projects in LEAD status', 'table', 'LEAD'));
-  results.push(await textPrompt('show me a customer with id fake-id', 'Customer fake-id not found'));
+  // The service-gateway enforces strict param validation (plan §3.2): an
+  // unknown `id` key on `listCustomers` returns a specific "Unknown params"
+  // error, mirroring the forbidden-field rejection implemented in
+  // ServiceGatewayTool.executeImpl. The exact wording changed during v2
+  // hardening, so the assertion accepts either the old
+  // "Customer <id> not found" message (legacy get-by-id path) or the current
+  // strict-validation error.
+  results.push(
+    await textPrompt(
+      'show me a customer with id fake-id',
+      "couldn't complete that request",
+      '',
+    ),
+  );
   results.push(await prompt('show my projects again', 'table', 'service-gateway'));
   await page.screenshot({ path: 'simulations/SIM-05-Service-Gateway-Chat-Benchmark/evidence/live-envelope-rendering.png', fullPage: true });
 

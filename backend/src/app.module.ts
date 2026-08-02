@@ -128,6 +128,7 @@ import { HealthModule } from './modules/health/health.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { MeetingsModule } from './modules/meetings/meetings.module';
 // Phase 7 — EAOS-5 Solution Packs (Marketplace + install lifecycle)
 import { SolutionPacksModule } from './modules/solution-packs/solution-packs.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
@@ -317,6 +318,9 @@ import { ServiceGatewayFlagsModule } from './modules/service-gateway-v2/rollout/
 
     // Phase 6 — EAOS-4 Knowledge Hub (RAG pipeline)
     KnowledgeModule,
+
+    // Parity v3 — Phase P3 (Meeting Intelligence)
+    MeetingsModule,
 
     // Phase 7 — EAOS-5 Solution Packs
     SolutionPacksModule,

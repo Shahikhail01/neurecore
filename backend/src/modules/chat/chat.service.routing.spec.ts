@@ -72,6 +72,19 @@ function makeChatService(opts: {
   // indirectly via the routing call path. The chat-service constructor
   // takes 13 deps; we stub each one because resolveAndRecordChatAllowedTools
   // only touches intentClassifier, intentRegistry, and routingDecisions.
+  const chatHistoryStub = {
+    saveMessage: jest.fn(async () => undefined),
+  };
+  const activityServiceStub = {
+    record: jest.fn(() => Promise.resolve(undefined)),
+  };
+  const aiGatewayStub = {
+    send: jest.fn(async () => ({ content: '', metadata: {} })),
+    stream: jest.fn(async function* () {
+      yield { type: 'done', content: '', metadata: {} };
+    }),
+  };
+
   const svc = new ChatService(
     {} as never,
     {} as never,
@@ -82,10 +95,10 @@ function makeChatService(opts: {
         return { messages: [], toolResults: [], envelope: null };
       }),
     } as never,
+    activityServiceStub as never,
     {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
+    aiGatewayStub as never,
+    chatHistoryStub as never,
     {} as never,
     tenantFlags,
     intentClassifier,

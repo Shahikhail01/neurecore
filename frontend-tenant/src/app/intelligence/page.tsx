@@ -67,7 +67,7 @@ import {
   IndustryDashboardFallback,
 } from '@/components/dashboard/IndustryDashboardRenderer';
 import { KpiCard } from '@/components/creatio/KpiCard';
-import { StatusBadge } from '@/components/creatio/StatusBadge';
+import { StatusBadge, type BadgeVariant } from '@/components/creatio/StatusBadge';
 import { ActionButton } from '@/components/creatio/ActionToolbar';
 import { AreaChart } from '@/components/charts/AreaChart';
 import { LineChart as LineChartComponent } from '@/components/charts/LineChart';
@@ -77,11 +77,12 @@ import { useDashboardKpis } from '@/hooks/useDashboardKpis';
 import { useChartData } from '@/hooks/useChartData';
 import { useTimeRange } from '@/hooks/useTimeRange';
 import api from '@/services/api';
+import { commandCenterService, type CommandCenterCosts, type CommandCenterModelHealth, type CommandCenterChannelHealth, type CommandCenterInventory, type CommandCenterQuality, type CommandCenterSecurityEvents, type CommandCenterKillSwitchList, type CommandCenterAuditCorrelation, type SetKillSwitchInput } from '@/services/command-center.service';
 import type { AIRoutingConfig } from '@/types/settings.types';
 import { DEFAULT_AI_ROUTING } from '@/types/settings.types';
 
 // ─── Types ────────────────────────────────────────────────────────────────
-type IntelTab = 'analytics' | 'observability' | 'health' | 'reliability' | 'security' | 'settings';
+type IntelTab = 'analytics' | 'observability' | 'health' | 'reliability' | 'security' | 'command-center' | 'settings';
 type SettingsSubTab =
   | 'organization'
   | 'profile'
@@ -126,6 +127,7 @@ const TABS: { id: IntelTab; label: string; icon: typeof BarChart3 }[] = [
   { id: 'health',        label: 'Health',        icon: HeartPulse },
   { id: 'reliability',   label: 'Reliability',   icon: ShieldCheck },
   { id: 'security',      label: 'Security',      icon: Shield },
+  { id: 'command-center',label: 'Command Center',icon: Cpu },
   { id: 'settings',      label: 'Settings',      icon: Settings },
 ];
 
@@ -250,6 +252,7 @@ export default function IntelligencePage() {
             {activeTab === 'health' && <HealthTab />}
             {activeTab === 'reliability' && <ReliabilityTab />}
             {activeTab === 'security' && <SecurityTab />}
+            {activeTab === 'command-center' && <CommandCenterTab />}
             {activeTab === 'settings' && <SettingsTab subTab={settingsSubTab} onSetSubTab={handleSetSettingsSubTab} />}
           </motion.div>
         </AnimatePresence>
@@ -1781,6 +1784,661 @@ function AIRoutingSection() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ─── P8 — Command Center Tab (CR-AI-1201..1207) ──────────────────────────
+// Surfaces the canonical intelligence feeds from the command-center
+// service. Every panel traces to its source model and tenant scope;
+// empty states are explicit (no fabricated counts).
+type CCSubTab =
+  | 'inventory'
+  | 'quality'
+  | 'costs'
+  | 'model-health'
+  | 'channel-health'
+  | 'security'
+  | 'kill-switches'
+  | 'audit-correlation';
+
+const CC_TABS: { id: CCSubTab; label: string }[] = [
+  { id: 'inventory',         label: 'Inventory' },
+  { id: 'quality',           label: 'Quality' },
+  { id: 'costs',             label: 'Cost' },
+  { id: 'model-health',      label: 'Model health' },
+  { id: 'channel-health',    label: 'Channel health' },
+  { id: 'security',          label: 'Security' },
+  { id: 'kill-switches',     label: 'Kill switches' },
+  { id: 'audit-correlation', label: 'Audit correlation' },
+];
+
+function CommandCenterTab() {
+  const [sub, setSub] = useState<CCSubTab>('inventory');
+  const [inventory, setInventory] = useState<CommandCenterInventory | null>(null);
+  const [quality, setQuality] = useState<CommandCenterQuality | null>(null);
+  const [costs, setCosts] = useState<CommandCenterCosts | null>(null);
+  const [modelHealth, setModelHealth] = useState<CommandCenterModelHealth | null>(null);
+  const [channelHealth, setChannelHealth] = useState<CommandCenterChannelHealth | null>(null);
+  const [security, setSecurity] = useState<CommandCenterSecurityEvents | null>(null);
+  const [killSwitches, setKillSwitches] = useState<CommandCenterKillSwitchList | null>(null);
+  const [auditCorr, setAuditCorr] = useState<CommandCenterAuditCorrelation | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [inv, qua, cos, mh, ch, sec, ks, ac] = await Promise.all([
+        commandCenterService.getInventory(),
+        commandCenterService.getQuality(),
+        commandCenterService.getCosts(),
+        commandCenterService.getModelHealth(),
+        commandCenterService.getChannelHealth(),
+        commandCenterService.getSecurityEvents(100),
+        commandCenterService.getKillSwitches(),
+        commandCenterService.getAuditCorrelation(50, 24),
+      ]);
+      setInventory(inv);
+      setQuality(qua);
+      setCosts(cos);
+      setModelHealth(mh);
+      setChannelHealth(ch);
+      setSecurity(sec);
+      setKillSwitches(ks);
+      setAuditCorr(ac);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load command center');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const refreshSecurity = useCallback(async () => {
+    try {
+      const sec = await commandCenterService.getSecurityEvents(100);
+      setSecurity(sec);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to refresh security feed');
+    }
+  }, []);
+
+  const refreshKillSwitches = useCallback(async () => {
+    try {
+      const ks = await commandCenterService.getKillSwitches();
+      setKillSwitches(ks);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to refresh kill switches');
+    }
+  }, []);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
+          <Cpu className="w-4 h-4 text-accent-400" />
+          Command Center — P8 intelligence
+        </h2>
+        <ActionButton variant="ghost" size="sm" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void refresh()}>
+          Refresh
+        </ActionButton>
+      </div>
+
+      {error && (
+        <div className="card-surface p-3 text-xs text-state-danger" role="alert">
+          {error}
+        </div>
+      )}
+
+      <div className="flex gap-1 border-b border-surface-border overflow-x-auto" role="tablist" aria-label="Command Center sub-tabs">
+        {CC_TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={sub === t.id}
+            onClick={() => setSub(t.id)}
+            className={`px-3 py-2 text-xs font-medium border-b-2 transition ${
+              sub === t.id
+                ? 'border-accent-500 text-zinc-100'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && !inventory && (
+        <div className="card-surface p-8 text-center text-zinc-500 text-sm" role="status">
+          Loading command center…
+        </div>
+      )}
+
+      {sub === 'inventory' && inventory && (
+        <CCInventoryPanel inventory={inventory} />
+      )}
+      {sub === 'quality' && quality && (
+        <CCQualityPanel quality={quality} />
+      )}
+      {sub === 'costs' && costs && (
+        <CCCostsPanel costs={costs} />
+      )}
+      {sub === 'model-health' && modelHealth && (
+        <CCModelHealthPanel health={modelHealth} />
+      )}
+      {sub === 'channel-health' && channelHealth && (
+        <CCChannelHealthPanel health={channelHealth} />
+      )}
+      {sub === 'security' && security && (
+        <CCSecurityPanel security={security} onRefresh={refreshSecurity} />
+      )}
+      {sub === 'kill-switches' && killSwitches && (
+        <CCKillSwitchPanel
+          data={killSwitches}
+          onRefresh={refreshKillSwitches}
+          onError={(msg) => setError(msg)}
+        />
+      )}
+      {sub === 'audit-correlation' && auditCorr && (
+        <CCAuditCorrelationPanel data={auditCorr} />
+      )}
+    </div>
+  );
+}
+
+function CCInventoryPanel({ inventory }: { inventory: CommandCenterInventory }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <KpiCard label="Agents" value={inventory.agents.length} color="ops" />
+        <KpiCard label="Skills" value={inventory.skills.length} color="ops" />
+        <KpiCard label="Models" value={inventory.models.length} color="strategy" />
+        <KpiCard label="Knowledge" value={inventory.knowledge.length} color="warn" />
+        <KpiCard label="Channels" value={inventory.channels.length} color="risk" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <CCListCard
+          title="Agents"
+          empty="No agents configured for this tenant."
+          rows={inventory.agents.map((a) => ({
+            id: a.id,
+            primary: a.name,
+            secondary: a.model,
+            badge: a.status,
+          }))}
+        />
+        <CCListCard
+          title="Skills"
+          empty="No skill definitions registered."
+          rows={inventory.skills.map((s) => ({
+            id: s.id,
+            primary: s.name,
+            secondary: `v${s.version}`,
+            badge: s.status,
+          }))}
+        />
+        <CCListCard
+          title="Models in use"
+          empty="No model deployments detected."
+          rows={inventory.models.map((m) => ({
+            id: m.model,
+            primary: m.model,
+            secondary: `${m.agentCount} agents`,
+            badge: m.provider,
+          }))}
+        />
+        <CCListCard
+          title="Knowledge entries"
+          empty="No knowledge entries ingested."
+          rows={inventory.knowledge.map((k) => ({
+            id: k.id,
+            primary: k.name,
+            secondary: k.kind,
+            badge: k.status,
+          }))}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CCQualityPanel({ quality }: { quality: CommandCenterQuality }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <KpiCard
+          label="Avg score"
+          value={quality.summary.averageScore === null ? '—' : quality.summary.averageScore.toFixed(2)}
+          color="ops"
+        />
+        <KpiCard label="Evaluated" value={quality.summary.evaluatedCount} color="ops" />
+        <KpiCard label="Abstentions" value={quality.summary.abstentionCount} color="warn" />
+        <KpiCard label="Corrections" value={quality.summary.correctionCount} color="risk" />
+        <KpiCard label="Revisions" value={quality.summary.revisionCount} color="warn" />
+        <KpiCard label="Feedback" value={quality.summary.feedbackCount} color="neutral" />
+      </div>
+      <CCListCard
+        title="Recent evaluations"
+        empty="No evaluator scores in the selected window."
+        rows={quality.attempts.slice(0, 10).map((a) => ({
+          id: a.attemptId,
+          primary: a.taskId || a.attemptId,
+          secondary: a.reflection ?? '',
+          badge: a.score === null ? 'no-score' : `score ${a.score.toFixed(2)}`,
+        }))}
+      />
+    </div>
+  );
+}
+
+function CCCostsPanel({ costs }: { costs: CommandCenterCosts }) {
+  const fmt = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="MTD cost" value={fmt(costs.monthToDateCents)} color="risk" />
+        <KpiCard label="MTD tokens" value={costs.monthToDateTokens.toLocaleString()} color="ops" />
+        <KpiCard label="Budget total" value={fmt(costs.totalBudgetCents)} color="neutral" />
+        <KpiCard
+          label="Utilization"
+          value={`${(costs.utilizationPercent * 100).toFixed(1)}%`}
+          color={costs.utilizationPercent >= 0.9 ? 'risk' : costs.utilizationPercent >= 0.5 ? 'warn' : 'ops'}
+        />
+      </div>
+      <CCListCard
+        title="Cost by model"
+        empty="No cost records for this tenant this month."
+        rows={costs.byModel.map((m) => ({
+          id: `${m.model}-${m.provider}`,
+          primary: m.model,
+          secondary: `${m.tokens.toLocaleString()} tokens`,
+          badge: fmt(m.costCents),
+        }))}
+      />
+      <CCListCard
+        title="Active budgets"
+        empty="No budgets configured."
+        rows={costs.budgets.map((b) => ({
+          id: b.id,
+          primary: b.name,
+          secondary: `${b.scope} • resets ${new Date(b.resetAt).toLocaleDateString()}`,
+          badge: `${b.utilizationPercent.toFixed(0)}%`,
+        }))}
+      />
+    </div>
+  );
+}
+
+function CCModelHealthPanel({ health }: { health: CommandCenterModelHealth }) {
+  const gradeColor = (g: string): BadgeVariant =>
+    g === 'UNHEALTHY' ? 'danger' : g === 'DEGRADED' ? 'warning' : g === 'HEALTHY' ? 'success' : 'neutral';
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <KpiCard label="Total attempts" value={health.totalAttempts} color="ops" />
+        <KpiCard
+          label="Error rate"
+          value={`${(health.overallErrorRate * 100).toFixed(1)}%`}
+          color={health.overallErrorRate > 0.1 ? 'risk' : 'ops'}
+        />
+        <KpiCard label="Models tracked" value={health.models.length} color="neutral" />
+      </div>
+      <CCListCard
+        title="Per-model health"
+        empty="No attempts in the selected window."
+        rows={health.models.map((m) => ({
+          id: m.model,
+          primary: m.model,
+          secondary:
+            m.p95DurationMs === null
+              ? `${m.attempts} attempts • no latency`
+              : `${m.attempts} attempts • p95 ${m.p95DurationMs}ms`,
+          badge: m.grade,
+        }))}
+        badgeColorFor={gradeColor}
+      />
+    </div>
+  );
+}
+
+function CCChannelHealthPanel({ health }: { health: CommandCenterChannelHealth }) {
+  const gradeColor = (g: string): BadgeVariant =>
+    g === 'UNHEALTHY' ? 'danger' : g === 'DEGRADED' ? 'warning' : g === 'HEALTHY' ? 'success' : 'neutral';
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="Total" value={health.totalChannels} color="ops" />
+        <KpiCard label="Healthy" value={health.healthyChannels} color="ops" />
+        <KpiCard label="Degraded" value={health.degradedChannels} color="warn" />
+        <KpiCard label="Unhealthy" value={health.unhealthyChannels} color="risk" />
+      </div>
+      <CCListCard
+        title="Connectors"
+        empty="No channels configured for this tenant."
+        rows={health.channels.map((c) => ({
+          id: c.id,
+          primary: c.provider,
+          secondary: c.tokenExpiresAt
+            ? `token expires ${new Date(c.tokenExpiresAt).toLocaleDateString()}`
+            : 'no token',
+          badge: c.grade,
+        }))}
+        badgeColorFor={gradeColor}
+      />
+    </div>
+  );
+}
+
+interface CCRow {
+  id: string;
+  primary: string;
+  secondary: string;
+  badge: string;
+}
+
+function CCSecurityPanel({
+  security,
+  onRefresh,
+}: {
+  security: CommandCenterSecurityEvents;
+  onRefresh: () => void | Promise<void>;
+}) {
+  const sevColor = (s: string): BadgeVariant =>
+    s === 'critical' ? 'danger' : s === 'high' ? 'warning' : s === 'medium' ? 'info' : 'neutral';
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+          <Shield className="w-4 h-4 text-state-danger" />
+          Security events feed
+        </h3>
+        <ActionButton variant="ghost" size="sm" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void onRefresh()}>
+          Refresh
+        </ActionButton>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <KpiCard label="Total" value={security.summary.total} color="ops" />
+        <KpiCard label="Critical" value={security.summary.criticalCount} color="risk" />
+        <KpiCard label="Denials" value={security.summary.denials} color="warn" />
+        <KpiCard label="Injection" value={security.summary.injectionAttempts} color="risk" />
+        <KpiCard label="DLP" value={security.summary.dlpEvents} color="warn" />
+        <KpiCard label="Malware" value={security.summary.malwareEvents} color="risk" />
+      </div>
+      <CCListCard
+        title="Recent security events"
+        empty="No security events recorded for this tenant."
+        rows={security.events.slice(0, 25).map((e) => ({
+          id: e.id,
+          primary: e.action,
+          secondary: `${e.actor}${e.resource ? ` • ${e.resource}${e.resourceId ? ` ${e.resourceId}` : ''}` : ''}${e.ipAddress ? ` • ${e.ipAddress}` : ''}`,
+          badge: e.severity,
+        }))}
+        badgeColorFor={sevColor}
+      />
+    </div>
+  );
+}
+
+function CCKillSwitchPanel({
+  data,
+  onRefresh,
+  onError,
+}: {
+  data: CommandCenterKillSwitchList;
+  onRefresh: () => void | Promise<void>;
+  onError: (msg: string) => void;
+}) {
+  const [pending, setPending] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [confirming, setConfirming] = useState<{ scope: 'process' | 'phase' | 'channel' | 'tenant-feature'; target: string; enabled: boolean } | null>(null);
+
+  const submit = async () => {
+    if (!confirming) return;
+    if (!reason || reason.trim().length < 3) {
+      onError('Reason must be at least 3 characters');
+      return;
+    }
+    const payload: SetKillSwitchInput = {
+      scope: confirming.scope,
+      target: confirming.scope === 'process' ? undefined : confirming.target,
+      enabled: confirming.enabled,
+      reason: reason.trim(),
+    };
+    const key = `${confirming.scope}:${confirming.target}:${confirming.enabled}`;
+    setPending(key);
+    try {
+      await commandCenterService.setKillSwitch(payload);
+      setConfirming(null);
+      setReason('');
+      await onRefresh();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Failed to toggle kill switch');
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+          <Zap className="w-4 h-4 text-state-warning" />
+          Kill switches
+        </h3>
+        <ActionButton variant="ghost" size="sm" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void onRefresh()}>
+          Refresh
+        </ActionButton>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <KpiCard
+          label="Process kill switch"
+          value={data.processEnabled ? 'ON' : 'OFF'}
+          color={data.processEnabled ? 'risk' : 'ops'}
+        />
+        <KpiCard label="Phases enabled" value={data.entries.filter((e) => e.scope === 'phase' && e.enabled).length} color="ops" />
+        <KpiCard label="Channels enabled" value={data.entries.filter((e) => e.scope === 'channel' && e.enabled).length} color="ops" />
+      </div>
+
+      <div className="card-surface p-4 space-y-3">
+        <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Phases</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {data.entries.filter((e) => e.scope === 'phase').map((e) => {
+            const key = `phase:${e.target}:${!e.enabled}`;
+            const isPending = pending === key;
+            return (
+              <div key={`phase-${e.target}`} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay">
+                <div className="min-w-0">
+                  <p className="text-sm text-zinc-100">{e.target}</p>
+                  <p className="text-[11px] text-zinc-500">phase gate</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label={`Toggle phase ${e.target}`}
+                  disabled={isPending}
+                  onClick={() => setConfirming({ scope: 'phase', target: e.target, enabled: !e.enabled })}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition disabled:opacity-50 ${
+                    e.enabled
+                      ? 'bg-state-warning/15 text-state-warning hover:bg-state-warning/25'
+                      : 'bg-state-success/15 text-state-success hover:bg-state-success/25'
+                  }`}
+                >
+                  {e.enabled ? 'Enabled' : 'Disabled'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="card-surface p-4 space-y-3">
+        <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Channels</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {data.entries.filter((e) => e.scope === 'channel').map((e) => (
+            <div key={`channel-${e.target}`} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay">
+              <div className="min-w-0">
+                <p className="text-sm text-zinc-100">{e.target}</p>
+                <p className="text-[11px] text-zinc-500">channel gate</p>
+              </div>
+              <button
+                type="button"
+                aria-label={`Toggle channel ${e.target}`}
+                disabled={pending === `channel:${e.target}:${!e.enabled}`}
+                onClick={() => setConfirming({ scope: 'channel', target: e.target, enabled: !e.enabled })}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition disabled:opacity-50 ${
+                  e.enabled
+                    ? 'bg-state-warning/15 text-state-warning hover:bg-state-warning/25'
+                    : 'bg-state-success/15 text-state-success hover:bg-state-success/25'
+                }`}
+              >
+                {e.enabled ? 'Enabled' : 'Disabled'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {confirming && (
+        <div className="card-surface p-4 space-y-3 border border-state-warning/40" role="dialog" aria-label="Confirm kill switch toggle">
+          <p className="text-xs text-zinc-300">
+            About to set <span className="font-mono">{confirming.scope}:{confirming.target || '<process>'}</span> to{' '}
+            <span className={confirming.enabled ? 'text-state-success' : 'text-state-warning'}>
+              {confirming.enabled ? 'ENABLED' : 'DISABLED'}
+            </span>
+            . Provide an operator reason (will be recorded in AuditLog).
+          </p>
+          <label className="block text-xs text-zinc-400">
+            Reason
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. rotate credentials / incident response"
+              className="mt-1 w-full px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-100 focus:outline-none focus:border-accent-500"
+              aria-required="true"
+              minLength={3}
+            />
+          </label>
+          <div className="flex items-center gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming(null);
+                setReason('');
+              }}
+              className="px-3 py-1.5 rounded-md text-xs font-medium border border-surface-border text-zinc-300 hover:bg-surface-overlay transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void submit()}
+              disabled={pending !== null || reason.trim().length < 3}
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white transition disabled:opacity-50"
+            >
+              {pending ? 'Applying…' : 'Confirm'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CCAuditCorrelationPanel({ data }: { data: CommandCenterAuditCorrelation }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-state-info" />
+          Audit correlation ({data.count})
+        </h3>
+        <span className="text-[11px] text-zinc-500">
+          {new Date(data.windowStart).toLocaleString()} → {new Date(data.windowEnd).toLocaleString()}
+        </span>
+      </div>
+      {data.events.length === 0 ? (
+        <div className="card-surface p-8 text-center text-zinc-500 text-sm">
+          No correlated audit events in the selected window.
+        </div>
+      ) : (
+        <div className="card-surface overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="text-[10px] uppercase tracking-wide text-zinc-500 border-b border-surface-border">
+              <tr>
+                <th className="text-left px-3 py-2">Time</th>
+                <th className="text-left px-3 py-2">Action</th>
+                <th className="text-left px-3 py-2">Resource</th>
+                <th className="text-left px-3 py-2">Actor</th>
+                <th className="text-left px-3 py-2">Result</th>
+                <th className="text-left px-3 py-2">Correlation</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-border">
+              {data.events.map((e) => (
+                <tr key={e.id}>
+                  <td className="px-3 py-2 font-mono text-zinc-500 whitespace-nowrap">{new Date(e.occurredAt).toLocaleTimeString()}</td>
+                  <td className="px-3 py-2 text-zinc-200">{e.action}</td>
+                  <td className="px-3 py-2 text-zinc-400">
+                    {e.resource ?? '—'}
+                    {e.resourceId ? <span className="text-zinc-600"> · {e.resourceId}</span> : null}
+                  </td>
+                  <td className="px-3 py-2 text-zinc-400">{e.actor}</td>
+                  <td className="px-3 py-2">
+                    <span className={e.result === 'failure' ? 'text-state-danger' : 'text-state-success'}>{e.result}</span>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-zinc-500 truncate max-w-[180px]" title={e.correlationId ?? ''}>
+                    {e.correlationId ?? '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CCListCard({
+  title,
+  rows,
+  empty,
+  badgeColorFor,
+}: {
+  title: string;
+  rows: CCRow[];
+  empty: string;
+  badgeColorFor?: (badge: string) => BadgeVariant;
+}) {
+  return (
+    <div className="card-surface p-4 space-y-2">
+      <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">{title}</h3>
+      {rows.length === 0 ? (
+        <p className="text-xs text-zinc-500 py-3">{empty}</p>
+      ) : (
+        <ul className="divide-y divide-surface-border">
+          {rows.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm text-zinc-100 truncate">{r.primary}</p>
+                {r.secondary && (
+                  <p className="text-[11px] text-zinc-500 truncate">{r.secondary}</p>
+                )}
+              </div>
+              <StatusBadge
+                status={r.badge}
+                variant={badgeColorFor ? badgeColorFor(r.badge) : 'neutral'}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

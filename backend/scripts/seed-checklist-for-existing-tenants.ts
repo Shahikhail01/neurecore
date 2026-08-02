@@ -15,11 +15,12 @@
 
 import { PrismaClient } from '@prisma/client';
 import { ChecklistService } from '../src/modules/onboarding/checklist/checklist.service';
+import { PrismaService } from '../src/infrastructure/database/prisma.service';
 
 async function main() {
   const prisma = new PrismaClient();
   try {
-    const checklist = new ChecklistService(prisma);
+    const checklist = new ChecklistService(prisma as unknown as PrismaService);
 
     // Find all tenants who completed onboarding but don't yet have checklist rows.
     const candidates = await prisma.tenant.findMany({

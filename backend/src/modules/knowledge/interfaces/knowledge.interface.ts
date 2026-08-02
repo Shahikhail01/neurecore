@@ -110,7 +110,11 @@ export interface IRAGPipeline {
 export type RAGStreamEvent =
   | { type: 'start'; citations: RAGCitation[] }
   | { type: 'delta'; text: string }
-  | { type: 'done'; citations: RAGCitation[]; tokensUsed: { input: number; output: number; total: number } }
+  | {
+      type: 'done';
+      citations: RAGCitation[];
+      tokensUsed: { input: number; output: number; total: number };
+    }
   | { type: 'error'; message: string };
 
 export interface RAGPipelineOptions {
@@ -126,6 +130,68 @@ export interface RAGPipelineOptions {
   maxContextTokens?: number;
   /** α weight for vector similarity (β = 1 - α for BM25). Default 0.7. */
   vectorWeight?: number;
+  /**
+   * Minimum hybrid score (0..1) for a chunk to be cited. Default 0.2.
+   * Below this the chunk is discarded and the answer may abstain.
+   */
+  minCitationScore?: number;
+  /**
+   * Minimum coverage = cited_chunks / retrieved_chunks. Default 0.5.
+   * Below this the answer explicitly abstains.
+   */
+  minCoverage?: number;
+}
+
+/**
+ * GroundedAnswerContract — the v3.1 contract every knowledge answer
+ * MUST satisfy (plan §P2). The shape is a superset of {@link RAGAnswer}
+ * and adds claims, retrieval evidence, coverage/confidence, explicit
+ * limitations, and an abstention reason when the answer cannot be
+ * grounded.
+ */
+export interface GroundedClaim {
+  /** Stable id used to correlate with citations. */
+  readonly id: string;
+  readonly text: string;
+  readonly citationIds: string[];
+}
+
+export interface GroundedCitation {
+  readonly id: string;
+  readonly knowledgeEntryId: string;
+  readonly version: string;
+  readonly label: string;
+  /** Human-readable span (chunk index / page / section). */
+  readonly span: string;
+  readonly confidence: number;
+  /** ACL check result captured at retrieval time. */
+  readonly aclAllowed: boolean;
+  /** Auth-pointer the UI calls to re-authorize on click. */
+  readonly authPointer: string;
+}
+
+export interface RetrievalEvidence {
+  readonly queryTokens: number;
+  readonly retrievedChunks: number;
+  readonly citedChunks: number;
+  /** Tenant + capability + policy snapshot used for the retrieval. */
+  readonly policySnapshot: Record<string, unknown>;
+}
+
+export interface GroundedAnswerContract {
+  readonly answer: string;
+  readonly claims: GroundedClaim[];
+  readonly citations: GroundedCitation[];
+  readonly retrievalEvidence: RetrievalEvidence;
+  readonly confidence: number;
+  readonly coverage: number;
+  readonly limitations: string[];
+  /**
+   * Present when the answer abstains (coverage below threshold,
+   * retrieval empty, ACL revoked, etc.). When set, `answer` MUST be
+   * the explicit abstention message and `claims` MUST be empty.
+   */
+  readonly abstentionReason: string | null;
 }
 
 // ─── DI tokens ────────────────────────────────────────────────────────────

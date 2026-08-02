@@ -13,7 +13,7 @@
  * - Predictions via IPredictionProvider
  */
 
-import { Module, OnModuleInit, Logger } from '@nestjs/common';
+import { Module, OnModuleInit, Logger, forwardRef } from '@nestjs/common';
 import { ReadCapabilityRegistry } from './capabilities/read-capability-registry';
 import { SafeProjector } from './capabilities/safe-projector';
 import { MutationDispatcher } from './capabilities/mutation-dispatcher';
@@ -28,6 +28,10 @@ import { RoutingService } from './router/routing.service';
 import { WorkRuntimeModule } from '../work-runtime/work-runtime.module';
 import { RoutingDecisionsModule } from '../routing-decisions/routing-decisions.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
+import { MicrosoftGraphModule } from '../integrations/microsoft/microsoft-graph.module';
+import { ChatModule } from '../chat/chat.module';
+import { EventsModule } from '../events/events.module';
 import {
   READ_CAPABILITY_REGISTRY,
   MUTATION_DISPATCHER,
@@ -38,9 +42,28 @@ import {
   PredictionProvider,
   RecommendationProvider,
 } from './recommendations/prediction-recommendation.providers';
+import {
+  BrevoSender,
+  CalendarReceiver,
+  CalendarSender,
+  CrmReceiver,
+  EmailReceiver,
+  EmailSender,
+  TeamsSender,
+  WebChatReceiver,
+  WebChatSender,
+} from './channels/channel-adapters';
 
 @Module({
-  imports: [WorkRuntimeModule, RoutingDecisionsModule, AnalyticsModule],
+  imports: [
+    WorkRuntimeModule,
+    RoutingDecisionsModule,
+    AnalyticsModule,
+    IntegrationsModule,
+    MicrosoftGraphModule,
+    forwardRef(() => ChatModule),
+    EventsModule,
+  ],
   providers: [
     ReadCapabilityRegistry,
     { provide: READ_CAPABILITY_REGISTRY, useExisting: ReadCapabilityRegistry },
@@ -57,6 +80,15 @@ import {
     { provide: PREDICTION_PROVIDER, useExisting: PredictionProvider },
     RecommendationProvider,
     { provide: RECOMMENDATION_PROVIDER, useExisting: RecommendationProvider },
+    WebChatReceiver,
+    WebChatSender,
+    EmailReceiver,
+    EmailSender,
+    CalendarReceiver,
+    CalendarSender,
+    CrmReceiver,
+    BrevoSender,
+    TeamsSender,
   ],
   exports: [
     ReadCapabilityRegistry,
@@ -70,6 +102,15 @@ import {
     RoutingService,
     PREDICTION_PROVIDER,
     RECOMMENDATION_PROVIDER,
+    WebChatReceiver,
+    WebChatSender,
+    EmailReceiver,
+    EmailSender,
+    CalendarReceiver,
+    CalendarSender,
+    CrmReceiver,
+    BrevoSender,
+    TeamsSender,
   ],
 })
 export class ServiceGatewayV2Module implements OnModuleInit {

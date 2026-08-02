@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ChatController } from './chat.controller';
+import { SkillRegistryController } from './skill-registry.controller';
 import { ChatService } from './chat.service';
 import { ChatSseService } from './chat-sse.service';
 import { ChatHistoryService } from './chat-history.service';
@@ -22,10 +23,10 @@ import { RoutingDecisionsModule } from '../routing-decisions/routing-decisions.m
     MetricsModule,
     HermesAdapterModule,
     ChatResponseModule,
-    ServiceGatewayV2Module,
+    forwardRef(() => ServiceGatewayV2Module),
     RoutingDecisionsModule,
   ],
-  controllers: [ChatController],
+  controllers: [ChatController, SkillRegistryController],
   providers: [ChatService, ChatSseService, ChatHistoryService],
   exports: [ChatService, ChatHistoryService],
 })

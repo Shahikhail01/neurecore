@@ -18,6 +18,9 @@
  * opt-in via DB_AVAILABLE.
  */
 
+import { promises as fsPromises } from 'fs';
+import * as pathMod from 'path';
+
 import {
   CertificationHarness,
   newRunId,
@@ -95,8 +98,23 @@ export interface CertificationRun {
   scenarios: CertificationScenario[];
   results: CertificationResult[];
   gateG9: GateG9Summary;
+  parity?: ParityCertificationSummary;
+  gateP9?: import('./parity-v3/gate').GateP9Summary;
+  parityV3?: import('./parity-v3/parity-v3-runner').ParityV3RunReport;
   gateG7?: GateG7Summary;
   gateG7Report?: TenantIsolationProbeReport;
+}
+
+export interface ParityCertificationSummary {
+  baselinePath: string;
+  rtmPath: string;
+  capabilityCount: number;
+  mappedScenarioCount: number;
+  certifiedCapabilityCount: number;
+  uncertifiedCapabilityCount: number;
+  unmappedCapabilityIds: string[];
+  evidenceComplete: boolean;
+  releaseApproved: boolean;
 }
 
 export interface GateG9Summary {
@@ -317,6 +335,22 @@ export class CertificationRunner {
   }
 
   /**
+   * Attach a P9 parity-v3 report. Surfaced on the next
+   * `runCertification` call as `parityV3` + `gateP9`. Lets the
+   * integration spec feed a real DB-backed P9 report into the
+   * machine-readable output alongside G9 and G7.
+   */
+  attachParityV3(
+    report: import('./parity-v3/parity-v3-runner').ParityV3RunReport,
+  ): void {
+    this.latestParityV3 = report;
+  }
+
+  private latestParityV3:
+    | import('./parity-v3/parity-v3-runner').ParityV3RunReport
+    | null = null;
+
+  /**
    * Executes the certification run. The provided executor is the
    * application-code path under test (real command registry, real
    * Prisma, real outbox). The runner handles framing, failure
@@ -340,6 +374,11 @@ export class CertificationRunner {
     }
 
     run.gateG9 = computeGateG9(run.results);
+    run.parity = await buildParityCertificationSummary(run.results);
+    if (this.latestParityV3) {
+      run.parityV3 = this.latestParityV3;
+      run.gateP9 = this.latestParityV3.gateP9;
+    }
     if (this.latestGateG7Report) {
       run.gateG7 = computeGateG7(this.latestGateG7Report.results);
       run.gateG7Report = this.latestGateG7Report;
@@ -557,6 +596,13 @@ export function computeGateG9(results: CertificationResult[]): GateG9Summary {
   const releaseApproved =
     passed === total &&
     cleanRunPassRate >= 0.98 &&
+    rate(duplicates) >= 0.99 &&
+    rate(restarts) >= 0.99 &&
+    rate(transients) >= 0.9 &&
+    rate(revisions) >= 0.99 &&
+    rate(sessions) >= 0.99 &&
+    rate(sockets) >= 0.99 &&
+    rate(xtenant) === 1 &&
     zeroDuplicateEffects &&
     zeroCrossTenantExposure &&
     everyRunHasEvidence;
@@ -579,6 +625,80 @@ export function computeGateG9(results: CertificationResult[]): GateG9Summary {
     everyRunHasEvidence,
     releaseApproved,
   };
+}
+
+async function buildParityCertificationSummary(
+  results: CertificationResult[],
+): Promise<ParityCertificationSummary> {
+  const baselinePath = pathMod.resolve(
+    __dirname,
+    '../../../../memory-bank-new/docs/parity-v3/creatio-parity-baseline.yaml',
+  );
+  const rtmPath = pathMod.resolve(
+    __dirname,
+    '../../../../memory-bank-new/docs/parity-v3/requirements-traceability-matrix.yaml',
+  );
+  const [baseline, rtm] = await Promise.all([
+    fsPromises.readFile(baselinePath, 'utf8'),
+    fsPromises.readFile(rtmPath, 'utf8'),
+  ]);
+  const capabilityIds = [...baseline.matchAll(/^\s+- id: (CR-AI-\d+)/gm)].map(
+    (match) => match[1],
+  );
+  const rtmIds = [...rtm.matchAll(/^\s+- capability_id: (CR-AI-\d+)/gm)].map(
+    (match) => match[1],
+  );
+  const scenarioCount = new Set(
+    [...rtm.matchAll(/tests:\s*\[([^\]]*)\]/g)].flatMap((match) =>
+      match[1]
+        .split(',')
+        .map((value) => value.trim().replace(/^['"]|['"]$/g, ''))
+        .filter(Boolean),
+    ),
+  ).size;
+  const certified = capabilityIds.filter((id) => {
+    const baselineEntry = baseline.match(
+      new RegExp(`- id: ${id}[\\s\\S]*?status: ([A-Z_]+)`),
+    );
+    return baselineEntry?.[1] === 'CERTIFIED' && rtmIds.includes(id);
+  });
+  const unmappedCapabilityIds = capabilityIds.filter(
+    (id) => !rtmIds.includes(id),
+  );
+  const evidenceComplete =
+    results.length > 0 &&
+    results.every((result) => result.correlationTrail.length > 0);
+  const scenarioEvidenceComplete = results.every((result) => {
+    const expectedEntityKeys = result.metrics;
+    return (
+      result.passed &&
+      Object.keys(expectedEntityKeys).some((key) => key.startsWith('expected:'))
+    );
+  });
+  return {
+    baselinePath,
+    rtmPath,
+    capabilityCount: capabilityIds.length,
+    mappedScenarioCount: scenarioCount,
+    certifiedCapabilityCount: certified.length,
+    uncertifiedCapabilityCount: capabilityIds.length - certified.length,
+    unmappedCapabilityIds,
+    evidenceComplete,
+    releaseApproved:
+      evidenceComplete &&
+      scenarioEvidenceComplete &&
+      unmappedCapabilityIds.length === 0 &&
+      results.length > 0,
+  };
+}
+
+function duplicateSuppressionRate(results: CertificationResult[]): number {
+  return results.length === 0
+    ? 0
+    : results.filter(
+        (result) =>
+          result.passed && result.metrics['suppressed_duplicate'] === 1,
+      ).length / results.length;
 }
 
 export function classifyGateG9(g: GateG9Summary): {
@@ -606,6 +726,7 @@ export function classifyGateG9(g: GateG9Summary): {
     ['Session expiry resilience', g.sessionExpiryResilienceRate >= 0.99],
     ['Socket-disabled recovery', g.socketDisabledRecoveryRate >= 0.99],
     ['Cross-tenant denial', g.crossTenantDenialRate === 1],
+    ['Parity evidence complete', g.totalScenarios > 0],
   ];
   for (const [label, ok_] of rules) {
     (ok_ ? ok : failing).push(label);
@@ -632,4 +753,25 @@ export function classifyGateG9WithG7(
     releaseApproved: base.failing.length === 0 && g7v.failing.length === 0,
   };
   return combined;
+}
+
+/**
+ * Combined verdict across G9, G7 and P9. APPROVED only when all three
+ * gates pass. If P9 is absent (legacy call site) the function falls
+ * back to the G9+G7 verdict.
+ */
+export function classifyGateG9WithG7AndP9(
+  g9: GateG9Summary,
+  g7: GateG7Summary | undefined,
+  p9: import('./parity-v3/gate').GateP9Summary | undefined,
+): { ok: string[]; failing: string[]; releaseApproved: boolean } {
+  const combined = classifyGateG9WithG7(g9, g7);
+  if (!p9) return combined;
+  const p9Ok = p9.rules.filter((r) => r.ok).map((r) => `P9:${r.id}`);
+  const p9Fail = p9.rules.filter((r) => !r.ok).map((r) => `P9:${r.id}`);
+  return {
+    ok: [...combined.ok, ...p9Ok],
+    failing: [...combined.failing, ...p9Fail],
+    releaseApproved: combined.releaseApproved && p9.approved,
+  };
 }

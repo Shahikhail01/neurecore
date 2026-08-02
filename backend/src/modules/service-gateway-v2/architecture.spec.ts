@@ -29,6 +29,13 @@ const GATEWAY_DIRS = [
   'recommendations',
   'certification',
 ];
+
+// P0-001: scan critical modules outside the gateway for wildcard
+// tenantId branches. The agents.service.ts bug was caught by extending
+// the audit here; keeping it in this list is a regression guard.
+const CROSS_GATEWAY_WILDCARD_FILES: ReadonlyArray<string> = [
+  join(__dirname, '..', 'agents', 'services', 'agents.service.ts'),
+];
 const FORBIDDEN_PRISMA_PATTERNS = [
   /import.*from ['"]@prisma\/client/,
   /this\.prisma\./,
@@ -165,6 +172,29 @@ async function runTests(): Promise<TestResult[]> {
       }
     }
   }
+  // P0-001: also scan the cross-gateway files that historically
+  // accepted the wildcard. The agents.service.ts fix is a regression
+  // guard — if anyone reintroduces the branch, this test fails.
+  for (const file of CROSS_GATEWAY_WILDCARD_FILES) {
+    try {
+      const content = await readFile(file, 'utf-8');
+      const matches = content.match(/tenantId\s*[:=]\s*['"`]\*['"`]/g);
+      if (matches) {
+        for (const m of matches) {
+          tenantWildcardTest.passed = false;
+          tenantWildcardTest.violations.push({ file, match: m });
+        }
+      }
+    } catch {
+      // file missing — treat as a violation so the audit fails
+      // loudly rather than silently passing.
+      tenantWildcardTest.passed = false;
+      tenantWildcardTest.violations.push({
+        file,
+        match: 'audit target missing',
+      });
+    }
+  }
   results.push(tenantWildcardTest);
 
   const prismaTest: TestResult = {
@@ -172,6 +202,29 @@ async function runTests(): Promise<TestResult[]> {
     passed: true,
     violations: [],
   };
+
+  // P0-001: connector adapters must never contain a "STUB IMPLEMENTATION"
+  // marker. Any silent-success stub is a fabricated external effect.
+  // The HubSpot / Pipedrive / Salesforce adapters block in production
+  // but must not be silently no-op in tests.
+  const connectorStubTest: TestResult = {
+    name: 'NO_CONNECTOR_STUB_MARKERS',
+    passed: true,
+    violations: [],
+  };
+  const connectorDir = join(V2_ROOT, 'connectors', 'adapters');
+  const connectorFiles = await collectFiles(connectorDir);
+  for (const file of connectorFiles) {
+    const content = await readFile(file, 'utf-8');
+    if (/STUB IMPLEMENTATION/i.test(content)) {
+      connectorStubTest.passed = false;
+      connectorStubTest.violations.push({
+        file,
+        match: 'STUB IMPLEMENTATION marker present',
+      });
+    }
+  }
+  results.push(connectorStubTest);
 
   for (const subDir of GATEWAY_DIRS) {
     const dir = join(V2_ROOT, subDir);

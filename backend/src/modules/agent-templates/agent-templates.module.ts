@@ -8,9 +8,23 @@ import { AgentTemplateCertificationRepository } from './agent-template-certifica
 import { AgentLifecycleAuditRepository } from './agent-lifecycle-audit.repository';
 import { AgentTemplateLifecycleService } from './agent-template-lifecycle.service';
 import { AgentSkillBuilderService } from './agent-skill-builder.service';
+import { OobAgentRegistrationService } from './services/oob-agent-registration.service';
+import { SkillGraphService } from './services/skill-graph.service';
+import {
+  NlDraftService,
+  DeterministicDraftSynthesizer,
+  DRAFT_SYNTHESIZER,
+} from './services/nl-draft.service';
+import { SkillSimulationService } from './services/skill-simulation.service';
+import { SkillVersionDiffService } from './services/skill-version-diff.service';
+import { SkillComposerController } from './controllers/skill-composer.controller';
 
 @Module({
-  controllers: [AgentTemplatesController, AgentSkillsController],
+  controllers: [
+    AgentTemplatesController,
+    AgentSkillsController,
+    SkillComposerController,
+  ],
   providers: [
     AgentTemplatesService,
     AgentTemplateVersionRepository,
@@ -19,11 +33,23 @@ import { AgentSkillBuilderService } from './agent-skill-builder.service';
     AgentLifecycleAuditRepository,
     AgentTemplateLifecycleService,
     AgentSkillBuilderService,
+    OobAgentRegistrationService,
+    SkillGraphService,
+    NlDraftService,
+    SkillSimulationService,
+    SkillVersionDiffService,
+    DeterministicDraftSynthesizer,
+    { provide: DRAFT_SYNTHESIZER, useExisting: DeterministicDraftSynthesizer },
   ],
   exports: [
     AgentTemplatesService,
     AgentTemplateLifecycleService,
     AgentSkillBuilderService,
+    OobAgentRegistrationService,
+    SkillGraphService,
+    NlDraftService,
+    SkillSimulationService,
+    SkillVersionDiffService,
     AgentTemplateVersionRepository,
     AgentSkillDefinitionRepository,
     AgentTemplateCertificationRepository,

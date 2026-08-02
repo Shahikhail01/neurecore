@@ -70,11 +70,23 @@ export class AgentsService implements IAgentService {
     } = filter;
     const skip = (page - 1) * limit;
 
-    // FIX-010: tenantId is optional for platform-level cross-tenant queries
-    // (controlled by @Roles + TenantContextGuard upstream). When absent
-    // or set to the '*' wildcard, the tenant filter is skipped.
+    // P9/P0-001: tenantId MUST be a real UUID. The '*' wildcard is
+    // forbidden because it would silently disable the tenant filter
+    // and leak agents across tenants. Platform-level cross-tenant
+    // queries are explicitly out of scope for this method and must
+    // use a dedicated admin surface that does not bypass tenant
+    // scoping. An undefined tenantId is also rejected: the WHERE
+    // clause is required to carry a tenantId value or the query is
+    // fail-closed (Prisma will return zero rows because the agent
+    // table has tenantId NOT NULL).
+    if (tenantId === undefined || tenantId === null || tenantId === '') {
+      throw new Error('TENANT_ID_REQUIRED');
+    }
+    if (tenantId === '*') {
+      throw new Error('TENANT_WILDCARD_FORBIDDEN');
+    }
     const where: Record<string, unknown> = {
-      ...(tenantId && tenantId !== '*' ? { tenantId } : {}),
+      tenantId,
       ...(departmentId ? { departmentId } : {}),
       ...(status && { status }),
       ...(type && { type }),
@@ -152,8 +164,8 @@ export class AgentsService implements IAgentService {
     // per-tenant overrides.
     const defaultModel =
       process.env['DEFAULT_AGENT_MODEL'] &&
-      process.env['DEFAULT_AGENT_MODEL']!.length > 0
-        ? process.env['DEFAULT_AGENT_MODEL']!
+      process.env['DEFAULT_AGENT_MODEL'].length > 0
+        ? process.env['DEFAULT_AGENT_MODEL']
         : 'gpt-4o-mini';
 
     // Auto-generate profile if metadata is not provided
@@ -331,8 +343,15 @@ export class AgentsService implements IAgentService {
     inputs: CreateAgentInput[],
     userId: string,
     tenantId: string,
-  ): Promise<Array<{ agent?: unknown; error?: string; index: number; name?: string }>> {
-    const results: Array<{ agent?: unknown; error?: string; index: number; name?: string }> = [];
+  ): Promise<
+    Array<{ agent?: unknown; error?: string; index: number; name?: string }>
+  > {
+    const results: Array<{
+      agent?: unknown;
+      error?: string;
+      index: number;
+      name?: string;
+    }> = [];
     for (let i = 0; i < inputs.length; i++) {
       try {
         const agent = await this.create(inputs[i], userId, tenantId);

@@ -1,3 +1,24 @@
+/**
+ * PredictionService — Phase 5 P5 (lifecycle-aware)
+ *
+ * Same Prediction contract as before:
+ *   - canonical abstention envelope;
+ *   - calibrated http/linear/baseline scoring via CalibratedAnalyticsProvider;
+ *   - feature-snapshot gating (coverage, freshness);
+ *   - provenance + limitations on every emission.
+ *
+ * NEW: refuses to score on a model that has not completed the 11-stage
+ * Model Lifecycle Service. The check is performed on every predict()
+ * call by reading the `metadata.lifecycle.stages[]` snapshot
+ * persisted by ModelLifecycleService. Production readiness requires
+ *   - gated-production = COMPLETE
+ *   - monitoring        = IN_PROGRESS | COMPLETE
+ *
+ * Tenant isolation: every read of feature snapshots, analytics models,
+ * and the calibrated provider is filtered by tenantId via the
+ * canonical repositories. Cross-tenant ids are silently absent.
+ */
+
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { FeatureSnapshotRepository } from './featureSnapshot.repository';
@@ -56,8 +77,6 @@ export class PredictionService implements IPredictionProvider {
       );
     }
 
-    // Pin a model: prefer the snapshot's modelId, otherwise the
-    // first analytics model registered for the tenant.
     let modelId = latest.modelId ?? '';
     let modelVersion = latest.modelVersion ?? 'unknown';
     if (!modelId) {
@@ -70,6 +89,17 @@ export class PredictionService implements IPredictionProvider {
       }
       modelId = fallback.id;
       modelVersion = fallback.version;
+    }
+
+    const lifecycleReady = await this.isLifecycleProductionReady(
+      modelId,
+      tenantId,
+    );
+    if (!lifecycleReady) {
+      return this.abstain(
+        input,
+        'abstain: model has not completed gated-production/monitoring lifecycle stages',
+      );
     }
 
     const scored = await this.calibrated.score(
@@ -112,6 +142,26 @@ export class PredictionService implements IPredictionProvider {
         'snapshot age is computed at prediction time only',
       ],
     };
+  }
+
+  private async isLifecycleProductionReady(
+    modelId: string,
+    tenantId: string,
+  ): Promise<boolean> {
+    const model = await this.prisma.analyticsModel.findFirst({
+      where: { id: modelId, OR: [{ tenantId }, { tenantId: null }] },
+    });
+    if (!model) return false;
+    const lifecycle = (model.metadata ?? {}) as {
+      lifecycle?: { stages?: Array<{ stage: string; status: string }> };
+    };
+    const stages = lifecycle.lifecycle?.stages ?? [];
+    const gated = stages.find((s) => s.stage === 'gated-production')?.status;
+    const monitor = stages.find((s) => s.stage === 'monitoring')?.status;
+    return (
+      gated === 'COMPLETE' &&
+      (monitor === 'IN_PROGRESS' || monitor === 'COMPLETE')
+    );
   }
 
   private abstain(input: PredictionInput, reason: string): Prediction {

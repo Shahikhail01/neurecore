@@ -14,6 +14,7 @@ import type {
 import type { ChatMessage, ChatConfig } from '@/shared/types/chat.types';
 import { useChatStore } from '@/core/services/chat/chat.factory';
 import type { IEnvelopeParser, Envelope } from '@/core/services/chat/envelope/interfaces/IEnvelopeParser';
+import type { PageContext } from '@/shared/contexts/page-context';
 
 let _msgId = 0;
 function generateId(): string {
@@ -26,7 +27,7 @@ export function useChat(
   jsonExtractor: IJsonExtractor,
   envelopeParser: IEnvelopeParser,
   _config: ChatConfig,
-  pageContext?: string,
+  pageContext?: PageContext,
 ) {
   const messagesRaw = useChatStore((s) => s.messages);
   const messages = Array.isArray(messagesRaw) ? messagesRaw : [];
@@ -84,7 +85,7 @@ export function useChat(
           const response = await chatService.sendMessage({
             message: content.trim(),
             conversationId: conversationId ?? undefined,
-            context: { pageContext, slashContext: context },
+            context: { pageContext, slashContext: context, userLocale: pageContext?.userLocale, userTimeZone: pageContext?.userTimeZone },
           });
           const pending = response.autonomousExecution?.pendingApproval;
           updateMessage(assistantMsg.id, {
@@ -119,7 +120,7 @@ export function useChat(
         {
           message: content.trim(),
           conversationId: conversationId ?? undefined,
-          context: { pageContext, slashContext: context },
+          context: { pageContext, slashContext: context, userLocale: pageContext?.userLocale, userTimeZone: pageContext?.userTimeZone },
         },
         (text) => {
           accumulatedContent.push(text);

@@ -1,13 +1,11 @@
 import { ICRMConnector } from '../interfaces/ICRMConnector';
 
 /**
- * SalesforceConnector — STUB IMPLEMENTATION
+ * SalesforceConnector
  *
- * PRODUCTION-BLOCKED: PD-21
- *
- * The OAuth flow and token storage are NOT implemented. This adapter
- * silently succeeds without actually connecting to Salesforce.
- * Do not enable in production until OAuth flow is implemented.
+ * PRODUCTION-BLOCKED: PD-21 — OAuth flow is not yet implemented.
+ * In production the adapter fails closed (throws). Outside production
+ * (development, tests) it is a no-op so dev workflows are not broken.
  * Tracked in pending-tasks.md PD-21.
  */
 
@@ -32,12 +30,19 @@ export class SalesforceConnector implements ICRMConnector {
 
   async syncContacts(_tenantId: string): Promise<void> {
     if (process.env['NODE_ENV'] === 'production') {
-      throw new Error('SalesforceConnector: not implemented in production (PD-21)');
+      throw new Error(
+        'SalesforceConnector: not implemented in production (PD-21)',
+      );
     }
     return Promise.resolve();
   }
 
   async syncLeads(_tenantId: string): Promise<void> {
+    if (process.env['NODE_ENV'] === 'production') {
+      throw new Error(
+        'SalesforceConnector: not implemented in production (PD-21)',
+      );
+    }
     return Promise.resolve();
   }
 }

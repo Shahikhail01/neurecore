@@ -39,6 +39,7 @@ export class ChatService implements IChatService {
         provider?: string;
         liveData?: Record<string, unknown>;
         autonomousExecution?: ChatResponse['autonomousExecution'];
+        provenance?: import('@/shared/types/chat.types').ChatProvenance;
       }>(this.config.apiEndpoint, {
         message: request.message,
         conversationId: request.conversationId ?? undefined,
@@ -106,6 +107,7 @@ export class ChatService implements IChatService {
         chartType,
         suggestions,
         autonomousExecution: response.autonomousExecution,
+        provenance: response.provenance,
       };
     } catch (err) {
       // Network errors, parse errors, or unexpected exceptions.

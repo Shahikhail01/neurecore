@@ -7,15 +7,20 @@
  *   - Controllers: KnowledgeController
  *   - Providers: ChunkingService, EmbeddingsService, PgVectorStore,
  *                HybridSearchService, RAGPipeline, RagAskSseService,
- *                KnowledgeService, KnowledgeRagAskGuard
+ *                KnowledgeService, KnowledgeRagAskGuard,
+ *                ParserRegistry + parsers, FileCipher, FileIngestionService,
+ *                RetentionService, KnowledgeSecurityEventService
  *   - Module dependencies: TenantContextModule (global), ModelsModule
  *     (LLMFactory). CacheModule is @Global so RedisService is available
- *     without an explicit import.
+ *     without an explicit import. AuditModule is @Global.
  *
  * Exports:
  *   - KnowledgeService, RAGPipeline, HybridSearchService — so other
  *     modules (capabilities/intelligence, future Solution Packs) can
  *     re-use the RAG pipeline without duplicating it.
+ *   - Phase P2: FileIngestionService, RetentionService,
+ *     KnowledgeSecurityEventService, ParserRegistry so Meetings (P3),
+ *     Chat and Tools modules can consume them through one owner.
  */
 
 import { Module } from '@nestjs/common';
@@ -41,9 +46,6 @@ import { ModelsModule } from '../models/models.module';
     RagAskSseService,
     KnowledgeRagAskGuard,
     ...knowledgeProviders,
-    // Phase 7 G1 — IndustryKnowledgeSeeder is exported so OnboardingModule
-    // (which already imports KnowledgeModule for the RAG pipeline) can
-    // consume it via the standard provider DI binding.
   ],
 })
 export class KnowledgeModule {}

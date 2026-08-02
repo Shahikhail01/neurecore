@@ -25,7 +25,8 @@ describe('DepartmentsPoolService — Phase 10 Departments Pool', () => {
     it('hides legacy-tier rows by default', () => {
       const where = service['config'].buildWhere({});
       expect(where).toHaveProperty('NOT');
-      expect((where as { NOT: { category: string } }).NOT.category).toBe('legacy-tier');
+      // post-P13: legacy-tier was collapsed to DepartmentTemplateCategory.OTHER
+      expect((where as { NOT: { category: string } }).NOT.category).toBe('OTHER');
     });
 
     it('filters by category from status', () => {

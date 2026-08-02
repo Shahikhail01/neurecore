@@ -1,13 +1,11 @@
 import { ICRMConnector } from '../interfaces/ICRMConnector';
 
 /**
- * HubSpotConnector — STUB IMPLEMENTATION
+ * HubSpotConnector
  *
- * PRODUCTION-BLOCKED: PD-21
- *
- * The OAuth2 token exchange and API calls are NOT implemented.
- * This adapter silently succeeds without connecting to HubSpot.
- * Do not enable in production until OAuth flow is implemented.
+ * PRODUCTION-BLOCKED: PD-21 — OAuth2 flow is not yet implemented.
+ * In production the adapter fails closed (throws). Outside production
+ * (development, tests) it is a no-op so dev workflows are not broken.
  * Tracked in pending-tasks.md PD-21.
  */
 export class HubSpotConnector implements ICRMConnector {
@@ -33,7 +31,9 @@ export class HubSpotConnector implements ICRMConnector {
   async syncContacts(_tenantId: string): Promise<void> {
     void _tenantId.length;
     if (process.env['NODE_ENV'] === 'production') {
-      throw new Error('HubSpotConnector: not implemented in production (PD-21)');
+      throw new Error(
+        'HubSpotConnector: not implemented in production (PD-21)',
+      );
     }
     // GET https://api.hubapi.com/crm/v3/objects/contacts?limit=100
     return Promise.resolve();
@@ -42,7 +42,9 @@ export class HubSpotConnector implements ICRMConnector {
   async syncLeads(_tenantId: string): Promise<void> {
     void _tenantId.length;
     if (process.env['NODE_ENV'] === 'production') {
-      throw new Error('HubSpotConnector: not implemented in production (PD-21)');
+      throw new Error(
+        'HubSpotConnector: not implemented in production (PD-21)',
+      );
     }
     // GET https://api.hubapi.com/crm/v3/objects/deals
     return Promise.resolve();

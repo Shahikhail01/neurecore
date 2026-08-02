@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { AgentsService } from './services/agents.service';
 import { FlexibleIdPipe } from '../../common/pipes/flexible-id.pipe';
@@ -67,13 +68,13 @@ export class AgentsController {
     @Query('status') status?: AgentStatus,
     @Query('type') type?: AgentType,
   ): Promise<PaginatedResponse<AgentResponseDto>> {
-    // FIX-010: platform roles get '*' wildcard → cross-tenant query.
-    // Non-platform roles use JWT tenantId. Services skip tenant filter for '*'.
-    const tenantId = user.tenantId
-      ? user.tenantId
-      : PLATFORM_ROLES_AGENTS.has(user.role)
-        ? '*'
-        : undefined;
+    // P9/P0-001: every agent list query MUST be tenant-scoped. The
+    // previous '*' wildcard branch was a real cross-tenant bypass and
+    // is removed. Platform roles use the dedicated /platform surface;
+    // this endpoint always requires a real tenantId from the JWT.
+    if (!user.tenantId) {
+      throw new NotFoundException('Tenant context required');
+    }
     const { data, total, page, limit } = await this.agentsService.findAll(
       {
         departmentId,
@@ -82,7 +83,7 @@ export class AgentsController {
         page: pagination.page,
         limit: pagination.limit,
       },
-      tenantId,
+      user.tenantId,
     );
 
     return {

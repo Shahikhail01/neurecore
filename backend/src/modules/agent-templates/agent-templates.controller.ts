@@ -32,6 +32,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import type { JwtPayload } from '../auth/interfaces/token.interface';
 import type { AgentType } from '@prisma/client';
 import { UserRole } from '@prisma/client';
+import { OobAgentRegistrationService } from './services/oob-agent-registration.service';
 
 /**
  * AgentTemplatesController  — /api/v1/agent-templates
@@ -45,6 +46,7 @@ export class AgentTemplatesController {
   constructor(
     private readonly templatesService: AgentTemplatesService,
     private readonly lifecycle: AgentTemplateLifecycleService,
+    private readonly oob: OobAgentRegistrationService,
   ) {}
 
   // ─── Platform (SUPER_ADMIN) ──────────────────────────────────────────────
@@ -352,5 +354,35 @@ export class AgentTemplatesController {
       tenantId: user.tenantId,
       templateId: id,
     });
+  }
+
+  // ─── Phase 4 P4 — OOTB agent provisioning ──────────────────────────────
+  //
+  // Endpoint exposed for tenant provisioning + admin verification. ADMIN
+  // / OWNER / SUPER_ADMIN can list OOTB agents, register them in the
+  // database (idempotent), or activate a single agent by stableId. The
+  // endpoint never trusts a tenant id from the body — the caller's
+  // tenantId comes from the JWT.
+
+  @Get('oob/list')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.PLATFORM_ADMIN,
+    UserRole.SUPPORT,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.USER,
+  )
+  listOobAgents() {
+    return this.oob.registerAll();
+  }
+
+  @Post('oob/:stableId/activate')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.PLATFORM_ADMIN, UserRole.OWNER)
+  activateOobAgent(
+    @Param('stableId') stableId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.oob.activate(stableId, user.sub);
   }
 }
