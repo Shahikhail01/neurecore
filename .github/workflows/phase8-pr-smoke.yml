@@ -1,0 +1,74 @@
+name: Phase 8 PR Smoke
+
+# This lane runs Phase 8 conformance in-process and produces a SIMULATED
+# capacity report. It MUST NOT claim production capacity.
+#
+# - Triggers on PR changes to backend/src/harness/phase8/**
+# - Runs `pnpm certify:phase8` (Jest, in-process only)
+# - Renders the standalone runner report (SIMULATED_NO_PRODUCTION_CLAIM)
+# - Annotates the workflow with an honest summary: "SIMULATED, not production"
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/harness/phase8/**'
+      - '.github/workflows/phase8-pr-smoke.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/src/harness/phase8/**'
+      - '.github/workflows/phase8-pr-smoke.yml'
+
+jobs:
+  phase8-pr-smoke:
+    name: Phase 8 conformance (in-process, SIMULATED)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      PHASE8_HONEST_NO_PRODUCTION_CLAIM: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint (max-warnings=0)
+        run: npx eslint "src/harness/phase8/**/*.ts" --max-warnings=0
+
+      - name: Phase 8 conformance suite
+        run: pnpm certify:phase8
+
+      - name: Render standalone Phase 8 report (SIMULATED)
+        run: pnpm certify:phase8:report
+
+      - name: Annotate honest summary
+        if: always()
+        run: |
+          {
+            echo "### Phase 8 PR Smoke Summary"
+            echo ""
+            echo "- **Verdict:** SIMULATED_NO_PRODUCTION_CLAIM"
+            echo "- **No real SLO/SRE approval implied.**"
+            echo "- **Release capacity gate is fail-closed by design** (see PHASE8-CAPACITY-REPORT.md)."
+            echo "- **No production adapter is registered;** all 11 production adapters stamp UNSUPPORTED."
+            echo "- **CI lane cannot authorize release promotion.**"
+            echo "- **Tests:** all conformance specs must pass for merge."
+            echo ""
+            echo "_Do not interpret a green Phase 8 PR smoke as production capacity._"
+          } >> "$GITHUB_STEP_SUMMARY"

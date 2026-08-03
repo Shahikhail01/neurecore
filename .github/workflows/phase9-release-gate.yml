@@ -1,0 +1,87 @@
+name: Phase 9 Release Gate (CI, SIMULATED)
+
+# This lane runs Phase 9 conformance + the standalone release-gate runner in CI.
+# It MUST NOT claim production release authority.
+#
+# - Triggers on PR changes to backend/src/harness/phase9/** AND CI workflows
+# - Consumes the existing 105-scenario Phase 9 G9 matrix as one source of evidence
+# - Runs `pnpm certify:phase9:verdict` (Jest, in-process only)
+# - Runs `pnpm certify:phase9:release-gate` (standalone runner, SIMULATED)
+# - Annotates the workflow with an honest summary: "SIMULATED, not production"
+#
+# External blockers (NOT addressed by this workflow):
+#   - Release Engineering sign-off
+#   - Security and Compliance approval
+#   - SRE/Platform capacity approval
+#   - Capability-owner attestation
+#   - Independent reviewer acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/harness/phase9/**'
+      - '.github/workflows/phase9-release-gate.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/src/harness/phase9/**'
+      - '.github/workflows/phase9-release-gate.yml'
+
+jobs:
+  phase9-release-gate:
+    name: Phase 9 release gate (in-process, SIMULATED)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      PHASE9_HONEST_NO_RELEASE_AUTHORITY: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript typecheck (Phase 9)
+        run: npx tsc --project tsconfig.phase9.json
+
+      - name: Lint (max-warnings=0)
+        run: npx eslint "src/harness/phase9/**/*.ts" --max-warnings=0
+
+      - name: Phase 9 conformance suite
+        run: pnpm certify:phase9:verdict
+
+      - name: Render standalone Phase 9 release-gate report (SIMULATED)
+        run: pnpm certify:phase9:release-gate
+
+      - name: Annotate honest summary
+        if: always()
+        run: |
+          {
+            echo "### Phase 9 Release Gate Summary (CI, SIMULATED)"
+            echo ""
+            echo "- **Verdict:** SIMULATED — cannot authorize production release."
+            echo "- **No Release Engineering sign-off is implied.**"
+            echo "- **No Security or Compliance approval is implied.**"
+            echo "- **No SRE/Platform capacity approval is implied.**"
+            echo "- **No capability-owner attestation is implied.**"
+            echo "- **No independent reviewer acceptance is implied.**"
+            echo "- **All 7 Phase 9 production adapters stamp UNREGISTERED.**"
+            echo "- **Consumes the existing 105-scenario G9 matrix as evidence source.**"
+            echo "- **Phase 9 release gate is fail-closed by design** (see PHASE9-COMPLETION.md)."
+            echo "- **CI lane cannot authorize release promotion.**"
+            echo "- **Tests:** all conformance specs must pass for merge."
+            echo ""
+            echo "_Do not interpret a green Phase 9 CI run as production release authority._"
+          } >> "$GITHUB_STEP_SUMMARY"

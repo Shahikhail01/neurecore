@@ -1,0 +1,93 @@
+name: Phase 8 Nightly (SIMULATED)
+
+# Nightly lane that runs the full Phase 8 conformance + the standalone
+# runner, which produces a SIMULATED capacity report.
+#
+# This lane is INTENTIONALLY SIMULATED: there is no real staging or
+# production environment wired into the harness. The nightly lane will
+# always produce a `SIMULATED_NO_PRODUCTION_CLAIM` verdict and WILL NOT
+# authorize release promotion. It exists to detect regressions in the
+# in-process harness, alert port, retention/restore, and integrity
+# verification.
+#
+# - Schedule: nightly at 03:00 UTC
+# - Cannot be tricked into a real capacity claim
+# - Annotates the workflow honestly even on success
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  phase8-nightly:
+    name: Phase 8 nightly (SIMULATED)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      PHASE8_HONEST_NO_PRODUCTION_CLAIM: '1'
+      PHASE8_LANE: NIGHTLY
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint "src/harness/phase8/**/*.ts" --max-warnings=0
+
+      - name: Phase 8 conformance (nightly, full matrix)
+        run: pnpm certify:phase8
+
+      - name: Render nightly capacity report
+        run: pnpm certify:phase8:report
+
+      - name: Verify report integrity + retention + round-trip
+        run: |
+          set -euo pipefail
+          REPORT_DIR=src/test/certification/reports/phase8
+          if [ ! -d "$REPORT_DIR" ]; then
+            echo "No report directory produced"
+            exit 1
+          fi
+          INTEGRITY=$(ls "$REPORT_DIR"/*-integrity.json 2>/dev/null | head -1 || true)
+          if [ -z "$INTEGRITY" ]; then
+            echo "No integrity report produced"
+            exit 1
+          fi
+          echo "Integrity report: $INTEGRITY"
+          cat "$INTEGRITY"
+          TAMPERED=$(node -e "const j=require('./$INTEGRITY'); if (j.tampered) { console.error('TAMPERED'); process.exit(2); }")
+          ROUNDTRIP=$(node -e "const j=require('./$INTEGRITY'); if (!j.roundTrip.checksumOk) { console.error('ROUND_TRIP_FAIL'); process.exit(3); }")
+          RETENTION=$(node -e "const j=require('./$INTEGRITY'); if (!j.retention.kept) { console.error('RETENTION_PURGED'); process.exit(4); }")
+          echo "Integrity OK; not tampered; round-trip OK; retention kept."
+
+      - name: Annotate honest nightly summary
+        if: always()
+        run: |
+          {
+            echo "### Phase 8 Nightly Summary"
+            echo ""
+            echo "- **Lane:** NIGHTLY"
+            echo "- **Verdict:** SIMULATED_NO_PRODUCTION_CLAIM (expected; no real env wired)"
+            echo "- **Cannot authorize release.**"
+            echo "- **What this run proves:** in-process harness still produces schema-valid evidence, integrity-verifiable reports, retention-kept reports."
+            echo "- **What this run does NOT prove:** any production or staging capacity."
+            echo "- **External blockers (still open):** no approved SLO policy; no SRE/Platform sign-off; no production adapter registered."
+          } >> "$GITHUB_STEP_SUMMARY"

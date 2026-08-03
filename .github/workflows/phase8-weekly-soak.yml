@@ -1,0 +1,89 @@
+name: Phase 8 Weekly Soak (SIMULATED)
+
+# Weekly soak lane. INTENTIONALLY SIMULATED.
+#
+# This workflow exists so the harness keeps a weekly rhythm and a record
+# of in-process soaks; it MUST NOT claim production capacity. The
+# `phase8-weekly-soak` job runs the full default profile matrix once per
+# week and records the report.
+#
+# If a real staging or production adapter is registered (none is, as of
+# 2026-08-03), the workflow will refuse to claim a non-SIMULATED
+# capacity verdict and will FAIL the lane. The lane is honest-by-design.
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+jobs:
+  phase8-weekly-soak:
+    name: Phase 8 weekly soak (SIMULATED, fail-closed)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      PHASE8_HONEST_NO_PRODUCTION_CLAIM: '1'
+      PHASE8_LANE: WEEKLY_SOAK
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint "src/harness/phase8/**/*.ts" --max-warnings=0
+
+      - name: Phase 8 conformance (weekly, full matrix)
+        run: pnpm certify:phase8
+
+      - name: Render weekly soak report
+        run: pnpm certify:phase8:report
+
+      - name: Assert SIMULATED_NO_PRODUCTION_CLAIM
+        run: |
+          set -euo pipefail
+          REPORT_DIR=src/test/certification/reports/phase8
+          CAP=$(ls "$REPORT_DIR"/*-capacity.json 2>/dev/null | head -1 || true)
+          if [ -z "$CAP" ]; then
+            echo "No capacity report produced"
+            exit 1
+          fi
+          VERDICT=$(node -e "console.log(require('./$CAP').verdict)")
+          echo "Weekly capacity verdict: $VERDICT"
+          if [ "$VERDICT" != "SIMULATED_NO_PRODUCTION_CLAIM" ]; then
+            echo "::error::Weekly soak produced a non-simulated verdict ($VERDICT). The simulated weekly lane must NOT claim real capacity; check production adapter registrations."
+            exit 2
+          fi
+
+      - name: Annotate honest weekly summary
+        if: always()
+        run: |
+          {
+            echo "### Phase 8 Weekly Soak Summary"
+            echo ""
+            echo "- **Lane:** WEEKLY_SOAK"
+            echo "- **Verdict:** SIMULATED_NO_PRODUCTION_CLAIM (intentional; no real env)"
+            echo "- **This run CANNOT authorize production capacity.**"
+            echo "- **What we test:** weekly cadence of the in-process harness, soak profile windows, integrity, retention."
+            echo "- **External prerequisites for a real weekly soak:**"
+            echo "  - Registered production-like staging adapter"
+            echo "  - Approved SLO policy with `approvedEnvironment=STAGING`"
+            echo "  - SRE/Platform capacity sign-off"
+            echo "  - These are NOT in place; the weekly lane is honest-by-design."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,71 @@
+name: Phase 9 STAGING Evidence
+
+# Phase 9 STAGING-class evidence promotion lane.
+#
+# Runs STAGING-class evidence conformance plus the standalone release-gate
+# runner with PHASE9_STAGING_MODE=1.
+#
+# - Triggers on PR changes to backend/src/harness/phase9/**
+# - Runs `pnpm certify:phase9:staging:all`
+# - Annotates the workflow summary with the honest STAGING framing.
+# - MUST FAIL if environmentClass !== STAGING or any Phase 9 production
+#   adapter reports UNREGISTERED.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/harness/phase9/**'
+      - 'memory-bank-arc/harness/PHASE9-COMPLETION.md'
+      - 'memory-bank-arc/harness/adrs/ADR-006**'
+      - 'memory-bank-arc/harness/adrs/ADR-007**'
+      - 'memory-bank-arc/harness/adrs/ADR-008**'
+      - 'memory-bank-arc/harness/adrs/ADR-009**'
+      - 'memory-bank-arc/harness/adrs/ADR-010**'
+      - 'memory-bank-arc/harness/adrs/ADR-011**'
+      - 'memory-bank-arc/harness/runbooks/phase9-release-gate.md'
+      - '.github/workflows/phase9-staging-evidence.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/src/harness/phase9/**'
+      - '.github/workflows/phase9-staging-evidence.yml'
+
+jobs:
+  phase9-staging-evidence:
+    name: Phase 9 STAGING evidence (conformance + release-gate)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      PHASE9_STAGING_MODE: '1'
+      PHASE9_EVIDENCE_SOURCE: 'staging'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Phase 9 STAGING conformance
+        run: pnpm certify:phase9:staging
+
+      - name: Phase 9 release-gate (STAGING class)
+        run: PHASE9_STAGING_MODE=1 pnpm exec ts-node src/harness/phase9/run-phase9-certification.ts
+
+      - name: Annotate STAGING framing
+        if: always()
+        run: |
+          echo "## Phase 9 STAGING-class evidence" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- environmentClass: STAGING (loadStagingAdapters)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- All 7 production adapters are REGISTERED under STAGING" >> "$GITHUB_STEP_SUMMARY"
+          echo "- The release gate is fail-closed: missing signatures, missing rollback drill, expired/revoked waivers, or non-STAGING evidence will produce passed: false" >> "$GITHUB_STEP_SUMMARY"
+          echo "- A green run here authorizes STAGING-class promotion only; PRODUCTION promotion requires a separate ADR + SRE/Platform sign-off" >> "$GITHUB_STEP_SUMMARY"
