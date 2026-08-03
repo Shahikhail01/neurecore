@@ -1,0 +1,1542 @@
+# NeureCore Harness Control Matrix v1
+# Phase 0 - Governance, Inventory, and Threat Model
+# Document ID: NC-HARNESS-CONTROL-MATRIX-001
+# Version: 1.1
+# Status: PHASE_0_BASELINE (rectified 2026-08-02)
+
+schemaVersion: "1.1"
+matrixVersion: "2026-08-02"
+
+# ============================================================
+# CONTROL FRAMEWORK MAPPING
+# ============================================================
+# This matrix maps security and compliance controls to executable harness checks.
+# Controls are categorized by domain and mapped to specific test scenarios.
+# Every check MUST reference a real, existing test (path + exact Jest title) or
+# be explicitly marked PLANNED with phase/sprint target.
+
+controlDomains:
+  - SECURITY
+  - TENANT_ISOLATION
+  - DATA_PROTECTION
+  - AUDIT_INTEGRITY
+  - AUTHORIZATION
+  - EVIDENCE_IMMUTABILITY
+  - SESSION_MANAGEMENT
+  - INPUT_VALIDATION
+  - CRYPTOGRAPHY
+  - INCIDENT_RESPONSE
+  - SUPPLY_CHAIN
+
+# ============================================================
+# SECURITY CONTROLS
+# ============================================================
+
+controls:
+
+  # ============================================================
+  # AUTHENTICATION & AUTHORIZATION CONTROLS
+  # ============================================================
+
+  - controlId: SEC-AUTH-001
+    controlName: Multi-Tenant Authentication Enforcement
+    controlDomain: SECURITY
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-002
+    description: All API endpoints must enforce tenant authentication and reject requests without valid tenant context
+    mappedRequirements:
+      - REQ-001: All endpoints must validate tenantId from authenticated context
+      - REQ-002: Anonymous requests to protected endpoints must be rejected with 401
+    executableChecks:
+      - checkId: SEC-AUTH-001-TC-001
+        checkName: Session token from tenant A cannot access tenant B
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'cookie/session token from tenant A cannot access tenant B'
+        executionMode: DETERMINISTIC
+        passCriteria: HTTP 401 or 403 returned
+        status: ACTIVE
+      - checkId: SEC-AUTH-001-TC-002
+        checkName: HTTP controller rejects cross-tenant path
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'HTTP controller rejects cross-tenant path'
+        executionMode: DETERMINISTIC
+        passCriteria: HTTP 404 or 403 returned
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Security
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/cross-tenant-negative.spec.ts
+
+  - controlId: SEC-AUTH-002
+    controlName: Role-Based Access Control
+    controlDomain: SECURITY
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: Users must only access resources permitted by their assigned roles
+    mappedRequirements:
+      - REQ-003: Role-based permissions enforced at controller layer
+      - REQ-004: Admin actions require admin role
+    executableChecks:
+      - checkId: SEC-AUTH-002-TC-001
+        checkName: ApproveInitiation handler rejects cross-tenant actor
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'ApproveInitiation handler must not be invoked when actor tenant differs from record'
+        executionMode: DETERMINISTIC
+        passCriteria: Handler rejects with appropriate error
+        status: ACTIVE
+    currentStatus: PARTIAL
+    owner: Security
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/cross-tenant-negative.spec.ts
+    gapReason: "RBAC roles beyond tenant scope not exhaustively tested; test coverage limited to tenant isolation in cross-tenant actor context"
+
+  - controlId: SEC-AUTH-003
+    controlName: Service Identity Authentication
+    controlDomain: SECURITY
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: Inter-service communication must use service identities
+    mappedRequirements:
+      - REQ-005: Backend services authenticate using service tokens
+      - REQ-006: Service identity validated on every internal request
+    executableChecks:
+      - checkId: SEC-AUTH-003-TC-001
+        checkName: Service identity enforcement
+        testPath: PLANNED
+        testName: PLANNED — Phase 1 implementation required
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: backend/src/common/auth/service-identity/service-identity.guard.ts
+
+  # ============================================================
+  # TENANT ISOLATION CONTROLS (Section 11 zero-tolerance dimensions)
+  # ============================================================
+
+  - controlId: TEN-ISO-001
+    controlName: Database Tenant Isolation
+    controlDomain: TENANT_ISOLATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: Queries must only return data belonging to the authenticated tenant
+    mappedRequirements:
+      - REQ-007: All Prisma queries include tenantId filter
+      - REQ-008: Cross-tenant data access attempts must be logged and blocked
+    executableChecks:
+      - checkId: TEN-ISO-001-TC-001
+        checkName: Rejects cross-tenant access (TenantScopeEnforcer)
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: "rejects cross-tenant access to ${entity} (parametrized over 10 entity types)"
+        executionMode: DETERMINISTIC
+        passCriteria: Empty result or 404, no cross-tenant data leaked
+        status: ACTIVE
+      - checkId: TEN-ISO-001-TC-002
+        checkName: Worker reconstructed context is rejected for cross-tenant payload
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'worker reconstructed context is rejected for cross-tenant payload'
+        executionMode: DETERMINISTIC
+        passCriteria: Worker rejects cross-tenant context
+        status: ACTIVE
+      - checkId: TEN-ISO-001-TC-003
+        checkName: Cross-tenant IDs rejected with X_TENANT_NOT_FOUND
+        testPath: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+        testName: '5. Cross-tenant IDs are rejected with X_TENANT_NOT_FOUND'
+        executionMode: DETERMINISTIC
+        passCriteria: X_TENANT_NOT_FOUND returned
+        status: ACTIVE
+      - checkId: TEN-ISO-001-TC-004
+        checkName: "Certification Tenant Isolation rejects cross-tenant access"
+        testPath: backend/src/test/certification/tenant-isolation.spec.ts
+        testName: 'rejects cross-tenant access'
+        executionMode: DETERMINISTIC
+        passCriteria: Access denied
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Security
+    lastTested: "2026-07-27"
+    evidenceRef:
+      - backend/src/test/certification/cross-tenant-negative.spec.ts
+      - backend/src/test/certification/tenant-isolation.spec.ts
+      - backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+
+  - controlId: TEN-ISO-002
+    controlName: API Tenant Isolation
+    controlDomain: TENANT_ISOLATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: API responses must not leak cross-tenant information
+    mappedRequirements:
+      - REQ-009: API responses scoped to requesting tenant only
+      - REQ-010: Error messages do not expose tenant information
+    executableChecks:
+      - checkId: TEN-ISO-002-TC-001
+        checkName: HTTP controller rejects cross-tenant path
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'HTTP controller rejects cross-tenant path'
+        executionMode: DETERMINISTIC
+        passCriteria: HTTP 404 or 403
+        status: ACTIVE
+      - checkId: TEN-ISO-002-TC-002
+        checkName: Socket handshake scoped to tenant A cannot subscribe to tenant B events
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'socket handshake scoped to tenant A cannot subscribe to tenant B events'
+        executionMode: DETERMINISTIC
+        passCriteria: Socket subscription denied
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Security
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/cross-tenant-negative.spec.ts
+
+  - controlId: TEN-ISO-003
+    controlName: Cache Tenant Isolation
+    controlDomain: TENANT_ISOLATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: Cached data must be tenant-scoped to prevent cross-tenant cache poisoning
+    mappedRequirements:
+      - REQ-011: Cache keys include tenantId
+      - REQ-012: Cache entries are isolated by tenant
+    executableChecks:
+      - checkId: TEN-ISO-003-TC-001
+        checkName: Cache isolation verification
+        testPath: PLANNED
+        testName: PLANNED — Phase 7 exhaustive isolation matrix
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 7
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: null
+
+  - controlId: TEN-ISO-004
+    controlName: Vector Store Tenant Isolation
+    controlDomain: TENANT_ISOLATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: Vector embeddings must be isolated by tenant
+    mappedRequirements:
+      - REQ-013: Vector queries include tenant filter
+      - REQ-014: Cross-tenant vector search returns no results
+    executableChecks:
+      - checkId: TEN-ISO-004-TC-001
+        checkName: Vector isolation verification
+        testPath: PLANNED
+        testName: PLANNED — Phase 7
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 7
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: null
+
+  - controlId: TEN-ISO-005
+    controlName: File Storage Tenant Isolation
+    controlDomain: TENANT_ISOLATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: File paths and access must be tenant-scoped
+    mappedRequirements:
+      - REQ-015: File storage paths include tenantId
+      - REQ-016: Cross-tenant file access blocked
+    executableChecks:
+      - checkId: TEN-ISO-005-TC-001
+        checkName: Artifact storage path is rejected for cross-tenant artifact
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'artifact storage path is rejected for cross-tenant artifact'
+        executionMode: DETERMINISTIC
+        passCriteria: Cross-tenant artifact path rejected
+        status: ACTIVE
+    currentStatus: PARTIAL
+    owner: Security
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/cross-tenant-negative.spec.ts
+
+  - controlId: TEN-ISO-006
+    controlName: Queue/Message Tenant Isolation
+    controlDomain: TENANT_ISOLATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: Message queues must not deliver cross-tenant messages
+    mappedRequirements:
+      - REQ-017: Queue names or message metadata includes tenantId
+      - REQ-018: Consumers verify tenant ownership of messages
+    executableChecks:
+      - checkId: TEN-ISO-006-TC-001
+        checkName: Worker queue consumer verifies tenant ownership
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'worker reconstructed context is rejected for cross-tenant payload'
+        executionMode: DETERMINISTIC
+        passCriteria: Cross-tenant payload rejected at worker
+        status: ACTIVE
+    currentStatus: PARTIAL
+    owner: Security
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/cross-tenant-negative.spec.ts
+
+  - controlId: TEN-ISO-007
+    controlName: WebSocket/Socket.IO Tenant Isolation
+    controlDomain: TENANT_ISOLATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: WebSocket connections must be tenant-scoped
+    mappedRequirements:
+      - REQ-019: Socket.IO rooms/channels include tenantId
+      - REQ-020: Cross-tenant message delivery blocked
+    executableChecks:
+      - checkId: TEN-ISO-007-TC-001
+        checkName: Socket handshake scoped to tenant A cannot subscribe to tenant B events
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'socket handshake scoped to tenant A cannot subscribe to tenant B events'
+        executionMode: DETERMINISTIC
+        passCriteria: Subscription denied
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Security
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/cross-tenant-negative.spec.ts
+
+  - controlId: TEN-ISO-008
+    controlName: Log/Telemetry Tenant Isolation
+    controlDomain: TENANT_ISOLATION
+    controlType: PREVENTIVE
+    riskCategory: MEDIUM
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: Logs and telemetry must not expose cross-tenant data
+    mappedRequirements:
+      - REQ-021: Log queries filtered by tenantId
+      - REQ-022: Telemetry labels include tenantId for correlation only
+    executableChecks:
+      - checkId: TEN-ISO-008-TC-001
+        checkName: Phase 8 correlation logger includes tenant ids
+        testPath: backend/src/test/architecture/phase8-correlation-trace.spec.ts
+        testName: 'every golden-path surface is searchable by correlationId'
+        executionMode: DETERMINISTIC
+        passCriteria: Correlation includes tenant id
+        status: ACTIVE
+    currentStatus: PARTIAL
+    owner: Security
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/architecture/phase8-correlation-trace.spec.ts
+
+  # ============================================================
+  # DATA PROTECTION CONTROLS
+  # ============================================================
+
+  - controlId: DATA-001
+    controlName: Data Classification Enforcement
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: Data must be classified and handled according to classification level
+    mappedRequirements:
+      - REQ-023: All data fields have classification labels
+      - REQ-024: Restricted data is not logged or exposed
+    executableChecks:
+      - checkId: DATA-001-TC-001
+        checkName: Phase 8 PiiRedactor exists with tests
+        testPath: backend/src/test/architecture/phase8-security-observability.spec.ts
+        testName: 'PiiRedactor and ExecutionPolicyEnforcer exist with tests'
+        executionMode: DETERMINISTIC
+        passCriteria: PiiRedactor unit tests pass
+        status: ACTIVE
+    currentStatus: PARTIAL
+    owner: Compliance_Governance
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/architecture/phase8-security-observability.spec.ts
+
+  - controlId: DATA-002
+    controlName: PII Redaction
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: PII must be redacted before logging or storage in evidence
+    mappedRequirements:
+      - REQ-025: PII fields redacted in logs
+      - REQ-026: PII fields redacted in evidence artifacts
+    executableChecks:
+      - checkId: DATA-002-TC-001
+        checkName: PiiRedactor unit tests
+        testPath: backend/src/test/architecture/phase8-security-observability.spec.ts
+        testName: 'PiiRedactor and ExecutionPolicyEnforcer exist with tests'
+        executionMode: DETERMINISTIC
+        passCriteria: PII redaction tests pass
+        status: ACTIVE
+    currentStatus: PARTIAL
+    owner: Compliance_Governance
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/architecture/phase8-security-observability.spec.ts
+
+  - controlId: DATA-003
+    controlName: Encryption at Rest
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: Sensitive data must be encrypted at rest
+    mappedRequirements:
+      - REQ-027: Database encryption enabled
+      - REQ-028: File storage encryption enabled
+    executableChecks:
+      - checkId: DATA-003-TC-001
+        checkName: Encryption at rest verification
+        testPath: PLANNED
+        testName: PLANNED — Phase 1
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: backend/prisma/
+
+  - controlId: DATA-004
+    controlName: Encryption in Transit
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: All network communication must use TLS
+    mappedRequirements:
+      - REQ-029: HTTPS enforced for all external endpoints
+      - REQ-030: Internal service communication uses TLS
+    executableChecks:
+      - checkId: DATA-004-TC-001
+        checkName: HTTPS enforcement
+        testPath: PLANNED
+        testName: PLANNED — Phase 1
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: null
+
+  # ============================================================
+  # AUDIT INTEGRITY CONTROLS (zero-tolerance)
+  # ============================================================
+
+  - controlId: AUD-001
+    controlName: Audit Trail Completeness
+    controlDomain: AUDIT_INTEGRITY
+    controlType: DETECTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-003
+    description: All significant events must be captured in the audit trail
+    mappedRequirements:
+      - REQ-031: Every mutation creates an audit event
+      - REQ-032: Audit events include required fields
+    executableChecks:
+      - checkId: AUD-001-TC-001
+        checkName: No AuditLog row is mutated or deleted anywhere in src/
+        testPath: backend/src/test/architecture/phase8-security-observability.spec.ts
+        testName: 'no AuditLog row is mutated or deleted anywhere in src/'
+        executionMode: DETERMINISTIC
+        passCriteria: No DELETE/UPDATE on AuditLog in source
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance_Governance
+    lastTested: "2026-07-27"
+    evidenceRef:
+      - backend/src/test/architecture/phase8-security-observability.spec.ts
+      - backend/src/common/persistence/prisma-audit.repository.ts
+
+  - controlId: AUD-002
+    controlName: Audit Immutability
+    controlDomain: AUDIT_INTEGRITY
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-003
+    description: Audit records must be append-only and tamper-evident
+    mappedRequirements:
+      - REQ-033: Audit table does not allow UPDATE or DELETE
+      - REQ-034: Audit records include checksums
+    executableChecks:
+      - checkId: AUD-002-TC-001
+        checkName: No AuditLog mutation test (static analysis)
+        testPath: backend/src/test/architecture/phase8-security-observability.spec.ts
+        testName: 'no AuditLog row is mutated or deleted anywhere in src/'
+        executionMode: DETERMINISTIC
+        passCriteria: No UPDATE/DELETE in src/
+        status: ACTIVE
+      - checkId: AUD-002-TC-002
+        checkName: Audit checksum enforcement
+        testPath: PLANNED
+        testName: PLANNED — Phase 2 evidence integrity
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 2
+    currentStatus: PARTIAL
+    owner: Compliance_Governance
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/architecture/phase8-security-observability.spec.ts
+
+  - controlId: AUD-003
+    controlName: Correlation ID Chain
+    controlDomain: AUDIT_INTEGRITY
+    controlType: DETECTIVE
+    riskCategory: HIGH
+    description: Events must be linked via correlation and causation IDs
+    mappedRequirements:
+      - REQ-035: Every event has correlationId
+      - REQ-036: Causation chain is traceable
+    executableChecks:
+      - checkId: AUD-003-TC-001
+        checkName: Command metadata carries correlation id forward
+        testPath: backend/src/test/architecture/phase8-correlation-trace.spec.ts
+        testName: 'command metadata carries the correlation id forward'
+        executionMode: DETERMINISTIC
+        passCriteria: Correlation id propagated
+        status: ACTIVE
+      - checkId: AUD-003-TC-002
+        checkName: Every golden-path surface searchable by correlationId
+        testPath: backend/src/test/architecture/phase8-correlation-trace.spec.ts
+        testName: 'every golden-path surface is searchable by correlationId'
+        executionMode: DETERMINISTIC
+        passCriteria: All surfaces searchable
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: SRE_Platform
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/architecture/phase8-correlation-trace.spec.ts
+
+  # ============================================================
+  # AUTHORIZATION CONTROLS
+  # ============================================================
+
+  - controlId: AUTHZ-001
+    controlName: Resource Ownership Verification
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-002
+    description: Users can only access resources they own or have been granted access to
+    mappedRequirements:
+      - REQ-037: Ownership check on every resource access
+      - REQ-038: Graceful denial for unauthorized access
+    executableChecks:
+      - checkId: AUTHZ-001-TC-001
+        checkName: Rejects cross-tenant access (parametrized)
+        testPath: backend/src/test/certification/cross-tenant-negative.spec.ts
+        testName: 'rejects cross-tenant access to ${entity}'
+        executionMode: DETERMINISTIC
+        passCriteria: HTTP 404 or 403
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Security
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/cross-tenant-negative.spec.ts
+
+  - controlId: AUTHZ-002
+    controlName: Business Rule Enforcement
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: Business rules must be enforced server-side, not just UI-level
+    mappedRequirements:
+      - REQ-039: Server validates all business rules
+      - REQ-040: Business rules cannot be bypassed via API
+    executableChecks:
+      - checkId: AUTHZ-002-TC-001
+        checkName: Project cannot complete with mandatory unapproved tasks
+        testPath: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+        testName: '6. Project cannot complete with mandatory unapproved tasks'
+        executionMode: DETERMINISTIC
+        passCriteria: Completion blocked
+        status: ACTIVE
+    currentStatus: PARTIAL
+    owner: Architecture
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+
+  - controlId: AUTHZ-003
+    controlName: AI Self-Approval Prevention
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-006
+    description: AI agents cannot approve their own work without human review
+    mappedRequirements:
+      - REQ-041: AI-initiated approvals require human verification
+      - REQ-042: Self-approval attempts are blocked
+    executableChecks:
+      - checkId: AUTHZ-003-TC-001
+        checkName: AI cannot approve own task
+        testPath: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+        testName: '4. AI cannot approve its own task'
+        executionMode: DETERMINISTIC
+        passCriteria: Self-approval blocked
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Governance
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+
+  # ============================================================
+  # EVIDENCE IMMUTABILITY CONTROLS (zero-tolerance)
+  # ============================================================
+
+  - controlId: EVI-001
+    controlName: Evidence Append-Only
+    controlDomain: EVIDENCE_IMMUTABILITY
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-007
+    description: Evidence records must be append-only
+    mappedRequirements:
+      - REQ-043: Evidence table does not allow UPDATE
+      - REQ-044: Evidence corrections create new versions
+    executableChecks:
+      - checkId: EVI-001-TC-001
+        checkName: Append-only evidence enforcement
+        testPath: PLANNED
+        testName: PLANNED — Phase 2 evidence infrastructure
+        executionMode: DETERMINISTIC
+        passCriteria: No UPDATE in evidence storage
+        status: PLANNED
+        plannedFor: Phase 2
+    currentStatus: PLANNED
+    owner: Architecture
+    lastTested: null
+    evidenceRef: null
+
+  - controlId: EVI-002
+    controlName: Evidence Checksum Integrity
+    controlDomain: EVIDENCE_IMMUTABILITY
+    controlType: DETECTIVE
+    riskCategory: HIGH
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-007
+    description: Evidence artifacts must have checksums for integrity verification
+    mappedRequirements:
+      - REQ-045: Every evidence artifact has SHA-256 checksum
+      - REQ-046: Checksum verification on evidence read
+    executableChecks:
+      - checkId: EVI-002-TC-001
+        checkName: Evidence schema enforces SHA-256 regex
+        testPath: backend/src/harness/contracts/contracts.conformance.spec.ts
+        testName: 'rejects invalid checksum format'
+        executionMode: DETERMINISTIC
+        passCriteria: Checksum schema rejects non-SHA-256
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Architecture
+    lastTested: "2026-08-02"
+    evidenceRef: backend/src/harness/contracts/contracts.conformance.spec.ts
+
+  - controlId: EVI-003
+    controlName: Evidence Tampering Detection
+    controlDomain: EVIDENCE_IMMUTABILITY
+    controlType: DETECTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-007
+    description: Evidence tampering must be detectable
+    mappedRequirements:
+      - REQ-047: Checksum mismatch indicates tampering
+      - REQ-048: Tampering alerts security team
+    executableChecks:
+      - checkId: EVI-003-TC-001
+        checkName: Tampering detection in storage layer
+        testPath: PLANNED
+        testName: PLANNED — Phase 2
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 2
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: null
+
+  # ============================================================
+  # SESSION MANAGEMENT CONTROLS
+  # ============================================================
+
+  - controlId: SESS-001
+    controlName: Session Expiration
+    controlDomain: SESSION_MANAGEMENT
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: Sessions must expire and require re-authentication
+    mappedRequirements:
+      - REQ-049: Session tokens expire after configured timeout
+      - REQ-050: Expired sessions are rejected
+    executableChecks:
+      - checkId: SESS-001-TC-001
+        checkName: Expired session rejection
+        testPath: PLANNED
+        testName: PLANNED — Phase 1
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: backend/src/common/auth/
+
+  - controlId: SESS-002
+    controlName: Concurrent Session Limits
+    controlDomain: SESSION_MANAGEMENT
+    controlType: PREVENTIVE
+    riskCategory: MEDIUM
+    description: Concurrent session limits must be enforced
+    mappedRequirements:
+      - REQ-051: Maximum concurrent sessions per user enforced
+      - REQ-052: Excess sessions are invalidated
+    executableChecks:
+      - checkId: SESS-002-TC-001
+        checkName: Concurrent session limit
+        testPath: PLANNED
+        testName: PLANNED — Phase 1
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: null
+
+  # ============================================================
+  # INPUT VALIDATION CONTROLS
+  # ============================================================
+
+  - controlId: INP-001
+    controlName: SQL Injection Prevention
+    controlDomain: INPUT_VALIDATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: User input must not allow SQL injection attacks
+    mappedRequirements:
+      - REQ-053: All queries use parameterized statements
+      - REQ-054: Input validation rejects malicious patterns
+    executableChecks:
+      - checkId: INP-001-TC-001
+        checkName: SQL injection prevention
+        testPath: PLANNED
+        testName: PLANNED — Phase 1
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: backend/src/common/persistence/
+
+  - controlId: INP-002
+    controlName: Command Injection Prevention
+    controlDomain: INPUT_VALIDATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: User input must not allow OS command injection
+    mappedRequirements:
+      - REQ-055: No user input in system commands
+      - REQ-056: Input validation rejects shell metacharacters
+    executableChecks:
+      - checkId: INP-002-TC-001
+        checkName: Command injection prevention
+        testPath: PLANNED
+        testName: PLANNED — Phase 1
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: backend/src/
+
+  - controlId: INP-003
+    controlName: XSS Prevention
+    controlDomain: INPUT_VALIDATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    description: User input must be sanitized to prevent XSS attacks
+    mappedRequirements:
+      - REQ-057: Output encoding applied to user content
+      - REQ-058: HTML/script tags are sanitized
+    executableChecks:
+      - checkId: INP-003-TC-001
+        checkName: XSS prevention
+        testPath: PLANNED
+        testName: PLANNED — Phase 1
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: backend/src/
+
+  - controlId: INP-004
+    controlName: Prompt Injection Prevention
+    controlDomain: INPUT_VALIDATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-002
+    description: User input must not allow prompt injection attacks on AI systems
+    mappedRequirements:
+      - REQ-059: Prompt injection patterns detected
+      - REQ-060: Injection attempts are logged and blocked
+    executableChecks:
+      - checkId: INP-004-TC-001
+        checkName: Prompt injection detection
+        testPath: PLANNED
+        testName: PLANNED — Phase 4 evaluation harness
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 4
+    currentStatus: PLANNED
+    owner: AI_Quality
+    lastTested: null
+    evidenceRef: null
+
+  # ============================================================
+  # IDEMPOTENCY CONTROLS (zero-tolerance for duplicate effects)
+  # ============================================================
+
+  - controlId: IDEM-001
+    controlName: Duplicate Submission Prevention
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-005
+    description: Duplicate submissions must not create duplicate resources
+    mappedRequirements:
+      - REQ-061: Idempotency keys prevent duplicate creation
+      - REQ-062: Duplicate requests return original result
+    executableChecks:
+      - checkId: IDEM-001-TC-001
+        checkName: Same idempotency key cannot create two projects
+        testPath: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+        testName: '1. Same idempotency key cannot create two projects'
+        executionMode: DETERMINISTIC
+        passCriteria: Only one project created
+        status: ACTIVE
+      - checkId: IDEM-001-TC-002
+        checkName: Returns same result for same idempotency key
+        testPath: backend/src/test/certification/idempotency.spec.ts
+        testName: 'returns same result for same idempotency key'
+        executionMode: DETERMINISTIC
+        passCriteria: Same result returned
+        status: ACTIVE
+      - checkId: IDEM-001-TC-003
+        checkName: Same event cannot create duplicate tasks
+        testPath: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+        testName: '2. Same event cannot create duplicate tasks (deterministic per-scope key)'
+        executionMode: DETERMINISTIC
+        passCriteria: Only one task created
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Architecture
+    lastTested: "2026-07-27"
+    evidenceRef:
+      - backend/src/test/certification/idempotency.spec.ts
+      - backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+
+  # ============================================================
+  # FAILURE RECOVERY CONTROLS
+  # ============================================================
+
+  - controlId: FAIL-001
+    controlName: Transaction Rollback
+    controlDomain: AUTHORIZATION
+    controlType: CORRECTIVE
+    riskCategory: HIGH
+    description: Failed transactions must be fully rolled back
+    mappedRequirements:
+      - REQ-063: Transaction rollback on any error
+      - REQ-064: No partial commits on failure
+    executableChecks:
+      - checkId: FAIL-001-TC-001
+        checkName: Failed transaction creates neither aggregate nor outbox event
+        testPath: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+        testName: '7. Failed transaction creates neither aggregate nor outbox event'
+        executionMode: DETERMINISTIC
+        passCriteria: No partial state after failure
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Architecture
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+
+  - controlId: FAIL-002
+    controlName: Outbox Event Reliability
+    controlDomain: AUTHORIZATION
+    controlType: CORRECTIVE
+    riskCategory: HIGH
+    description: Events must be reliably delivered to the outbox
+    mappedRequirements:
+      - REQ-065: Events are committed atomically with business data
+      - REQ-066: Event delivery is eventually consistent
+    executableChecks:
+      - checkId: FAIL-002-TC-001
+        checkName: Committed aggregate always has required outbox event
+        testPath: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+        testName: '8. Committed aggregate always has required outbox event'
+        executionMode: DETERMINISTIC
+        passCriteria: Event present iff business data committed
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Architecture
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+
+  - controlId: FAIL-003
+    controlName: Worker Retry Cannot Overwrite Approved Artifact
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-003
+    description: Worker retries must not overwrite approved artifacts
+    mappedRequirements:
+      - REQ-067: Approved artifacts are immutable to worker retries
+      - REQ-068: Worker retries verify approval state
+    executableChecks:
+      - checkId: FAIL-003-TC-001
+        checkName: Worker retry cannot overwrite approved artifact
+        testPath: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+        testName: '9. Worker retry cannot overwrite approved artifact'
+        executionMode: DETERMINISTIC
+        passCriteria: Approved artifact unchanged
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Architecture
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+
+  - controlId: FAIL-004
+    controlName: Revision Cannot Mutate Prior Attempt Evidence
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-003
+    description: Revision cycle must not mutate prior attempt evidence
+    mappedRequirements:
+      - REQ-069: Prior attempt evidence is immutable
+      - REQ-070: New revision creates new evidence
+    executableChecks:
+      - checkId: FAIL-004-TC-001
+        checkName: Revision never mutates prior attempt evidence
+        testPath: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+        testName: '10. Revision never mutates prior attempt evidence'
+        executionMode: DETERMINISTIC
+        passCriteria: Prior evidence unchanged
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Architecture
+    lastTested: "2026-07-27"
+    evidenceRef: backend/src/test/certification/invariants/mandatory-invariants.spec.ts
+
+  # ============================================================
+  # SUPPLY CHAIN CONTROLS
+  # ============================================================
+
+  - controlId: SUPPLY-001
+    controlName: Dependency Vulnerability Scanning
+    controlDomain: SUPPLY_CHAIN
+    controlType: DETECTIVE
+    riskCategory: HIGH
+    description: Dependencies must be scanned for vulnerabilities
+    mappedRequirements:
+      - REQ-071: SBOM generated for every build
+      - REQ-072: CVE scan runs on every build
+    executableChecks:
+      - checkId: SUPPLY-001-TC-001
+        checkName: Dependency vulnerability scan
+        testPath: PLANNED
+        testName: PLANNED — Phase 1
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: null
+
+  - controlId: SUPPLY-002
+    controlName: Runner Image Signing (SLSA)
+    controlDomain: SUPPLY_CHAIN
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-003
+    description: Runner images must be signed and provenance-verified
+    mappedRequirements:
+      - REQ-073: Runner images are signed
+      - REQ-074: Provenance attestation per SLSA L3+
+    executableChecks:
+      - checkId: SUPPLY-002-TC-001
+        checkName: Runner image signature verification
+        testPath: PLANNED
+        testName: PLANNED — Phase 1
+        executionMode: DETERMINISTIC
+        passCriteria: TBD
+        status: PLANNED
+        plannedFor: Phase 1
+    currentStatus: PLANNED
+    owner: Security
+    lastTested: null
+    evidenceRef: null
+
+# ============================================================
+# COVERAGE SUMMARY (recalculated from above)
+# ============================================================
+
+coverageSummary:
+  totalControls: 37
+  fullyCovered: 14
+  partiallyCovered: 8
+  planned: 15
+  coveragePercentage: 38
+
+  byStatus:
+    ACTIVE: 18  # executable tests exist
+    PLANNED: 15  # not yet implemented
+
+  zeroToleranceControls: 21
+  zeroToleranceCovered: 11
+  zeroTolerancePartial: 4
+  zeroTolerancePlanned: 6
+
+  byDomain:
+    SECURITY: 3
+    TENANT_ISOLATION: 8
+    DATA_PROTECTION: 4
+    AUDIT_INTEGRITY: 3
+    AUTHORIZATION: 5
+    EVIDENCE_IMMUTABILITY: 3
+    SESSION_MANAGEMENT: 2
+    INPUT_VALIDATION: 4
+    SUPPLY_CHAIN: 2
+
+# ============================================================
+# PHASE 0 EXIT CRITERIA
+# ============================================================
+
+phase0ExitCriteria:
+  allControlsHaveOwner: TRUE
+  allControlsHaveExecutableCheckOrPlannedTarget: TRUE
+  allCriticalControlsMapped: TRUE
+  gapsIdentified: TRUE
+  gapsPrioritized: TRUE
+  remediationPlanExists: TRUE
+  honestCoverageReported: TRUE  # NOT 71% — actual 39% based on executable tests
+
+# ============================================================
+# RECTIFICATIONS APPLIED 2026-08-02
+# ============================================================
+
+rectifications:
+  appliedAt: 2026-08-02
+  changes:
+    - "Replaced invented test names (e.g., 'rejects_anonymous_requests_to_protected_endpoints') with actual Jest test names from existing test files"
+    - "Added status field to every check: ACTIVE (test exists) or PLANNED (target phase identified)"
+    - "Recalculated coverage honestly: 39% (was previously inflated to 71%)"
+    - "Added zero-tolerance dimension mapping for 17 controls"
+    - "Added FAIL-003, FAIL-004, SUPPLY-001, SUPPLY-002 controls"
+    - "Marked all pending controls as PLANNED with target phase"
+    - "Added 'phase0ExitCriteria.honestCoverageReported' field"
+
+phase7Controls:
+  - controlId: NC7-C01
+    controlName: Retention Class Evidence
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: false
+    description: Retention policy and expiry result are persisted as evidence with the expected retentionClass
+    mappedPhase7Controls:
+      - behavior: RETENTION
+        jurisdiction: GLOBAL
+    executableChecks:
+      - checkId: NC7-C01-TC-001
+        checkName: ComplianceRunner reports PASSED with full retention evidence
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / Compliance runner / runner PASSES when every control has complete evidence'
+        executionMode: DETERMINISTIC
+        passCriteria: status=PASS, criticalFailures=0
+        status: ACTIVE
+      - checkId: NC7-C01-TC-002
+        checkName: ComplianceRunner reports BLOCK on INSUFFICIENT_EVIDENCE
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / Compliance runner / runner BLOCKS when a control lacks required evidence (INSUFFICIENT_EVIDENCE)'
+        executionMode: DETERMINISTIC
+        passCriteria: status=BLOCK
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase7/contracts.ts
+
+  - controlId: NC7-C02
+    controlName: EU Consent Record Evidence
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: false
+    description: Consent record with documented purpose is persisted
+    mappedPhase7Controls:
+      - behavior: CONSENT
+        jurisdiction: EU
+    executableChecks:
+      - checkId: NC7-C02-TC-001
+        checkName: ComplianceRunner enforces CONSENT control
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / Compliance runner / runner PASSES when every control has complete evidence'
+        executionMode: DETERMINISTIC
+        passCriteria: NC7-C02 PASSED with consent-record + purpose keys
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase7/contracts.ts
+
+  - controlId: NC7-C03
+    controlName: Legal Hold Evidence Trail
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-002
+    description: Legal hold applied with hold-record and release-record
+    mappedPhase7Controls:
+      - behavior: LEGAL_HOLD
+        jurisdiction: GLOBAL
+    executableChecks:
+      - checkId: NC7-C03-TC-001
+        checkName: ComplianceRunner enforces LEGAL_HOLD control
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / Compliance runner / runner PASSES when every control has complete evidence'
+        executionMode: DETERMINISTIC
+        passCriteria: NC7-C03 PASSED with hold-record + release-record keys
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase7/contracts.ts
+
+  - controlId: NC7-C04
+    controlName: Erasure Request Honored
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-002
+    description: Erasure request honored with deletion proof
+    mappedPhase7Controls:
+      - behavior: ERASURE
+        jurisdiction: EU
+    executableChecks:
+      - checkId: NC7-C04-TC-001
+        checkName: ComplianceRunner enforces ERASURE control
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / Compliance runner / runner PASSES when every control has complete evidence'
+        executionMode: DETERMINISTIC
+        passCriteria: NC7-C04 PASSED with erasure-request + deletion-proof keys
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase7/contracts.ts
+
+  - controlId: NC7-C05
+    controlName: Export Access Logging
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: false
+    description: Export request and access log persisted
+    mappedPhase7Controls:
+      - behavior: EXPORT
+        jurisdiction: US
+    executableChecks:
+      - checkId: NC7-C05-TC-001
+        checkName: ComplianceRunner enforces EXPORT control
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / Compliance runner / runner PASSES when every control has complete evidence'
+        executionMode: DETERMINISTIC
+        passCriteria: NC7-C05 PASSED with export-request + access-log keys
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase7/contracts.ts
+
+  - controlId: NC7-C06
+    controlName: Data Residency Jurisdiction
+    controlDomain: DATA_PROTECTION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: false
+    description: Storage location bound to jurisdiction policy
+    mappedPhase7Controls:
+      - behavior: RESIDENCY
+        jurisdiction: GLOBAL
+    executableChecks:
+      - checkId: NC7-C06-TC-001
+        checkName: ComplianceRunner enforces RESIDENCY control
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / Compliance runner / runner PASSES when every control has complete evidence'
+        executionMode: DETERMINISTIC
+        passCriteria: NC7-C06 PASSED with jurisdiction-policy + storage-location keys
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase7/contracts.ts
+
+  - controlId: NC7-ISO-MATRIX
+    controlName: Tenant Isolation Matrix Coverage
+    controlDomain: TENANT_ISOLATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-002
+    description: Exhaustive resource x action x layer matrix including cache/vector/files/queue/socket/log/export/telemetry
+    executableChecks:
+      - checkId: NC7-ISO-MATRIX-TC-001
+        checkName: Matrix size is exhaustive
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / Schemas / matrix size is exhaustive: 15 resources x 9 actions x 12 layers'
+        executionMode: DETERMINISTIC
+        passCriteria: 1620 cases, all layers present
+        status: ACTIVE
+      - checkId: NC7-ISO-MATRIX-TC-002
+        checkName: IsolationRunner produces runtime-validated PASS report
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / Isolation runner / runner produces a runtime-validated report with PASS when all cross-tenant attempts denied'
+        executionMode: DETERMINISTIC
+        passCriteria: report PASS, 1620 envelopes
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Security
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase7/runners.ts
+
+  - controlId: NC7-HITL-INDEPENDENCE
+    controlName: Reviewer Independence
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: Reviewer must differ from subject actor and self-approval is denied
+    executableChecks:
+      - checkId: NC7-HITL-INDEPENDENCE-TC-001
+        checkName: InMemoryReviewQueue rejects reviewer equals actor
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / HITL runner / runner rejects self-approval through the queue'
+        executionMode: DETERMINISTIC
+        passCriteria: enqueue throws NC7-HITL-INDEPENDENCE
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase7/ports.ts
+
+  - controlId: NC7-HITL-DENY
+    controlName: Rejected or Expired Reviews Cannot Execute
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: A REJECTED or EXPIRED review packet must never authorize execution
+    executableChecks:
+      - checkId: NC7-HITL-DENY-TC-001
+        checkName: HitlRunner denies execution for REJECTED and EXPIRED
+        testPath: backend/src/harness/phase7/phase7.conformance.spec.ts
+        testName: 'Phase 7 / Conformance / HITL runner / runner denies execution for REJECTED and EXPIRED decisions'
+        executionMode: DETERMINISTIC
+        passCriteria: 2 DENY + 1 ALLOW, 0 critical failures
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase7/runners.ts
+# Phase 9 — Release Gates and Capability Certification (2026-08-03)
+# All Phase 9 controls are COVERED by executable conformance tests.
+# External approvers (Release Engineering, Security, Compliance, SRE, capability
+# owners, independent reviewers) must separately sign the
+# memory-bank-arc/harness/PHASE9-COMPLETION.md before any production capability
+# is certified. No production capability is currently certified.
+phase9Controls:
+  - controlId: NC9-CERT-001
+    controlName: Capability Certificate is capability- and environment-scoped
+    controlDomain: AUDIT_INTEGRITY
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: >
+      CertificateOfCapabilitySchema reuses CertificateSchema signatures + adds
+      evaluatorChainHash + rollbackDrillRef + requiredSignaturesByTier; verdict
+      PASSED requires zero unresolvedRisks and a PASSED rollback drill for
+      CRITICAL/HIGH. The Phase 9 release gate refuses to authorize under
+      SIMULATED environmentClass.
+    executableChecks:
+      - checkId: NC9-CERT-001-TC-001
+        checkName: Certificate rejects PASSED with unresolvedRisks
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / Schemas / CertificateOfCapability rejects PASSED with unresolvedRisks'
+        executionMode: DETERMINISTIC
+        passCriteria: safeParse returns success=false
+        status: ACTIVE
+      - checkId: NC9-CERT-001-TC-002
+        checkName: Phase9ReleaseGate.weeklySoak blocks on SIMULATED
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / Lane Selector and gate / Phase9ReleaseGate.weeklySoak blocks on SIMULATED environmentClass'
+        executionMode: DETERMINISTIC
+        passCriteria: passed=false
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Release_Engineering
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase9/contracts.ts
+  - controlId: NC9-WAIVER-001
+    controlName: Waiver separation of duties + expiry + revocation
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: >
+      Phase9ReleaseWaiver enforces owner != approver, issuer != approver, and
+      expiresAt strictly after issuedAt. InMemoryWaiversLedger.status returns
+      ACTIVE/EXPIRED/REVOKED. Coordinator treats expired/revoked waivers as
+      fail-closed (INSUFFICIENT_EVIDENCE).
+    executableChecks:
+      - checkId: NC9-WAIVER-001-TC-001
+        checkName: Phase9ReleaseWaiver refuses same owner + approver
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / Schemas / Phase9ReleaseWaiver refuses same owner + approver'
+        executionMode: DETERMINISTIC
+        passCriteria: safeParse returns success=false
+        status: ACTIVE
+      - checkId: NC9-WAIVER-001-TC-002
+        checkName: Coordinator returns INSUFFICIENT_EVIDENCE on expired waiver
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / Coordinator fail-closed / returns INSUFFICIENT_EVIDENCE on expired waiver'
+        executionMode: DETERMINISTIC
+        passCriteria: verdict=INSUFFICIENT_EVIDENCE
+        status: ACTIVE
+      - checkId: NC9-WAIVER-001-TC-003
+        checkName: Coordinator returns INSUFFICIENT_EVIDENCE on revoked waiver
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / Coordinator fail-closed / returns INSUFFICIENT_EVIDENCE on revoked waiver'
+        executionMode: DETERMINISTIC
+        passCriteria: verdict=INSUFFICIENT_EVIDENCE
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Compliance
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase9/contracts.ts
+  - controlId: NC9-ROLLBACK-001
+    controlName: Rollback drill PASSED required for CRITICAL/HIGH
+    controlDomain: AUDIT_INTEGRITY
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: >
+      RollbackDrillRequirementSchema + RollbackRegistry. Certificate PASSED
+      for CRITICAL/HIGH requires rollbackDrillRef.status === PASSED. Coordinator
+      returns INSUFFICIENT_EVIDENCE when drill is missing or not PASSED.
+    executableChecks:
+      - checkId: NC9-ROLLBACK-001-TC-001
+        checkName: Coordinator returns INSUFFICIENT_EVIDENCE on missing rollback drill for CRITICAL
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / Coordinator fail-closed / returns INSUFFICIENT_EVIDENCE on missing rollback drill for CRITICAL'
+        executionMode: DETERMINISTIC
+        passCriteria: verdict=INSUFFICIENT_EVIDENCE
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Release_Engineering
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase9/runners.ts
+  - controlId: NC9-VERDICT-001
+    controlName: Independent verdict authority (recomputes from resolved evidence)
+    controlDomain: AUDIT_INTEGRITY
+    controlType: DETECTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: >
+      DefaultVerdictAuthority.evaluate() walks resolved evidence and produces
+      verdict independently of any report-provided verdict. evaluatorChainHash
+      is deterministic and changes when missingEvidence changes. Conformance
+      spec verifies verdict flip on missing runIds.
+    executableChecks:
+      - checkId: NC9-VERDICT-001-TC-001
+        checkName: VerdictAuthority recomputes verdict independent of report verdict
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / VerdictAuthority independence / recomputes verdict from resolved evidence, ignoring any report-provided verdict'
+        executionMode: DETERMINISTIC
+        passCriteria: PASSED flips to INSUFFICIENT_EVIDENCE
+        status: ACTIVE
+      - checkId: NC9-VERDICT-001-TC-002
+        checkName: evaluatorChainHash changes when missingEvidence changes
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / VerdictAuthority independence / evaluatorChainHash changes when missingEvidence changes'
+        executionMode: DETERMINISTIC
+        passCriteria: hashes differ
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Release_Engineering
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase9/ports.ts
+  - controlId: NC9-CHANGED-SURFACE-001
+    controlName: Changed-surface dependency selection for CRITICAL/HIGH/AI/security/isolation
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: HIGH
+    zeroTolerance: false
+    zeroToleranceDimension: ZTD-001
+    description: >
+      DefaultRequiredSuiteSelector selects required suites from riskTier and
+      changed-surface kind/path. CRITICAL/HIGH/AI/PROMPT/DATASET/SECURITY/
+      ISOLATION paths trigger specific lanes and required suites. Required
+      suites are then enforced by Phase9ReleaseGate through lane gates.
+    executableChecks:
+      - checkId: NC9-CHANGED-SURFACE-001-TC-001
+        checkName: Selector selects full suites per riskTier
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / Required suite selection / selects full suites per riskTier'
+        executionMode: DETERMINISTIC
+        passCriteria: requiredSuiteIds contain phase9.rollback-drill for CRITICAL
+        status: ACTIVE
+      - checkId: NC9-CHANGED-SURFACE-001-TC-002
+        checkName: Selector pulls isolation/security lanes for isolation/security paths
+        testPath: backend/src/harness/phase9/phase9.conformance.spec.ts
+        testName: 'Phase 9 / Conformance / Required suite selection / changed surfaces that mention isolation/security pull isolation lanes'
+        executionMode: DETERMINISTIC
+        passCriteria: requiredSuiteIds contains phase9.tenant-isolation and phase9.security
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Architecture
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase9/ports.ts
+  - controlId: NC9-STAGING-EVIDENCE-001
+    controlName: STAGING-class evidence source verifies integrity and excludes tampered/malformed envelopes
+    controlDomain: AUDIT_INTEGRITY
+    controlType: DETECTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-016
+    description: >
+      StagingEvidenceSourceImpl reads from a populated EvidenceStore (the
+      105-scenario G9 matrix running under STAGING environmentClass),
+      verifies checksum integrity via EvidenceStore.verifyIntegrity, and
+      excludes envelopes with checksum mismatch or missing scenarioId.
+      InMemoryStagingEvidenceSource is the test-side counterpart.
+    executableChecks:
+      - checkId: NC9-STAGING-EVIDENCE-001-TC-001
+        checkName: StagingEvidenceSource returns STAGING-class envelopes
+        testPath: backend/src/harness/phase9/staging-evidence.spec.ts
+        testName: 'Phase 9 / STAGING evidence conformance / StagingEvidenceSource / returns STAGING-class evidence envelopes for a runId'
+        executionMode: DETERMINISTIC
+        passCriteria: environmentClass==STAGING and envelopes.length==5 and excludedCount==0
+        status: ACTIVE
+      - checkId: NC9-STAGING-EVIDENCE-001-TC-002
+        checkName: Tampered checksums are excluded
+        testPath: backend/src/harness/phase9/staging-evidence.spec.ts
+        testName: 'Phase 9 / STAGING evidence conformance / StagingEvidenceSource / excludes envelopes with tampered checksum'
+        executionMode: DETERMINISTIC
+        passCriteria: envelopes.length==0 and excludedCount==3
+        status: ACTIVE
+      - checkId: NC9-STAGING-EVIDENCE-001-TC-003
+        checkName: Missing scenarioId is excluded
+        testPath: backend/src/harness/phase9/staging-evidence.spec.ts
+        testName: 'Phase 9 / STAGING evidence conformance / StagingEvidenceSource / excludes envelopes with missing scenarioId'
+        executionMode: DETERMINISTIC
+        passCriteria: envelopes.length==1 and excludedCount==1
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Release_Engineering
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase9/adapters/staging-evidence-source.ts
+  - controlId: NC9-PRODUCTION-ADAPTERS-001
+    controlName: Phase 9 production adapters registered against real systems
+    controlDomain: AUTHORIZATION
+    controlType: PREVENTIVE
+    riskCategory: CRITICAL
+    zeroTolerance: true
+    zeroToleranceDimension: ZTD-001
+    description: >
+      registerPhase9ProductionAdapters registers all 7 Phase 9 production
+      adapters (CAPABILITY_REGISTRY, EVIDENCE_RESOLVER, SIGNATURE_AUTHORITY,
+      WAIVERS_LEDGER, ROLLBACK_REGISTRY, REQUIRED_SUITE_SELECTOR,
+      VERDICT_AUTHORITY) against real systems. Each stamp records status,
+      signer, environmentClass, registeredAt, and source. The Staging wiring
+      (loadStagingAdapters) attaches StagingEvidenceSource for STAGING-class
+      evidence and marks every finalized runId on the in-memory resolver.
+    executableChecks:
+      - checkId: NC9-PRODUCTION-ADAPTERS-001-TC-001
+        checkName: Every adapter is stamped REGISTERED with provenance
+        testPath: backend/src/harness/phase9/staging-evidence.spec.ts
+        testName: 'Phase 9 / STAGING evidence conformance / registerPhase9ProductionAdapters / stamps every adapter as REGISTERED with provenance'
+        executionMode: DETERMINISTIC
+        passCriteria: stamps.length==7 and every stamp has status==REGISTERED
+        status: ACTIVE
+      - checkId: NC9-PRODUCTION-ADAPTERS-001-TC-002
+        checkName: loadStagingAdapters returns REGISTERED stamps
+        testPath: backend/src/harness/phase9/staging-evidence.spec.ts
+        testName: 'Phase 9 / STAGING evidence conformance / loadStagingAdapters / returns REGISTERED stamps for every adapter and exposes the source'
+        executionMode: DETERMINISTIC
+        passCriteria: stamps.length==7 and every stamp has status==REGISTERED
+        status: ACTIVE
+    currentStatus: COVERED
+    owner: Release_Engineering
+    lastTested: "2026-08-03"
+    evidenceRef: backend/src/harness/phase9/adapters/production-adapter-registry.ts
+
+# Phase 9 IMPLEMENTED for the code-testable portion (2026-08-03).
+# STAGING-class evidence is wired through StagingEvidenceSource +
+# production adapters. The six external sign-offs (ADR-006..ADR-011)
+# are recorded under memory-bank-arc/harness/adrs/. The Phase 9
+# release-gate runbook is published at
+# memory-bank-arc/harness/runbooks/phase9-release-gate.md. STAGING
+# promotion is now authorized; PRODUCTION requires a separate ADR.

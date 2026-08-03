@@ -73,6 +73,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Connectors', href: '/connectors', icon: '⬟' },
       { label: 'Billing', href: '/billing', icon: '⬡' },
       { label: 'Infrastructure', href: '/infrastructure', icon: '◈' },
+      { label: 'Harness Control', href: '/harness-control', icon: '◇' },
       { label: 'Audit Logs', href: '/audit', icon: '◫' },
     ],
   },

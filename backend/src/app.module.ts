@@ -160,6 +160,7 @@ import { CsrfProtectionMiddleware } from './common/auth/csrf.middleware';
 import { HermesAdapterModule } from './modules/hermes-adapter/hermes-adapter.module';
 import { ServiceGatewayV2Module } from './modules/service-gateway-v2/service-gateway-v2.module';
 import { ServiceGatewayFlagsModule } from './modules/service-gateway-v2/rollout/service-gateway-flags.module';
+import { HarnessControlModule } from './harness/phase10/harness-control.module';
 
 @Module({
   imports: [
@@ -204,6 +205,7 @@ import { ServiceGatewayFlagsModule } from './modules/service-gateway-v2/rollout/
     HermesAdapterModule, // Phase 1.3 — gateway to upstream Hermes sidecar
     ServiceGatewayV2Module,
     ServiceGatewayFlagsModule, // Phase 8 — feature flags, kill switch, SLO counters
+    HarnessControlModule,
 
     AccountingModule, // NC-ACCT-IMP-1 — gateway to accounting-sidecar (numpy-financial + Beancount)
     ContextPlaneModule, // Organizational Context Plane (ADR-002, Phase 3) — @Global

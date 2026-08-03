@@ -23,6 +23,54 @@ enum UserRole {
   AUDITOR
 }
 
+enum HarnessRunEnvironment {
+  LOCAL
+  CI
+  STAGING
+  PRODUCTION_PROBE
+  PRODUCTION
+}
+
+enum HarnessRunState {
+  REQUESTED
+  APPROVED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  BLOCKED
+}
+
+enum HarnessChangeKind {
+  SCENARIO
+  PROMPT
+  RUBRIC
+  DATASET
+  POLICY
+}
+
+enum HarnessChangeState {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  DEPRECATED
+}
+
+enum HarnessWaiverState {
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+enum HarnessCertificateState {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
 enum TenantStatus {
   ACTIVE
   SUSPENDED
@@ -911,6 +959,197 @@ model AuditLog {
   @@index([createdAt])
   @@index([correlationId])
   @@map("audit_logs")
+}
+
+model HarnessRunPolicy {
+  id                     String                @id @default(uuid())
+  name                   String
+  environment            HarnessRunEnvironment
+  destructiveAllowed     Boolean               @default(false)
+  productionAllowed      Boolean               @default(false)
+  requiresApproval       Boolean               @default(true)
+  maxBudgetUsd           Decimal               @db.Decimal(12, 2)
+  maxConcurrency         Int                   @default(1)
+  allowedCapabilityIds   String[]              @default([])
+  approvedBy              String?
+  approvedAt              DateTime?
+  deprecatedAt            DateTime?
+  version                 Int                   @default(1)
+  createdBy               String
+  createdAt               DateTime              @default(now())
+
+  runs HarnessRun[]
+
+  @@index([environment, deprecatedAt])
+  @@map("harness_run_policies")
+}
+
+model HarnessRun {
+  id             String                @id @default(uuid())
+  capabilityId   String
+  scenarioId     String
+  tenantId       String?
+  environment    HarnessRunEnvironment
+  state          HarnessRunState       @default(REQUESTED)
+  runPolicyId    String
+  requestedBy    String
+  approvedBy     String?
+  approvedAt     DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  replayOfRunId  String?
+  destructive    Boolean               @default(false)
+  budgetUsd      Decimal               @db.Decimal(12, 2)
+  idempotencyKey String                @unique
+  outcome        String?
+  checksum       String?
+  provenance     Json                  @default("{}")
+  createdAt      DateTime              @default(now())
+
+  runPolicy HarnessRunPolicy @relation(fields: [runPolicyId], references: [id])
+  evidence  HarnessEvidence[]
+
+  @@index([capabilityId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([state, environment])
+  @@map("harness_runs")
+}
+
+model HarnessEvidence {
+  id             String   @id @default(uuid())
+  runId          String
+  tenantId       String?
+  mediaType      String
+  classification String
+  storageRef     String
+  checksum       String
+  previousHash   String?
+  redacted       Boolean  @default(true)
+  retentionClass String
+  provenance     Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  run HarnessRun @relation(fields: [runId], references: [id])
+
+  @@index([runId, createdAt])
+  @@index([tenantId])
+  @@map("harness_evidence")
+}
+
+model HarnessChangeVersion {
+  id            String             @id @default(uuid())
+  kind          HarnessChangeKind
+  key           String
+  version       Int
+  state         HarnessChangeState @default(DRAFT)
+  ownerId       String
+  createdBy     String
+  approvedBy    String?
+  approvedAt    DateTime?
+  deprecatedAt  DateTime?
+  reviewDate    DateTime
+  content       Json
+  contentHash   String
+  rollbackData  Json?
+  evaluationRunId String?
+  createdAt     DateTime           @default(now())
+
+  @@unique([kind, key, version])
+  @@index([kind, state])
+  @@map("harness_change_versions")
+}
+
+model HarnessWaiver {
+  id                  String              @id @default(uuid())
+  capabilityId        String
+  scope               String
+  reason              String
+  compensatingControl String
+  ownerId             String
+  requestedBy         String
+  approvedBy          String?
+  issueLink           String
+  state               HarnessWaiverState @default(PENDING_APPROVAL)
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  revokedBy           String?
+  revokeReason        String?
+  createdAt           DateTime            @default(now())
+
+  @@index([capabilityId, state])
+  @@index([expiresAt])
+  @@map("harness_waivers")
+}
+
+model HarnessCertificate {
+  id             String                  @id @default(uuid())
+  capabilityId   String
+  environment    HarnessRunEnvironment
+  state          HarnessCertificateState @default(ACTIVE)
+  verdict        String
+  evidenceHash   String
+  limitations    String[]                @default([])
+  issuedBy       String
+  reviewedBy     String
+  issuedAt       DateTime                @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokedBy      String?
+  revokeReason   String?
+
+  @@index([capabilityId, environment, state])
+  @@map("harness_certificates")
+}
+
+model HarnessAuditEvent {
+  id           String   @id @default(uuid())
+  actorId      String
+  action       String
+  resourceType String
+  resourceId   String
+  tenantId     String?
+  result       String
+  details      Json     @default("{}")
+  previousHash String?
+  eventHash    String   @unique
+  createdAt    DateTime @default(now())
+
+  @@index([resourceType, resourceId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([tenantId])
+  @@map("harness_audit_events")
+}
+
+model HarnessReplayBundle {
+  id                 String                @id @default(uuid())
+  sourceRunId        String
+  environment        HarnessRunEnvironment
+  externalSideEffects Boolean              @default(false)
+  schemaVersion      String
+  manifest           Json
+  checksum           String
+  createdBy          String
+  createdAt          DateTime              @default(now())
+
+  executions HarnessReplayExecution[]
+
+  @@index([sourceRunId])
+  @@map("harness_replay_bundles")
+}
+
+model HarnessReplayExecution {
+  id                     String   @id @default(uuid())
+  bundleId               String
+  actorId                String
+  state                  String
+  sideEffectFirewallProof Json
+  startedAt              DateTime @default(now())
+  finishedAt             DateTime?
+
+  bundle HarnessReplayBundle @relation(fields: [bundleId], references: [id])
+
+  @@index([bundleId, startedAt])
+  @@map("harness_replay_executions")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
