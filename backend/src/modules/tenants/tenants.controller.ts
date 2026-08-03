@@ -91,6 +91,18 @@ export class TenantsController {
     return this.tenantsService.findOne(id);
   }
 
+  /**
+   * Tenant usage summary — counts of all related entities plus tier limits
+   * and utilization percentages. Used by the admin tenant detail drawer.
+   * SUPER_ADMIN only — read-only aggregate.
+   * GET /api/v1/tenants/:id/usage
+   */
+  @Get(':id/usage')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.PLATFORM_ADMIN)
+  getUsageSummary(@Param('id') id: string) {
+    return this.tenantsService.getUsageSummary(id);
+  }
+
   @Get('me/current')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.USER, UserRole.AUDITOR)
   async getCurrent(@CurrentUser() user: { tenantId?: string | null }) {

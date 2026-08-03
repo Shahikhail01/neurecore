@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
@@ -262,5 +263,122 @@ async deactivate(id: string, tenantId?: string) {
       data: { departmentId: null },
       select: { id: true, departmentId: true },
     });
+  }
+
+  // ─── Platform-admin actions (SUPER_ADMIN) ─────────────────────────────────
+
+  /**
+   * Generate a new random password, hash it, persist it, and return the
+   * plaintext once. Refuses to target the requesting admin.
+   */
+  async adminResetPassword(
+    userId: string,
+    requestingUserId: string,
+  ): Promise<{
+    userId: string;
+    email: string;
+    temporaryPassword: string;
+    resetAt: string;
+  }> {
+    if (userId === requestingUserId) {
+      throw new BadRequestException(
+        'Use the change-password endpoint to update your own password',
+      );
+    }
+
+    const target = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+    if (!target) throw new NotFoundException(`User ${userId} not found`);
+
+    const temporaryPassword = this.generateTemporaryPassword();
+    const passwordHash = await this.passwordService.hash(temporaryPassword);
+    const resetAt = new Date();
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, passwordChangedAt: resetAt },
+    });
+
+    this.logger.warn(
+      `SUPER_ADMIN password reset applied to user ${target.email} (${userId})`,
+    );
+
+    return {
+      userId: target.id,
+      email: target.email,
+      temporaryPassword,
+      resetAt: resetAt.toISOString(),
+    };
+  }
+
+  /**
+   * Hard-delete a user. Refuses to delete self and refuses to delete the
+   * last remaining SUPER_ADMIN.
+   */
+  async adminDeleteUser(userId: string, requestingUserId: string): Promise<void> {
+    if (userId === requestingUserId) {
+      throw new BadRequestException('You cannot delete your own account');
+    }
+
+    const target = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true },
+    });
+    if (!target) throw new NotFoundException(`User ${userId} not found`);
+
+    if (target.role === UserRole.SUPER_ADMIN) {
+      const superAdminCount = await this.prisma.user.count({
+        where: { role: UserRole.SUPER_ADMIN },
+      });
+      if (superAdminCount <= 1) {
+        throw new BadRequestException(
+          'Cannot delete the last remaining SUPER_ADMIN',
+        );
+      }
+    }
+
+    await this.prisma.user.delete({ where: { id: userId } });
+    this.logger.warn(
+      `SUPER_ADMIN deleted user ${target.email} (${userId})`,
+    );
+  }
+
+  /**
+   * Read-only: Resolve the OWNER of a tenant (used by the admin tenant
+   * drawer to support "reset tenant owner password" without a round-trip
+   * to the FE).
+   */
+  async findTenantOwnerId(tenantId: string): Promise<string | null> {
+    const owner = await this.prisma.user.findFirst({
+      where: { tenantId, role: UserRole.OWNER },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return owner?.id ?? null;
+  }
+
+  private generateTemporaryPassword(): string {
+    // 16 chars, URL-safe, no ambiguous chars (0/O, 1/l/I).
+    const alphabet =
+      'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    const bytes = new Uint8Array(16);
+    // crypto is available in Node 18+; safe-read from globalThis.
+    const cryptoSrc =
+      (globalThis as { crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array } })
+        .crypto;
+    if (cryptoSrc?.getRandomValues) {
+      cryptoSrc.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < bytes.length; i += 1) {
+        bytes[i] = Math.floor(Math.random() * 256);
+      }
+    }
+    let out = '';
+    for (let i = 0; i < bytes.length; i += 1) {
+      out += alphabet[bytes[i] % alphabet.length];
+    }
+    return out;
   }
 }

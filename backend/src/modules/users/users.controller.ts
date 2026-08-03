@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -12,6 +13,7 @@ import {
   ForbiddenException,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiCommon } from '../../common/decorators/api-common.decorator';
 import { UsersService } from './users.service';
@@ -76,6 +78,26 @@ export class UsersController {
     return {
       items: items as unknown as UserResponseDto[],
       pagination: { page: page ?? 1, limit: limit ?? 20, total, totalPages: Math.max(1, Math.ceil(total / (limit ?? 20))) },
+    };
+  }
+
+  /**
+   * Resolve the earliest-created OWNER for a tenant.
+   * GET /api/v1/users/tenant/:tenantId/owner
+   */
+  @Get('tenant/:tenantId/owner')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.PLATFORM_ADMIN,
+    UserRole.SECURITY_OFFICER,
+    UserRole.SUPPORT,
+  )
+  async findTenantOwner(@Param('tenantId') tenantId: string) {
+    const ownerId = await this.usersService.findTenantOwnerId(tenantId);
+    return {
+      success: true,
+      message: ownerId ? 'Tenant owner resolved' : 'Tenant owner not found',
+      data: { ownerId },
     };
   }
 
@@ -238,5 +260,54 @@ export class UsersController {
     if (!user.tenantId) throw new ForbiddenException('Tenant context required');
     await this.usersService.unassignFromDepartment(userId, user.tenantId);
     return { success: true, message: 'User unassigned from department' };
+  }
+
+  // ─── Platform-admin actions (SUPER_ADMIN only) ────────────────────────────
+
+  /**
+   * Admin-driven password reset. Generates a new random 16-char password,
+   * hashes it, persists it, and returns the plaintext ONCE so the admin
+   * can convey it to the user. Refuses to act on self.
+   * POST /api/v1/users/:id/reset-password
+   */
+  @Post(':id/reset-password')
+  @Roles(UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<
+    ActionResult<{
+      userId: string;
+      email: string;
+      temporaryPassword: string;
+      resetAt: string;
+    } | null>
+  > {
+    const result = await this.usersService.adminResetPassword(id, user.id);
+    return {
+      success: true,
+      message: 'Password reset. Share the temporary password with the user securely.',
+      data: result,
+    };
+  }
+
+  /**
+   * Hard-delete a user. SUPER_ADMIN only. Refuses to delete self, and
+   * refuses to delete the last remaining SUPER_ADMIN.
+   * DELETE /api/v1/users/:id
+   */
+  @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN)
+  async delete(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ActionResult<null>> {
+    await this.usersService.adminDeleteUser(id, user.id);
+    return {
+      success: true,
+      message: 'User permanently deleted',
+      data: null,
+    };
   }
 }

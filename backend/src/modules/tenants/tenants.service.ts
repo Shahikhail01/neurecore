@@ -362,6 +362,130 @@ export class TenantsService {
     return this.prisma.tenant.delete({ where: { id } });
   }
 
+  /**
+   * Tenant usage summary — SUPER_ADMIN read-only aggregate used by the
+   * admin tenant detail drawer. Counts every related entity that exists
+   * for the tenant, plus tier limits and recent spend.
+   *
+   * The counts are intentionally best-effort — each `count` is wrapped in
+   * its own try/catch so a single missing column on a future migration
+   * cannot blank the whole endpoint (the admin drawer would otherwise
+   * lose every metric at once).
+   */
+  async getUsageSummary(id: string) {
+    const tenant = (await this.findOne(id)) as {
+      id: string;
+      name: string;
+      slug: string;
+      status: string;
+      tierId?: string | null;
+      tier?: {
+        id: string;
+        slug: string;
+        name: string;
+        maxUsers?: number | null;
+        maxAgents?: number | null;
+        maxDepartments?: number | null;
+        maxStorageGB?: number | null;
+        maxApiCalls?: number | null;
+        maxConversationMessages?: number | null;
+        maxFileSizeMB?: number | null;
+      } | null;
+    };
+
+    // Resolve tier from the relation when present; otherwise fall back to
+    // a direct lookup by tierId so the summary stays usable even when the
+    // drift-safe findOne() path returned a row without the `tier` include.
+    let tier = tenant.tier ?? null;
+    if (!tier && tenant.tierId) {
+      try {
+        const t = await this.prisma.tier.findUnique({
+          where: { id: tenant.tierId },
+        });
+        if (t) {
+          tier = t as unknown as typeof tier;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Tier lookup on usage summary failed: ${(error as Error).message}`,
+        );
+      }
+    }
+
+    const safeCount = async (
+      delegate: { count: (args: unknown) => Promise<number> } | undefined,
+      args: unknown,
+    ): Promise<number> => {
+      if (!delegate) return 0;
+      try {
+        return await delegate.count(args);
+      } catch (error) {
+        this.logger.warn(
+          `Usage counter skipped: ${(error as Error).message}`,
+        );
+        return 0;
+      }
+    };
+
+    const [users, agents, departments, projects, conversations, invoices] =
+      await Promise.all([
+        safeCount(this.prisma.user, { where: { tenantId: id } }),
+        safeCount(this.prisma.agent, { where: { tenantId: id } }),
+        safeCount(this.prisma.department, { where: { tenantId: id } }),
+        safeCount(this.prisma.project, { where: { tenantId: id } }),
+        safeCount(this.prisma.chatSession, { where: { tenantId: id } }),
+        safeCount(this.prisma.invoice, { where: { tenantId: id } }),
+      ]);
+
+    const activeUsers = await safeCount(this.prisma.user, {
+      where: { tenantId: id, isActive: true },
+    });
+
+    const tierLimits = {
+      maxUsers: tier?.maxUsers ?? null,
+      maxAgents: tier?.maxAgents ?? null,
+      maxDepartments: tier?.maxDepartments ?? null,
+      maxStorageGB: tier?.maxStorageGB ?? null,
+      maxApiCalls: tier?.maxApiCalls ?? null,
+      maxConversationMessages: tier?.maxConversationMessages ?? null,
+      maxFileSizeMB: tier?.maxFileSizeMB ?? null,
+    };
+
+    const utilization = {
+      users: tierLimits.maxUsers
+        ? Math.round((users / tierLimits.maxUsers) * 100)
+        : null,
+      agents: tierLimits.maxAgents
+        ? Math.round((agents / tierLimits.maxAgents) * 100)
+        : null,
+      departments: tierLimits.maxDepartments
+        ? Math.round((departments / tierLimits.maxDepartments) * 100)
+        : null,
+    };
+
+    return {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tenantSlug: tenant.slug,
+      status: tenant.status,
+      tier: tier
+        ? { id: tier.id, slug: tier.slug, name: tier.name }
+        : null,
+      counts: {
+        users,
+        activeUsers,
+        agents,
+        departments,
+        projects,
+        conversations,
+        invoices,
+      },
+      tierLimits,
+      utilization,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   private isMissingColumnError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
     const code = (error as { code?: string }).code;
