@@ -382,6 +382,23 @@ function DepartmentsTab() {
                   </div>
                 </Link>
 
+                <div className="px-4 pb-2 flex items-center gap-2">
+                  <Link
+                    href={`/departments/${encodeURIComponent(dept.id)}/control-room`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-accent-500/30 text-accent-500 hover:bg-accent-500/10 transition"
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    Control Room
+                  </Link>
+                  <Link
+                    href={`/departments/${encodeURIComponent(dept.id)}/workspace`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-surface-border text-zinc-400 hover:text-zinc-200 hover:bg-surface-overlay transition"
+                  >
+                    <Briefcase className="w-3.5 h-3.5" />
+                    Workspace
+                  </Link>
+                </div>
+
                 {/* Quick expand: see agent names */}
                 <button
                   onClick={() => toggleExpand(dept.id)}

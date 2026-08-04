@@ -28,6 +28,8 @@ import type { UpdateWorkflowDto } from '../dto/update-workflow.dto';
 import type {
   WorkflowResponseDto,
   WorkflowExecutionSummaryDto,
+  WorkflowExecutionHistoryItemDto,
+  UpdateWorkflowExecutionDto,
 } from '../dto/workflow-response.dto';
 
 interface ListWorkflowsOptions {
@@ -261,11 +263,14 @@ export class WorkflowsService {
 
     this.events.emitToTenant(tenantId, 'workflow:event', {
       workflowId: id,
+      workflowName: existing.name,
       event:
         targetStatus === WorkflowStatus.ACTIVE
           ? 'workflow:activated'
           : 'workflow:paused',
       status: targetStatus,
+      stageLabel:
+        targetStatus === WorkflowStatus.ACTIVE ? 'Activation' : 'Pause requested',
       timestamp: Date.now(),
     });
 
@@ -312,9 +317,25 @@ export class WorkflowsService {
 
     this.events.emitToTenant(tenantId, 'workflow:event', {
       workflowId: id,
+      workflowName: existing.name,
       event: 'workflow:started',
+      status: existing.status,
+      stageLabel: 'Execution started',
       executionId: execution.id,
+      progressPercent: 10,
+      detail: 'Workflow execution record created',
       input,
+      timestamp: Date.now(),
+    });
+
+    this.events.emitToTenant(tenantId, 'workflow:progress', {
+      workflowId: id,
+      workflowName: existing.name,
+      status: existing.status,
+      stageLabel: 'Execution queued',
+      executionId: execution.id,
+      progressPercent: 25,
+      detail: 'Workflow execution is queued for runtime processing',
       timestamp: Date.now(),
     });
 
@@ -323,6 +344,98 @@ export class WorkflowsService {
     // The job worker would later call completeExecution / failExecution.
 
     return { executionId: execution.id };
+  }
+
+  async updateExecution(
+    workflowId: string,
+    executionId: string,
+    tenantId: string,
+    dto: UpdateWorkflowExecutionDto,
+  ): Promise<{ executionId: string; status: string }> {
+    const workflow = await this.prisma.workflow.findFirst({
+      where: { id: workflowId, tenantId },
+    });
+    if (!workflow) {
+      throw new NotFoundException(`Workflow ${workflowId} not found`);
+    }
+
+    const execution = await this.prisma.workflowExecution.findFirst({
+      where: { id: executionId, workflowId, tenantId },
+    });
+    if (!execution) {
+      throw new NotFoundException(`Workflow execution ${executionId} not found`);
+    }
+    if (execution.status !== 'RUNNING') {
+      throw new BadRequestException(
+        `Workflow execution ${executionId} is already ${execution.status}.`,
+      );
+    }
+
+    const completedAt = new Date();
+    const durationMs = Math.max(
+      0,
+      completedAt.getTime() - execution.startedAt.getTime(),
+    );
+
+    await this.prisma.workflowExecution.update({
+      where: { id: executionId },
+      data: {
+        status: dto.status,
+        completedAt,
+        durationMs,
+        errorMessage: dto.status === 'FAILED' ? dto.errorMessage ?? dto.detail ?? 'Workflow execution failed' : null,
+      },
+    });
+
+    const executionAgg = await this.prisma.workflowExecution.aggregate({
+      where: { workflowId, tenantId },
+      _count: { _all: true },
+    });
+    const successCount = await this.prisma.workflowExecution.count({
+      where: { workflowId, tenantId, status: 'COMPLETED' },
+    });
+    const totalRuns = executionAgg._count._all;
+    const successRate = totalRuns > 0 ? Math.round((successCount / totalRuns) * 100) : 0;
+
+    await this.prisma.workflow.update({
+      where: { id: workflowId },
+      data: {
+        successRate,
+      },
+    });
+
+    this.events.emitToTenant(tenantId, 'workflow:progress', {
+      workflowId,
+      workflowName: workflow.name,
+      status: dto.status === 'COMPLETED' ? 'ARCHIVED' : 'ERROR',
+      stageLabel: dto.status === 'COMPLETED' ? 'Execution completed' : 'Execution failed',
+      executionId,
+      progressPercent: 100,
+      detail:
+        dto.detail ??
+        (dto.status === 'COMPLETED'
+          ? 'Workflow execution completed successfully'
+          : dto.errorMessage ?? 'Workflow execution failed'),
+      timestamp: Date.now(),
+    });
+
+    this.events.emitToTenant(tenantId, 'workflow:event', {
+      workflowId,
+      workflowName: workflow.name,
+      event: dto.status === 'COMPLETED' ? 'workflow:completed' : 'workflow:failed',
+      status: dto.status === 'COMPLETED' ? 'ARCHIVED' : 'ERROR',
+      stageLabel: dto.status === 'COMPLETED' ? 'Completed' : 'Failed',
+      executionId,
+      progressPercent: 100,
+      detail:
+        dto.detail ??
+        (dto.status === 'COMPLETED'
+          ? 'Workflow execution completed successfully'
+          : dto.errorMessage ?? 'Workflow execution failed'),
+      timestamp: Date.now(),
+    });
+
+    return { executionId, status: dto.status };
   }
 
   // ─── Status summary ─────────────────────────────────────────────────────
@@ -372,6 +485,44 @@ export class WorkflowsService {
       lastRunAt: workflow.lastExecutedAt ?? null,
       status: workflow.status,
     };
+  }
+
+  async getExecutionHistory(
+    id: string,
+    tenantId: string,
+    limit = 10,
+  ): Promise<WorkflowExecutionHistoryItemDto[]> {
+    const workflow = await this.prisma.workflow.findFirst({
+      where: { id, tenantId },
+      select: { id: true },
+    });
+    if (!workflow) {
+      throw new NotFoundException(`Workflow ${id} not found`);
+    }
+
+    const executions = await this.prisma.workflowExecution.findMany({
+      where: { workflowId: id, tenantId },
+      orderBy: { startedAt: 'desc' },
+      take: Math.max(1, Math.min(50, limit)),
+      select: {
+        id: true,
+        status: true,
+        startedAt: true,
+        completedAt: true,
+        durationMs: true,
+        errorMessage: true,
+      },
+    });
+
+    return executions.map((execution) => ({
+      id: execution.id,
+      status: execution.status,
+      startedAt: execution.startedAt,
+      completedAt: execution.completedAt,
+      durationMs: execution.durationMs,
+      errorMessage: execution.errorMessage,
+      createdAt: execution.startedAt,
+    }));
   }
 
   // ─── Map Prisma model → response DTO ───────────────────────────────────

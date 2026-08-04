@@ -21,7 +21,7 @@ import api from '@/services/api';
 import { unwrapItem, unwrapList } from '@/services/unwrap';
 import { deptTemplatesService, type DepartmentTemplate, type BulkAgentDeployItem } from '@/services/deptTemplates.service';
 import { agentTemplatesService, type AgentTemplate } from '@/services/agentTemplates.service';
-import { packagesService, type Package, type DeployPackagePreview, type DeployPackageOutcome } from '@/services/packages.service';
+import { packagesService, type Package, type DeployPackagePreview, type DeployPackageOutcome, type PackageDeploymentHistoryItem } from '@/services/packages.service';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { Tenant } from '@/types/api.types';
 
@@ -97,6 +97,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
   const [pkgDeploying, setPkgDeploying] = useState(false);
   const [pkgDeployResult, setPkgDeployResult] = useState<DeployPackageOutcome | null>(null);
   const [pkgDeployError, setPkgDeployError] = useState<string | null>(null);
+  const [pkgDeployHistory, setPkgDeployHistory] = useState<PackageDeploymentHistoryItem[]>([]);
+  const selectedPackage = packages.find((pkg) => pkg.id === selectedPackageId) ?? null;
 
   // Deploy: Single department flow
   const [singleDeptTemplateId, setSingleDeptTemplateId] = useState('');
@@ -148,15 +150,17 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
   }, [tenantId]);
 
   const loadDeployAssets = useCallback(async () => {
-    const [dtRes, atRes, pkgRes] = await Promise.all([
+    const [dtRes, atRes, pkgRes, pkgHistoryRes] = await Promise.all([
       deptTemplatesService.list({ limit: 100 }),
       agentTemplatesService.list({ limit: 100 }),
       packagesService.list({ limit: 100 }),
+      packagesService.deployHistory(tenantId, 8),
     ]);
     setDeptTemplates(dtRes.items);
     setAgentTemplateList(atRes.items);
     setPackages(pkgRes.items);
-  }, []);
+    setPkgDeployHistory(pkgHistoryRes);
+  }, [tenantId]);
 
   useEffect(() => {
     if (tab === 'departments') void loadDepts();
@@ -249,6 +253,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       });
       setPkgDeployResult(result);
       setPkgPreview(null);
+      const refreshedHistory = await packagesService.deployHistory(tenantId, 8);
+      setPkgDeployHistory(refreshedHistory);
     } catch (err: unknown) {
       setPkgDeployError(err instanceof Error ? err.message : 'Deployment failed');
     } finally {
@@ -800,6 +806,38 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                       +{pkgDeployResult.departments.created} departments, +{pkgDeployResult.agents.created} agents
                       {pkgDeployResult.agents.skipped > 0 && <> ({pkgDeployResult.agents.skipped} skipped — idempotent)</>}
                     </div>
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                      <div className="rounded-lg border border-green-800/30 bg-black/10 p-3">
+                        <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Departments</div>
+                        <div className="space-y-1 max-h-40 overflow-y-auto">
+                          {pkgDeployResult.departments.items.map((item) => (
+                            <div key={`${item.templateId}-${item.id || item.name}`} className="flex items-center justify-between gap-2 text-xs">
+                              <span className="text-zinc-200 truncate">{item.name}</span>
+                              <span className={`rounded-full px-2 py-0.5 ${item.reused ? 'bg-zinc-800 text-zinc-300' : 'bg-green-900/50 text-green-200'}`}>
+                                {item.reused ? 'reused' : 'created'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-green-800/30 bg-black/10 p-3">
+                        <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Employees</div>
+                        <div className="space-y-1 max-h-40 overflow-y-auto">
+                          {pkgDeployResult.agents.items.map((item) => (
+                            <div key={`${item.templateId}-${item.id || item.name}`} className="flex items-center justify-between gap-2 text-xs">
+                              <span className="text-zinc-200 truncate">{item.name}</span>
+                              <span className={`rounded-full px-2 py-0.5 ${item.reused ? 'bg-zinc-800 text-zinc-300' : 'bg-green-900/50 text-green-200'}`}>
+                                {item.reused ? 'skipped' : 'created'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-zinc-400">
+                      <div>Authority: <span className="text-zinc-200">{pkgDeployResult.authorityLevel}</span></div>
+                      <div>Idempotent: <span className="text-zinc-200">{pkgDeployResult.idempotent ? 'Yes' : 'No'}</span></div>
+                    </div>
                     <button onClick={() => { setPkgDeployResult(null); setSelectedPackageId(''); setPkgPreview(null); }}
                       className="mt-3 text-xs text-[color:var(--accent-400)] hover:underline block">
                       Deploy another →
@@ -828,6 +866,36 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                         ))}
                       </select>
                     </div>
+
+                    {selectedPackage && (
+                      <div className="rounded-lg border border-surface-border bg-surface-overlay/50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-zinc-100">{selectedPackage.name}</div>
+                            <div className="text-xs text-zinc-500 mt-1">
+                              {selectedPackage.description || 'No package description provided.'}
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] text-zinc-300">
+                            {selectedPackage.status}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                          <div className="rounded-lg bg-black/10 px-3 py-2">
+                            <div className="text-zinc-500">Departments</div>
+                            <div className="text-zinc-100 font-medium">{selectedPackage.departments?.length ?? 0}</div>
+                          </div>
+                          <div className="rounded-lg bg-black/10 px-3 py-2">
+                            <div className="text-zinc-500">Employees</div>
+                            <div className="text-zinc-100 font-medium">{selectedPackage.aiAgents?.length ?? 0}</div>
+                          </div>
+                          <div className="rounded-lg bg-black/10 px-3 py-2">
+                            <div className="text-zinc-500">Features</div>
+                            <div className="text-zinc-100 font-medium">{selectedPackage.features?.length ?? 0}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Options */}
                     <div className="flex flex-wrap gap-4">
@@ -878,6 +946,26 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                           {pkgPreview.capacity.agentsUsed}/{pkgPreview.capacity.agentsLimit} agents
                           {' '}({pkgPreview.capacity.departmentsRemaining}D / {pkgPreview.capacity.agentsRemaining}A free)
                         </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                          <div className="rounded-lg bg-black/10 px-3 py-2">
+                            <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Deploy mode</div>
+                            <div className="text-xs text-zinc-300">
+                              {pkgWithAgents ? 'Departments + employees' : 'Departments only'}
+                            </div>
+                            <div className="text-xs text-zinc-300">
+                              Authority {pkgAuthority} • {pkgIdempotent ? 'Idempotent' : 'Non-idempotent'}
+                            </div>
+                          </div>
+                          <div className="rounded-lg bg-black/10 px-3 py-2">
+                            <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Projected delta</div>
+                            <div className="text-xs text-zinc-300">
+                              +{pkgPreview.totals.departments} departments
+                            </div>
+                            <div className="text-xs text-zinc-300">
+                              {pkgWithAgents ? `+${pkgPreview.totals.agents} employees` : '+0 employees'}
+                            </div>
+                          </div>
+                        </div>
                         {pkgPreview.blockers.length > 0 && (
                           <ul className="text-xs text-yellow-400 list-disc pl-4 space-y-0.5">
                             {pkgPreview.blockers.map((b, i) => <li key={i}>{b}</li>)}
@@ -901,6 +989,54 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                         {pkgDeploying ? 'Deploying…' : 'Deploy Package'}
                       </button>
                     </div>
+                  </div>
+                )}
+              </DeployCard>
+
+              <DeployCard title="Package Deployment History" subtitle="Recent package rollouts for this tenant with authority and idempotency evidence.">
+                {pkgDeployHistory.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-zinc-500">
+                    No package deployment history yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {pkgDeployHistory.map((entry) => (
+                      <div key={entry.id} className="rounded-lg border border-surface-border bg-surface-overlay/40 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-zinc-100">
+                              {entry.packageName ?? 'Package deployment'}
+                            </div>
+                            <div className="mt-1 text-xs text-zinc-500">
+                              {new Date(entry.createdAt).toLocaleString()} by {entry.actor}
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] text-zinc-300">
+                            {entry.authorityLevel}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                          <div className="rounded bg-black/10 px-2.5 py-2">
+                            <div className="text-zinc-500">Departments</div>
+                            <div className="text-zinc-100">{entry.departmentsCreated} created</div>
+                            <div className="text-zinc-400">{entry.departmentsReused} reused</div>
+                          </div>
+                          <div className="rounded bg-black/10 px-2.5 py-2">
+                            <div className="text-zinc-500">Employees</div>
+                            <div className="text-zinc-100">{entry.agentsCreated} created</div>
+                            <div className="text-zinc-400">{entry.agentsSkipped} skipped</div>
+                          </div>
+                          <div className="rounded bg-black/10 px-2.5 py-2">
+                            <div className="text-zinc-500">Mode</div>
+                            <div className="text-zinc-100">{entry.withAgents ? 'With employees' : 'Departments only'}</div>
+                          </div>
+                          <div className="rounded bg-black/10 px-2.5 py-2">
+                            <div className="text-zinc-500">Idempotent</div>
+                            <div className="text-zinc-100">{entry.idempotent ? 'Yes' : 'No'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </DeployCard>

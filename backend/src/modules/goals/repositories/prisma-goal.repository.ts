@@ -8,7 +8,7 @@
  * - Tenant Isolation: ALL queries include tenantId filter (passed as parameter)
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type {
   IGoalRepository,
@@ -56,7 +56,13 @@ export class PrismaGoalRepository implements IGoalRepository {
     const limit = options.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = tenantId !== '*' ? { tenantId } : {};
+    // Phase 0.5 P-1 audit fix: refuse wildcard tenant bypass.
+    if (tenantId === '*') {
+      throw new ForbiddenException(
+        'tenantId "*" is forbidden; use a platform-admin port for cross-tenant queries',
+      );
+    }
+    const where: Record<string, unknown> = { tenantId };
 
     if (status) where.status = status;
     if (level) where.level = level;

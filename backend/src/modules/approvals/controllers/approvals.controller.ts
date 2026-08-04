@@ -9,12 +9,9 @@
 
 import {
     Controller,
-    Get,
     Post,
     Body,
     Param,
-    Query,
-    HttpStatus,
     UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -23,7 +20,6 @@ import { ApprovalsService } from '../services/approvals.service';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../auth/interfaces/token.interface';
 import type {
-    StratifiedApprovalsResponse,
     ApprovalFeedback,
 } from '../../../shared/types/approvals.types';
 
@@ -34,26 +30,13 @@ import type {
 export class ApprovalsController {
     constructor(private readonly approvalsService: ApprovalsService) { }
 
-    @Get('stratified')
-    @ApiOperation({
-        summary: 'Get stratified approvals',
-        description:
-            'Returns approvals stratified into critical and routine, with AI recommendations.',
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Stratified approvals successfully retrieved',
-    })
-    @ApiResponse({ status: 403, description: 'Unauthorized' })
-    async getStratified(
-        @CurrentUser() user: JwtPayload,
-        @Query('status') status?: string
-    ): Promise<StratifiedApprovalsResponse> {
-        return this.approvalsService.getStratifiedApprovals(
-            user.tenantId!,
-            status || 'PENDING'
-        );
-    }
+    // REMOVED @Get('stratified') — collides with governance.controller.ts
+    // ApprovalsController @ GET /approvals/stratified.
+    // Phase 0.5 collision-resolution: governance's enrichment-backed
+    // implementation is the canonical owner; this controller now exposes
+    // only the unique endpoints (feedback, approve, reject). Consumers
+    // should call GET /api/v1/approvals/stratified on the governance route.
+    // See neurecore/memory-bank-arc/comms/route-duplication-report.yaml.
 
     @Post('feedback')
     @ApiOperation({

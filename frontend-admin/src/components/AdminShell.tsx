@@ -19,12 +19,18 @@ export default function AdminShell({
   user,
   children,
 }: {
-  user: AuthUser;
+  user: AuthUser | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+
+  // Auth guard: during static prerender and before the auth store resolves,
+  // `user` is null. Render nothing (and rely on the auth hook's redirect to
+  // /login) instead of crashing on `user.firstName`. Solid: the guard is
+  // independent of any page; every page that renders AdminShell inherits it.
+  if (!user) return null;
 
   async function handleLogout() {
     await logout();

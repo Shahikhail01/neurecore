@@ -10,3 +10,4 @@ export {
   WorkflowResponseDto,
   WorkflowExecutionSummaryDto,
 } from './workflow-response.dto';
+export { UpdateWorkflowExecutionDto } from './workflow-response.dto';

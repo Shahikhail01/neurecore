@@ -30,7 +30,6 @@ import {
   ShieldCheck,
   Activity,
   Mail,
-  MailOpen,
   Archive,
   Trash2,
   CheckCheck,
@@ -43,7 +42,8 @@ import {
   Wallet,
   Bot,
   CircleDot,
-  Hash,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 
 import { PageShell, PageHero } from '@neurecore/ui-visual';
@@ -53,6 +53,7 @@ import { KpiCard } from '@/components/creatio/KpiCard';
 import { StatusBadge } from '@/components/creatio/StatusBadge';
 import { ActionButton } from '@/components/creatio/ActionToolbar';
 import ThreadInboxPanel from '@/components/threads/ThreadInboxPanel';
+import { rejectApproval } from '@/services/approval-enrichment.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 type ServiceDeskTab = 'inbox' | 'approvals' | 'audit' | 'activity' | 'threads';
@@ -440,6 +441,10 @@ function ApprovalsTab() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING');
+  const [selected, setSelected] = useState<Approval | null>(null);
+  const [rejecting, setRejecting] = useState<Approval | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const fetchApprovals = useCallback(async () => {
     setLoading(true);
@@ -458,15 +463,28 @@ function ApprovalsTab() {
 
   useEffect(() => { void fetchApprovals(); }, [fetchApprovals]);
 
-  const review = async (id: string, decision: 'APPROVED' | 'REJECTED') => {
-    const comment = decision === 'REJECTED' ? prompt('Reason for rejection?') ?? '' : '';
+  const review = async (approval: Approval, decision: 'APPROVED' | 'REJECTED', reason?: string) => {
+    setBusyId(approval.id);
     try {
-      await apiFetch(`/approvals/${id}/review`, {
-        method: 'PATCH',
-        body: JSON.stringify({ decision, comment }),
-      });
+      if (decision === 'REJECTED') {
+        await rejectApproval(approval.id, reason?.trim() || undefined);
+      } else {
+        await apiFetch(`/approvals/${approval.id}/review`, {
+          method: 'PATCH',
+          body: JSON.stringify({ decision, comment: '' }),
+        });
+      }
       void fetchApprovals();
-    } catch { /* silent */ }
+      if (selected?.id === approval.id) setSelected(null);
+      if (rejecting?.id === approval.id) {
+        setRejecting(null);
+        setRejectReason('');
+      }
+    } catch {
+      /* silent */
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const pendingCount = approvals.filter((a) => a.status === 'PENDING').length;
@@ -552,7 +570,11 @@ function ApprovalsTab() {
                     <ActionButton
                       variant="danger"
                       size="sm"
-                      onClick={() => review(a.id, 'REJECTED')}
+                      disabled={busyId === a.id}
+                      onClick={() => {
+                        setRejecting(a);
+                        setRejectReason('');
+                      }}
                     >
                       Reject
                     </ActionButton>
@@ -560,9 +582,18 @@ function ApprovalsTab() {
                       variant="primary"
                       size="sm"
                       icon={<CheckCircle2 className="w-3 h-3" />}
-                      onClick={() => review(a.id, 'APPROVED')}
+                      disabled={busyId === a.id}
+                      onClick={() => void review(a, 'APPROVED')}
                     >
                       Approve
+                    </ActionButton>
+                    <ActionButton
+                      variant="ghost"
+                      size="sm"
+                      icon={<ChevronRight className="w-3 h-3" />}
+                      onClick={() => setSelected(a)}
+                    >
+                      Details
                     </ActionButton>
                   </div>
                 )}
@@ -571,6 +602,149 @@ function ApprovalsTab() {
           ))}
         </div>
       )}
+
+      <AnimatePresence>
+        {selected && (
+          <ApprovalDetailModal approval={selected} onClose={() => setSelected(null)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {rejecting && (
+          <RejectApprovalModal
+            approval={rejecting}
+            reason={rejectReason}
+            setReason={setRejectReason}
+            onClose={() => {
+              setRejecting(null);
+              setRejectReason('');
+            }}
+            onConfirm={() => void review(rejecting, 'REJECTED', rejectReason)}
+            busy={busyId === rejecting.id}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ApprovalDetailModal({
+  approval,
+  onClose,
+}: {
+  approval: Approval;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 12, scale: 0.98 }}
+        className="w-full max-w-2xl rounded-2xl border border-surface-border bg-surface-raised shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-surface-border px-5 py-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Approval details</p>
+            <h3 className="text-lg font-semibold text-zinc-100 mt-1">{approval.title}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-md p-2 text-zinc-500 hover:bg-surface-overlay hover:text-zinc-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="grid gap-4 px-5 py-4 md:grid-cols-2">
+          <DetailItem label="Status" value={approval.status} />
+          <DetailItem label="Risk" value={approval.priority ?? '—'} />
+          <DetailItem label="Amount" value={approval.amount != null ? `$${approval.amount.toFixed(2)}` : '—'} />
+          <DetailItem label="Created" value={new Date(approval.createdAt).toLocaleString()} />
+          <DetailItem label="Requester" value={approval.requester ? `${approval.requester.firstName ?? ''} ${approval.requester.lastName ?? ''}`.trim() : '—'} />
+          <DetailItem label="Agent" value={approval.agent?.name ?? '—'} />
+          <div className="md:col-span-2 rounded-xl border border-surface-border bg-surface-overlay/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Description</p>
+            <p className="mt-2 text-sm text-zinc-300 whitespace-pre-wrap">{approval.description ?? 'No description provided.'}</p>
+          </div>
+          {approval.reviewComment && (
+            <div className="md:col-span-2 rounded-xl border border-[color:var(--accent-500)]/30 bg-[color:var(--accent-500)]/5 p-4">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">Review comment</p>
+              <p className="mt-2 text-sm text-zinc-200">{approval.reviewComment}</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-surface-border bg-surface-overlay/60 p-4">
+      <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className="mt-2 text-sm text-zinc-200">{value}</p>
+    </div>
+  );
+}
+
+function RejectApprovalModal({
+  approval,
+  reason,
+  setReason,
+  onClose,
+  onConfirm,
+  busy,
+}: {
+  approval: Approval;
+  reason: string;
+  setReason: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  busy: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 12, scale: 0.98 }}
+        className="w-full max-w-xl rounded-2xl border border-surface-border bg-surface-raised shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-surface-border px-5 py-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Reject approval</p>
+            <h3 className="text-lg font-semibold text-zinc-100 mt-1">{approval.title}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-md p-2 text-zinc-500 hover:bg-surface-overlay hover:text-zinc-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <p className="text-sm text-zinc-400">
+            Add a rejection reason so the requester and audit trail have clear context.
+          </p>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={4}
+            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-accent-500"
+            placeholder="Explain why this approval should be rejected..."
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-surface-border px-4 py-2 text-sm text-zinc-300 hover:bg-surface-overlay"
+              disabled={busy}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="rounded-lg bg-state-danger px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              disabled={busy}
+            >
+              {busy ? 'Rejecting…' : 'Reject approval'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

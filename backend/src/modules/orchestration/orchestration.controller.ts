@@ -30,7 +30,14 @@ const PLATFORM_ROLES: ReadonlySet<UserRole> = new Set([
 ]);
 
 @ApiCommon('orchestration')
-@Controller({ version: '1' })
+// Phase 0.5 collision-resolution:
+// Previously this controller was mounted at the API root with handlers like
+// `@Get('workflows')` which collided with the canonical
+// `modules/workflows/workflows.controller.ts` (also mounted at
+// `@Controller({ path: 'workflows', version: '1' })`). We moved the
+// orchestration routes under `orchestration/*` to make the boundary explicit.
+// See neurecore/memory-bank-arc/comms/route-duplication-report.yaml.
+@Controller({ path: 'orchestration', version: '1' })
 export class OrchestrationController {
   constructor(
     private readonly tasksService: TasksService,

@@ -11,6 +11,7 @@ import {
   HttpStatus,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiCommon } from '../../common/decorators/api-common.decorator';
 import { DepartmentsService } from './services/departments.service';
@@ -65,14 +66,26 @@ export class DepartmentsController {
   ): Promise<PaginatedResponse<DepartmentResponseDto>> {
     const PLATFORM_ROLES: readonly string[] = ['SUPER_ADMIN', 'PLATFORM_ADMIN'];
     let targetTenantId: string | null;
+    // Phase 0.5 P-1 audit note:
+    // Platform admins (SUPER_ADMIN, PLATFORM_ADMIN) may target any tenant via
+    // `?tenantId=...`. Per v3 P-1 rule §11, platform-admin cross-tenant access
+    // must not rely on a wildcard sentinel — the controller below explicitly
+    // resolves the target tenant from the query parameter when the caller is
+    // a platform role, or from the JWT tenant otherwise. The previous
+    // `user.tenantId !== '*'` check has been removed because it implicitly
+    // accepted the wildcard; the JWT now never carries `'*'` as a real
+    // tenant id.
     if (queryTenantId && PLATFORM_ROLES.includes(user.role)) {
       targetTenantId = queryTenantId;
-    } else if (user.tenantId && user.tenantId !== '*') {
+    } else if (user.tenantId) {
       targetTenantId = user.tenantId;
     } else if (queryTenantId) {
-      targetTenantId = queryTenantId;
+      // Non-platform caller supplied ?tenantId=... — reject.
+      throw new ForbiddenException(
+        'tenantId query parameter is reserved for platform administrators',
+      );
     } else {
-      throw new Error('Tenant ID is required to list departments');
+      throw new ForbiddenException('Tenant context required');
     }
     const all = await this.departmentsService.findAll(targetTenantId);
     const start = (pagination.page - 1) * pagination.limit;

@@ -24,6 +24,19 @@ interface RoutineDetail {
     type: string;
     name?: string;
     config?: Record<string, unknown>;
+    webhookPath?: string | null;
+    lastFiredAt?: string | null;
+    nextFireAt?: string | null;
+  }>;
+  runs?: Array<{
+    id: string;
+    status: string;
+    createdAt: string;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    durationMs?: number | null;
+    triggerType?: string;
+    error?: string;
   }>;
   lastRunAt?: string | null;
   createdAt: string;
@@ -33,6 +46,7 @@ interface RoutineDetail {
 export function RoutineInspector({ id }: { id: string }) {
   const [r, setR] = useState<RoutineDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busyRunId, setBusyRunId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -49,7 +63,7 @@ export function RoutineInspector({ id }: { id: string }) {
   }, [id]);
 
   const setStatus = async (status: 'ACTIVE' | 'PAUSED' | 'DISABLED') => {
-    await api.patch(`/routines/${id}`, { status });
+    await api.put(`/routines/${id}`, { status });
     load();
   };
   const execute = async () => {
@@ -60,6 +74,24 @@ export function RoutineInspector({ id }: { id: string }) {
     if (!confirm('Delete this routine?')) return;
     await api.delete(`/routines/${id}`);
     load();
+  };
+  const resumeRun = async (runId: string) => {
+    setBusyRunId(runId);
+    try {
+      await api.post(`/routines/runs/${runId}/resume`, {});
+      load();
+    } finally {
+      setBusyRunId(null);
+    }
+  };
+  const cancelRun = async (runId: string) => {
+    setBusyRunId(runId);
+    try {
+      await api.post(`/routines/runs/${runId}/cancel`, {});
+      load();
+    } finally {
+      setBusyRunId(null);
+    }
   };
 
   if (loading) {
@@ -126,10 +158,64 @@ export function RoutineInspector({ id }: { id: string }) {
             {r.triggers.map((t) => (
               <div
                 key={t.id}
-                className="text-xs px-2 py-1.5 rounded bg-surface border border-surface-border flex items-center justify-between"
+                className="text-xs px-2 py-2 rounded bg-surface border border-surface-border"
               >
-                <span className="text-zinc-200">{t.name ?? t.type}</span>
-                <span className="text-[10px] text-zinc-500 uppercase">{t.type}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-zinc-200">{t.name ?? t.type}</span>
+                  <span className="text-[10px] text-zinc-500 uppercase">{t.type}</span>
+                </div>
+                <div className="mt-1 space-y-0.5 text-[11px] text-zinc-500">
+                  {t.webhookPath && <div className="font-mono break-all">{t.webhookPath}</div>}
+                  {t.lastFiredAt && <div>Last fired: {new Date(t.lastFiredAt).toLocaleString()}</div>}
+                  {t.nextFireAt && <div>Next fire: {new Date(t.nextFireAt).toLocaleString()}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.runs && r.runs.length > 0 && (
+        <div>
+          <p className="text-xs text-zinc-500 mb-2">Recent runs</p>
+          <div className="space-y-1.5 max-h-44 overflow-y-auto">
+            {r.runs.slice(0, 6).map((run) => (
+              <div key={run.id} className="rounded bg-surface border border-surface-border px-2 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-zinc-200">{run.triggerType ?? 'MANUAL'}</span>
+                  <StatusBadge status={run.status} />
+                </div>
+                <div className="mt-1 text-[11px] text-zinc-500">
+                  Started {new Date(run.startedAt ?? run.createdAt).toLocaleString()}
+                </div>
+                {run.durationMs != null && (
+                  <div className="text-[11px] text-zinc-500">Duration {run.durationMs}ms</div>
+                )}
+                {run.error && (
+                  <div className="mt-1 text-[11px] text-red-300">{run.error}</div>
+                )}
+                <div className="mt-2 flex gap-2">
+                  {(run.status === 'PAUSED' || run.status === 'CANCELLED') && (
+                    <button
+                      type="button"
+                      disabled={busyRunId === run.id}
+                      onClick={() => void resumeRun(run.id)}
+                      className="rounded-md border border-surface-border px-2 py-1 text-[11px] text-zinc-200 hover:bg-surface-overlay disabled:opacity-50"
+                    >
+                      {busyRunId === run.id ? 'Resuming…' : 'Resume'}
+                    </button>
+                  )}
+                  {run.status === 'RUNNING' && (
+                    <button
+                      type="button"
+                      disabled={busyRunId === run.id}
+                      onClick={() => void cancelRun(run.id)}
+                      className="rounded-md border border-red-800/40 px-2 py-1 text-[11px] text-red-300 hover:bg-red-950/30 disabled:opacity-50"
+                    >
+                      {busyRunId === run.id ? 'Cancelling…' : 'Cancel'}
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -137,6 +223,7 @@ export function RoutineInspector({ id }: { id: string }) {
       )}
 
       <Row label="Created" value={new Date(r.createdAt).toLocaleString()} />
+      <Row label="Updated" value={new Date(r.updatedAt).toLocaleString()} />
 
       <div className="flex flex-col gap-2 pt-2 border-t border-surface-border">
         {r.status === 'ACTIVE' ? (

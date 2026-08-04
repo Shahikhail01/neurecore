@@ -20,7 +20,16 @@ interface AuthedRequest extends Request {
   user?: JwtPayload;
 }
 
-@Controller({ path: 'compliance', version: '1' })
+// Phase 0.5 collision-resolution:
+// Previously this Hermes controller was mounted at `@Controller({ path:
+// 'compliance', version: '1' })` which collided with the canonical
+// `modules/compliance/compliance.controller.ts` on the same prefix. Although
+// the two controllers owned disjoint sub-paths (`/compliance/checklist/*`
+// vs `/compliance/export/*`), sharing the prefix is fragile and violates the
+// SOLID rule "one canonical owner per route prefix". We moved Hermes's audit
+// exports under `hermes-compliance/*` so the boundary is explicit.
+// See neurecore/memory-bank-arc/comms/route-duplication-report.yaml.
+@Controller({ path: 'hermes-compliance', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.AUDITOR, UserRole.SUPER_ADMIN, UserRole.OWNER)
 export class ComplianceController {

@@ -56,6 +56,21 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { DepartmentTemplatesModule } from './modules/department-templates/department-templates.module';
 import { ModelsModule } from './modules/models/models.module';
 import { AIGatewayModule } from './modules/ai-gateway/ai-gateway.module';
+import { LlmRegistryModule } from './modules/llm-registry/llm-registry.module';
+import { AiTwinModule } from './modules/ai-twin/ai-twin.module';
+import { ComplianceModule } from './modules/compliance/compliance.module';
+import { DsrModule } from './modules/dsr/dsr.module';
+import { DomainAgentsModule } from './modules/domain-agents/domain-agents.module';
+import { ChannelsModule } from './modules/channels/channels.module';
+import { StudioModule } from './modules/studio/studio.module';
+import { AlwaysOnModule } from './modules/always-on/always-on.module';
+import { MobileCompanionModule } from './modules/mobile/mobile-companion.module';
+import { LocalizationModule } from './modules/localization/localization.module';
+import { Phase6Module } from './modules/studio/phase6.module';
+import { Phase7Module } from './modules/service-ops/phase7.module';
+import { CodingAgentSdkBridgeModule } from './modules/coding-agent-sdk/coding-agent-sdk-bridge.module';
+import { SalesOutreachModule } from './modules/sales-outreach/sales-outreach.module';
+import { ResidencyModule } from './modules/residency/residency.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AdminModule } from './modules/admin/admin.module';
@@ -141,7 +156,6 @@ import { CommandCenterModule } from './modules/command-center/command-center.mod
 import { ContextModule } from './modules/context/context.module';
 // Phase 5 — Batch Approvals & Learning Loop
 import { ApprovalsModule } from './modules/approvals/approvals.module';
-import { ComplianceModule } from './modules/compliance/compliance.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -227,6 +241,21 @@ import { HarnessControlModule } from './harness/phase10/harness-control.module';
     DepartmentTemplatesModule,
     ModelsModule,
     AIGatewayModule,
+    LlmRegistryModule, // Phase 1 — BYO-LLM + per-tenant model binding
+    AiTwinModule, // Phase 1 — AI Twin permission mirror + 4-step wizard
+    ComplianceModule, // Phase 2 — Compliance Posture Center
+    DsrModule, // Phase 2 — GDPR DSR workflow
+    DomainAgentsModule, // Phase 4 — Domain Agents (10 sales + 5 marketing + 5 service + 5 workflow + 1 universal)
+    ChannelsModule, // Phase 5 — Channel integrations + MCP catalog
+    StudioModule, // Phase 5 — Business Studio no-code authoring
+    AlwaysOnModule, // Phase 5 — Always-on CRM triad (Freedom UI / Productivity / Conversational)
+    MobileCompanionModule, // Phase 5 — Mobile companion device registry
+    LocalizationModule, // Phase 5 — Localization (16 locales)
+    Phase6Module, // Phase 6 — Studio codegen + marketplace + scheduler + SLA + service ops
+    Phase7Module, // Phase 7 — Customer 360 + triage + guidance + self-service + knowledge gaps + sales extras + governance authoring + XAI
+    CodingAgentSdkBridgeModule, // Phase 8 — Coding Agent SDK Bridge (Claude Code / Codex / Cursor / Continue.dev)
+    SalesOutreachModule, // Phase 8 — Sales outreach orchestrator + ALM env config + mobile omnichannel sessions
+    ResidencyModule, // Phase 9 — Regional residency + drift observability
     ChatModule,
 
     // Phase 4 — Analytics Engine, CRM Connectors, Financial Module & Reliability
@@ -340,9 +369,6 @@ import { HarnessControlModule } from './harness/phase10/harness-control.module';
     ContextModule,
     // Phase 5 — Batch Approvals & Learning Loop
     ApprovalsModule,
-
-    // Stage 2 Phase 2A — Compliance Checklist Engine
-    ComplianceModule,
 
     // Phase 10 — Admin Business Composition (six pools)
     AgentsPoolModule,       // Pool #1 — AI Employees

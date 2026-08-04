@@ -106,6 +106,46 @@ enum AgentType {
   META
 }
 
+// Phase 4 — Domain-agent taxonomy (Sales / Marketing / Service / Workflow / Universal).
+// Single source of truth used by AgentDefinition below and every OOB
+// agent implementation. Adding a new agent = adding a value here AND
+// a row in the OOB_AGENT_REGISTRY. Solid: enum values are stable
+// forever (no renumbering) so audit log rows that reference an agent
+// by enum id stay queryable across migrations.
+enum DomainAgentKind {
+  // Sales (10) — source plan §5.6
+  SALES_ACCOUNT_RESEARCH
+  SALES_QUOTE_GENERATION
+  SALES_MEETING_PREPARATION
+  SALES_MS_TEAMS
+  SALES_MS_OUTLOOK
+  SALES_FORECAST
+  SALES_TERRITORY_MANAGEMENT
+  SALES_NEXT_BEST_STEP
+  SALES_ORDER_FULFILLMENT
+  SALES_CRM_DATA_UPDATE
+  // Marketing (5) — §5.7
+  MARKETING_CONTENT
+  MARKETING_EMAIL_GENERATION
+  MARKETING_CAMPAIGN
+  MARKETING_LEAD_SCORING
+  MARKETING_LEAD_DISTRIBUTION
+  // Service (5) — §5.8
+  SERVICE_CASE_RESOLUTION
+  SERVICE_KNOWLEDGE_BASE
+  SERVICE_CASE_CLASSIFICATION
+  SERVICE_PLAYBOOK
+  SERVICE_NEXT_BEST_ACTION
+  // Workflow / Productivity (5) — §5.15
+  WORKFLOW_CONTENT_PREPARATION
+  WORKFLOW_CONTENT_LOCALIZATION
+  WORKFLOW_MEETING_MANAGEMENT
+  WORKFLOW_ACTIVITY_SUMMARY
+  WORKFLOW_COMMUNICATION_TEMPLATE
+  // Universal
+  UNIVERSAL_GENERIC
+}
+
 enum TaskStatus {
   DRAFT
   READY
@@ -597,6 +637,12 @@ model Tenant {
   // WS-2.1: Progressive onboarding — local defaults & wizard-persisted fields
   locale               String?           @default("en-US")
   timezone             String?           @default("UTC")
+
+  // Phase 1 relations (added 2026-08-04)
+  llmBindings          TenantLlmBinding[]
+  twins                AiTwin[]
+  // Phase 2 relations (added 2026-08-04)
+  dsrRequests          DsrRequest[]
   currency             String?           @default("USD")
   dateFormat           String?           @default("medium")
   timeFormat           String?           @default("12h")
@@ -844,6 +890,8 @@ model User {
 
   // Phase 1.3 back-relations (added 2026-07-20)
   hermesSessions HermesSession[]
+  // Phase 1 relations (added 2026-08-04)
+  twins                AiTwin[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6698,4 +6746,1859 @@ model AgentLifecycleAuditLog {
   @@index([tenantId, occurredAt])
   @@index([tenantId, actorId])
   @@map("agent_lifecycle_audit_logs")
+}
+
+// =============================================================================
+// Phase 1 — LLM Provider Registry + AI Twin
+//
+// Source plan: creatio-ai-parity-implementation-plan-v2.md §5.17.4-5
+//   (§5.17.4 Bring-your-own LLM, §5.17.5 per-tenant model override)
+//
+// Solid rules:
+//   • One canonical owner for LLM provider configuration (this model).
+//   • Tenant scoping is mandatory; the wildcard tenant sentinel is rejected
+//     in service code (detect-wildcard-tenant-bypass.ts CI gate).
+//   • API keys are NEVER stored in plain text — the `secretRef` field points
+//     into the existing SecretProviderService vault.
+// =============================================================================
+
+enum LlmProviderStatus {
+  ACTIVE
+  DISABLED
+  DRAINING // draining: not used for new requests, in-flight requests still complete
+}
+
+enum LlmProviderKind {
+  OPENAI_COMPATIBLE // generic OpenAI-compatible HTTP API (covers OpenAI, Azure,
+  // OpenRouter, vLLM, llama.cpp server, local llama-stack, OpenClaw, etc.)
+  ANTHROPIC
+  GOOGLE
+  COHERE
+  INTERNAL_MOCK // deterministic mock used for tests + offline certification
+}
+
+// LLM Provider — platform-wide registered LLM endpoints.
+// Owned by NeureCore platform admins (cc.neurecore.com). Tenants CANNOT
+// create new providers; they only reference them via TenantLlmBinding.
+model LlmProvider {
+  id           String          @id @default(uuid())
+  // The slug is the stable handle used in env vars and audit logs.
+  slug         String          @unique
+  displayName  String
+  kind         LlmProviderKind
+  status       LlmProviderStatus @default(ACTIVE)
+  // base URL of the provider (e.g. https://api.openai.com/v1)
+  baseUrl      String
+  // Pointer into SecretProviderService vault — never plaintext.
+  secretRef    String
+  // Optional organization / project id for providers that support it.
+  orgId        String?
+  // Free-form provider metadata (e.g. "supports-streaming": true).
+  metadata     Json            @default("{}")
+
+  // Operational toggles for the platform team.
+  requestsPerMinuteCap Int? // null = no platform-wide cap
+  maxConcurrent        Int? // null = no cap
+
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  models       LlmProviderModel[]
+  bindings     TenantLlmBinding[]
+
+  @@index([status])
+  @@index([kind])
+  @@map("llm_providers")
+}
+
+// LLM Provider Model — a specific model offered by a provider (e.g.
+// gpt-4o, claude-3-5-sonnet, llama-3.1-70b). Each provider typically exposes
+// several.
+model LlmProviderModel {
+  id           String     @id @default(uuid())
+  providerId   String
+  // Stable model identifier as the provider exposes it (e.g. "gpt-4o",
+  // "claude-3-5-sonnet-20240620").
+  modelId      String
+  displayName  String
+  // Free-form capabilities used by the capability resolver
+  // (text-in/text-out, tool-use, vision, json-mode, max-context-tokens).
+  capabilities Json       @default("{}")
+  // Operational metadata used for routing and cost attribution.
+  contextWindow Int       @default(8192)
+  costInputPer1k  Decimal? @db.Decimal(12, 8)
+  costOutputPer1k Decimal? @db.Decimal(12, 8)
+
+  provider     LlmProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  bindings     TenantLlmBinding[]
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([providerId, modelId])
+  @@index([providerId])
+  @@map("llm_provider_models")
+}
+
+// Tenant LLM Binding — which provider+model a tenant uses by default and
+// what overrides apply. Per v2 §5.17.5: per-tenant model override is a
+// first-class capability. Per v3 P-1 rule §11: every binding MUST carry a
+// real tenantId; wildcard is rejected at the service layer.
+model TenantLlmBinding {
+  id              String   @id @default(uuid())
+  tenantId        String
+  providerId      String
+  modelId         String
+  // Priority 0 = default. Higher numbers = fallback in priority order.
+  // The first binding whose status=ACTIVE is the canonical default.
+  priority        Int      @default(0)
+  status          LlmProviderStatus @default(ACTIVE)
+  // Optional per-tenant override of the platform cap.
+  requestsPerMinuteCap Int?
+  // Free-form per-tenant metadata (e.g. cost centre, business unit).
+  metadata        Json     @default("{}")
+
+  // Lifecycle: created by who, last rotated when.
+  createdByActorId String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastRotatedAt    DateTime?
+
+  provider        LlmProvider     @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  model           LlmProviderModel @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, providerId, modelId, priority])
+  @@index([tenantId, status])
+  @@index([tenantId, priority])
+  @@index([providerId])
+  @@map("tenant_llm_bindings")
+}
+
+// LLM Binding Audit — append-only history of every binding change.
+// Required by v2 §5.4.15 (audit trail). Mirrors the AgentLifecycleAuditLog
+// pattern but lives in its own table because binding rotation is a separate
+// concern from agent lifecycle.
+model LlmBindingAudit {
+  id           String   @id @default(uuid())
+  tenantId     String
+  bindingId    String
+  actorId      String
+  action       String   // CREATED | UPDATED | ROTATED | DISABLED | RE_ENABLED | DELETED
+  previousHash String?  // chain hash: sha256(prevHash || JSON(this row minus hash))
+  currentHash  String
+  occurredAt   DateTime @default(now())
+  reason       String?
+  metadata     Json     @default("{}")
+
+  @@index([tenantId, bindingId, occurredAt])
+  @@index([tenantId, occurredAt])
+  @@map("llm_binding_audits")
+}
+
+// =============================================================================
+// AI Twin — personal-agent builder (§5.3.1-5.3.8 of v2 plan).
+//
+// Per Creatio's governance rule: "The AI Twin doesn't get new privileges.
+// It inherits, and is bound by, the same access as the person it acts for."
+// The runtime contract below is enforced in TwinExecutionGuard: every twin
+// action is evaluated against (user.tenantId, user.role, user.id) — no scope
+// elevation. Every envelope carries `actorUserId`.
+// =============================================================================
+
+enum TwinLifecycleStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+// AI Twin — a personal agent owned by a single user. One twin per user
+// per tenant; the (tenantId, ownerUserId) unique constraint enforces that.
+model AiTwin {
+  id            String              @id @default(uuid())
+  tenantId      String
+  ownerUserId   String
+  slug          String // user-chosen handle; unique within (tenantId, ownerUserId)
+  displayName   String
+  description   String?
+  status        TwinLifecycleStatus @default(DRAFT)
+  // The wizard step the owner is currently on (1..4). Persisted so the
+  // owner can resume the wizard across sessions.
+  wizardStep    Int                 @default(1)
+  // Wizard snapshots — JSON encoded because the step fields evolve.
+  step1Goal     Json?
+  step2Iteration Json?
+  step3Test     Json?
+  step4Deploy   Json?
+  // Versioned agent template the twin is built on. NULL until step 4 deploy.
+  agentTemplateId String?
+  agentTemplateVersionId String?
+  // Capability scope — the twin can ONLY use these (read/write) actions.
+  // Empty = inherit none. Non-empty = explicit whitelist evaluated at runtime.
+  allowedReadScopes  Json              @default("[]")
+  allowedWriteScopes Json              @default("[]")
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  activatedAt   DateTime?
+  archivedAt    DateTime?
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner         User                @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  auditLog      AiTwinAuditLog[]
+
+  @@unique([tenantId, ownerUserId, slug])
+  @@index([tenantId, ownerUserId])
+  @@index([tenantId, status])
+  @@map("ai_twins")
+}
+
+// AI Twin Audit — append-only history of every twin action. Critical for
+// the Creatio promise "every decision is logged and traceable to the user".
+model AiTwinAuditLog {
+  id            String   @id @default(uuid())
+  tenantId      String
+  twinId        String
+  // Per the AI Twin permission mirror contract: actorUserId is the human
+  // owner whose permissions the twin inherited. twinId is who performed
+  // the action. Both are stored to make audit attribution unambiguous.
+  actorUserId   String
+  action        String   // INTENT_RESOLVED | TOOL_INVOKED | APPROVAL_REQUESTED | APPROVAL_GRANTED | APPROVAL_REJECTED | WIZARD_ADVANCED | DEPLOYED | PAUSED | ARCHIVED
+  outcome       String   // SUCCESS | FAILURE | ABSTAINED | PENDING_APPROVAL
+  envelope      Json     @default("{}") // canonical TwinEnvelope
+  reason        String?
+  occurredAt    DateTime @default(now())
+
+  twin          AiTwin   @relation(fields: [twinId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, twinId, occurredAt])
+  @@index([tenantId, actorUserId, occurredAt])
+  @@index([tenantId, action])
+  @@map("ai_twin_audit_logs")
+}
+
+// =============================================================================
+// Phase 2 — Compliance Posture Center + Governance Application
+//
+// Source plan: creatio-ai-parity-implementation-plan-v2.md §5.4, §5.14, §5.18
+//
+// Solid rules:
+//   • Governance controls are tenant-scoped; no platform-wide override path.
+//   • DSR (Data Subject Request) workflow is the GDPR surface — each state
+//     transition writes an append-only row to the audit log.
+//   • Posture snapshots are computed, not stored — derived from real data.
+// =============================================================================
+
+enum GovernanceControlSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum GovernanceControlStatus {
+  ACTIVE
+  DISABLED
+  DRAFT
+}
+
+enum GovernanceControlOrigin {
+  PREDEFINED // shipped by NeureCore (read-only for tenants)
+  CUSTOM // tenant-defined
+}
+
+// GovernanceControl — one row per control in the Control Library.
+// Predefined controls (origin=PREDEFINED) ship with NeureCore and have
+// fixed rules. Custom controls (origin=CUSTOM) are authored by tenants
+// via the Governance app and have a JSON expression that the engine
+// evaluates against audit data.
+model GovernanceControl {
+  id            String                   @id @default(uuid())
+  tenantId      String? // NULL for predefined (platform-owned) controls
+  slug          String
+  displayName   String
+  description   String
+  severity      GovernanceControlSeverity
+  status        GovernanceControlStatus
+  origin        GovernanceControlOrigin
+  // Domain this control belongs to (data | user-access | operational | security).
+  domain        String
+  // Compliance standards this control maps to.
+  standards     String[]                 @default([])
+  // The evaluation rule. For PREDEFINED controls this is a registered
+  // rule id (resolved at runtime). For CUSTOM controls this is a JSON
+  // predicate evaluated by the governance engine.
+  rule          Json                     @default("{}")
+  // Cadence at which the control runs: "ON_DEMAND" | "DAILY" | "WEEKLY" | "MONTHLY".
+  cadence       String                   @default("ON_DEMAND")
+  // Free-form metadata (owner, runbook link, tags).
+  metadata      Json                     @default("{}")
+
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  // Soft-deprecation marker for predefined controls.
+  deprecatedAt  DateTime?
+
+  evaluations   GovernanceControlEvaluation[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, domain])
+  @@index([tenantId, status])
+  @@index([origin, slug])
+  @@map("governance_controls")
+}
+
+enum GovernanceControlOutcome {
+  PASS
+  FAIL
+  ERROR
+  SKIPPED
+}
+
+// GovernanceControlEvaluation — one row per run of a control.
+// Append-only; the latest run is the current posture.
+model GovernanceControlEvaluation {
+  id              String                   @id @default(uuid())
+  tenantId        String?
+  controlId       String
+  outcome         GovernanceControlOutcome
+  // Score 0..100. NULL when the control is boolean.
+  score           Int?
+  // Evidence — JSON payload summarising what the rule found.
+  evidence        Json                     @default("{}")
+  // Who/what ran the evaluation ("system" for scheduled, "user:<id>" otherwise).
+  ranBy           String
+  startedAt       DateTime
+  finishedAt      DateTime                 @default(now())
+  durationMs      Int
+  // Free-form notes (remediation steps, exception reason, etc.)
+  notes           String?
+
+  control         GovernanceControl         @relation(fields: [controlId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, controlId, finishedAt])
+  @@index([tenantId, finishedAt])
+  @@index([controlId, finishedAt])
+  @@map("governance_control_evaluations")
+}
+
+// DsrRequest — Data Subject Request workflow (GDPR Articles 15-22).
+// State machine:
+//   OPEN → IN_PROGRESS → COMPLETED
+//                     ↘ REJECTED (with reason)
+//   OPEN → CANCELLED (by requester)
+enum DsrRequestType {
+  EXPORT // Article 15 — right of access
+  DELETE // Article 17 — right to erasure
+  RESTRICT // Article 18 — right to restriction
+  RECTIFY // Article 16 — right to rectification
+  PORTABILITY // Article 20 — right to data portability
+}
+
+enum DsrRequestStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model DsrRequest {
+  id              String              @id @default(uuid())
+  tenantId        String
+  type            DsrRequestType
+  status          DsrRequestStatus    @default(OPEN)
+  // The data subject the request is about. For tenant users this is the
+  // user id; for external subjects (e.g. a contact), this is a free-form
+  // subject identifier.
+  subjectId       String
+  subjectKind     String              @default("user") // "user" | "contact" | "other"
+  // Who filed the request. For tenant self-service this is the subject
+  // themselves; for proxy requests it's the actor.
+  requesterId     String
+  // Human-readable notes attached to the request.
+  reason          String?
+  // Resolution payload — e.g. export download URL, deletion confirmation.
+  resolution      Json                @default("{}")
+
+  // Lifecycle timestamps.
+  openedAt        DateTime            @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+
+  // Audit.
+  audit           DsrAuditLog[]
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, openedAt])
+  @@map("dsr_requests")
+}
+
+enum DsrAuditAction {
+  OPENED
+  STARTED
+  COMPLETED
+  REJECTED
+  CANCELLED
+  EVIDENCE_ATTACHED
+  REMEDIATION_TRIGGERED
+}
+
+model DsrAuditLog {
+  id          String         @id @default(uuid())
+  tenantId    String
+  dsrId       String
+  actorId     String
+  action      DsrAuditAction
+  previousState Json         @default("{}")
+  newState      Json         @default("{}")
+  reason        String?
+  occurredAt    DateTime     @default(now())
+
+  request     DsrRequest @relation(fields: [dsrId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, dsrId, occurredAt])
+  @@index([tenantId, occurredAt])
+  @@map("dsr_audit_logs")
+}
+
+// GovernanceEnvironment — a registered environment (production, staging,
+// dev). Used by the Governance app's Environment Management page.
+enum GovernanceEnvironmentKind {
+  PRODUCTION
+  STAGING
+  DEVELOPMENT
+  CI
+  LOCAL
+}
+
+model GovernanceEnvironment {
+  id            String                    @id @default(uuid())
+  // Globally unique slug.
+  slug          String                    @unique
+  displayName   String
+  kind          GovernanceEnvironmentKind
+  // Connection details for the governance engine to query the environment.
+  baseUrl       String?
+  secretRef     String? // pointer into SecretProviderService
+  // Free-form metadata (region, deployment tag, owner team).
+  metadata      Json                      @default("{}")
+  status        String                    @default("ACTIVE")
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  @@index([kind])
+  @@map("governance_environments")
+}
+
+
+
+// =============================================================================
+// Phase 4 — Domain Agent Definitions (single canonical registry)
+//
+// Source plan: creatio-ai-parity-implementation-plan-v2.md §5.6, §5.7,
+// §5.8, §5.15.
+//
+// Solid:
+//   • AgentDefinition is the single source of truth for every OOB agent
+//     NeureCore ships. Custom agents can be added per-tenant via the
+//     AgentTemplate table; this table is reserved for the platform
+//     registry.
+//   • Tenant LLM bindings (Phase 1.2) and Twin permission mirrors
+//     (Phase 1.3) compose at runtime via TenantAgentDefinition (per-
+//     tenant overrides of risk tier + scope).
+// =============================================================================
+
+model AgentDefinition {
+  id              String          @id @default(uuid())
+  kind            DomainAgentKind @unique
+  // Slug used in URLs and audit logs. Lowercase, dash-separated.
+  slug            String          @unique
+  displayName     String
+  shortName       String
+  description     String
+  // Domain this agent belongs to (sales / marketing / service / workflow).
+  domain          String
+  // Capabilities the agent reads (e.g. "crm.read.contacts").
+  reads           String[]        @default([])
+  // Capabilities the agent writes (e.g. "crm.write.tasks").
+  writes          String[]        @default([])
+  // Risk tier 1..5 used for HITL policy enforcement.
+  riskTier        Int             @default(2)
+  // Source plan section reference for traceability.
+  planSection     String
+  // Human-readable version label.
+  version         String          @default("1.0.0")
+  // Whether the agent is enabled platform-wide.
+  enabled         Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tenantBindings  TenantAgentDefinition[]
+  executions      AgentExecution[]
+
+  @@index([domain])
+  @@index([enabled])
+  @@map("agent_definitions")
+}
+
+// Per-tenant overrides (Phase 4: tenant enables / disables / re-rates
+// the agent, or scopes it to a department). Origin lives on AgentDefinition;
+// tenant-specific data lives here.
+model TenantAgentDefinition {
+  id              String   @id @default(uuid())
+  tenantId        String
+  agentDefinitionId String
+  enabled         Boolean  @default(true)
+  // Per-tenant risk tier override (NULL = inherit platform tier).
+  riskTierOverride Int?
+  // Department the agent is scoped to (NULL = tenant-wide).
+  departmentId    String?
+  // Free-form metadata (e.g. owner team, runbook link).
+  metadata        Json     @default("{}")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  agentDefinition AgentDefinition @relation(fields: [agentDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, agentDefinitionId])
+  @@index([tenantId, enabled])
+  @@map("tenant_agent_definitions")
+}
+
+// AgentExecution — one row per agent invocation (or invocation batch
+// when an agent runs a multi-step workflow). Append-only. Phase 4 ships
+// the table; Phase 5 wires the executor.
+model AgentExecution {
+  id              String   @id @default(uuid())
+  tenantId        String
+  agentDefinitionId String
+  // The actor who initiated the run (user id, twin id, or system).
+  actorId         String
+  actorKind       String   @default("user") // "user" | "twin" | "system"
+  // The trigger source — "manual" | "schedule" | "approval" | "event".
+  triggerSource   String   @default("manual")
+  status          String   @default("RUNNING") // RUNNING | SUCCESS | FAILURE | ABSTAINED | PENDING_APPROVAL
+  // Inputs the agent received (sanitised — never includes secrets).
+  inputs          Json     @default("{}")
+  // Outputs the agent produced.
+  outputs         Json     @default("{}")
+  // Decision trace — what scopes were used, what policy was evaluated.
+  decisionTrace   Json     @default("{}")
+  // Error info if status=FAILURE.
+  errorMessage    String?
+  // Latency in milliseconds.
+  durationMs      Int?
+  startedAt       DateTime @default(now())
+  finishedAt      DateTime?
+
+  agentDefinition AgentDefinition @relation(fields: [agentDefinitionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, agentDefinitionId, startedAt])
+  @@index([tenantId, status])
+  @@index([tenantId, startedAt])
+  @@map("agent_executions")
+}
+
+// =============================================================================
+// Phase 5 — Channel Integrations (Outlook / Teams / Zoom / Voice / Video / SMS / Email / MCP)
+//
+// Source plan: creatio-ai-parity-implementation-plan-v2.md §5.16.
+//
+// Solid:
+//   • ChannelKind is the single taxonomy; every channel adapter must
+//     implement ChannelAdapter and self-register on boot.
+//   • ChannelConnection is per-tenant; no platform-wide override path.
+//   • The MCP descriptor (Phase 5.1) lives alongside, not inside, the
+//     HTTP controllers — agents consume it via the MCP action catalog.
+// =============================================================================
+
+enum ChannelKind {
+  WEB_ASSISTANT      // in-app chat
+  EMAIL              // Brevo / SMTP
+  SMS                // SMS provider
+  VOICE              // inbound + outbound voice
+  VIDEO              // video conferencing (Zoom, Teams meetings)
+  MS_TEAMS           // MS Teams chat
+  MS_OUTLOOK         // MS Outlook inbox + calendar
+  GOOGLE_CHAT        // Google Chat
+  GOOGLE_CALENDAR    // Google Calendar
+  ZOOM               // Zoom meeting
+  MCP                // machine-only — MCP action catalog
+  WEBHOOK            // inbound webhook
+}
+
+enum ChannelConnectionStatus {
+  ACTIVE
+  DISABLED
+  ERROR
+  DRAINING
+}
+
+model ChannelConnection {
+  id            String                   @id @default(uuid())
+  tenantId      String
+  kind          ChannelKind
+  displayName   String
+  status        ChannelConnectionStatus  @default(ACTIVE)
+  // Configuration lives as JSON. Values include OAuth tokens (already
+  // encrypted via SecretProviderService), webhook URLs, agent routing
+  // preferences.
+  config        Json                     @default("{}")
+  // Secret reference for the API key (resolved via SecretProviderService).
+  secretRef     String?
+  // Last error message if status=ERROR.
+  lastError     String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  lastCheckedAt DateTime?
+
+  @@unique([tenantId, kind, displayName])
+  @@index([tenantId, kind, status])
+  @@map("channel_connections")
+}
+
+// ChannelEvent — append-only log of inbound + outbound events on a
+// channel. Phase 5.1 ships the table; Phase 5.4 (mobile) extends it.
+model ChannelEvent {
+  id            String      @id @default(uuid())
+  tenantId      String
+  kind          ChannelKind
+  connectionId  String?
+  direction     String      // "inbound" | "outbound"
+  // Free-form event payload (already-redacted — no secrets).
+  payload       Json        @default("{}")
+  // Result of the event processing.
+  status        String      @default("RECEIVED") // RECEIVED | PROCESSED | FAILED | DROPPED
+  errorMessage  String?
+  occurredAt    DateTime    @default(now())
+  processedAt   DateTime?
+
+  @@index([tenantId, kind, occurredAt])
+  @@index([tenantId, status])
+  @@map("channel_events")
+}
+
+// =============================================================================
+// Phase 5 — Business Studio no-code authoring surface
+//
+// Source plan: creatio-ai-parity-implementation-plan-v2.md §5.13.
+//
+// Solid:
+//   • StudioApp / StudioPage / StudioProcess / StudioDataModel /
+//     StudioReport are the five canonical authoring surfaces.
+//   • StudioComponent is the composable library entry — one row per
+//     reusable no-code component (single source of truth for the
+//     marketplace).
+//   • StudioDeployment captures every CD event (Phase 5.4 wires the
+//     executor).
+//   • Tenant scoping is mandatory; wildcard sentinel is rejected at
+//     every service entry point.
+// =============================================================================
+
+enum StudioAppStatus {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+}
+
+enum StudioPageKind {
+  LIST
+  DETAIL
+  FORM
+  DASHBOARD
+  CUSTOM
+}
+
+model StudioApp {
+  id            String            @id @default(uuid())
+  tenantId      String
+  slug          String
+  displayName   String
+  description   String?
+  status        StudioAppStatus   @default(DRAFT)
+  // Versioned manifest — JSON describing pages, processes, data models,
+  // dashboards, and component bindings.
+  manifest      Json              @default("{}")
+  // The version label, bumped on each manifest save.
+  version       String            @default("0.1.0")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  publishedAt   DateTime?
+
+  pages         StudioPage[]
+  processes     StudioProcess[]
+  dataModels    StudioDataModel[]
+  reports       StudioReport[]
+  components    StudioComponent[]
+  deployments   StudioDeployment[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@map("studio_apps")
+}
+
+model StudioPage {
+  id            String          @id @default(uuid())
+  tenantId      String
+  appId         String
+  slug          String
+  displayName   String
+  kind          StudioPageKind  @default(CUSTOM)
+  // Schema-less JSON describing the page layout. Phase 5.2 ships the
+  // container; the visual editor is a Phase 5.3 deliverable.
+  layout        Json            @default("{}")
+  // Component references by id (component is in StudioComponent).
+  componentIds  String[]        @default([])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  app           StudioApp       @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, slug])
+  @@index([tenantId])
+  @@map("studio_pages")
+}
+
+enum StudioProcessKind {
+  WORKFLOW
+  BUSINESS_PROCESS
+  CASE
+  AI_WORKFLOW
+}
+
+model StudioProcess {
+  id            String             @id @default(uuid())
+  tenantId      String
+  appId         String
+  slug          String
+  displayName   String
+  kind          StudioProcessKind  @default(WORKFLOW)
+  definition    Json               @default("{}")
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  app           StudioApp          @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, slug])
+  @@index([tenantId])
+  @@map("studio_processes")
+}
+
+model StudioDataModel {
+  id            String     @id @default(uuid())
+  tenantId      String
+  appId         String
+  slug          String
+  displayName   String
+  // Field schema — JSON describing columns + types + relations.
+  fields        Json       @default("[]")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  app           StudioApp  @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, slug])
+  @@index([tenantId])
+  @@map("studio_data_models")
+}
+
+model StudioReport {
+  id            String     @id @default(uuid())
+  tenantId      String
+  appId         String
+  slug          String
+  displayName   String
+  // Chart + KPI + table layout — JSON.
+  layout        Json       @default("{}")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  app           StudioApp  @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, slug])
+  @@index([tenantId])
+  @@map("studio_reports")
+}
+
+enum StudioComponentOrigin {
+  PREDEFINED
+  TENANT
+  COMMUNITY
+}
+
+model StudioComponent {
+  id            String                  @id @default(uuid())
+  // NULL tenantId = platform-owned PREDEFINED component.
+  tenantId      String?
+  appId         String?
+  slug          String
+  displayName   String
+  description   String
+  origin        StudioComponentOrigin   @default(TENANT)
+  // JSON describing the component's props + slots.
+  schema        Json                    @default("{}")
+  // Optional preview thumbnail URL.
+  previewUrl    String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  app           StudioApp?              @relation(fields: [appId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, slug])
+  @@index([origin])
+  @@map("studio_components")
+}
+
+enum StudioDeploymentKind {
+  DEV_TO_STAGING
+  STAGING_TO_PRODUCTION
+  ROLLBACK
+}
+
+enum StudioDeploymentStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model StudioDeployment {
+  id            String                 @id @default(uuid())
+  tenantId      String
+  appId         String
+  kind          StudioDeploymentKind
+  status        StudioDeploymentStatus @default(PENDING)
+  version       String
+  notes         String?
+  createdAt     DateTime               @default(now())
+  finishedAt    DateTime?
+  errorMessage  String?
+
+  app           StudioApp              @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, appId, createdAt])
+  @@index([tenantId, status])
+  @@map("studio_deployments")
+}
+
+// =============================================================================
+// Phase 6 — Studio visual editor + governance runner
+//
+// Source plan: creatio-ai-parity-implementation-plan-v2.md §5.13.6/7/8/10/11/14/17, §5.14.1/4/5, §5.9.5/6/7, §5.10.2, §5.13.18.
+//
+// Solid:
+//   • StudioPromptTemplate is the single canonical library of AI-driven
+//     development prompt templates. Adding a template = new row.
+//   • ComponentPublishRequest is the marketplace publish gate; only
+//     ACTIVE components can be installed by other tenants.
+//   • GovernanceEvaluationSchedule and ScheduleRun are append-only —
+//     the audit trail of every scheduled control run.
+//   • SLAEvent is append-only — the 30-day GDPR Article 12(3) timer.
+//   • LandingPage is per-tenant; marketplace + tenant-custom pages
+//     coexist on the same table.
+// =============================================================================
+
+enum StudioPromptTarget {
+  APP
+  PAGE
+  PROCESS
+  DATA_MODEL
+}
+
+enum StudioPromptKind {
+  PromptToApp
+  PromptToPage
+  PromptToProcess
+  PromptToDataModel
+}
+
+// StudioPromptTemplate — the canonical prompt library for AI-Driven
+// Development (§5.13.6/7/8). Templates carry the prompt shape; the
+// codegen layer (Phase 6.1) renders them against an LLM.
+model StudioPromptTemplate {
+  id            String             @id @default(uuid())
+  // NULL tenantId = platform-owned PREDEFINED template.
+  tenantId      String?
+  kind          StudioPromptKind
+  slug          String
+  displayName   String
+  // The system prompt body. Rendered as the first turn of a chat
+  // conversation; the user message is the goal text.
+  body          String
+  // Optional JSON schema for the expected output.
+  outputSchema  Json               @default("{}")
+  // Risk tier the prompt carries when used in autonomous mode.
+  riskTier      Int                @default(2)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([kind])
+  @@map("studio_prompt_templates")
+}
+
+// StudioCodegenJob — one row per AI-driven codegen invocation.
+// Append-only.
+enum StudioCodegenKind {
+  PROMPT_TO_APP
+  PROMPT_TO_PAGE
+  PROMPT_TO_PROCESS
+  PROMPT_TO_DATA_MODEL
+}
+
+enum StudioCodegenStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  REJECTED
+}
+
+model StudioCodegenJob {
+  id            String              @id @default(uuid())
+  tenantId      String
+  appId         String
+  kind          StudioCodegenKind
+  prompt        String
+  // The generated manifest / page layout / process definition.
+  output        Json                @default("{}")
+  // Validation result — what we checked before accepting the output.
+  validation    Json                @default("{}")
+  status        StudioCodegenStatus @default(PENDING)
+  errorMessage  String?
+  createdBy     String
+  createdAt     DateTime            @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+
+  @@index([tenantId, appId, createdAt])
+  @@index([tenantId, status])
+  @@map("studio_codegen_jobs")
+}
+
+enum ComponentPublishStatus {
+  PENDING_REVIEW
+  ACTIVE
+  REJECTED
+  DEPRECATED
+}
+
+// ComponentPublishRequest — the marketplace publish gate. The
+// PREDEFINED components bypass this row (they ship ACTIVE by default).
+// Tenant components must go through review before other tenants can
+// install them.
+model ComponentPublishRequest {
+  id            String                  @id @default(uuid())
+  componentId   String
+  tenantId      String
+  reviewerId    String? // NULL until reviewed
+  status        ComponentPublishStatus  @default(PENDING_REVIEW)
+  // Free-form submission notes.
+  notes         String?
+  decisionNotes String?
+  submittedAt   DateTime                @default(now())
+  decidedAt     DateTime?
+
+  @@index([status])
+  @@index([tenantId, status])
+  @@map("component_publish_requests")
+}
+
+// StudioEnvironment — replaces the platform-only env management that
+// was Phase 5.5 stubbed.
+enum StudioEnvironmentKind {
+  PRODUCTION
+  STAGING
+  DEVELOPMENT
+  CI
+  LOCAL
+}
+
+model StudioEnvironment {
+  id            String               @id @default(uuid())
+  tenantId      String
+  slug          String
+  displayName   String
+  kind          StudioEnvironmentKind
+  baseUrl       String?
+  secretRef     String?
+  metadata      Json                 @default("{}")
+  status        String               @default("ACTIVE")
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, kind])
+  @@map("studio_environments")
+}
+
+// DeploymentPipeline — the canonical pipeline model that drives the
+// CD runner (Phase 6.2). One row per (tenant, environment).
+model DeploymentPipeline {
+  id            String   @id @default(uuid())
+  tenantId      String
+  appId         String
+  environmentId String
+  // Auto-deploy on `appId` publish (skip manual stage gates).
+  autoDeploy    Boolean  @default(false)
+  // JSON describing the gate steps (approve / test / security scan).
+  gates         Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([appId, environmentId])
+  @@index([tenantId])
+  @@map("deployment_pipelines")
+}
+
+// ScheduledGovernanceRun — the canonical schedule for a governance
+// control evaluation. Phase 6.2 wires the runner.
+enum GovernanceScheduleKind {
+  ONE_OFF
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model ScheduledGovernanceRun {
+  id          String                  @id @default(uuid())
+  tenantId    String?
+  controlId   String
+  kind        GovernanceScheduleKind  @default(ONE_OFF)
+  // Cron expression (5-field, standard cron). The runner interprets.
+  cron        String?
+  // Next execution time (set by the runner after each run).
+  nextRunAt   DateTime?
+  lastRunAt   DateTime?
+  enabled     Boolean                 @default(true)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([enabled, nextRunAt])
+  @@index([tenantId, enabled])
+  @@map("scheduled_governance_runs")
+}
+
+// GovernanceScheduleExecution — append-only history.
+model GovernanceScheduleExecution {
+  id            String                     @id @default(uuid())
+  scheduleId    String
+  tenantId      String?
+  controlId     String
+  outcome       String                     // PASS | FAIL | ERROR | SKIPPED
+  score         Int?
+  evidence      Json                       @default("{}")
+  durationMs    Int
+  ranBy         String                     // "system:scheduler"
+  startedAt     DateTime
+  finishedAt    DateTime                   @default(now())
+  errorMessage  String?
+
+  @@index([scheduleId, finishedAt])
+  @@index([controlId, finishedAt])
+  @@map("governance_schedule_executions")
+}
+
+// SLAEvent — append-only timer records. Phase 6.3 uses this to drive
+// the GDPR Article 12(3) 30-day response timer.
+model SLAEvent {
+  id            String   @id @default(uuid())
+  tenantId      String
+  // The subject this SLA applies to (DSR request id, etc.).
+  subjectId     String
+  subjectKind   String   // "dsr-request" | "case" | etc.
+  // SLA definition (e.g. {duration: "P30D", policy: "gdpr-art12-3"}).
+  policy        String
+  // Due time — the runner triggers an escalation when now > dueAt.
+  dueAt         DateTime
+  // Status transitions: OPEN -> ESCALATED -> MET / BREACHED.
+  status        String   @default("OPEN")
+  escalatedAt   DateTime?
+  resolvedAt    DateTime?
+  resolution    String?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, status])
+  @@index([tenantId, dueAt])
+  @@index([tenantId, subjectKind, subjectId])
+  @@map("sla_events")
+}
+
+// LandingPage — per-tenant landing pages (§5.10.2).
+enum LandingPageStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model LandingPage {
+  id            String              @id @default(uuid())
+  tenantId      String
+  slug          String
+  displayName   String
+  // The page content — JSON describing blocks, copy, CTAs.
+  content       Json                @default("{}")
+  status        LandingPageStatus   @default(DRAFT)
+  publishedAt   DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@map("landing_pages")
+}
+
+// FieldWorkOrder — service field dispatch (§5.9.7).
+enum FieldWorkOrderStatus {
+  DRAFT
+  SCHEDULED
+  DISPATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model FieldWorkOrder {
+  id            String                 @id @default(uuid())
+  tenantId      String
+  // The case this work order is for.
+  caseId        String?
+  // Worker / technician assignment.
+  assigneeId    String?
+  // Skill tags required (e.g. ["electrical", "low-voltage"]).
+  requiredSkills String[]              @default([])
+  // Optional geo pin.
+  latitude      Float?
+  longitude     Float?
+  // Time window.
+  scheduledFor  DateTime?
+  durationMin   Int?
+  status        FieldWorkOrderStatus   @default(DRAFT)
+  notes         String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, assigneeId])
+  @@map("field_work_orders")
+}
+
+// RootCauseAnalysis — service recurring incident analysis (§5.9.6).
+model RootCauseAnalysis {
+  id            String   @id @default(uuid())
+  tenantId      String
+  // The trigger (case cluster id or alert id).
+  triggerId     String
+  // The identified root cause.
+  cause         String
+  // Confidence 0..1.
+  confidence    Float    @default(0)
+  // Linked case ids.
+  caseIds       String[] @default([])
+  // Suggested remediation steps.
+  remediation   Json     @default("[]")
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@map("root_cause_analyses")
+}
+
+// StudioDashboard — the no-code dashboards designer (§5.13.18).
+model StudioDashboard {
+  id            String   @id @default(uuid())
+  tenantId      String
+  slug          String
+  displayName   String
+  // KPI tiles + chart configs.
+  layout        Json     @default("{}")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("studio_dashboards")
+}
+
+// Per-user locale preference (§5.20.4).
+model UserLocalePreference {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  localeId  String   // FK by name to the OOB_LOCALES registry
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@map("user_locale_preferences")
+}
+
+// =============================================================================
+// Phase 7 — Service operations + governance authoring + Studio UI support
+//
+// Source plan: §5.9.1/2/3/4, §5.10.4/5, §5.11.3/4/5, §5.13.13/16,
+//              §5.14.3/8/9/12, §5.4.17/19.
+//
+// Solid:
+//   • CustomerTouchpointEvent is append-only; customer 360 view is
+//     computed on read.
+//   • CaseTriageRule is the no-code authoring surface for autonomous
+//     case routing.
+//   • ChatbotPersona controls the 24/7 self-service persona + KB
+//     grounding.
+//   • GovernanceControlRule is the JSON predicate used by custom
+//     governance controls (no-code authoring surface).
+//   • OperationalHealthMetric is appended on every health probe.
+// =============================================================================
+
+enum CaseTriageAction {
+  AUTO_ROUTE_QUEUE
+  AUTO_ROUTE_OWNER
+  AUTO_PRIORITY
+  ESCALATE_HUMAN
+  REQUEST_INFO
+}
+
+enum CasePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum OperationalHealthSeverity {
+  OK
+  WARN
+  CRITICAL
+}
+
+// CustomerTouchpointEvent — append-only touchpoint log used to build
+// the 360° customer view (§5.9.1).
+model CustomerTouchpointEvent {
+  id            String   @id @default(uuid())
+  tenantId      String
+  customerId    String
+  // The channel that produced the touchpoint.
+  channelKind   String
+  // Stable event id from the source system (used for idempotency).
+  externalId    String
+  // Touchpoint payload (subject + body + metadata).
+  payload       Json     @default("{}")
+  // When the source system observed the touchpoint.
+  occurredAt    DateTime
+  receivedAt    DateTime @default(now())
+  // Free-form tags (e.g. "purchase-intent", "support-question").
+  tags          String[] @default([])
+
+  @@unique([tenantId, channelKind, externalId])
+  @@index([tenantId, customerId, occurredAt])
+  @@index([tenantId, channelKind, occurredAt])
+  @@map("customer_touchpoint_events")
+}
+
+// CaseTriageRule — no-code authoring for autonomous case routing
+// (§5.9.2). One row = one rule. Evaluated by ContactCenterService.
+model CaseTriageRule {
+  id            String           @id @default(uuid())
+  tenantId      String
+  slug          String
+  displayName   String
+  description   String?
+  // Priority (LOW..URGENT) the rule assigns when it matches.
+  priority      CasePriority     @default(MEDIUM)
+  // Action the runner takes when the rule matches.
+  action        CaseTriageAction
+  // Optional queue name / owner id / template id the runner applies.
+  targetQueue   String?
+  targetOwnerId String?
+  // The rule predicate is a JSON filter on the case payload.
+  predicate     Json             @default("{}")
+  enabled       Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, enabled])
+  @@map("case_triage_rules")
+}
+
+// ChatbotPersona — the 24/7 self-service persona (§5.9.4). One row
+// per persona; the runner selects the right persona based on the
+// incoming channel + tenant preferences.
+enum ChatbotPersonaKind {
+  SELF_SERVICE_24_7
+  SALES_ASSIST
+  SUPPORT_TIER_1
+  INTERNAL_HELPDESK
+}
+
+model ChatbotPersona {
+  id              String             @id @default(uuid())
+  tenantId        String
+  kind            ChatbotPersonaKind
+  slug            String
+  displayName     String
+  // System prompt that grounds the persona.
+  systemPrompt    String
+  // The set of MCP action ids the persona is allowed to invoke.
+  allowedActionIds String[]          @default([])
+  // KB category filter (which knowledge categories this persona may read).
+  knowledgeCategories String[]       @default([])
+  // Confidence threshold below which the persona escalates to a human.
+  escalationThreshold Float          @default(0.6)
+  enabled          Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, kind, enabled])
+  @@map("chatbot_personas")
+}
+
+// RealTimeAgentGuidance — append-only log of guidance hints shown to
+// service agents in real time (§5.9.3).
+model RealTimeAgentGuidance {
+  id            String   @id @default(uuid())
+  tenantId      String
+  caseId        String
+  agentId       String
+  // The hint text shown to the agent.
+  hint          String
+  // Confidence 0..1.
+  confidence    Float    @default(0)
+  // What triggered the hint (KB article id, similar-case id, etc.).
+  trigger       String
+  shownAt       DateTime @default(now())
+  // Whether the agent accepted the hint.
+  acceptedAt    DateTime?
+
+  @@index([tenantId, caseId, shownAt])
+  @@map("real_time_agent_guidance")
+}
+
+// KnowledgeGap — emitted when the knowledge self-curation runner finds
+// a recurring question that lacks a KB article (§5.9.8).
+model KnowledgeGap {
+  id            String   @id @default(uuid())
+  tenantId      String
+  // The recurring question / topic.
+  topic         String
+  // Number of cases that asked this question.
+  caseCount     Int      @default(0)
+  // Cluster centroid (deterministic hash of the topic).
+  topicHash     String
+  // Suggested article title + body.
+  suggestedTitle String?
+  suggestedBody  String?
+  status        String   @default("OPEN") // OPEN | DRAFTED | PUBLISHED | DISMISSED
+  detectedAt    DateTime @default(now())
+
+  @@unique([tenantId, topicHash])
+  @@index([tenantId, status])
+  @@map("knowledge_gaps")
+}
+
+// CaseEscalation — append-only log of triage escalations (§5.9.3).
+model CaseEscalation {
+  id            String   @id @default(uuid())
+  tenantId      String
+  caseId        String
+  // Rule that triggered the escalation.
+  ruleId        String?
+  fromStatus    String
+  toStatus      String
+  reason        String
+  actorId       String   // "system:triage" or user id
+  occurredAt    DateTime @default(now())
+
+  @@index([tenantId, caseId, occurredAt])
+  @@map("case_escalations")
+}
+
+// CustomerIntentSignal — appended on every real-time intent
+// classification; used by the marketing 360° enrichment (§5.10.1).
+model CustomerIntentSignal {
+  id            String   @id @default(uuid())
+  tenantId      String
+  customerId    String
+  // Signal source: chat, form, email, etc.
+  source        String
+  // The detected intent kind (e.g. "purchase", "support", "demo").
+  intentKind    String
+  confidence    Float
+  // Raw features the classifier used.
+  features      Json     @default("{}")
+  detectedAt    DateTime @default(now())
+
+  @@index([tenantId, customerId, detectedAt])
+  @@index([tenantId, intentKind])
+  @@map("customer_intent_signals")
+}
+
+// EventOrchestration — marketing events (§5.10.4).
+model Event {
+  id            String   @id @default(uuid())
+  tenantId      String
+  slug          String
+  displayName   String
+  // Date / time / location / capacity.
+  startsAt      DateTime
+  endsAt        DateTime
+  capacity      Int?
+  venue         String?
+  metadata      Json     @default("{}")
+  status        String   @default("DRAFT")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  invitations   EventInvitation[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@map("events")
+}
+
+model EventInvitation {
+  id            String   @id @default(uuid())
+  tenantId      String
+  eventId       String
+  contactId     String
+  // State machine: PENDING -> SENT -> OPENED -> REGISTERED -> DECLINED.
+  status        String   @default("PENDING")
+  sentAt        DateTime?
+  openedAt      DateTime?
+  registeredAt  DateTime?
+  declinedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, eventId])
+  @@map("event_invitations")
+}
+
+// Partner — marketing partner ecosystem (§5.10.5).
+model Partner {
+  id            String   @id @default(uuid())
+  tenantId      String
+  slug          String
+  displayName   String
+  contactEmail  String
+  metadata      Json     @default("{}")
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  shares        PartnerLeadShare[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, enabled])
+  @@map("partners")
+}
+
+model PartnerLeadShare {
+  id            String   @id @default(uuid())
+  tenantId      String
+  partnerId     String
+  leadId        String
+  status        String   @default("SHARED") // SHARED | ACCEPTED | REJECTED | CONVERTED
+  notes         String?
+  sharedAt      DateTime @default(now())
+  resolvedAt    DateTime?
+
+  partner       Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, partnerId, status])
+  @@index([tenantId, leadId])
+  @@map("partner_lead_shares")
+}
+
+// Quote — sales quote generation (§5.11.3).
+model Quote {
+  id            String   @id @default(uuid())
+  tenantId      String
+  dealId        String
+  quoteNumber   String
+  // Line items + discounts + totals.
+  items         Json     @default("[]")
+  subtotal      Decimal  @db.Decimal(18, 2) @default(0)
+  discountTotal Decimal  @db.Decimal(18, 2) @default(0)
+  total         Decimal  @db.Decimal(18, 2) @default(0)
+  currency      String   @default("USD")
+  status        String   @default("DRAFT") // DRAFT | SENT | ACCEPTED | REJECTED | EXPIRED
+  validUntil    DateTime?
+  // AI-generated flag (true when produced by SALES_QUOTE_GENERATION).
+  aiGenerated   Boolean  @default(false)
+  generatedByAgentId String?
+  approvedByActorId   String?
+  approvedAt          DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, dealId])
+  @@index([tenantId, status])
+  @@map("quotes")
+}
+
+// SalesOutreachCampaign — AI-orchestrated outreach (§5.11.2).
+model SalesOutreachCampaign {
+  id              String   @id @default(uuid())
+  tenantId        String
+  slug            String
+  displayName     String
+  // The channel sequence (email -> sms -> wait 3d -> call).
+  sequence        Json     @default("[]")
+  status          String   @default("DRAFT")
+  // KPIs.
+  contactedCount  Int      @default(0)
+  repliedCount    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@map("sales_outreach_campaigns")
+}
+
+// FieldSalesAssignment — sales field companion (§5.11.4).
+model FieldSalesAssignment {
+  id            String   @id @default(uuid())
+  tenantId      String
+  repId         String
+  // The account / lead / opportunity the rep is visiting.
+  subjectKind   String   // "account" | "lead" | "deal"
+  subjectId     String
+  // Geo pin + planned time.
+  latitude      Float?
+  longitude     Float?
+  scheduledFor  DateTime
+  // Status machine.
+  status        String   @default("PLANNED") // PLANNED | IN_PROGRESS | COMPLETED | CANCELLED
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, repId, scheduledFor])
+  @@index([tenantId, status])
+  @@map("field_sales_assignments")
+}
+
+// SalesLeadRoutingDecision — sales lead distribution (§5.11.5).
+model SalesLeadRoutingDecision {
+  id            String   @id @default(uuid())
+  tenantId      String
+  leadId        String
+  // The rule + chosen rep / queue.
+  ruleId        String?
+  chosenRepId   String?
+  chosenQueue   String?
+  // Score breakdown.
+  score         Float    @default(0)
+  reason        String
+  decidedAt     DateTime @default(now())
+
+  @@index([tenantId, leadId, decidedAt])
+  @@map("sales_lead_routing_decisions")
+}
+
+// SalesOutreachRun — the canonical orchestration record for an
+// outreach campaign execution (one row per campaign-step pair).
+model SalesOutreachRun {
+  id            String   @id @default(uuid())
+  tenantId      String
+  campaignId    String
+  // The contact + step + channel used for this run.
+  contactId     String
+  stepIndex     Int
+  channelKind   String
+  status        String   @default("PENDING") // PENDING | SENT | REPLIED | ESCALATED | SKIPPED | FAILED
+  // The MCP action name invoked (e.g. "email-send", "teams-message-send").
+  actionName    String?
+  // The provider response id (message id, call id, etc.).
+  providerId    String?
+  // When the runner decided the next step.
+  nextStepAt    DateTime?
+  scheduledFor  DateTime
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  errorMessage  String?
+
+  @@index([tenantId, campaignId])
+  @@index([tenantId, contactId, scheduledFor])
+  @@index([tenantId, status])
+  @@map("sales_outreach_runs")
+}
+
+// ApprovalPolicy — the canonical policy that gates outreach steps.
+// Phase 8.2 ships 2 OOB policies: "ALL_STEPS_AUTO" and
+// "STEPS_ABOVE_TIER_3_REQUIRE_APPROVAL".
+enum ApprovalPolicyKind {
+  ALL_STEPS_AUTO
+  STEPS_ABOVE_TIER_3_REQUIRE_APPROVAL
+  ALL_STEPS_REQUIRE_APPROVAL
+}
+
+model ApprovalPolicy {
+  id            String               @id @default(uuid())
+  tenantId      String
+  kind          ApprovalPolicyKind
+  displayName   String
+  description   String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([tenantId, kind])
+  @@map("approval_policies")
+}
+
+// StudioEnvironmentConfig — the canonical per-environment
+// configuration that backs the ALM runner (§5.13.15).
+model StudioEnvironmentConfig {
+  id            String   @id @default(uuid())
+  tenantId      String
+  // Foreign key to StudioEnvironment is enforced at the application
+  // layer (the env table was created in Phase 6). Stored as id-only.
+  environmentId String
+  // The pipeline that promotes builds into this environment.
+  pipelineId    String?
+  // Whether destructive ops are allowed in this env.
+  destructiveAllowed Boolean @default(false)
+  // Whether production traffic is allowed in this env.
+  productionAllowed   Boolean @default(false)
+  // Free-form metadata (deployment overrides, feature flags, etc.).
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([tenantId, environmentId])
+  @@index([tenantId, environmentId])
+  @@map("studio_environment_configs")
+}
+
+// MobileOmnichannelSession — the canonical mobile-omnichannel session
+// record (§5.13.16). One row per active mobile companion device.
+model MobileOmnichannelSession {
+  id              String   @id @default(uuid())
+  tenantId        String
+  // The mobile companion connection id (Phase 5.4).
+  connectionId    String
+  // The user the device belongs to.
+  userId          String
+  // Last activity timestamp.
+  lastActiveAt    DateTime @default(now())
+  // Optional geo.
+  latitude        Float?
+  longitude       Float?
+  // Free-form session metadata.
+  metadata        Json     @default("{}")
+
+  @@unique([connectionId])
+  @@index([tenantId, userId])
+  @@index([tenantId, lastActiveAt])
+  @@map("mobile_omnichannel_sessions")
+}
+
+// =============================================================================
+// Phase 9 — Regional residency + observability backtest
+//
+// Source plan: §5.17.7 (Regional / data residency controls) +
+//              §5.2.2 (AI observability: backtest + drift signals).
+//
+// Solid:
+//   • TenantRegion is the canonical per-tenant region selection. Once
+//     set, the runtime layer routes every data plane call through the
+//     matching region's connection pool.
+//   • DriftBaseline stores the reference distribution a model was
+//     calibrated against. The backtest runner compares new feature
+//     distributions against it (Phase 9.3 wires the cron job).
+// =============================================================================
+
+enum TenantRegion {
+  US_EAST
+  US_WEST
+  EU_CENTRAL
+  EU_WEST
+  ASIA_PACIFIC
+  ASIA_NORTHEAST
+  MIDDLE_EAST
+  SOUTH_AMERICA
+  CANADA
+  AUSTRALIA
+  AFRICA
+}
+
+enum ResidencyEnforcementMode {
+  SOFT // log-only
+  HARD // refuse cross-region reads / writes
+}
+
+model TenantRegionConfig {
+  id            String                    @id @default(uuid())
+  tenantId      String
+  region        TenantRegion
+  enforcementMode ResidencyEnforcementMode @default(HARD)
+  // Override default region for specific data types (e.g. "llm_calls":
+  // "US_EAST"; "data_storage": "EU_CENTRAL").
+  overrides     Json                      @default("{}")
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  @@unique([tenantId, region])
+  @@index([tenantId, region])
+  @@map("tenant_region_configs")
+}
+
+// DriftBaseline — the feature distribution captured at model calibration
+// time. The backtest runner compares new features against this baseline.
+model DriftBaseline {
+  id            String   @id @default(uuid())
+  tenantId      String?
+  // The agent or model id this baseline applies to.
+  modelId       String
+  // The feature + (mean, stdDev, count) snapshot.
+  baseline      Json     @default("{}")
+  sampleSize    Int      @default(0)
+  recordedAt    DateTime @default(now())
+  // When the baseline expires (90 days by default).
+  expiresAt     DateTime
+
+  @@index([tenantId, modelId, recordedAt])
+  @@index([tenantId, expiresAt])
+  @@map("drift_baselines")
+}
+
+// DriftEvaluation — one row per backtest run.
+enum DriftOutcome {
+  STABLE
+  DRIFTING
+  CRITICAL_DRIFT
+}
+
+model DriftEvaluation {
+  id            String       @id @default(uuid())
+  tenantId      String?
+  modelId       String
+  outcome       DriftOutcome
+  // PSI / KS scores per feature.
+  scores        Json         @default("{}")
+  // Free-form note describing what the runner saw.
+  note          String?
+  ranAt         DateTime     @default(now())
+
+  @@index([tenantId, modelId, ranAt])
+  @@index([tenantId, outcome])
+  @@map("drift_evaluations")
+}
+
+// -----------------------------------------------------------------------------
+// Phase 7 governance authoring tables
+// -----------------------------------------------------------------------------
+
+// GovernanceControlRule — JSON predicate for custom governance
+// controls (§5.14.3). The runner evaluates the predicate against
+// audit-log evidence.
+model GovernanceControlRule {
+  id            String   @id @default(uuid())
+  tenantId      String
+  // Stable slug; unique per tenant.
+  slug          String
+  displayName   String
+  description   String
+  // Domain this rule covers (data / user-access / operational / security).
+  domain        String
+  // Standards this rule maps to.
+  standards     String[] @default([])
+  // The JSON predicate. Evaluated against the evidence row.
+  predicate     Json     @default("{}")
+  // Whether the rule is enabled.
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, domain, enabled])
+  @@map("governance_control_rules")
+}
+
+// OperationalHealthMetric — append-only log of health probes
+// (§5.14.8 + §5.14.5).
+model OperationalHealthMetric {
+  id            String                     @id @default(uuid())
+  tenantId      String
+  // What was probed: e.g. "license.expiry", "dev-flag-in-prod".
+  probe         String
+  severity      OperationalHealthSeverity @default(OK)
+  // What the probe found.
+  detail        Json                       @default("{}")
+  observedAt    DateTime                   @default(now())
+
+  @@index([tenantId, probe, observedAt])
+  @@index([tenantId, severity])
+  @@map("operational_health_metrics")
+}
+
+// SecurityControlState — current state of a security control
+// (§5.14.9). E.g. "redis-tls: enabled", "db-tls: enabled".
+model SecurityControlState {
+  id            String   @id @default(uuid())
+  tenantId      String
+  controlKey    String   // e.g. "redis-tls", "db-tls", "secure-uploads"
+  state         String   // "enabled" | "disabled" | "misconfigured"
+  detail        Json     @default("{}")
+  observedAt    DateTime @default(now())
+
+  @@unique([tenantId, controlKey])
+  @@index([tenantId, controlKey])
+  @@map("security_control_states")
+}
+
+// InternalComplianceCheck — operational / management / IT checks
+// (§5.14.12). Append-only.
+model InternalComplianceCheck {
+  id            String   @id @default(uuid())
+  tenantId      String
+  category      String   // "operational" | "management" | "it"
+  checkName     String
+  outcome       String   // PASS | FAIL | ERROR
+  detail        Json     @default("{}")
+  ranAt         DateTime @default(now())
+
+  @@index([tenantId, category, ranAt])
+  @@map("internal_compliance_checks")
+}
+
+// -----------------------------------------------------------------------------
+// Phase 7 XAI / agent envelope metadata (§5.4.17)
+// -----------------------------------------------------------------------------
+
+// AgentEnvelopeExplanation — append-only explanation record persisted
+// alongside every agent envelope. Powers the "why this action" panel.
+model AgentEnvelopeExplanation {
+  id            String   @id @default(uuid())
+  tenantId      String
+  // The agent execution id this explanation is for.
+  executionId   String
+  // The decision trace (scopes used, policy evaluated, confidence).
+  decisionTrace Json     @default("{}")
+  // Human-readable "why" text.
+  reason        String
+  // The factors that drove the decision (top-K).
+  factors       Json     @default("[]")
+  // Optional XAI: feature importances (model-name -> map of feature -> weight).
+  featureImportances Json @default("{}")
+  generatedAt   DateTime @default(now())
+
+  @@index([tenantId, executionId])
+  @@map("agent_envelope_explanations")
 }

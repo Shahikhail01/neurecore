@@ -4,6 +4,7 @@ import {
   NotFoundException,
   Inject,
   BadRequestException,
+  ForbiddenException,
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
@@ -53,8 +54,17 @@ export class TasksService {
     } = options ?? {};
     const skip = (page - 1) * limit;
 
+    // Phase 0.5 P-1 audit fix:
+    // v3 P-1 rule §11 forbids wildcard tenant bypasses. Refuse '*' with a
+    // typed ForbiddenException; legitimate cross-tenant queries must use a
+    // separately authorized administrative port.
+    if (tenantId === '*') {
+      throw new ForbiddenException(
+        'tenantId "*" is forbidden; use a platform-admin port for cross-tenant queries',
+      );
+    }
     const where: Record<string, unknown> = {
-      ...(tenantId && tenantId !== '*' ? { tenantId } : {}),
+      ...(tenantId ? { tenantId } : {}),
       ...(status && { status }),
       ...(agentId && { agentId }),
       ...(goalId && { goalId }),

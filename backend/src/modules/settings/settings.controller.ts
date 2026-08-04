@@ -107,24 +107,32 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   // ==================== AI PROVIDERS ====================
+  // Phase 0.5 collision-resolution:
+  // The `ai/providers/*` paths are owned by `modules/ai-gateway/controllers/ai-providers.controller.ts`
+  // (mounted at `@Controller({ path: 'settings/ai', version: '1' })`). Settings
+  // previously exposed a slim wrapper on the same paths which collided at
+  // runtime. We moved the settings wrappers under `ai/provider-preferences/*`
+  // so they no longer shadow the canonical routes. Consumers must call the
+  // `/api/v1/settings/ai/providers/*` paths on the AI gateway controller.
+  // See neurecore/memory-bank-arc/comms/route-duplication-report.yaml.
 
-  @Get('ai/providers')
+  @Get('ai/provider-preferences')
   async getAIProviders() {
     const providers = await this.settingsService.getAIProviders();
     return { items: providers };
   }
 
-  @Get('ai/providers/:id')
+  @Get('ai/provider-preferences/:id')
   async getAIProvider(@Param('id') id: string) {
     return this.settingsService.getAIProvider(id);
   }
 
-  @Post('ai/providers')
+  @Post('ai/provider-preferences')
   async createAIProvider(@Body() dto: CreateAIProviderDto) {
     return this.settingsService.createAIProvider(dto);
   }
 
-  @Patch('ai/providers/:id')
+  @Patch('ai/provider-preferences/:id')
   async updateAIProvider(
     @Param('id') id: string,
     @Body() dto: UpdateAIProviderDto,
@@ -132,13 +140,13 @@ export class SettingsController {
     return this.settingsService.updateAIProvider(id, dto);
   }
 
-  @Delete('ai/providers/:id')
+  @Delete('ai/provider-preferences/:id')
   async deleteAIProvider(@Param('id') id: string) {
     await this.settingsService.deleteAIProvider(id);
     return { success: true };
   }
 
-  @Patch('ai/providers/:id/toggle')
+  @Patch('ai/provider-preferences/:id/toggle')
   async toggleAIProvider(
     @Param('id') id: string,
     @Body() dto: ToggleProviderDto,
@@ -146,23 +154,23 @@ export class SettingsController {
     return this.settingsService.toggleAIProvider(id, dto.enabled);
   }
 
-  @Post('ai/providers/:id/set-default')
+  @Post('ai/provider-preferences/:id/set-default')
   async setDefaultAIProvider(@Param('id') id: string) {
     return this.settingsService.setDefaultAIProvider(id);
   }
 
-  @Post('ai/providers/:id/test')
+  @Post('ai/provider-preferences/:id/test')
   async testAIProvider(@Param('id') id: string) {
     return this.settingsService.testAIProvider(id);
   }
 
-  @Get('ai/providers/:providerId/models')
+  @Get('ai/provider-preferences/:providerId/models')
   async getAIModels(@Param('providerId') providerId: string) {
     const models = await this.settingsService.getAIModels(providerId);
     return { items: models };
   }
 
-  @Post('ai/providers/:providerId/models')
+  @Post('ai/provider-preferences/:providerId/models')
   async addAIModel(@Param('providerId') providerId: string, @Body() dto: any) {
     return this.settingsService.addAIModel(providerId, dto);
   }

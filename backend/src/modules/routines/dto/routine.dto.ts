@@ -238,6 +238,16 @@ export class CreateRoutineDto {
   @IsObject()
   @IsOptional()
   metadata?: Record<string, unknown>;
+
+  @IsString()
+  @IsOptional()
+  ownerAgentId?: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @IsOptional()
+  @Type(() => CreateTriggerDto)
+  triggers?: CreateTriggerDto[];
 }
 
 export class UpdateRoutineDto {
@@ -264,6 +274,10 @@ export class UpdateRoutineDto {
   @IsObject()
   @IsOptional()
   metadata?: Record<string, unknown>;
+
+  @IsString()
+  @IsOptional()
+  ownerAgentId?: string | null;
 
   @IsEnum(['DRAFT', 'ACTIVE', 'PAUSED', 'DISABLED'])
   @IsOptional()

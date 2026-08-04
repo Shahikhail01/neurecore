@@ -2,7 +2,7 @@
  * Customers Module — Prisma Repository Implementation
  */
 
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { Customer as PrismaCustomer } from '@prisma/client';
 import type {
@@ -62,7 +62,13 @@ export class PrismaCustomerRepository implements ICustomerRepository {
     options: ListCustomersOptions,
     tenantId: string,
   ): Promise<{ data: Customer[]; total: number }> {
-    const where: Record<string, unknown> = tenantId !== '*' ? { tenantId } : {};
+    // Phase 0.5 P-1 audit fix: refuse wildcard tenant bypass.
+    if (tenantId === '*') {
+      throw new ForbiddenException(
+        'tenantId "*" is forbidden; use a platform-admin port for cross-tenant queries',
+      );
+    }
+    const where: Record<string, unknown> = { tenantId };
     if (options.status) where.status = options.status;
     // Phase 4 G4 — F&C discriminator filter. Combines with the AND
     // semantics above (status AND financialSubType AND search).

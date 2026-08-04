@@ -119,6 +119,7 @@ export interface CreateRoutineInput {
   graphDefinition: RoutineGraphDefinition;
   config?: RoutineConfig;
   metadata?: Record<string, unknown>;
+  ownerAgentId?: string;
   tenantId: string;
   createdById?: string;
 }
@@ -129,6 +130,7 @@ export interface UpdateRoutineInput {
   graphDefinition?: RoutineGraphDefinition;
   config?: RoutineConfig;
   metadata?: Record<string, unknown>;
+  ownerAgentId?: string | null;
 }
 
 export interface CreateTriggerInput {

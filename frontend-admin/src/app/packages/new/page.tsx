@@ -18,6 +18,7 @@ import { motion } from 'framer-motion';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { packagesService, type CreatePackagePayload, type PackageComposition } from '@/services/packages.service';
+import type { PackageRecommendationHistoryEntry } from '@/services/packages.service';
 import { industriesPoolService, type Industry } from '@/services/industriesPool.service';
 import { tiersPoolService, type Tier } from '@/services/tiersPool.service';
 import { featuresPoolService, type Feature, type FeatureCategory } from '@/services/featuresPool.service';
@@ -56,10 +57,20 @@ export default function NewPackagePage() {
 
   // Preview (live totals)
   const [preview, setPreview] = useState({
+    readiness: { score: 0, label: 'NEEDS_REVIEW' as const },
     totals: { departments: 0, agents: 0, features: 0 },
     missing: { departments: [] as string[], agents: [] as string[], features: [] as string[] },
     categories: {} as Record<string, number>,
+    rules: {
+      conflicts: [] as string[],
+      dependencies: [] as string[],
+      recommendations: [] as string[],
+      recommendationDetails: [] as Array<{ message: string; severity: 'HIGH' | 'MEDIUM' | 'LOW'; reason: string }>,
+      suggestedFeatureKeys: [] as string[],
+      suggestedBundles: [] as Array<{ key: string; label: string; reason: string; featureKeys: string[]; priority: 'HIGH' | 'MEDIUM' | 'LOW' }>,
+    },
   });
+  const [recommendationHistory, setRecommendationHistory] = useState<PackageRecommendationHistoryEntry[]>([]);
 
   useEffect(() => {
     void (async () => {
@@ -84,9 +95,11 @@ export default function NewPackagePage() {
   useEffect(() => {
     if (!industryId || !tierId) {
       setPreview({
+        readiness: { score: 0, label: 'NEEDS_REVIEW' },
         totals: { departments: 0, agents: 0, features: 0 },
         missing: { departments: [], agents: [], features: [] },
         categories: {},
+        rules: { conflicts: [], dependencies: [], recommendations: [], recommendationDetails: [], suggestedFeatureKeys: [], suggestedBundles: [] },
       });
       return;
     }
@@ -103,6 +116,17 @@ export default function NewPackagePage() {
         console.error('Package preview failed:', err);
       });
   }, [industryId, tierId, departmentIds, aiAgentIds, featureIds]);
+
+  useEffect(() => {
+    if (!industryId || !tierId) {
+      setRecommendationHistory([]);
+      return;
+    }
+    void packagesService
+      .recommendationHistory({ industryId, tierId, limit: 6 })
+      .then(setRecommendationHistory)
+      .catch(() => setRecommendationHistory([]));
+  }, [industryId, tierId]);
 
   const selectedIndustry = useMemo(
     () => industries.find((i) => i.id === industryId),
@@ -127,6 +151,95 @@ export default function NewPackagePage() {
     for (const f of allFeatures) map[f.category].push(f);
     return map;
   }, [allFeatures]);
+
+  const selectedAgents = useMemo(
+    () => allAgents.filter((agent) => aiAgentIds.includes(agent.id)),
+    [allAgents, aiAgentIds],
+  );
+  const selectedDepartments = useMemo(
+    () => allDepartments.filter((department) => departmentIds.includes(department.id)),
+    [allDepartments, departmentIds],
+  );
+  const governanceSummary = useMemo(() => {
+    let approvalBound = 0;
+    let citationsRequired = 0;
+    let tenantEditable = 0;
+    const channels = new Set<string>();
+
+    for (const agent of selectedAgents) {
+      const config = (agent.config ?? {}) as Record<string, unknown>;
+      if (config.authorityLevel === 'APPROVAL') approvalBound += 1;
+      if (config.requiresCitations === true) citationsRequired += 1;
+      if (config.allowTenantEditing !== false) tenantEditable += 1;
+      if (Array.isArray(config.channels)) {
+        for (const channel of config.channels) {
+          if (typeof channel === 'string' && channel.trim()) channels.add(channel);
+        }
+      }
+    }
+
+    return {
+      approvalBound,
+      citationsRequired,
+      tenantEditable,
+      channels: Array.from(channels),
+    };
+  }, [selectedAgents]);
+
+  function applySuggestedFeatures() {
+    if (preview.rules.suggestedFeatureKeys.length === 0) return;
+    void packagesService.acceptRecommendations({
+      industryId,
+      tierId,
+      suggestedFeatureKeys: preview.rules.suggestedFeatureKeys,
+      currentFeatureIds: featureIds,
+      currentDepartmentIds: departmentIds,
+      currentAiAgentIds: aiAgentIds,
+    }).then(() => packagesService.recommendationHistory({ industryId, tierId, limit: 6 }))
+      .then(setRecommendationHistory)
+      .catch(() => {
+      /* noop */
+    });
+    const suggestedIds = allFeatures
+      .filter((feature) => preview.rules.suggestedFeatureKeys.includes(feature.key))
+      .map((feature) => feature.id);
+    setFeatureIds((current) => Array.from(new Set([...current, ...suggestedIds])));
+  }
+
+  function dismissSuggestedFeatures(reason: string) {
+    if (preview.rules.suggestedFeatureKeys.length === 0) return;
+    void packagesService.dismissRecommendations({
+      industryId,
+      tierId,
+      suggestedFeatureKeys: preview.rules.suggestedFeatureKeys,
+      reason,
+      currentFeatureIds: featureIds,
+      currentDepartmentIds: departmentIds,
+      currentAiAgentIds: aiAgentIds,
+    }).then(() => packagesService.recommendationHistory({ industryId, tierId, limit: 6 }))
+      .then(setRecommendationHistory)
+      .catch(() => {
+        /* noop */
+      });
+  }
+
+  function snoozeSuggestedFeatures(reason: string, snoozeUntil: string) {
+    if (preview.rules.suggestedFeatureKeys.length === 0) return;
+    void packagesService.snoozeRecommendations({
+      industryId,
+      tierId,
+      suggestedFeatureKeys: preview.rules.suggestedFeatureKeys,
+      reason,
+      snoozeUntil,
+      currentFeatureIds: featureIds,
+      currentDepartmentIds: departmentIds,
+      currentAiAgentIds: aiAgentIds,
+    }).then(() => packagesService.recommendationHistory({ industryId, tierId, limit: 6 }))
+      .then(setRecommendationHistory)
+      .catch(() => {
+        /* noop */
+      });
+  }
 
   function toggle<T extends string>(setter: (v: T[]) => void, current: T[], id: T) {
     setter(current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
@@ -292,6 +405,37 @@ export default function NewPackagePage() {
                   Select which building blocks belong to this package.
                 </p>
 
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                  {[
+                    ['Departments', String(selectedDepartments.length)],
+                    ['Agents', String(selectedAgents.length)],
+                    ['Approval-bound', String(governanceSummary.approvalBound)],
+                    ['Channels', governanceSummary.channels.length > 0 ? governanceSummary.channels.join(', ') : '—'],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl border border-surface-border bg-surface-overlay/40 p-3">
+                      <div className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</div>
+                      <div className="mt-1 text-sm font-medium text-zinc-100">{value}</div>
+                    </div>
+                  ))}
+                </div>
+                {preview.rules.suggestedFeatureKeys.length > 0 && (
+                  <div className="flex items-center justify-between rounded-xl border border-emerald-800/40 bg-emerald-950/20 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-emerald-200">Suggested feature bundle available</p>
+                      <p className="text-xs text-emerald-300/80">
+                        {preview.rules.suggestedFeatureKeys.join(', ')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={applySuggestedFeatures}
+                      className="rounded-lg border border-emerald-700/50 px-3 py-1.5 text-sm text-emerald-100"
+                    >
+                      Apply suggested
+                    </button>
+                  </div>
+                )}
+
                 <PickerGroup
                   title="Departments"
                   items={allDepartments.map((d) => ({ id: d.id, label: d.name, sub: d.slug }))}
@@ -353,6 +497,13 @@ export default function NewPackagePage() {
                 <ReviewRow label="Departments" value={`${departmentIds.length}`} />
                 <ReviewRow label="AI Employees" value={`${aiAgentIds.length}`} />
                 <ReviewRow label="Features" value={`${featureIds.length}`} />
+                <ReviewRow label="Approval-bound agents" value={`${governanceSummary.approvalBound}`} />
+                <ReviewRow label="Citations required" value={`${governanceSummary.citationsRequired}`} />
+                <ReviewRow label="Tenant-editable agents" value={`${governanceSummary.tenantEditable}`} />
+                <ReviewRow label="Channels" value={governanceSummary.channels.join(', ') || '—'} />
+                <ReviewRow label="Conflicts" value={`${preview.rules.conflicts.length}`} />
+                <ReviewRow label="Dependencies" value={`${preview.rules.dependencies.length}`} />
+                <ReviewRow label="Recommendations" value={`${preview.rules.recommendations.length}`} />
                 <p className="text-xs text-zinc-500 pt-2">
                   Submitting will create the package as DRAFT. You can publish it from the detail view.
                 </p>
@@ -400,9 +551,15 @@ export default function NewPackagePage() {
           <PackagePreview
             industryName={selectedIndustry?.name}
             tierName={selectedTier?.name}
+            readiness={preview.readiness}
             totals={preview.totals}
             missing={preview.missing}
             categories={preview.categories}
+            rules={preview.rules}
+            onApplySuggested={preview.rules.suggestedFeatureKeys.length > 0 ? applySuggestedFeatures : undefined}
+            onDismissSuggested={preview.rules.suggestedFeatureKeys.length > 0 ? dismissSuggestedFeatures : undefined}
+            onSnoozeSuggested={preview.rules.suggestedFeatureKeys.length > 0 ? snoozeSuggestedFeatures : undefined}
+            recommendationHistory={recommendationHistory}
           />
         </div>
       </div>
@@ -431,8 +588,11 @@ function PickerGroup({
   onToggle: (id: string) => void;
 }) {
   const [filter, setFilter] = useState('');
+  const [selectedOnly, setSelectedOnly] = useState(false);
   const visible = items.filter(
-    (i) => i.label.toLowerCase().includes(filter.toLowerCase()) || (i.sub ?? '').includes(filter),
+    (i) =>
+      (!selectedOnly || selected.includes(i.id)) &&
+      (i.label.toLowerCase().includes(filter.toLowerCase()) || (i.sub ?? '').includes(filter)),
   );
   return (
     <div>
@@ -440,12 +600,56 @@ function PickerGroup({
         <label className="text-xs text-zinc-400">{title}</label>
         <span className="text-[10px] text-zinc-600">{selected.length} selected</span>
       </div>
+      <div className="flex gap-2 mb-2">
+        <button
+          type="button"
+          onClick={() => setSelectedOnly((value) => !value)}
+          className={`rounded-full px-2 py-1 text-[10px] border ${
+            selectedOnly
+              ? 'border-[color:var(--accent-500)] text-indigo-200'
+              : 'border-surface-border text-zinc-500'
+          }`}
+        >
+          Selected only
+        </button>
+        <button
+          type="button"
+          onClick={() => visible.forEach((item) => !selected.includes(item.id) && onToggle(item.id))}
+          className="rounded-full px-2 py-1 text-[10px] border border-surface-border text-zinc-500"
+        >
+          Select visible
+        </button>
+        <button
+          type="button"
+          onClick={() => selected.slice().forEach((id) => onToggle(id))}
+          className="rounded-full px-2 py-1 text-[10px] border border-surface-border text-zinc-500"
+        >
+          Clear selected
+        </button>
+      </div>
       <input
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder={`Filter ${title.toLowerCase()}…`}
         className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[color:var(--accent-500)] transition mb-2"
       />
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {items
+            .filter((item) => selected.includes(item.id))
+            .slice(0, 8)
+            .map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onToggle(item.id)}
+                className="rounded-full border border-[color:var(--accent-500)]/40 bg-[color:var(--accent-500)]/10 px-2 py-0.5 text-[10px] text-indigo-200"
+              >
+                {item.label} ×
+              </button>
+            ))}
+        </div>
+      )}
       <div className="rounded-lg border border-surface-border bg-surface-overlay p-2 max-h-44 overflow-y-auto">
         {visible.length === 0 ? (
           <div className="text-xs text-zinc-500 text-center py-2">No matches</div>

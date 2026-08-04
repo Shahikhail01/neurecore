@@ -15,6 +15,53 @@ export interface CreateAgentsPoolPayload extends CreateAgentTemplatePayload {
   enabled?: boolean;
 }
 
+export interface SandboxAgentTemplatePayload {
+  prompt: string;
+  modelOverride?: string;
+  maxTokens?: number;
+  includeTools?: boolean;
+  knowledgeSources?: string[];
+}
+
+export interface SandboxAgentTemplateResult {
+  templateId: string;
+  templateName: string;
+  model: string;
+  authorityLevel: string;
+  memoryPolicy: string;
+  channels: string[];
+  allowedTools: string[];
+  blockedTools: string[];
+  knowledgeSources: string[];
+  response: string;
+  toolPlan: string[];
+  warnings: string[];
+  tokenUsage: {
+    input: number;
+    output: number;
+    total: number;
+  };
+}
+
+export interface PersistedSandboxRun {
+  id: string;
+  actor: string;
+  createdAt: string;
+  prompt: string;
+  result: SandboxAgentTemplateResult;
+}
+
+export interface SandboxRunComparison {
+  left: PersistedSandboxRun;
+  right: PersistedSandboxRun;
+  summary: {
+    responseChanged: boolean;
+    toolPlanChanged: boolean;
+    tokenDelta: number;
+    warningDelta: number;
+  };
+}
+
 export const agentsPoolService = {
   async list(opts?: {
     page?: number;
@@ -72,5 +119,30 @@ export const agentsPoolService = {
   async duplicate(id: string, name?: string): Promise<AgentsPoolEntry> {
     const res = await api.post(`/agents-pool/${id}/duplicate`, name ? { name } : {});
     return unwrapItem(res) as AgentsPoolEntry;
+  },
+
+  async sandboxRun(
+    id: string,
+    payload: SandboxAgentTemplatePayload,
+  ): Promise<SandboxAgentTemplateResult> {
+    const res = await api.post(`/agents-pool/${id}/sandbox-run`, payload);
+    return unwrapItem(res) as SandboxAgentTemplateResult;
+  },
+
+  async listSandboxRuns(id: string): Promise<PersistedSandboxRun[]> {
+    const res = await api.get(`/agents-pool/${id}/sandbox-runs`);
+    const data = res.data?.data ?? res.data;
+    return Array.isArray(data) ? (data as PersistedSandboxRun[]) : [];
+  },
+
+  async compareSandboxRuns(
+    id: string,
+    leftId: string,
+    rightId: string,
+  ): Promise<SandboxRunComparison> {
+    const res = await api.get(`/agents-pool/${id}/sandbox-compare`, {
+      params: { leftId, rightId },
+    });
+    return unwrapItem(res) as SandboxRunComparison;
   },
 };

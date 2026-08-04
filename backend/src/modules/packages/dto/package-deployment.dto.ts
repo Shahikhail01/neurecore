@@ -109,3 +109,19 @@ export interface PreviewPackageOutcome {
     agentsRemaining: number;
   };
 }
+
+export interface PackageDeploymentHistoryItem {
+  id: string;
+  packageId: string | null;
+  packageName: string | null;
+  tenantId: string;
+  actor: string;
+  authorityLevel: 'AUTO' | 'RECOMMEND' | 'APPROVAL';
+  idempotent: boolean;
+  withAgents: boolean;
+  departmentsCreated: number;
+  departmentsReused: number;
+  agentsCreated: number;
+  agentsSkipped: number;
+  createdAt: string;
+}

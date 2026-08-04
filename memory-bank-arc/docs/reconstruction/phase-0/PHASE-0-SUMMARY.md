@@ -3,6 +3,7 @@
 **Document:** NC-AWL-IMP-1 Phase 0
 **Date:** 2026-07-26
 **Status:** COMPLETE — Awaiting G0 Gate Approval
+**Note:** This is a historical forensic baseline. Some findings below were later remediated in Phase 1; the original evidence remains valid as the Phase 0 snapshot.
 
 ---
 
@@ -19,6 +20,7 @@ Phase 0 forensic investigation is complete. The deployed autonomous work layer h
 **Finding:** 47 direct Prisma mutations in `src/modules/tools/built-in/neurecore-tools.ts`
 
 **Remediation update, 2026-07-26:** Resolved during G1 remediation. Built-in tool business mutations now route through application/domain services or fail closed; architecture tests and a broad mutation scan verify 0 remaining adapter-backed business mutations in `src/modules/tools/built-in`.
+**Interpretation:** The 47-count is the Phase 0 baseline, not the current live count after remediation.
 
 **Impact:** Tools bypass the command pattern entirely, creating:
 - No idempotency guarantees
@@ -160,6 +162,7 @@ The Hermes failure is localized to the **tool execution boundary**:
 **Count:** 47 direct Prisma mutations in `neurecore-tools.ts`
 
 **Verification:** Grep confirmed 47 `prisma.create/update/delete` calls
+**Interpretation:** Use this as the forensic starting point; do not treat it as the current codebase state.
 
 **Remediation update, 2026-07-26:** Later G1 remediation reduced this count to 0 for `src/modules/tools/built-in`; see `phase-1/G1-LEGACY-TOOL-MUTATION-REMEDIATION.md`.
 

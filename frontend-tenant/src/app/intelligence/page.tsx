@@ -23,7 +23,7 @@
  *   └─────────────────────────────────────────────────────┘
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3,
@@ -77,7 +77,7 @@ import { useDashboardKpis } from '@/hooks/useDashboardKpis';
 import { useChartData } from '@/hooks/useChartData';
 import { useTimeRange } from '@/hooks/useTimeRange';
 import api from '@/services/api';
-import { commandCenterService, type CommandCenterCosts, type CommandCenterModelHealth, type CommandCenterChannelHealth, type CommandCenterInventory, type CommandCenterQuality, type CommandCenterSecurityEvents, type CommandCenterKillSwitchList, type CommandCenterAuditCorrelation, type SetKillSwitchInput } from '@/services/command-center.service';
+import { commandCenterService, type CommandCenterSummary, type CommandCenterCosts, type CommandCenterModelHealth, type CommandCenterChannelHealth, type CommandCenterInventory, type CommandCenterQuality, type CommandCenterSecurityEvents, type CommandCenterKillSwitchList, type CommandCenterAuditCorrelation, type SetKillSwitchInput } from '@/services/command-center.service';
 import type { AIRoutingConfig } from '@/types/settings.types';
 import { DEFAULT_AI_ROUTING } from '@/types/settings.types';
 
@@ -119,6 +119,46 @@ interface SecurityEvent {
   description: string;
   source?: string;
   createdAt: string;
+}
+
+interface ObservabilityLogEvent {
+  id: string;
+  type?: string;
+  message?: string;
+  severity?: string;
+  status?: string;
+  timestamp?: string;
+  createdAt?: string;
+}
+
+interface ObservabilityTrace {
+  taskId?: string;
+  agentId?: string | null;
+  startedAt?: string;
+  completedAt?: string | null;
+  steps?: Array<{
+    status?: string;
+    durationMs?: number | null;
+  }>;
+}
+
+interface ObservabilityCostBreakdownItem {
+  agentName?: string;
+  model?: string;
+  totalCost?: number;
+  cost?: number;
+  costUsd?: number;
+}
+
+interface ObservabilityCostsResponse {
+  totalCost?: number;
+  totalTokens?: number;
+  byAgent?: ObservabilityCostBreakdownItem[];
+}
+
+interface ObservabilityMetricPoint {
+  timestamp?: string;
+  value?: number;
 }
 
 const TABS: { id: IntelTab; label: string; icon: typeof BarChart3 }[] = [
@@ -340,16 +380,16 @@ function AnalyticsTab() {
       {/* Charts grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="Task Volume" icon={<Activity className="w-4 h-4 text-status-ops" />}>
-          <AreaChart data={taskData} dataKey="value" xKey="timestamp" color="var(--visual-glow-violet)" loading={taskLoading} height={200} />
+          <AreaChart data={taskData} dataKey="value" xKey="ts" color="var(--visual-glow-violet)" loading={taskLoading} height={200} />
         </ChartCard>
         <ChartCard title="Error Rate" icon={<AlertTriangle className="w-4 h-4 text-state-danger" />}>
-          <AreaChart data={errorData} dataKey="value" xKey="timestamp" color="var(--state-danger)" loading={errorLoading} height={200} />
+          <AreaChart data={errorData} dataKey="value" xKey="ts" color="var(--state-danger)" loading={errorLoading} height={200} />
         </ChartCard>
         <ChartCard title="Cost Trend (USD)" icon={<Wallet className="w-4 h-4 text-state-success" />}>
-          <LineChartComponent data={costData} dataKey="value" xKey="timestamp" color="var(--state-success)" loading={costLoading} height={200} />
+          <LineChartComponent data={costData} dataKey="value" xKey="ts" color="var(--state-success)" loading={costLoading} height={200} />
         </ChartCard>
         <ChartCard title="Active Employees" icon={<Cpu className="w-4 h-4 text-status-strategy" />}>
-          <LineChartComponent data={agentData} dataKey="value" xKey="timestamp" color="var(--visual-glow-cyan)" loading={agentLoading} height={200} />
+          <LineChartComponent data={agentData} dataKey="value" xKey="ts" color="var(--visual-glow-cyan)" loading={agentLoading} height={200} />
         </ChartCard>
       </div>
 
@@ -381,29 +421,169 @@ function AnalyticsTab() {
 // ─── Tab 2: Observability ────────────────────────────────────────────────
 function ObservabilityTab() {
   const { range, setRange } = useTimeRange();
-  const { data: latencyData, loading: latencyLoading } = useChartData('latency', range);
-  const { data: requestData, loading: requestLoading } = useChartData('requests', range);
-  const [events, setEvents] = useState<{ id: string; type: string; message: string; severity: string; timestamp: string }[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const [latencyData, setLatencyData] = useState<Array<{ ts: string; value: number }>>([]);
+  const [requestData, setRequestData] = useState<Array<{ ts: string; value: number }>>([]);
+  const [events, setEvents] = useState<Array<{ id: string; type: string; message: string; severity: string; timestamp: string }>>([]);
+  const [traceRows, setTraceRows] = useState<Array<{ id: string; agentLabel: string; stepCount: number; latencyMs: number; status: string; startedAt: string }>>([]);
+  const [costRows, setCostRows] = useState<Array<{ label: string; cost: number }>>([]);
+  const [summary, setSummary] = useState({
+    avgLatencyMs: 0,
+    requests: 0,
+    errors: 0,
+    throughputPerMinute: 0,
+    totalCost: 0,
+    totalTokens: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
-  const fetchEvents = useCallback(async () => {
-    setEventsLoading(true);
+  const resolveWindow = useCallback(() => {
+    const now = Date.now();
+    const durationMs =
+      range === '24h' ? 24 * 60 * 60 * 1000 :
+      range === '7d' ? 7 * 24 * 60 * 60 * 1000 :
+      30 * 24 * 60 * 60 * 1000;
+    return {
+      fromIso: new Date(now - durationMs).toISOString(),
+      toIso: new Date(now).toISOString(),
+      durationMs,
+    };
+  }, [range]);
+
+  const fetchObservability = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/v1/observability/logs?limit=30', {
-        credentials: 'include',
-      });
-      if (!res.ok) { setEvents([]); return; }
-      const json = await res.json();
-      const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.data?.data) ? json.data.data : []);
-      setEvents(list);
-    } catch {
-      setEvents([]);
-    } finally {
-      setEventsLoading(false);
-    }
-  }, []);
+      const { fromIso, toIso, durationMs } = resolveWindow();
+      const [logsRes, tracesRes, costsRes, latencyRes, requestsRes] = await Promise.all([
+        fetch('/api/v1/observability/logs?limit=30', { credentials: 'include' }),
+        fetch('/api/v1/observability/traces?limit=12', { credentials: 'include' }),
+        fetch(`/api/v1/observability/costs?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`, { credentials: 'include' }),
+        fetch(`/api/v1/observability/metrics?name=latency&from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}&limit=96`, { credentials: 'include' }),
+        fetch(`/api/v1/observability/metrics?name=requests&from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}&limit=96`, { credentials: 'include' }),
+      ]);
 
-  useEffect(() => { void fetchEvents(); }, [fetchEvents]);
+      const logsJson = logsRes.ok ? await logsRes.json() : null;
+      const tracesJson = tracesRes.ok ? await tracesRes.json() : null;
+      const costsJson = costsRes.ok ? await costsRes.json() : null;
+      const latencyJson = latencyRes.ok ? await latencyRes.json() : null;
+      const requestsJson = requestsRes.ok ? await requestsRes.json() : null;
+
+      const logs = (Array.isArray(logsJson?.data)
+        ? logsJson.data
+        : Array.isArray(logsJson?.data?.data)
+        ? logsJson.data.data
+        : []) as ObservabilityLogEvent[];
+      const traces = (Array.isArray(tracesJson?.data)
+        ? tracesJson.data
+        : Array.isArray(tracesJson?.data?.data)
+        ? tracesJson.data.data
+        : []) as ObservabilityTrace[];
+      const costs = (costsJson?.data ?? costsJson) as ObservabilityCostsResponse | null;
+      const latencyPoints = (Array.isArray(latencyJson?.data)
+        ? latencyJson.data
+        : Array.isArray(latencyJson?.data?.data)
+        ? latencyJson.data.data
+        : []) as ObservabilityMetricPoint[];
+      const requestPoints = (Array.isArray(requestsJson?.data)
+        ? requestsJson.data
+        : Array.isArray(requestsJson?.data?.data)
+        ? requestsJson.data.data
+        : []) as ObservabilityMetricPoint[];
+
+      const normalizedLatency = latencyPoints
+        .filter((point) => point.timestamp && typeof point.value === 'number')
+        .map((point) => ({ ts: point.timestamp as string, value: point.value as number }));
+      const normalizedRequests = requestPoints
+        .filter((point) => point.timestamp && typeof point.value === 'number')
+        .map((point) => ({ ts: point.timestamp as string, value: point.value as number }));
+      const errorCount = logs.filter((event) => {
+        const severity = (event.severity ?? '').toLowerCase();
+        const status = (event.status ?? '').toLowerCase();
+        return severity === 'error' || severity === 'critical' || status === 'failed' || status === 'error';
+      }).length;
+      const avgLatencyMs = normalizedLatency.length > 0
+        ? Math.round(normalizedLatency.reduce((sum, point) => sum + point.value, 0) / normalizedLatency.length)
+        : 0;
+      const requestCount = normalizedRequests.reduce((sum, point) => sum + point.value, 0);
+      const throughputPerMinute = durationMs > 0
+        ? Number((requestCount / (durationMs / 60000)).toFixed(2))
+        : 0;
+
+      setLatencyData(normalizedLatency);
+      setRequestData(normalizedRequests);
+      setEvents(
+        logs.map((event, index) => ({
+          id: event.id ?? `log-${index}`,
+          type: event.type ?? 'event',
+          message: event.message ?? 'No message',
+          severity: event.severity ?? 'info',
+          timestamp: event.timestamp ?? event.createdAt ?? new Date().toISOString(),
+        })),
+      );
+      setTraceRows(
+        traces.map((trace, index) => {
+          const steps = Array.isArray(trace.steps) ? trace.steps : [];
+          const startedAt = trace.startedAt ?? new Date().toISOString();
+          const completedAt = trace.completedAt ? new Date(trace.completedAt).getTime() : null;
+          const startedAtMs = new Date(startedAt).getTime();
+          const fallbackLatency = completedAt && startedAtMs ? Math.max(0, completedAt - startedAtMs) : 0;
+          const stepLatency = steps.reduce((sum, step) => sum + (step.durationMs ?? 0), 0);
+          const latestStatus = steps.slice().reverse().find((step) => step.status)?.status ?? (trace.completedAt ? 'completed' : 'running');
+          return {
+            id: trace.taskId ?? `trace-${index}`,
+            agentLabel: trace.agentId ?? 'Unassigned',
+            stepCount: steps.length,
+            latencyMs: stepLatency || fallbackLatency,
+            status: latestStatus.toUpperCase(),
+            startedAt,
+          };
+        }),
+      );
+      setCostRows(
+        (costs?.byAgent ?? [])
+          .map((item, index) => ({
+            label: item.agentName ?? item.model ?? `Item ${index + 1}`,
+            cost: Number((item.totalCost ?? item.costUsd ?? item.cost ?? 0).toFixed(4)),
+          }))
+          .filter((item) => item.cost > 0)
+          .slice(0, 6),
+      );
+      setSummary({
+        avgLatencyMs,
+        requests: Math.round(requestCount),
+        errors: errorCount,
+        throughputPerMinute,
+        totalCost: Number((costs?.totalCost ?? 0).toFixed(4)),
+        totalTokens: costs?.totalTokens ?? 0,
+      });
+    } catch {
+      setLatencyData([]);
+      setRequestData([]);
+      setEvents([]);
+      setTraceRows([]);
+      setCostRows([]);
+      setSummary({
+        avgLatencyMs: 0,
+        requests: 0,
+        errors: 0,
+        throughputPerMinute: 0,
+        totalCost: 0,
+        totalTokens: 0,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [resolveWindow]);
+
+  useEffect(() => { void fetchObservability(); }, [fetchObservability]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const timer = window.setInterval(() => {
+      void fetchObservability();
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [autoRefresh, fetchObservability]);
 
   return (
     <div className="space-y-5">
@@ -414,6 +594,15 @@ function ObservabilityTab() {
           Live observability
         </h2>
         <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-zinc-400">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              className="rounded border-surface-border bg-surface-overlay"
+            />
+            Auto refresh
+          </label>
           <div className="flex gap-1">
             {RANGE_OPTIONS.map((opt) => (
               <button
@@ -429,7 +618,7 @@ function ObservabilityTab() {
               </button>
             ))}
           </div>
-          <ActionButton variant="ghost" size="sm" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void fetchEvents()}>
+          <ActionButton variant="ghost" size="sm" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void fetchObservability()}>
             Refresh
           </ActionButton>
         </div>
@@ -437,20 +626,84 @@ function ObservabilityTab() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Avg Latency" value="—" color="ops" icon={<Zap className="w-4 h-4" />} />
-        <KpiCard label="Requests" value="—" color="profit" icon={<Activity className="w-4 h-4" />} />
-        <KpiCard label="Errors" value="—" color="risk" icon={<AlertTriangle className="w-4 h-4" />} />
-        <KpiCard label="Throughput" value="—" color="strategy" icon={<TrendingUp className="w-4 h-4" />} />
+        <KpiCard label="Avg Latency" value={`${summary.avgLatencyMs}ms`} color="ops" icon={<Zap className="w-4 h-4" />} loading={loading} />
+        <KpiCard label="Requests" value={summary.requests} color="profit" icon={<Activity className="w-4 h-4" />} loading={loading} />
+        <KpiCard label="Errors" value={summary.errors} color="risk" icon={<AlertTriangle className="w-4 h-4" />} loading={loading} />
+        <KpiCard label="Throughput" value={`${summary.throughputPerMinute}/min`} color="strategy" icon={<TrendingUp className="w-4 h-4" />} loading={loading} />
       </div>
 
       {/* Latency + request charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="P95 Latency (ms)" icon={<Zap className="w-4 h-4 text-status-ops" />}>
-          <LineChartComponent data={latencyData} dataKey="value" xKey="timestamp" color="var(--state-info)" loading={latencyLoading} height={200} />
+          <LineChartComponent data={latencyData} dataKey="value" xKey="ts" color="var(--state-info)" loading={loading} height={200} />
         </ChartCard>
         <ChartCard title="Requests / minute" icon={<Activity className="w-4 h-4 text-state-success" />}>
-          <AreaChart data={requestData} dataKey="value" xKey="timestamp" color="var(--state-success)" loading={requestLoading} height={200} />
+          <AreaChart data={requestData} dataKey="value" xKey="ts" color="var(--state-success)" loading={loading} height={200} />
         </ChartCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="card-surface">
+          <div className="px-5 py-3 border-b border-surface-border flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-accent-400" />
+              Recent traces
+            </h3>
+            <span className="text-xs text-zinc-500">{traceRows.length} traces</span>
+          </div>
+          <div className="divide-y divide-surface-border max-h-80 overflow-y-auto">
+            {loading ? (
+              <div className="p-8 text-center text-zinc-500 text-xs">Loading…</div>
+            ) : traceRows.length === 0 ? (
+              <div className="p-8 text-center text-zinc-500 text-xs">No traces available</div>
+            ) : (
+              traceRows.map((trace) => (
+                <div key={trace.id} className="px-5 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-200">{trace.agentLabel}</p>
+                      <p className="text-xs text-zinc-500">{trace.stepCount} steps • {new Date(trace.startedAt).toLocaleString()}</p>
+                    </div>
+                    <StatusBadge
+                      status={trace.status === 'COMPLETED' ? 'COMPLETED' : trace.status === 'FAILED' ? 'FAILED' : 'RUNNING'}
+                      label={trace.status}
+                    />
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-400">
+                    Latency {trace.latencyMs}ms
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="card-surface">
+          <div className="px-5 py-3 border-b border-surface-border flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-state-warning" />
+              Cost hotspots
+            </h3>
+            <span className="text-xs text-zinc-500">
+              ${summary.totalCost.toFixed(4)} • {summary.totalTokens.toLocaleString()} tokens
+            </span>
+          </div>
+          <div className="p-4">
+            {loading ? (
+              <div className="p-4 text-center text-zinc-500 text-xs">Loading…</div>
+            ) : costRows.length === 0 ? (
+              <div className="p-4 text-center text-zinc-500 text-xs">No cost activity available</div>
+            ) : (
+              <BarChart
+                data={costRows.map((row) => ({ label: row.label, value: row.cost, color: 'var(--state-warning)' }))}
+                dataKey="value"
+                xKey="label"
+                loading={false}
+                height={220}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Event stream */}
@@ -463,7 +716,7 @@ function ObservabilityTab() {
           <span className="text-xs text-zinc-500">{events.length} events</span>
         </div>
         <div className="divide-y divide-surface-border max-h-96 overflow-y-auto">
-          {eventsLoading ? (
+          {loading ? (
             <div className="p-8 text-center text-zinc-500 text-xs">Loading…</div>
           ) : events.length === 0 ? (
             <div className="p-8 text-center text-zinc-500 text-xs">No events yet</div>
@@ -1815,6 +2068,7 @@ const CC_TABS: { id: CCSubTab; label: string }[] = [
 
 function CommandCenterTab() {
   const [sub, setSub] = useState<CCSubTab>('inventory');
+  const [summary, setSummary] = useState<CommandCenterSummary | null>(null);
   const [inventory, setInventory] = useState<CommandCenterInventory | null>(null);
   const [quality, setQuality] = useState<CommandCenterQuality | null>(null);
   const [costs, setCosts] = useState<CommandCenterCosts | null>(null);
@@ -1825,12 +2079,14 @@ function CommandCenterTab() {
   const [auditCorr, setAuditCorr] = useState<CommandCenterAuditCorrelation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [inv, qua, cos, mh, ch, sec, ks, ac] = await Promise.all([
+      const [sum, inv, qua, cos, mh, ch, sec, ks, ac] = await Promise.all([
+        commandCenterService.getSummary(),
         commandCenterService.getInventory(),
         commandCenterService.getQuality(),
         commandCenterService.getCosts(),
@@ -1840,6 +2096,7 @@ function CommandCenterTab() {
         commandCenterService.getKillSwitches(),
         commandCenterService.getAuditCorrelation(50, 24),
       ]);
+      setSummary(sum);
       setInventory(inv);
       setQuality(qua);
       setCosts(cos);
@@ -1859,6 +2116,14 @@ function CommandCenterTab() {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [autoRefresh, refresh]);
+
   const refreshSecurity = useCallback(async () => {
     try {
       const sec = await commandCenterService.getSecurityEvents(100);
@@ -1877,6 +2142,15 @@ function CommandCenterTab() {
     }
   }, []);
 
+  const refreshAuditCorrelation = useCallback(async (windowHours = 24, correlationId?: string) => {
+    try {
+      const ac = await commandCenterService.getAuditCorrelation(50, windowHours, correlationId);
+      setAuditCorr(ac);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to refresh audit correlation');
+    }
+  }, []);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -1884,14 +2158,77 @@ function CommandCenterTab() {
           <Cpu className="w-4 h-4 text-accent-400" />
           Command Center — P8 intelligence
         </h2>
-        <ActionButton variant="ghost" size="sm" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void refresh()}>
-          Refresh
-        </ActionButton>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-zinc-400">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              className="rounded border-surface-border bg-surface-overlay"
+            />
+            Auto refresh
+          </label>
+          <ActionButton variant="ghost" size="sm" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void refresh()}>
+            Refresh
+          </ActionButton>
+        </div>
       </div>
 
       {error && (
         <div className="card-surface p-3 text-xs text-state-danger" role="alert">
           {error}
+        </div>
+      )}
+
+      {summary && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <KpiCard label="Agents" value={summary.agents.total} color="ops" />
+          <KpiCard label="Running" value={summary.agents.running} color="profit" />
+          <KpiCard label="Tasks" value={summary.tasks.total} color="strategy" />
+          <KpiCard label="Approvals" value={summary.approvals.pending} color="warn" />
+          <KpiCard label="Workflows" value={summary.workflows.active} color="risk" />
+        </div>
+      )}
+
+      {summary && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="card-surface p-4">
+            <div className="text-sm font-semibold text-zinc-100 mb-3">Recent governance activity</div>
+            <div className="space-y-2">
+              {summary.activity.slice(0, 6).map((item) => (
+                <div key={item.id} className="rounded-lg border border-surface-border bg-surface-overlay/40 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-zinc-100">{item.message}</span>
+                    <StatusBadge status={item.severity.toUpperCase()} />
+                  </div>
+                  <div className="mt-1 text-xs text-zinc-500">
+                    {new Date(item.timestamp).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+              {summary.activity.length === 0 && (
+                <div className="text-sm text-zinc-500">No recent governance activity.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="card-surface p-4">
+            <div className="text-sm font-semibold text-zinc-100 mb-3">Cost posture</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-surface-border bg-surface-overlay/40 p-3">
+                <div className="text-[11px] uppercase tracking-wide text-zinc-500">Month spend</div>
+                <div className="mt-1 text-sm font-medium text-zinc-100">
+                  ${(summary.costs.monthCents / 100).toFixed(2)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-surface-border bg-surface-overlay/40 p-3">
+                <div className="text-[11px] uppercase tracking-wide text-zinc-500">Budget</div>
+                <div className="mt-1 text-sm font-medium text-zinc-100">
+                  ${(summary.costs.budgetCents / 100).toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1945,7 +2282,7 @@ function CommandCenterTab() {
         />
       )}
       {sub === 'audit-correlation' && auditCorr && (
-        <CCAuditCorrelationPanel data={auditCorr} />
+        <CCAuditCorrelationPanel data={auditCorr} onRefresh={refreshAuditCorrelation} />
       )}
     </div>
   );
@@ -2149,8 +2486,12 @@ function CCSecurityPanel({
   security: CommandCenterSecurityEvents;
   onRefresh: () => void | Promise<void>;
 }) {
+  const [severityFilter, setSeverityFilter] = useState<'ALL' | 'critical' | 'high' | 'medium' | 'low'>('ALL');
   const sevColor = (s: string): BadgeVariant =>
     s === 'critical' ? 'danger' : s === 'high' ? 'warning' : s === 'medium' ? 'info' : 'neutral';
+  const visibleEvents = security.events.filter((event) =>
+    severityFilter === 'ALL' ? true : event.severity === severityFilter,
+  );
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -2158,9 +2499,22 @@ function CCSecurityPanel({
           <Shield className="w-4 h-4 text-state-danger" />
           Security events feed
         </h3>
-        <ActionButton variant="ghost" size="sm" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void onRefresh()}>
-          Refresh
-        </ActionButton>
+        <div className="flex items-center gap-2">
+          <select
+            value={severityFilter}
+            onChange={(e) => setSeverityFilter(e.target.value as 'ALL' | 'critical' | 'high' | 'medium' | 'low')}
+            className="px-2 py-1.5 rounded-md border border-surface-border bg-surface-overlay text-xs text-zinc-200 focus:outline-none focus:border-accent-500"
+          >
+            <option value="ALL">All severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <ActionButton variant="ghost" size="sm" icon={<RefreshCw className="w-3 h-3" />} onClick={() => void onRefresh()}>
+            Refresh
+          </ActionButton>
+        </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <KpiCard label="Total" value={security.summary.total} color="ops" />
@@ -2173,7 +2527,7 @@ function CCSecurityPanel({
       <CCListCard
         title="Recent security events"
         empty="No security events recorded for this tenant."
-        rows={security.events.slice(0, 25).map((e) => ({
+        rows={visibleEvents.slice(0, 25).map((e) => ({
           id: e.id,
           primary: e.action,
           secondary: `${e.actor}${e.resource ? ` • ${e.resource}${e.resourceId ? ` ${e.resourceId}` : ''}` : ''}${e.ipAddress ? ` • ${e.ipAddress}` : ''}`,
@@ -2197,6 +2551,9 @@ function CCKillSwitchPanel({
   const [pending, setPending] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [confirming, setConfirming] = useState<{ scope: 'process' | 'phase' | 'channel' | 'tenant-feature'; target: string; enabled: boolean } | null>(null);
+  const [newFeatureKey, setNewFeatureKey] = useState('service-gateway-v2.read');
+
+  const tenantFeatureEntries = data.entries.filter((e) => e.scope === 'tenant-feature');
 
   const submit = async () => {
     if (!confirming) return;
@@ -2243,6 +2600,37 @@ function CCKillSwitchPanel({
         />
         <KpiCard label="Phases enabled" value={data.entries.filter((e) => e.scope === 'phase' && e.enabled).length} color="ops" />
         <KpiCard label="Channels enabled" value={data.entries.filter((e) => e.scope === 'channel' && e.enabled).length} color="ops" />
+      </div>
+
+      <div className="card-surface p-4 space-y-3">
+        <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Global process gate</h4>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-surface-border bg-surface-overlay px-3 py-3">
+          <div className="min-w-0">
+            <p className="text-sm text-zinc-100">Service gateway process switch</p>
+            <p className="text-[11px] text-zinc-500">
+              Emergency-wide control for the entire rollout process.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Toggle process kill switch"
+            disabled={pending === `process::${!data.processEnabled}`}
+            onClick={() =>
+              setConfirming({
+                scope: 'process',
+                target: '',
+                enabled: !data.processEnabled,
+              })
+            }
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition disabled:opacity-50 ${
+              data.processEnabled
+                ? 'bg-state-warning/15 text-state-warning hover:bg-state-warning/25'
+                : 'bg-state-success/15 text-state-success hover:bg-state-success/25'
+            }`}
+          >
+            {data.processEnabled ? 'Enabled' : 'Disabled'}
+          </button>
+        </div>
       </div>
 
       <div className="card-surface p-4 space-y-3">
@@ -2303,6 +2691,75 @@ function CCKillSwitchPanel({
         </div>
       </div>
 
+      <div className="card-surface p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Tenant feature overrides</h4>
+          <span className="text-[11px] text-zinc-500">{tenantFeatureEntries.length} overrides</span>
+        </div>
+
+        <div className="rounded-lg border border-surface-border bg-surface-overlay p-3 space-y-2">
+          <label className="block text-[11px] text-zinc-400">
+            Feature key
+            <input
+              type="text"
+              value={newFeatureKey}
+              onChange={(e) => setNewFeatureKey(e.target.value)}
+              placeholder="service-gateway-v2.read"
+              className="mt-1 w-full px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-100 focus:outline-none focus:border-accent-500"
+            />
+          </label>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirming({ scope: 'tenant-feature', target: newFeatureKey.trim(), enabled: true })}
+              disabled={!newFeatureKey.trim().startsWith('service-gateway-v2.')}
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white transition disabled:opacity-50"
+            >
+              Enable override
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming({ scope: 'tenant-feature', target: newFeatureKey.trim(), enabled: false })}
+              disabled={!newFeatureKey.trim().startsWith('service-gateway-v2.')}
+              className="px-3 py-1.5 rounded-md text-xs font-medium border border-surface-border text-zinc-300 hover:bg-surface-overlay transition disabled:opacity-50"
+            >
+              Disable override
+            </button>
+          </div>
+          <p className="text-[11px] text-zinc-500">
+            Feature keys must start with <span className="font-mono">service-gateway-v2.</span>
+          </p>
+        </div>
+
+        {tenantFeatureEntries.length === 0 ? (
+          <div className="text-xs text-zinc-500 py-3">No tenant-specific feature overrides configured.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {tenantFeatureEntries.map((e) => (
+              <div key={`feature-${e.target}`} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay">
+                <div className="min-w-0">
+                  <p className="text-sm text-zinc-100 break-all">{e.target}</p>
+                  <p className="text-[11px] text-zinc-500">tenant feature override</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label={`Toggle tenant feature ${e.target}`}
+                  disabled={pending === `tenant-feature:${e.target}:${!e.enabled}`}
+                  onClick={() => setConfirming({ scope: 'tenant-feature', target: e.target, enabled: !e.enabled })}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition disabled:opacity-50 ${
+                    e.enabled
+                      ? 'bg-state-warning/15 text-state-warning hover:bg-state-warning/25'
+                      : 'bg-state-success/15 text-state-success hover:bg-state-success/25'
+                  }`}
+                >
+                  {e.enabled ? 'Enabled' : 'Disabled'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {confirming && (
         <div className="card-surface p-4 space-y-3 border border-state-warning/40" role="dialog" aria-label="Confirm kill switch toggle">
           <p className="text-xs text-zinc-300">
@@ -2350,7 +2807,17 @@ function CCKillSwitchPanel({
   );
 }
 
-function CCAuditCorrelationPanel({ data }: { data: CommandCenterAuditCorrelation }) {
+function CCAuditCorrelationPanel({
+  data,
+  onRefresh,
+}: {
+  data: CommandCenterAuditCorrelation;
+  onRefresh: (windowHours?: number, correlationId?: string) => void | Promise<void>;
+}) {
+  const [windowHours, setWindowHours] = useState('24');
+  const [correlationId, setCorrelationId] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -2361,6 +2828,51 @@ function CCAuditCorrelationPanel({ data }: { data: CommandCenterAuditCorrelation
         <span className="text-[11px] text-zinc-500">
           {new Date(data.windowStart).toLocaleString()} → {new Date(data.windowEnd).toLocaleString()}
         </span>
+      </div>
+      <div className="card-surface p-4 flex flex-col lg:flex-row lg:items-end gap-3">
+        <label className="text-xs text-zinc-400 flex-1">
+          Correlation ID
+          <input
+            type="text"
+            value={correlationId}
+            onChange={(e) => setCorrelationId(e.target.value)}
+            placeholder="Filter a specific correlation ID"
+            className="mt-1 w-full px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-100 focus:outline-none focus:border-accent-500"
+          />
+        </label>
+        <label className="text-xs text-zinc-400 w-full lg:w-40">
+          Window (hours)
+          <select
+            value={windowHours}
+            onChange={(e) => setWindowHours(e.target.value)}
+            className="mt-1 w-full px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-100 focus:outline-none focus:border-accent-500"
+          >
+            <option value="6">6</option>
+            <option value="24">24</option>
+            <option value="72">72</option>
+            <option value="168">168</option>
+          </select>
+        </label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => void onRefresh(Number(windowHours), correlationId.trim() || undefined)}
+            className="px-3 py-2 rounded-md text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white transition"
+          >
+            Apply filter
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCorrelationId('');
+              setWindowHours('24');
+              void onRefresh(24);
+            }}
+            className="px-3 py-2 rounded-md text-xs font-medium border border-surface-border text-zinc-300 hover:bg-surface-overlay transition"
+          >
+            Reset
+          </button>
+        </div>
       </div>
       {data.events.length === 0 ? (
         <div className="card-surface p-8 text-center text-zinc-500 text-sm">
@@ -2381,21 +2893,58 @@ function CCAuditCorrelationPanel({ data }: { data: CommandCenterAuditCorrelation
             </thead>
             <tbody className="divide-y divide-surface-border">
               {data.events.map((e) => (
-                <tr key={e.id}>
-                  <td className="px-3 py-2 font-mono text-zinc-500 whitespace-nowrap">{new Date(e.occurredAt).toLocaleTimeString()}</td>
-                  <td className="px-3 py-2 text-zinc-200">{e.action}</td>
-                  <td className="px-3 py-2 text-zinc-400">
-                    {e.resource ?? '—'}
-                    {e.resourceId ? <span className="text-zinc-600"> · {e.resourceId}</span> : null}
-                  </td>
-                  <td className="px-3 py-2 text-zinc-400">{e.actor}</td>
-                  <td className="px-3 py-2">
-                    <span className={e.result === 'failure' ? 'text-state-danger' : 'text-state-success'}>{e.result}</span>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-zinc-500 truncate max-w-[180px]" title={e.correlationId ?? ''}>
-                    {e.correlationId ?? '—'}
-                  </td>
-                </tr>
+                <Fragment key={e.id}>
+                  <tr>
+                    <td className="px-3 py-2 font-mono text-zinc-500 whitespace-nowrap">{new Date(e.occurredAt).toLocaleTimeString()}</td>
+                    <td className="px-3 py-2 text-zinc-200">{e.action}</td>
+                    <td className="px-3 py-2 text-zinc-400">
+                      {e.resource ?? '—'}
+                      {e.resourceId ? <span className="text-zinc-600"> · {e.resourceId}</span> : null}
+                    </td>
+                    <td className="px-3 py-2 text-zinc-400">{e.actor}</td>
+                    <td className="px-3 py-2">
+                      <span className={e.result === 'failure' ? 'text-state-danger' : 'text-state-success'}>{e.result}</span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-zinc-500 truncate max-w-[180px]" title={e.correlationId ?? ''}>
+                          {e.correlationId ?? '—'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedId((current) => current === e.id ? null : e.id)}
+                          className="text-[10px] text-accent-400 hover:text-accent-300 transition"
+                        >
+                          {expandedId === e.id ? 'Hide' : 'Details'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedId === e.id ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-3 bg-surface-overlay/30">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                          <div>
+                            <span className="text-zinc-500">Correlation ID</span>
+                            <div className="font-mono text-zinc-300 break-all">{e.correlationId ?? '—'}</div>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500">Causation ID</span>
+                            <div className="font-mono text-zinc-300 break-all">{e.causationId ?? '—'}</div>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500">Occurred at</span>
+                            <div className="text-zinc-300">{new Date(e.occurredAt).toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500">Actor / result</span>
+                            <div className="text-zinc-300">{e.actor} • {e.result}</div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>

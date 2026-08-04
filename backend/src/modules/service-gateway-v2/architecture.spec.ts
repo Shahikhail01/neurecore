@@ -21,7 +21,16 @@ import {
   PROBE_BOUNDARIES,
 } from './certification/tenant-isolation-probe';
 
+// GATEWAY_ROOT points at the service-gateway-v2 directory itself, so
+// GATEWAY_DIRS resolve to the gateway's own subdirectories
+// (service-gateway-v2/router, .../channels, ...). V2_ROOT (one level up)
+// is retained only for cross-gateway files that live beside the module
+// (e.g. src/modules/agents/...). Using V2_ROOT for GATEWAY_DIRS was a
+// path bug: it made the gate scan top-level modules whose names collided
+// with gateway subdir names (e.g. src/modules/channels/ from Phase 5),
+// producing false positives.
 const V2_ROOT = join(__dirname, '..');
+const GATEWAY_ROOT = __dirname;
 const GATEWAY_DIRS = [
   'router',
   'capabilities',
@@ -157,13 +166,17 @@ async function runTests(): Promise<TestResult[]> {
     violations: [],
   };
   for (const subDir of GATEWAY_DIRS) {
-    const dir = join(V2_ROOT, subDir);
+    const dir = join(GATEWAY_ROOT, subDir);
     const files = await collectFiles(dir);
     for (const file of files) {
+      // Skip test files: specs legitimately use `tenantId: '*'` as a
+      // fixture to verify the wildcard is rejected. This gate scans
+      // production wildcard-bypass branches, not test assertions.
+      if (file.endsWith('.spec.ts') || file.endsWith('.test.ts')) continue;
       const content = await readFile(file, 'utf-8');
       // tolerate the case where tenantId='*' appears inside a string
       // literal that documents why NOT to use it.
-      const matches = content.match(/tenantId\s*[:=]\s*['"`]\*['"`]/g);
+      const matches = content.match(/tenantId\s*[:=]\s*['"`\*]['"`]/g);
       if (matches) {
         for (const m of matches) {
           tenantWildcardTest.passed = false;
@@ -227,7 +240,7 @@ async function runTests(): Promise<TestResult[]> {
   results.push(connectorStubTest);
 
   for (const subDir of GATEWAY_DIRS) {
-    const dir = join(V2_ROOT, subDir);
+    const dir = join(GATEWAY_ROOT, subDir);
     const files = await collectFiles(dir);
     for (const file of files) {
       const content = await readFile(file, 'utf-8');

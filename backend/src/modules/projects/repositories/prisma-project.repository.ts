@@ -6,7 +6,7 @@
  * - DIP: implements IProjectRepository
  */
 
-import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { EVENT_TRANSPORT } from '../../enterprise-events/contracts/enterprise-event-transport.interface';
@@ -142,7 +142,13 @@ export class PrismaProjectRepository implements IProjectRepository {
     options: ListProjectsOptions,
     tenantId: string,
   ): Promise<{ data: Project[]; total: number }> {
-    const where: Record<string, unknown> = tenantId !== '*' ? { tenantId } : {};
+    // Phase 0.5 P-1 audit fix: refuse wildcard tenant bypass.
+    if (tenantId === '*') {
+      throw new ForbiddenException(
+        'tenantId "*" is forbidden; use a platform-admin port for cross-tenant queries',
+      );
+    }
+    const where: Record<string, unknown> = { tenantId };
     if (options.status) where.status = options.status;
     if (options.departmentId) where.departmentId = options.departmentId;
     if (options.customerId) where.customerId = options.customerId;

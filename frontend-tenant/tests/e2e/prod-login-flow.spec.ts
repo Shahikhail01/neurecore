@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 
 const ADMIN_BASE = process.env.ADMIN_BASE ?? 'https://cc.neurecore.com';
 const EMAIL = process.env.TEST_EMAIL ?? 'admin@neurecore.ai';
-const PASSWORD = process.env.TEST_PASSWORD ?? '';
+const PASSWORD = process.env.TEST_PASSWORD ?? 'Admin@123!';
 
 test.describe('Live prod login flow (FIX-020 — admin portal)', () => {
   test.skip(!PASSWORD, 'TEST_PASSWORD env not set — skipping live login test');
@@ -28,7 +28,10 @@ test.describe('Live prod login flow (FIX-020 — admin portal)', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
 
     // After login we should land on a non-login page (overview or similar).
-    await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 25_000 });
+    await page.waitForURL(
+      (url) => url.pathname.includes('/overview') || !url.pathname.includes('/login'),
+      { timeout: 25_000 },
+    );
 
     // Cookies should include __Host-nc_at with httpOnly.
     const cookies = await context.cookies();

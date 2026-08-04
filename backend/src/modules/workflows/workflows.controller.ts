@@ -40,6 +40,8 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResponse } from '../../common/responses/paginated.response';
 import { ActionResult } from '../../common/responses/action-result.response';
 import {
+  UpdateWorkflowExecutionDto,
+  WorkflowExecutionHistoryItemDto,
   WorkflowResponseDto,
   WorkflowExecutionSummaryDto,
 } from './dto/workflow-response.dto';
@@ -97,6 +99,20 @@ export class WorkflowsController {
   ): Promise<WorkflowExecutionSummaryDto> {
     if (!user.tenantId) throw new Error('Tenant ID required');
     return this.workflowsService.getStatus(id, user.tenantId);
+  }
+
+  @Get(':id/executions')
+  async getExecutionHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+    @Query('limit') limit = '10',
+  ): Promise<WorkflowExecutionHistoryItemDto[]> {
+    if (!user.tenantId) throw new Error('Tenant ID required');
+    return this.workflowsService.getExecutionHistory(
+      id,
+      user.tenantId,
+      parseInt(limit, 10),
+    );
   }
 
   /**
@@ -235,6 +251,34 @@ export class WorkflowsController {
       success: true,
       message: 'Workflow execution started',
       data: { executionId },
+    };
+  }
+
+  @Patch(':id/executions/:executionId')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.PLATFORM_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+  )
+  @HttpCode(HttpStatus.OK)
+  async updateExecution(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('executionId', ParseUUIDPipe) executionId: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() body: UpdateWorkflowExecutionDto,
+  ): Promise<ActionResult<{ executionId: string; status: string }>> {
+    if (!user.tenantId) throw new Error('Tenant ID required');
+    const result = await this.workflowsService.updateExecution(
+      id,
+      executionId,
+      user.tenantId,
+      body,
+    );
+    return {
+      success: true,
+      message: `Workflow execution ${body.status.toLowerCase()}`,
+      data: result,
     };
   }
 }

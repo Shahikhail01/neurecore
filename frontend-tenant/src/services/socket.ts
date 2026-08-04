@@ -58,13 +58,69 @@ export function getSocket(): Socket {
       hqEventBus.emit('task:update', { taskId, status: 'FAILED' }));
 
     // Workflow events — backend status → EventBus event string
-    socket.on('workflow:status_changed', ({ workflowId, status }: { workflowId: string; status: string }) => {
+    socket.on('workflow:status_changed', ({
+      workflowId,
+      status,
+      workflowName,
+      stageLabel,
+      executionId,
+      timestamp,
+    }: {
+      workflowId: string;
+      status: string;
+      workflowName?: string;
+      stageLabel?: string;
+      executionId?: string;
+      timestamp?: number;
+    }) => {
       const statusToEvent: Record<string, string> = {
         ACTIVE: 'started', ARCHIVED: 'completed', ERROR: 'failed', PAUSED: 'paused',
       };
       hqEventBus.emit('workflow:event', {
         workflowId,
         event: statusToEvent[status] ?? status.toLowerCase(),
+        status,
+        workflowName,
+        stageLabel,
+        executionId,
+        timestamp,
+      });
+    });
+
+    socket.on('workflow:event', (payload: {
+      workflowId: string;
+      event: string;
+      status?: string;
+      workflowName?: string;
+      stageLabel?: string;
+      executionId?: string;
+      progressPercent?: number;
+      detail?: string;
+      timestamp?: number;
+    }) => {
+      hqEventBus.emit('workflow:event', payload);
+    });
+
+    socket.on('workflow:progress', (payload: {
+      workflowId: string;
+      workflowName?: string;
+      status?: string;
+      stageLabel?: string;
+      executionId?: string;
+      progressPercent?: number;
+      detail?: string;
+      timestamp?: number;
+    }) => {
+      hqEventBus.emit('workflow:event', {
+        workflowId: payload.workflowId,
+        workflowName: payload.workflowName,
+        status: payload.status,
+        stageLabel: payload.stageLabel,
+        executionId: payload.executionId,
+        progressPercent: payload.progressPercent,
+        detail: payload.detail,
+        timestamp: payload.timestamp,
+        event: 'progress',
       });
     });
 

@@ -45,7 +45,17 @@ export interface HQSocketEvents {
   'socket:disconnected': void;
   'agent:status': { agentId: string; status: string };
   'task:update': { taskId: string; status: string };
-  'workflow:event': { workflowId: string; event: string };
+  'workflow:event': {
+    workflowId: string;
+    event: string;
+    status?: string;
+    workflowName?: string;
+    stageLabel?: string;
+    executionId?: string;
+    progressPercent?: number;
+    detail?: string;
+    timestamp?: number;
+  };
   'activity:new': { type: string; payload: unknown };
   'notification:new': { id: string; title: string; message: string; type: string };
   'approval:requested': { approvalId: string; title: string };

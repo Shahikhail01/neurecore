@@ -344,6 +344,13 @@ export default function DepartmentWorkspacePage() {
             <ActionToolbar
               right={
                 <>
+                  <Link
+                    href={`/departments/${encodeURIComponent(deptId)}/control-room`}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-accent-500/30 px-3 py-2 text-xs font-medium text-accent-500 hover:bg-accent-500/10 transition"
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    Control Room
+                  </Link>
                   <ActionButton
                     variant="secondary"
                     size="md"

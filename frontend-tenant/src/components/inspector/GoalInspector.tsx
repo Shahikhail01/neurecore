@@ -129,18 +129,35 @@ export function GoalInspector({ id }: { id: string }) {
       {g.targetDate && (
         <Row label="Target" value={new Date(g.targetDate).toLocaleDateString()} />
       )}
+      <Row label="Created" value={new Date(g.createdAt).toLocaleDateString()} />
       {g.completedAt && (
         <Row label="Completed" value={new Date(g.completedAt).toLocaleDateString()} />
       )}
 
       <div className="flex flex-col gap-2 pt-2 border-t border-surface-border">
-        {g.status === 'COMPLETED' ? (
+        {g.status !== 'COMPLETED' && (
+          <ActionButton variant="primary" size="md" onClick={() => setStatus('COMPLETED')}>
+            Mark Complete
+          </ActionButton>
+        )}
+        {g.status === 'COMPLETED' && (
           <ActionButton variant="secondary" size="md" onClick={() => setStatus('ACTIVE')}>
             Reopen
           </ActionButton>
-        ) : (
-          <ActionButton variant="primary" size="md" onClick={() => setStatus('COMPLETED')}>
-            Mark Complete
+        )}
+        {g.status === 'ACTIVE' && (
+          <ActionButton variant="secondary" size="md" onClick={() => setStatus('PAUSED')}>
+            Pause Goal
+          </ActionButton>
+        )}
+        {g.status === 'PAUSED' && (
+          <ActionButton variant="secondary" size="md" onClick={() => setStatus('ACTIVE')}>
+            Resume Goal
+          </ActionButton>
+        )}
+        {g.status !== 'ARCHIVED' && (
+          <ActionButton variant="ghost" size="md" onClick={() => setStatus('ARCHIVED')}>
+            Archive Goal
           </ActionButton>
         )}
         <ActionButton

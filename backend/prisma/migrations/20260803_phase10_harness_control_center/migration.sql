@@ -30,7 +30,7 @@ CREATE TABLE "harness_runs" (
   "tenantId" TEXT,
   "environment" "HarnessRunEnvironment" NOT NULL,
   "state" "HarnessRunState" NOT NULL DEFAULT 'REQUESTED',
-  "runPolicyId" TEXT NOT NULL REFERENCES "harness_run_policies"("id") RESTRICT,
+  "runPolicyId" TEXT NOT NULL REFERENCES "harness_run_policies"("id"),
   "requestedBy" TEXT NOT NULL,
   "approvedBy" TEXT,
   "approvedAt" TIMESTAMP(3),
@@ -48,7 +48,7 @@ CREATE TABLE "harness_runs" (
 
 CREATE TABLE "harness_evidence" (
   "id" TEXT PRIMARY KEY,
-  "runId" TEXT NOT NULL REFERENCES "harness_runs"("id") RESTRICT,
+  "runId" TEXT NOT NULL REFERENCES "harness_runs"("id"),
   "tenantId" TEXT,
   "mediaType" TEXT NOT NULL,
   "classification" TEXT NOT NULL,
@@ -167,7 +167,7 @@ CREATE TABLE "harness_replay_bundles" (
 
 CREATE TABLE "harness_replay_executions" (
   "id" TEXT PRIMARY KEY,
-  "bundleId" TEXT NOT NULL REFERENCES "harness_replay_bundles"("id") RESTRICT,
+  "bundleId" TEXT NOT NULL REFERENCES "harness_replay_bundles"("id"),
   "actorId" TEXT NOT NULL,
   "state" TEXT NOT NULL,
   "sideEffectFirewallProof" JSONB NOT NULL,

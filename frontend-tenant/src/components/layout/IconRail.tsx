@@ -261,7 +261,7 @@ export function buildRailSections(
         { id: 'org-chart',    label: 'Org Chart',   href: '/departments?tab=org-chart', icon: Network },
         { id: 'tasks',        label: 'Tasks',       href: '/departments?tab=tasks', icon: ListTodo },
         { id: 'workflows',    label: 'Workflows',   href: '/departments?tab=workflows', icon: GitBranch },
-        { id: 'routines',     label: 'Routines',    href: '/departments?tab=routines', icon: Repeat },
+        { id: 'routines',     label: 'Routines',    href: '/routines', icon: Repeat },
         { id: 'goals',        label: 'Goals',       href: '/departments?tab=goals', icon: Target },
         { id: 'projects',     label: 'Projects',    href: '/departments?tab=projects', icon: Briefcase },
         ...industryExtras,

@@ -4,6 +4,9 @@ import { ModelLifecycleController } from './controllers/model-lifecycle.controll
 import { AnalyticsService } from './services/analytics.service';
 import { PrismaFeatureStore } from './services/featureStore.prisma';
 import { HttpModelRunner } from './services/modelRunner.http';
+import { InProcessMockModelRunner } from './services/in-process-mock-model-runner';
+import { LeadScoringCalibration } from './services/lead-scoring-calibration';
+import { LeadScoringCalibrationController } from './controllers/lead-scoring-calibration.controller';
 import { FeatureSnapshotRepository } from './services/featureSnapshot.repository';
 import { CalibratedAnalyticsProvider } from './providers/calibrated.provider';
 import { PredictionService } from './services/prediction.service';
@@ -40,12 +43,17 @@ import { DriftMonitorService } from './services/drift-monitor.service';
  */
 @Module({
   imports: [WorkRuntimeModule],
-  controllers: [AnalyticsController, ModelLifecycleController],
+  controllers: [
+    AnalyticsController,
+    ModelLifecycleController,
+    LeadScoringCalibrationController,
+  ],
   providers: [
     AnalyticsService,
     PrismaFeatureStore,
-    HttpModelRunner,
-    { provide: MODEL_RUNNER, useExisting: HttpModelRunner },
+    InProcessMockModelRunner, // Phase 3 P-5: default model runner (deterministic, in-process)
+    HttpModelRunner, // secondary; kept for environments that opt in via env
+    { provide: MODEL_RUNNER, useExisting: InProcessMockModelRunner },
     FeatureSnapshotRepository,
     CalibratedAnalyticsProvider,
     PredictionService,
@@ -59,6 +67,7 @@ import { DriftMonitorService } from './services/drift-monitor.service';
     ModelLifecycleService,
     ModelCardService,
     DriftMonitorService,
+    LeadScoringCalibration, // Phase 3 P-5: certification gate
   ],
   exports: [
     AnalyticsService,
@@ -75,6 +84,7 @@ import { DriftMonitorService } from './services/drift-monitor.service';
     ModelLifecycleService,
     ModelCardService,
     DriftMonitorService,
+    LeadScoringCalibration,
   ],
 })
 export class AnalyticsModule {}

@@ -5,7 +5,7 @@
  * Follows Single Responsibility - only handles routine persistence.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import {
   IRoutineRepository,
@@ -39,6 +39,7 @@ export class PrismaRoutineRepository implements IRoutineRepository {
           data.graphDefinition as unknown as Prisma.InputJsonValue,
         config: data.config as Prisma.InputJsonValue,
         metadata: data.metadata as Prisma.InputJsonValue,
+        ownerAgentId: data.ownerAgentId,
         tenantId: data.tenantId,
         createdById: data.createdById,
         status: 'DRAFT',
@@ -65,7 +66,13 @@ export class PrismaRoutineRepository implements IRoutineRepository {
     tenantId: string,
     options?: ListRoutinesOptions,
   ): Promise<{ routines: Routine[]; total: number }> {
-    const where: Prisma.RoutineWhereInput = tenantId !== '*' ? { tenantId } : {};
+    // Phase 0.5 P-1 audit fix: refuse wildcard tenant bypass.
+    if (tenantId === '*') {
+      throw new ForbiddenException(
+        'tenantId "*" is forbidden; use a platform-admin port for cross-tenant queries',
+      );
+    }
+    const where: Prisma.RoutineWhereInput = { tenantId };
 
     if (options?.status) {
       where.status = options.status;
@@ -113,9 +120,14 @@ export class PrismaRoutineRepository implements IRoutineRepository {
       updateData.config = data.config as Prisma.InputJsonValue;
     if (data.metadata !== undefined)
       updateData.metadata = data.metadata as Prisma.InputJsonValue;
+    if (data.ownerAgentId !== undefined) {
+      updateData.ownerAgent = data.ownerAgentId
+        ? { connect: { id: data.ownerAgentId } }
+        : { disconnect: true };
+    }
 
     return this.prisma.routine.update({
-      where: { id },
+      where: { id, tenantId },
       data: updateData,
     });
   }
@@ -319,7 +331,13 @@ export class PrismaRoutineRunRepository implements IRoutineRunRepository {
     tenantId: string,
     options?: ListRunsOptions,
   ): Promise<{ runs: RoutineRun[]; total: number }> {
-    const where: Prisma.RoutineRunWhereInput = tenantId !== '*' ? { tenantId } : {};
+    // Phase 0.5 P-1 audit fix: refuse wildcard tenant bypass.
+    if (tenantId === '*') {
+      throw new ForbiddenException(
+        'tenantId "*" is forbidden; use a platform-admin port for cross-tenant queries',
+      );
+    }
+    const where: Prisma.RoutineRunWhereInput = { tenantId };
 
     if (options?.status) {
       where.status = options.status as any;

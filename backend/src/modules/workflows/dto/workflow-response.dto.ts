@@ -11,6 +11,7 @@
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Expose, Transform } from 'class-transformer';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { WorkflowStatus } from '@prisma/client';
 
 export class WorkflowResponseDto {
@@ -119,4 +120,53 @@ export class WorkflowExecutionSummaryDto {
   @ApiProperty({ example: 'DRAFT' })
   @Expose()
   status!: string;
+}
+
+export class WorkflowExecutionHistoryItemDto {
+  @ApiProperty({ format: 'uuid' })
+  @Expose()
+  id!: string;
+
+  @ApiProperty()
+  @Expose()
+  status!: string;
+
+  @ApiPropertyOptional({ format: 'date-time' })
+  @Expose()
+  startedAt?: Date | null;
+
+  @ApiPropertyOptional({ format: 'date-time' })
+  @Expose()
+  completedAt?: Date | null;
+
+  @ApiPropertyOptional()
+  @Expose()
+  durationMs?: number | null;
+
+  @ApiPropertyOptional()
+  @Expose()
+  errorMessage?: string | null;
+
+  @ApiProperty({ format: 'date-time' })
+  @Expose()
+  createdAt!: Date;
+}
+
+export class UpdateWorkflowExecutionDto {
+  @ApiProperty({ enum: ['COMPLETED', 'FAILED'] })
+  @IsString()
+  @IsIn(['COMPLETED', 'FAILED'])
+  status!: 'COMPLETED' | 'FAILED';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  detail?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  errorMessage?: string;
 }

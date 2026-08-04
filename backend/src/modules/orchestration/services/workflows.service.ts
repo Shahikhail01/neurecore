@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { WorkflowStatus } from '@prisma/client';
 
@@ -15,8 +15,19 @@ export class WorkflowsService {
     const { status, page = 1, limit = 20 } = options ?? {};
     const skip = (page - 1) * limit;
 
+    // Phase 0.5 P-1 audit fix:
+    // v3 P-1 rule §11 forbids wildcard tenant bypasses. Previously the code
+    // accepted `tenantId === '*'` and silently widened the filter to all
+    // tenants, breaking tenant isolation. We now refuse the wildcard with a
+    // typed ForbiddenException; legitimate cross-tenant queries must use a
+    // separately authorized administrative port (not yet introduced).
+    if (tenantId === '*') {
+      throw new ForbiddenException(
+        'tenantId "*" is forbidden; use a platform-admin port for cross-tenant queries',
+      );
+    }
     const where: Record<string, unknown> = {
-      ...(tenantId && tenantId !== '*' ? { tenantId } : {}),
+      ...(tenantId ? { tenantId } : {}),
       ...(status && { status }),
     };
     const [data, total] = await this.prisma.$transaction([

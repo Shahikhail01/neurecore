@@ -42,7 +42,7 @@
 
 **Other tenants** on the box (NOT neurecore): `app-frontend` (GUV, port 3001/3100), `gfcportal`, `shahisoft-nextjs`, `lifeosa-backend`, `ecoearthshop-backend` (cluster), `cookie-refresher`, `gfcportal`. Don't break these.
 
-**Database:** Contabo Local PostgreSQL 16 (`127.0.0.1:5432`, db `neurecore`, user `neurecore`).
+**Database:** Contabo Local PostgreSQL 16 (`127.0.0.1:5432`, db `neurecore_prod`, user `neurecore_app`).
 
 > ⚠️ **PORT NOTE:** The repo's `backend/.env.production` template points to `127.0.0.1:5433` (which is the **`audit-test` Postgres instance** — only 5 users, used for testing). The actual production backend uses port **5432** (host-installed `postgres 16/main`). The live `.env` on Contabo already has the correct URL — do **NOT** copy the repo template without fixing the port.
 **Cache:** Redis on `127.0.0.1:6379` (host-installed). **Note:** Upstash (`lasting-gobbler-72608.upstash.io`) returns `ENOTFOUND` — non-fatal, backend still healthy. As of FIX-PERF-001 (2026-07-21), the JWT blacklist check is fronted by a 30s LRU cache so the Upstash round-trip happens at most once per JTI per minute per worker.

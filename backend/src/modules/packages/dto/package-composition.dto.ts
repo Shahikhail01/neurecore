@@ -73,3 +73,105 @@ export class PackagePreviewDto {
   @IsString({ each: true })
   featureIds?: string[];
 }
+
+export class AcceptPackageRecommendationsDto {
+  @IsString()
+  industryId!: string;
+
+  @IsString()
+  tierId!: string;
+
+  @IsOptional()
+  @IsString()
+  packageId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  suggestedFeatureKeys!: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  currentFeatureIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  currentDepartmentIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  currentAiAgentIds?: string[];
+}
+
+export class DismissPackageRecommendationsDto {
+  @IsString()
+  industryId!: string;
+
+  @IsString()
+  tierId!: string;
+
+  @IsOptional()
+  @IsString()
+  packageId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  suggestedFeatureKeys!: string[];
+
+  @IsString()
+  reason!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  currentFeatureIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  currentDepartmentIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  currentAiAgentIds?: string[];
+}
+
+export class SnoozePackageRecommendationsDto {
+  @IsString()
+  industryId!: string;
+
+  @IsString()
+  tierId!: string;
+
+  @IsOptional()
+  @IsString()
+  packageId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  suggestedFeatureKeys!: string[];
+
+  @IsString()
+  reason!: string;
+
+  @IsString()
+  snoozeUntil!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  currentFeatureIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  currentDepartmentIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  currentAiAgentIds?: string[];
+}

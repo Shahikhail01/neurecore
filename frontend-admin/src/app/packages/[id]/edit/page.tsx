@@ -13,6 +13,7 @@ import Link from 'next/link';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { packagesService, type Package, type PackageComposition } from '@/services/packages.service';
+import type { PackageRecommendationHistoryEntry } from '@/services/packages.service';
 import { featuresPoolService, type Feature, type FeatureCategory } from '@/services/featuresPool.service';
 import { departmentsPoolService, type DepartmentPoolEntry } from '@/services/departmentsPool.service';
 import { agentsPoolService, type AgentsPoolEntry } from '@/services/agentsPool.service';
@@ -20,9 +21,18 @@ import { PackagePreview } from '@/components/package/PackagePreview';
 import { PackageInheritanceBanner } from '@/components/packages/PackageInheritanceBanner';
 
 const EMPTY_PREVIEW = {
+  readiness: { score: 0, label: 'NEEDS_REVIEW' as const },
   totals: { departments: 0, agents: 0, features: 0 },
   missing: { departments: [] as string[], agents: [] as string[], features: [] as string[] },
   categories: {} as Record<string, number>,
+  rules: {
+    conflicts: [] as string[],
+    dependencies: [] as string[],
+    recommendations: [] as string[],
+    recommendationDetails: [] as Array<{ message: string; severity: 'HIGH' | 'MEDIUM' | 'LOW'; reason: string }>,
+    suggestedFeatureKeys: [] as string[],
+    suggestedBundles: [] as Array<{ key: string; label: string; reason: string; featureKeys: string[]; priority: 'HIGH' | 'MEDIUM' | 'LOW' }>,
+  },
 };
 
 export default function EditPackagePage() {
@@ -48,6 +58,7 @@ export default function EditPackagePage() {
   const [tierId, setTierId] = useState('');
 
   const [preview, setPreview] = useState(EMPTY_PREVIEW);
+  const [recommendationHistory, setRecommendationHistory] = useState<PackageRecommendationHistoryEntry[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -103,6 +114,17 @@ export default function EditPackagePage() {
       });
   }, [industryId, tierId, departmentIds, aiAgentIds, featureIds]);
 
+  useEffect(() => {
+    if (!industryId || !tierId) {
+      setRecommendationHistory([]);
+      return;
+    }
+    void packagesService
+      .recommendationHistory({ packageId: pkg?.id, industryId, tierId, limit: 6 })
+      .then(setRecommendationHistory)
+      .catch(() => setRecommendationHistory([]));
+  }, [pkg?.id, industryId, tierId]);
+
   const featuresByCategory = useMemo(() => {
     const map: Record<FeatureCategory, Feature[]> = {
       INTEGRATION: [], API: [], COMMUNICATION: [], BRANDING: [],
@@ -111,6 +133,64 @@ export default function EditPackagePage() {
     for (const f of allFeatures) map[f.category].push(f);
     return map;
   }, [allFeatures]);
+
+  function applySuggestedFeatures() {
+    if (preview.rules.suggestedFeatureKeys.length === 0) return;
+    void packagesService.acceptRecommendations({
+      packageId: pkg?.id,
+      industryId,
+      tierId,
+      suggestedFeatureKeys: preview.rules.suggestedFeatureKeys,
+      currentFeatureIds: featureIds,
+      currentDepartmentIds: departmentIds,
+      currentAiAgentIds: aiAgentIds,
+    }).then(() => packagesService.recommendationHistory({ packageId: pkg?.id, industryId, tierId, limit: 6 }))
+      .then(setRecommendationHistory)
+      .catch(() => {
+      /* noop */
+    });
+    const suggestedIds = allFeatures
+      .filter((feature) => preview.rules.suggestedFeatureKeys.includes(feature.key))
+      .map((feature) => feature.id);
+    setFeatureIds((current) => Array.from(new Set([...current, ...suggestedIds])));
+  }
+
+  function dismissSuggestedFeatures(reason: string) {
+    if (preview.rules.suggestedFeatureKeys.length === 0) return;
+    void packagesService.dismissRecommendations({
+      packageId: pkg?.id,
+      industryId,
+      tierId,
+      suggestedFeatureKeys: preview.rules.suggestedFeatureKeys,
+      reason,
+      currentFeatureIds: featureIds,
+      currentDepartmentIds: departmentIds,
+      currentAiAgentIds: aiAgentIds,
+    }).then(() => packagesService.recommendationHistory({ packageId: pkg?.id, industryId, tierId, limit: 6 }))
+      .then(setRecommendationHistory)
+      .catch(() => {
+        /* noop */
+      });
+  }
+
+  function snoozeSuggestedFeatures(reason: string, snoozeUntil: string) {
+    if (preview.rules.suggestedFeatureKeys.length === 0) return;
+    void packagesService.snoozeRecommendations({
+      packageId: pkg?.id,
+      industryId,
+      tierId,
+      suggestedFeatureKeys: preview.rules.suggestedFeatureKeys,
+      reason,
+      snoozeUntil,
+      currentFeatureIds: featureIds,
+      currentDepartmentIds: departmentIds,
+      currentAiAgentIds: aiAgentIds,
+    }).then(() => packagesService.recommendationHistory({ packageId: pkg?.id, industryId, tierId, limit: 6 }))
+      .then(setRecommendationHistory)
+      .catch(() => {
+        /* noop */
+      });
+  }
 
   function toggle<T extends string>(setter: (v: T[]) => void, current: T[], id: T) {
     setter(current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
@@ -175,6 +255,23 @@ export default function EditPackagePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           <div className="rounded-xl border border-surface-border bg-surface-raised p-5 space-y-4">
+            {preview.rules.suggestedFeatureKeys.length > 0 && (
+              <div className="flex items-center justify-between rounded-xl border border-emerald-800/40 bg-emerald-950/20 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-emerald-200">Suggested feature bundle available</p>
+                  <p className="text-xs text-emerald-300/80">
+                    {preview.rules.suggestedFeatureKeys.join(', ')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={applySuggestedFeatures}
+                  className="rounded-lg border border-emerald-700/50 px-3 py-1.5 text-sm text-emerald-100"
+                >
+                  Apply suggested
+                </button>
+              </div>
+            )}
             <PickerGroup
               title="Departments"
               items={allDepartments.map((d) => ({ id: d.id, label: d.name, sub: d.slug }))}
@@ -250,9 +347,15 @@ export default function EditPackagePage() {
           <PackagePreview
             industryName={pkg?.industry?.name}
             tierName={pkg?.tier?.name}
+            readiness={preview.readiness}
             totals={preview.totals}
             missing={preview.missing}
             categories={preview.categories}
+            rules={preview.rules}
+            onApplySuggested={preview.rules.suggestedFeatureKeys.length > 0 ? applySuggestedFeatures : undefined}
+            onDismissSuggested={preview.rules.suggestedFeatureKeys.length > 0 ? dismissSuggestedFeatures : undefined}
+            onSnoozeSuggested={preview.rules.suggestedFeatureKeys.length > 0 ? snoozeSuggestedFeatures : undefined}
+            recommendationHistory={recommendationHistory}
           />
         </div>
       </div>

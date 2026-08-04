@@ -45,6 +45,7 @@ import type {
   DeployPackageDto,
   DeployPackageItemRef,
   DeployPackageOutcome,
+  PackageDeploymentHistoryItem,
   PreviewPackageDeployDto,
   PreviewPackageOutcome,
 } from '../dto/package-deployment.dto';
@@ -323,6 +324,30 @@ export class PackageDeploymentService {
       `Package deploy: pkg=${pkg.slug} (v${pkg.version}) tenant=${dto.tenantId} by=${actorRole}/${actorId} -> ${createdDepts.length} dept(s) [${createdDepts.filter((d) => !d.reused).length} new], ${agentResults.length} new agent(s), ${skippedResults.length} skipped`,
     );
 
+    await this.prisma.auditLog.create({
+      data: {
+        actor: actorId,
+        action: 'packages.deploy.executed',
+        resource: 'package-deployment',
+        resourceId: pkg.id,
+        tenantId: dto.tenantId,
+        result: 'success',
+        details: {
+          packageId: pkg.id,
+          packageName: pkg.name,
+          packageSlug: pkg.slug,
+          packageVersion: pkg.version,
+          authorityLevel,
+          idempotent,
+          withAgents,
+          departmentsCreated: createdDepts.filter((d) => !d.reused).length,
+          departmentsReused: createdDepts.filter((d) => d.reused).length,
+          agentsCreated: agentResults.length,
+          agentsSkipped: skippedResults.length,
+        },
+      },
+    });
+
     return {
       package: {
         id: pkg.id,
@@ -345,6 +370,53 @@ export class PackageDeploymentService {
       idempotent,
       deployedAt: new Date().toISOString(),
     };
+  }
+
+  async listDeploymentHistory(
+    tenantId: string,
+    limit = 10,
+  ): Promise<PackageDeploymentHistoryItem[]> {
+    const rows = await this.prisma.auditLog.findMany({
+      where: {
+        tenantId,
+        action: 'packages.deploy.executed',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.max(1, Math.min(50, limit)),
+      select: {
+        id: true,
+        actor: true,
+        tenantId: true,
+        createdAt: true,
+        details: true,
+      },
+    });
+
+    return rows.map((row) => {
+      const details =
+        row.details && typeof row.details === 'object'
+          ? (row.details as Record<string, unknown>)
+          : {};
+      return {
+        id: row.id,
+        packageId: (details.packageId as string) ?? null,
+        packageName: (details.packageName as string) ?? null,
+        tenantId: row.tenantId ?? tenantId,
+        actor: row.actor,
+        authorityLevel:
+          details.authorityLevel === 'AUTO' ||
+          details.authorityLevel === 'APPROVAL'
+            ? details.authorityLevel
+            : 'RECOMMEND',
+        idempotent: Boolean(details.idempotent),
+        withAgents: Boolean(details.withAgents),
+        departmentsCreated: Number(details.departmentsCreated ?? 0),
+        departmentsReused: Number(details.departmentsReused ?? 0),
+        agentsCreated: Number(details.agentsCreated ?? 0),
+        agentsSkipped: Number(details.agentsSkipped ?? 0),
+        createdAt: row.createdAt.toISOString(),
+      };
+    });
   }
 
   // ─── HELPERS ─────────────────────────────────────────────────────────

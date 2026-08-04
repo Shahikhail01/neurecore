@@ -54,7 +54,7 @@ The following are **explicitly preserved** and must not be broken:
 - Performance optimizations
 - Security hardening
 - Database migrations for existing schemas
--枯edenant isolated feature flags already deployed
+- Tenant-isolated feature flags already deployed
 - Documentation updates
 
 ---

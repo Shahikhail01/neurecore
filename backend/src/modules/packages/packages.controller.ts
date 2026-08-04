@@ -32,11 +32,15 @@ import type { JwtPayload } from '../auth/interfaces/token.interface';
 import type { CreatePackageDto } from './dto/create-package.dto';
 import type { UpdatePackageDto } from './dto/update-package.dto';
 import type {
+  AcceptPackageRecommendationsDto,
+  DismissPackageRecommendationsDto,
   PackagePreviewDto,
+  SnoozePackageRecommendationsDto,
   UpdatePackageCompositionDto,
 } from './dto/package-composition.dto';
 import type {
   DeployPackageOutcome,
+  PackageDeploymentHistoryItem,
   PreviewPackageOutcome,
 } from './dto/package-deployment.dto';
 // IMPORTANT: DTOs used as parameter-types on controller methods must be
@@ -111,6 +115,56 @@ export class PackagesController {
     return this.packages.preview(body);
   }
 
+  @Post('recommendations/accept')
+  @Roles('SUPER_ADMIN', 'PLATFORM_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Record acceptance of package composition recommendations' })
+  async acceptRecommendations(
+    @Body() body: AcceptPackageRecommendationsDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.packages.acceptRecommendations(user.sub, body);
+  }
+
+  @Post('recommendations/dismiss')
+  @Roles('SUPER_ADMIN', 'PLATFORM_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Record dismissal of package composition recommendations with reason' })
+  async dismissRecommendations(
+    @Body() body: DismissPackageRecommendationsDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.packages.dismissRecommendations(user.sub, body);
+  }
+
+  @Post('recommendations/snooze')
+  @Roles('SUPER_ADMIN', 'PLATFORM_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Record snoozed package composition recommendations with reason and resume date' })
+  async snoozeRecommendations(
+    @Body() body: SnoozePackageRecommendationsDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.packages.snoozeRecommendations(user.sub, body);
+  }
+
+  @Get('recommendations/history')
+  @Roles('SUPER_ADMIN', 'PLATFORM_ADMIN')
+  @ApiOperation({ summary: 'List accepted package recommendation history for the current composition scope' })
+  async recommendationHistory(
+    @Query('packageId') packageId?: string,
+    @Query('industryId') industryId?: string,
+    @Query('tierId') tierId?: string,
+    @Query('limit') limit = '10',
+  ) {
+    return this.packages.listRecommendationHistory({
+      packageId,
+      industryId,
+      tierId,
+      limit: Number(limit),
+    });
+  }
+
   /**
    * GET /api/v1/packages/deploy/preview?packageId=&tenantId=
    * Dry-run a package deployment. Returns blockers + capacity snapshot.
@@ -133,6 +187,16 @@ export class PackagesController {
       reason: raw.reason,
     };
     return this.deployment.preview(dto, user.tenantId ?? null, user.role);
+  }
+
+  @Get('deploy/history')
+  @Roles('SUPER_ADMIN', 'PLATFORM_ADMIN', 'OWNER', 'ADMIN')
+  @ApiOperation({ summary: 'List package deployment history for a tenant' })
+  async deployHistory(
+    @Query('tenantId') tenantId: string,
+    @Query('limit') limit = '10',
+  ): Promise<PackageDeploymentHistoryItem[]> {
+    return this.deployment.listDeploymentHistory(tenantId, Number(limit));
   }
 
   /**

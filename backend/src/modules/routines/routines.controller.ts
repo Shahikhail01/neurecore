@@ -74,13 +74,28 @@ export class RoutinesController {
       graphDefinition: dto.graphDefinition,
       config: dto.config,
       metadata: dto.metadata,
+      ownerAgentId: dto.ownerAgentId,
       tenantId,
       createdById: userId,
     });
 
+    if (Array.isArray(dto.triggers) && dto.triggers.length > 0) {
+      await Promise.all(
+        dto.triggers.map((trigger) =>
+          this.triggerRepo.create(routine.id, {
+            type: trigger.type,
+            name: trigger.name,
+            config: trigger.config,
+          }),
+        ),
+      );
+    }
+
+    const createdRoutine = await this.routineRepo.findById(routine.id, tenantId);
+
     return {
       status: 'success',
-      data: routine,
+      data: createdRoutine ?? routine,
     };
   }
 
@@ -143,6 +158,7 @@ export class RoutinesController {
       graphDefinition: dto.graphDefinition,
       config: dto.config,
       metadata: dto.metadata,
+      ownerAgentId: dto.ownerAgentId,
     });
 
     // Update status if provided

@@ -6,10 +6,11 @@
  *   POST  /:id/duplicate → clone a template for tenant creation
  */
 
-import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PoolController } from '../../common/pool/pool.controller';
 import type { AgentTemplate } from '@prisma/client';
 import type {
@@ -20,6 +21,8 @@ import type {
   UpdateAgentsPoolDto,
 } from './dto/update-agents-pool.dto';
 import { AgentsPoolService } from './agents-pool.service';
+import { SandboxAgentTemplateDto } from './dto/sandbox-agent-template.dto';
+import type { JwtPayload } from '../auth/interfaces/token.interface';
 
 @ApiTags('agents-pool')
 @ApiBearerAuth()
@@ -46,5 +49,28 @@ export class AgentsPoolController extends PoolController<
   @Post(':id/duplicate')
   async duplicate(@Param('id') id: string, @Body() body: { name?: string }) {
     return this.service.duplicate(id, body);
+  }
+
+  @Post(':id/sandbox-run')
+  async sandboxRun(
+    @Param('id') id: string,
+    @Body() body: SandboxAgentTemplateDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.sandboxRun(id, body, user.sub);
+  }
+
+  @Get(':id/sandbox-runs')
+  async sandboxRuns(@Param('id') id: string) {
+    return this.service.listSandboxRuns(id);
+  }
+
+  @Get(':id/sandbox-compare')
+  async sandboxCompare(
+    @Param('id') id: string,
+    @Query('leftId') leftId: string,
+    @Query('rightId') rightId: string,
+  ) {
+    return this.service.compareSandboxRuns(id, leftId, rightId);
   }
 }

@@ -63,11 +63,69 @@ export interface PackageComposition {
   suggestedDepartmentCount?: number;
 }
 
+export interface AcceptPackageRecommendationsPayload {
+  industryId: string;
+  tierId: string;
+  packageId?: string;
+  suggestedFeatureKeys: string[];
+  currentFeatureIds?: string[];
+  currentDepartmentIds?: string[];
+  currentAiAgentIds?: string[];
+}
+
+export interface PackageRecommendationHistoryEntry {
+  id: string;
+  action: string;
+  resource?: string;
+  resourceId?: string;
+  result: 'success' | 'failure';
+  details?: {
+    packageId?: string | null;
+    industryId?: string;
+    tierId?: string;
+    suggestedFeatureKeys?: string[];
+    reason?: string;
+    snoozeUntil?: string;
+    currentFeatureIds?: string[];
+    currentDepartmentIds?: string[];
+    currentAiAgentIds?: string[];
+  };
+  createdAt: string;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
 export interface PackagePreviewResult {
   valid: boolean;
+  readiness: {
+    score: number;
+    label: 'READY' | 'NEEDS_REVIEW' | 'AT_RISK';
+  };
   totals: { departments: number; agents: number; features: number };
   missing: { departments: string[]; agents: string[]; features: string[] };
   categories: Record<string, number>;
+  rules: {
+    conflicts: string[];
+    dependencies: string[];
+    recommendations: string[];
+    recommendationDetails: Array<{
+      message: string;
+      severity: 'HIGH' | 'MEDIUM' | 'LOW';
+      reason: string;
+    }>;
+    suggestedFeatureKeys: string[];
+    suggestedBundles: Array<{
+      key: string;
+      label: string;
+      reason: string;
+      featureKeys: string[];
+      priority: 'HIGH' | 'MEDIUM' | 'LOW';
+    }>;
+  };
 }
 
 export interface DeployPackagePreview {
@@ -108,6 +166,22 @@ export interface DeployPackageOutcome {
   authorityLevel: string;
   idempotent: boolean;
   deployedAt: string;
+}
+
+export interface PackageDeploymentHistoryItem {
+  id: string;
+  packageId: string | null;
+  packageName: string | null;
+  tenantId: string;
+  actor: string;
+  authorityLevel: 'AUTO' | 'RECOMMEND' | 'APPROVAL';
+  idempotent: boolean;
+  withAgents: boolean;
+  departmentsCreated: number;
+  departmentsReused: number;
+  agentsCreated: number;
+  agentsSkipped: number;
+  createdAt: string;
 }
 
 export const packagesService = {
@@ -202,6 +276,66 @@ export const packagesService = {
     });
     return unwrapItem(res) as DeployPackageOutcome;
   },
+
+  async deployHistory(
+    tenantId: string,
+    limit = 10,
+  ): Promise<PackageDeploymentHistoryItem[]> {
+    const res = await api.get('/packages/deploy/history', {
+      params: { tenantId, limit },
+    });
+    const data = res.data?.data ?? res.data;
+    return Array.isArray(data) ? (data as PackageDeploymentHistoryItem[]) : [];
+  },
+
+  async acceptRecommendations(
+    payload: AcceptPackageRecommendationsPayload,
+  ): Promise<{ ok: true }> {
+    const res = await api.post('/packages/recommendations/accept', payload);
+    return unwrapItem(res) as { ok: true };
+  },
+
+  async dismissRecommendations(payload: {
+    industryId: string;
+    tierId: string;
+    packageId?: string;
+    suggestedFeatureKeys: string[];
+    reason: string;
+    currentFeatureIds?: string[];
+    currentDepartmentIds?: string[];
+    currentAiAgentIds?: string[];
+  }): Promise<{ ok: true }> {
+    const res = await api.post('/packages/recommendations/dismiss', payload);
+    return unwrapItem(res) as { ok: true };
+  },
+
+  async snoozeRecommendations(payload: {
+    industryId: string;
+    tierId: string;
+    packageId?: string;
+    suggestedFeatureKeys: string[];
+    reason: string;
+    snoozeUntil: string;
+    currentFeatureIds?: string[];
+    currentDepartmentIds?: string[];
+    currentAiAgentIds?: string[];
+  }): Promise<{ ok: true }> {
+    const res = await api.post('/packages/recommendations/snooze', payload);
+    return unwrapItem(res) as { ok: true };
+  },
+
+  async recommendationHistory(args: {
+    packageId?: string;
+    industryId?: string;
+    tierId?: string;
+    limit?: number;
+  }): Promise<PackageRecommendationHistoryEntry[]> {
+    const res = await api.get('/packages/recommendations/history', {
+      params: args,
+    });
+    const data = res.data?.data ?? res.data;
+    return Array.isArray(data) ? (data as PackageRecommendationHistoryEntry[]) : [];
+  },
 } satisfies IPoolAdminService<Package, CreatePackagePayload> & {
   updateComposition(id: string, body: PackageComposition): Promise<Package>;
   preview(
@@ -220,4 +354,38 @@ export const packagesService = {
     tenantId: string,
     options?: DeployPackageOptions,
   ): Promise<DeployPackageOutcome>;
+  deployHistory(
+    tenantId: string,
+    limit?: number,
+  ): Promise<PackageDeploymentHistoryItem[]>;
+  acceptRecommendations(
+    payload: AcceptPackageRecommendationsPayload,
+  ): Promise<{ ok: true }>;
+  dismissRecommendations(payload: {
+    industryId: string;
+    tierId: string;
+    packageId?: string;
+    suggestedFeatureKeys: string[];
+    reason: string;
+    currentFeatureIds?: string[];
+    currentDepartmentIds?: string[];
+    currentAiAgentIds?: string[];
+  }): Promise<{ ok: true }>;
+  snoozeRecommendations(payload: {
+    industryId: string;
+    tierId: string;
+    packageId?: string;
+    suggestedFeatureKeys: string[];
+    reason: string;
+    snoozeUntil: string;
+    currentFeatureIds?: string[];
+    currentDepartmentIds?: string[];
+    currentAiAgentIds?: string[];
+  }): Promise<{ ok: true }>;
+  recommendationHistory(args: {
+    packageId?: string;
+    industryId?: string;
+    tierId?: string;
+    limit?: number;
+  }): Promise<PackageRecommendationHistoryEntry[]>;
 };
