@@ -19,10 +19,14 @@ import { useTenantAuth } from '@/hooks/useTenantAuth';
 import type { TenantSelf } from '@/services/tenants.service';
 
 const SUGGESTION_CHIPS = [
-  'How\u2019s our pipeline this week?',
-  'Show pending approvals',
-  'Summarize today\u2019s activity',
-  'Run a performance forecast',
+  'Score my top 10 leads by propensity to buy',
+  'What is the next best action for my deals?',
+  'Forecast the pipeline for this quarter',
+  'Generate a draft quote for my top deal',
+  'Summarize recent activity on this customer',
+  'Show me the 360 view of this customer',
+  'Find a knowledge base article about this error',
+  'Run my AI Twin on this task',
 ] as const;
 
 function greeting(hour: number): string {

@@ -13,6 +13,7 @@ import {
   type SidecarExecutionState,
 } from '../hermes-adapter/services/hermes-adapter.service';
 import { NC_TOOL_NAMES } from '../hermes-adapter/tools/scoped-tool.schemas';
+import { TenantLlmGateway } from '../llm-registry/tenant-llm.gateway';
 import type { IResponseEnvelope } from './responses/interfaces/response-envelope.interface';
 import {
   FeatureFlag as TenantFeatureFlag,
@@ -110,6 +111,7 @@ export class ChatService {
     private readonly intentRegistry: IntentRuleRegistry,
     private readonly typingExtractor: TypedParameterExtractor,
     private readonly routingDecisions: RoutingDecisionsService,
+    private readonly tenantLlmGateway: TenantLlmGateway,
   ) {}
 
   private saveReply(
@@ -165,6 +167,29 @@ export class ChatService {
       return await fn(tenantId, 'conversation');
     } catch {
       return undefined;
+    }
+  }
+
+  /**
+   * Best-effort resolution of the tenant's preferred model id. Returns
+   * `null` when the tenant has no binding or the resolver throws. The
+   * chat composer calls this once per request and forwards the result
+   * to the gateway as an override.
+   */
+  private async resolvePreferredModelIdSafe(
+    tenantId: string | null | undefined,
+  ): Promise<string | null> {
+    if (!tenantId || tenantId === '*') {
+      return null;
+    }
+    try {
+      const fn = (this.tenantLlmGateway as unknown as {
+        resolvePreferredModelId?: (t: string) => Promise<string | null>;
+      }).resolvePreferredModelId;
+      if (typeof fn !== 'function') return null;
+      return await fn(tenantId);
+    } catch {
+      return null;
     }
   }
 
@@ -544,11 +569,13 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       let replyModel: string;
       let replyProvider: string;
       if (useGateway) {
+        const preferredModelId = await this.resolvePreferredModelIdSafe(tenantId);
         const gwResp = await this.aiGateway.invoke({
           tenantId,
           capability: 'conversation',
           prompt,
           sourceModule: 'chat',
+          ...(preferredModelId ? { modelId: preferredModelId } : {}),
           ...(dto.temperature !== undefined
             ? { temperature: dto.temperature }
             : {}),
@@ -1117,11 +1144,13 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
     let insideThink = false;
     let thinkClosed = false;
 
+    const preferredStreamModelId = await this.resolvePreferredModelIdSafe(tenantId);
     for await (const chunk of this.aiGateway.stream({
       tenantId,
       capability: 'conversation',
       prompt,
       sourceModule: 'chat.stream',
+      ...(preferredStreamModelId ? { modelId: preferredStreamModelId } : {}),
       ...(dto.temperature !== undefined
         ? { temperature: dto.temperature }
         : {}),
@@ -1382,6 +1411,7 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       process.env.CHAT_USE_SERVICE_GATEWAY === 'true' &&
       !!tenantId &&
       !mutationIntent &&
+      !this.messageMentionsParityTool(message) &&
       (await this.tenantFlags.isEnabled(
         TenantFeatureFlag.SERVICE_GATEWAY,
         tenantId,
@@ -1438,6 +1468,41 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       );
     }
     return route;
+  }
+
+  /**
+   * Returns true when the prompt contains any keyword that maps to one of
+   * the Creatio-parity `nc.*` tools. Used to keep the service-gateway
+   * fast path from short-circuiting these new capabilities — the legacy
+   * allowlist (extended below) knows how to expose them.
+   */
+  private messageMentionsParityTool(message: string): boolean {
+    const m = message.toLowerCase();
+    return (
+      /\bscore\b/.test(m) ||
+      /\blead\b/.test(m) ||
+      /\bnext\b/.test(m) ||
+      /\baction\b/.test(m) ||
+      /\brecommend/.test(m) ||
+      /\bforecast\b/.test(m) ||
+      /\bpipeline\b/.test(m) ||
+      /\bquarter\b/.test(m) ||
+      /\bquote\b/.test(m) ||
+      /\bcase\b/.test(m) ||
+      /\bresolve\b/.test(m) ||
+      /\btriage\b/.test(m) ||
+      /\bkb\b/.test(m) ||
+      /\bknowledge\b/.test(m) ||
+      /\barticle[s]?\b/.test(m) ||
+      /\btwin\b/.test(m) ||
+      /\bai twin\b/.test(m) ||
+      /\bdigital twin\b/.test(m) ||
+      /\bchannel\b/.test(m) ||
+      /\bsms\b/.test(m) ||
+      /\bteams\b/.test(m) ||
+      /\b360\b/.test(m) ||
+      /\bcustomer view\b/.test(m)
+    );
   }
 
   private async resolveLegacyChatAllowedTools(
@@ -1532,6 +1597,7 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
         'updateCustomer',
         'archiveCustomer',
         'unarchiveCustomer',
+        'nc.customer_360',
       ].forEach((t) => set.add(t));
       return Array.from(set);
     }
@@ -1656,6 +1722,65 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       return Array.from(set);
     }
 
+    // Creatio parity — lead scoring / next-best-action.
+    if (has(/\bscore\b/) || has(/\blead\b/)) {
+      const set = new Set<string>(DISCOVERY);
+      set.add('nc.score_lead');
+      return Array.from(set);
+    }
+    if (has(/\bnext\b/) || has(/\baction\b/) || has(/\brecommend/)) {
+      const set = new Set<string>(DISCOVERY);
+      set.add('nc.next_best_step');
+      return Array.from(set);
+    }
+
+    // Creatio parity — pipeline forecast.
+    if (has(/\bforecast\b/) || has(/\bpipeline\b/) || has(/\bquarter\b/)) {
+      const set = new Set<string>(DISCOVERY);
+      set.add('nc.forecast_pipeline');
+      return Array.from(set);
+    }
+
+    // Creatio parity — quote generation.
+    if (has(/\bquote\b/)) {
+      const set = new Set<string>(DISCOVERY);
+      set.add('nc.generate_quote');
+      return Array.from(set);
+    }
+
+    // Creatio parity — service case resolution.
+    if (has(/\bcase\b/) || has(/\bresolve\b/) || has(/\btriage\b/)) {
+      const set = new Set<string>(DISCOVERY);
+      set.add('nc.resolve_case');
+      return Array.from(set);
+    }
+
+    // Creatio parity — knowledge base search.
+    if (has(/\bkb\b/) || has(/\bknowledge\b/) || has(/\barticle[s]?\b/)) {
+      const set = new Set<string>(DISCOVERY);
+      set.add('nc.search_kb');
+      return Array.from(set);
+    }
+
+    // Creatio parity — AI Twin invocation.
+    if (has(/\btwin\b/) || has(/\bai twin\b/) || has(/\bdigital twin\b/)) {
+      const set = new Set<string>(DISCOVERY);
+      set.add('nc.run_ai_twin');
+      return Array.from(set);
+    }
+
+    // Creatio parity — channel dispatch (email/sms/teams/send).
+    if (
+      has(/\bchannel\b/) ||
+      has(/\bsms\b/) ||
+      has(/\bteams\b/) ||
+      has(/\bsend\b/)
+    ) {
+      const set = new Set<string>(DISCOVERY);
+      set.add('nc.dispatch_channel');
+      return Array.from(set);
+    }
+
     // Generic read-only queries — give the LLM a wide read surface and
     // a few common writes. Falls back to the policy-enforced allowlist,
     // which already blocks destructive operations.
@@ -1686,6 +1811,15 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
       'changeTaskPriority',
       'pauseAgent',
       'resumeAgent',
+      'nc.score_lead',
+      'nc.next_best_step',
+      'nc.forecast_pipeline',
+      'nc.generate_quote',
+      'nc.resolve_case',
+      'nc.search_kb',
+      'nc.customer_360',
+      'nc.run_ai_twin',
+      'nc.dispatch_channel',
     ];
   }
 

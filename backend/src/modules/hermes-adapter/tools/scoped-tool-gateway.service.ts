@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, TaskStatus } from '@prisma/client';
+import { ChannelKind, Prisma, TaskStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { CustomersService } from '../../customers/customers.service';
 import { ProjectsService } from '../../projects/projects.service';
@@ -8,6 +8,16 @@ import { TasksService } from '../../orchestration/services/tasks.service';
 import { ApprovalsService } from '../../approvals/services/approvals.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { MemoryService } from '../../memory/memory.service';
+import { PredictionService } from '../../analytics/services/prediction.service';
+import {
+  CaseTriageService,
+  CustomerTouchpointService,
+  KnowledgeGapService,
+  QuoteService,
+  RealTimeGuidanceService,
+} from '../../service-ops/service-ops-360.service';
+import { AiTwinService } from '../../ai-twin/ai-twin.service';
+import { ChannelService } from '../../channels/channel.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { HermesScopedTokenClaims } from '../services/token.service';
 import { approvalRequiredTools, NC_TOOL_NAMES, ncToolSchemas, type NcToolName } from './scoped-tool.schemas';
@@ -32,6 +42,14 @@ export class ScopedToolGatewayService {
     private readonly notifications: NotificationsService,
     private readonly memory: MemoryService,
     private readonly prisma: PrismaService,
+    private readonly prediction: PredictionService,
+    private readonly quoteService: QuoteService,
+    private readonly caseTriage: CaseTriageService,
+    private readonly realTimeGuidance: RealTimeGuidanceService,
+    private readonly knowledgeGap: KnowledgeGapService,
+    private readonly customerTouchpoint: CustomerTouchpointService,
+    private readonly aiTwin: AiTwinService,
+    private readonly channelService: ChannelService,
   ) {}
 
   listTools(): readonly string[] { return NC_TOOL_NAMES; }
@@ -174,6 +192,229 @@ export class ScopedToolGatewayService {
         return this.notifications.create({ type: 'INFO', title: a.title, message: a.body, userId: user.id, tenantId: c.tenantId, payload: { link: a.link, executionId: c.executionId } });
       }
       case 'nc.search_memory': return this.memory.search({ tenantId: c.tenantId, query: a.query, limit: a.limit });
+      case 'nc.score_lead': {
+        if (!c.tenantId || c.tenantId === '*') {
+          throw new ForbiddenException('tenantId "*" is forbidden');
+        }
+        const prediction = await this.prediction.predict({
+          tenantId: c.tenantId,
+          subject: { type: 'lead', id: a.leadId },
+          predictionType: 'lead_score',
+        });
+        return {
+          leadId: a.leadId,
+          tenantId: c.tenantId,
+          score: prediction.value,
+          confidence: prediction.confidence,
+          model: prediction.model,
+          abstained: prediction.value == null,
+          explanation: prediction.explanation,
+          limitations: prediction.limitations,
+          generatedAt: prediction.generatedAt,
+          expiresAt: prediction.expiresAt,
+        };
+      }
+      case 'nc.next_best_step': {
+        if (!c.tenantId || c.tenantId === '*') {
+          throw new ForbiddenException('tenantId "*" is forbidden');
+        }
+        const subjectType = a.dealId ? 'deal' : 'contact';
+        const subjectId = (a.dealId ?? a.contactId) as string;
+        const prediction = await this.prediction.predict({
+          tenantId: c.tenantId,
+          subject: { type: subjectType, id: subjectId },
+          predictionType: 'next_best_action',
+        });
+        return {
+          subjectType,
+          subjectId,
+          tenantId: c.tenantId,
+          nextBestAction: prediction.value,
+          confidence: prediction.confidence,
+          model: prediction.model,
+          explanation: prediction.explanation,
+          limitations: prediction.limitations,
+          generatedAt: prediction.generatedAt,
+        };
+      }
+      case 'nc.forecast_pipeline': {
+        if (!c.tenantId || c.tenantId === '*') {
+          throw new ForbiddenException('tenantId "*" is forbidden');
+        }
+        const horizonDays = a.horizonDays ?? 90;
+        const quotes = await this.prisma.quote.findMany({
+          where: { tenantId: c.tenantId },
+          select: { id: true, total: true, subtotal: true, status: true, createdAt: true },
+          take: 500,
+        });
+        const totalCount = quotes.length;
+        const totalAmount = quotes.reduce((sum, q) => {
+          const t = typeof q.total === 'number' ? q.total : Number(q.total ?? 0);
+          return sum + t;
+        }, 0);
+        const byStatus: Record<string, { count: number; total: number }> = {};
+        for (const q of quotes) {
+          const t = typeof q.total === 'number' ? q.total : Number(q.total ?? 0);
+          const bucket = byStatus[q.status] ?? { count: 0, total: 0 };
+          bucket.count += 1;
+          bucket.total += t;
+          byStatus[q.status] = bucket;
+        }
+        return {
+          tenantId: c.tenantId,
+          quarter: a.quarter ?? null,
+          horizonDays,
+          totalQuotes: totalCount,
+          totalPipeline: totalAmount,
+          byStatus,
+          generatedAt: new Date().toISOString(),
+        };
+      }
+      case 'nc.generate_quote': {
+        if (!c.tenantId || c.tenantId === '*') {
+          throw new ForbiddenException('tenantId "*" is forbidden');
+        }
+        const existing = await this.prisma.quote.findFirst({
+          where: {
+            tenantId: c.tenantId,
+            dealId: a.dealId,
+            aiGenerated: true,
+            status: 'DRAFT',
+          },
+          select: { id: true, quoteNumber: true, total: true, status: true },
+        });
+        if (existing) {
+          return { ...existing, reused: true };
+        }
+        return this.quoteService.createDraft({
+          tenantId: c.tenantId,
+          dealId: a.dealId,
+          items: a.items,
+          aiGenerated: true,
+          generatedByAgentId: `hermes-tool:${c.executionId}`,
+        });
+      }
+      case 'nc.resolve_case': {
+        if (!c.tenantId || c.tenantId === '*') {
+          throw new ForbiddenException('tenantId "*" is forbidden');
+        }
+        if (a.action === 'classify') {
+          const triage = await this.caseTriage.evaluate({
+            tenantId: c.tenantId,
+            caseId: a.caseId,
+            payload: { caseId: a.caseId },
+          });
+          return { action: 'classify', caseId: a.caseId, triage };
+        }
+        if (a.action === 'suggest') {
+          const guidance = await this.realTimeGuidance.suggest({
+            tenantId: c.tenantId,
+            caseId: a.caseId,
+            agentId: c.sub,
+          });
+          return { action: 'suggest', caseId: a.caseId, guidance };
+        }
+        return {
+          action: 'draft_reply',
+          caseId: a.caseId,
+          draft:
+            'Acknowledged. I am reviewing the case details and will follow up with a full response shortly.',
+        };
+      }
+      case 'nc.search_kb': {
+        if (!c.tenantId || c.tenantId === '*') {
+          throw new ForbiddenException('tenantId "*" is forbidden');
+        }
+        const limit = a.limit ?? 5;
+        const gaps = await this.knowledgeGap.list(c.tenantId);
+        const matches = gaps.filter((g) =>
+          `${g.topic} ${g.suggestedTitle ?? ''}`
+            .toLowerCase()
+            .includes(a.query.toLowerCase()),
+        );
+        const rows = (matches.length > 0 ? matches : gaps).slice(0, limit).map((g) => ({
+          id: g.id,
+          topic: g.topic,
+          suggestedTitle: g.suggestedTitle,
+          status: g.status,
+          caseCount: g.caseCount,
+        }));
+        return {
+          tenantId: c.tenantId,
+          query: a.query,
+          totalMatches: rows.length,
+          results: rows,
+        };
+      }
+      case 'nc.customer_360': {
+        if (!c.tenantId || c.tenantId === '*') {
+          throw new ForbiddenException('tenantId "*" is forbidden');
+        }
+        const customer = await this.prisma.customer.findFirst({
+          where: { id: a.customerId, tenantId: c.tenantId },
+          select: {
+            id: true,
+            name: true,
+            financialSubType: true,
+            lifecycleStage: true,
+            createdAt: true,
+          },
+        });
+        if (!customer) {
+          throw new NotFoundException(`customer ${a.customerId} not found for tenant`);
+        }
+        const view = await this.customerTouchpoint.get360View(c.tenantId, a.customerId);
+        return { ...customer, ...view };
+      }
+      case 'nc.run_ai_twin': {
+        if (!c.tenantId || c.tenantId === '*') {
+          throw new ForbiddenException('tenantId "*" is forbidden');
+        }
+        const twin = await this.prisma.aiTwin.findFirst({
+          where: { id: a.twinId, tenantId: c.tenantId },
+          select: { id: true, slug: true, displayName: true, status: true },
+        });
+        if (!twin) throw new NotFoundException(`twin ${a.twinId} not found for tenant`);
+        await this.prisma.auditLog.create({
+          data: {
+            actor: c.sub,
+            tenantId: c.tenantId,
+            action: 'autonomous.ai_twin.run',
+            resource: 'ai_twin',
+            resourceId: twin.id,
+            result: 'success',
+            correlationId: c.executionId,
+            details: {
+              intent: a.intent,
+              twinSlug: twin.slug,
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return {
+          twinId: twin.id,
+          slug: twin.slug,
+          displayName: twin.displayName,
+          status: twin.status,
+          intent: a.intent,
+          acceptedAt: new Date().toISOString(),
+        };
+      }
+      case 'nc.dispatch_channel': {
+        if (!c.tenantId || c.tenantId === '*') {
+          throw new ForbiddenException('tenantId "*" is forbidden');
+        }
+        const validKinds = new Set<string>(Object.values(ChannelKind));
+        if (!validKinds.has(a.channelKind)) {
+          throw new BadRequestException(`unknown channelKind: ${a.channelKind}`);
+        }
+        return this.channelService.dispatch({
+          kind: a.channelKind as ChannelKind,
+          tenantId: c.tenantId,
+          connectionId: a.targetId,
+          actionName: 'send',
+          payload: a.payload,
+        });
+      }
     }
   }
 

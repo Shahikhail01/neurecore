@@ -2,8 +2,9 @@
 // ─── /customers — Customer list + creation surface ────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, Mail, Phone, Archive, ArchiveRestore } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Archive, ArchiveRestore, Sparkles } from 'lucide-react';
 import TenantShell from '@/components/TenantShell';
+import { useChatStore } from '@/core/services/chat/chat.factory';
 import { ActionButton } from '@/components/creatio/ActionToolbar';
 import { GlassPanel } from '@/components/home/GlassPanel';
 import { Modal } from '@/components/creatio/Modal';
@@ -120,6 +121,17 @@ export default function CustomersPage() {
     void load();
   };
 
+  // ── Phase 10.5 — Creatio AI parity: inline AI action ────────────────────
+  // Opens the global chat and seeds a pre-formed prompt scoped to the row.
+  // The chat executes the backend nc.* tool (customer_360 / search_kb /
+  // summarize) wired in Phase 10.3.
+  const promptChat = useChatStore((s) => s.requestExternalSend);
+  const onAi = (c: Customer) => {
+    promptChat(
+      `Show me the 360 view and summarize recent activity for customer "${c.name}" (${c.id}).`,
+    );
+  };
+
   const columns: ColumnDef<Customer>[] = [
     {
       key: 'name',
@@ -187,6 +199,16 @@ export default function CustomersPage() {
           className="flex justify-end gap-1"
           onClick={(e) => e.stopPropagation()}
         >
+          <span title="AI: summarize / 360 view">
+            <ActionButton
+              variant="ghost"
+              size="sm"
+              icon={<Sparkles className="w-3.5 h-3.5 text-primary" />}
+              onClick={() => onAi(c)}
+            >
+              AI
+            </ActionButton>
+          </span>
           {c.status === 'ARCHIVED' ? (
             <ActionButton
               variant="ghost"

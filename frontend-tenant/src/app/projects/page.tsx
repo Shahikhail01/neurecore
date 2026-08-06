@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Plus, Search, DollarSign, Calendar } from 'lucide-react';
+import { Plus, Search, DollarSign, Calendar, Sparkles } from 'lucide-react';
 import TenantShell from '@/components/TenantShell';
+import { useChatStore } from '@/core/services/chat/chat.factory';
 import { ActionButton } from '@/components/creatio/ActionToolbar';
 import { GlassPanel } from '@/components/home/GlassPanel';
 import { StatusBadge } from '@/components/creatio/StatusBadge';
@@ -75,11 +76,29 @@ export default function ProjectsPage() {
               All projects across customers, organized by status.
             </p>
           </div>
-          <Link href="/projects/new">
-            <ActionButton variant="primary" size="md" icon={<Plus className="w-4 h-4" />}>
-              New Project
-            </ActionButton>
-          </Link>
+          <div className="flex items-center gap-2">
+            <span title="AI: summarize the pipeline">
+              <ActionButton
+                variant="ghost"
+                size="md"
+                icon={<Sparkles className="w-4 h-4 text-primary" />}
+                onClick={() =>
+                  useChatStore
+                    .getState()
+                    .requestExternalSend(
+                      'Summarize the current projects pipeline by status and flag anything at risk.',
+                    )
+                }
+              >
+                AI: Summarize
+              </ActionButton>
+            </span>
+            <Link href="/projects/new">
+              <ActionButton variant="primary" size="md" icon={<Plus className="w-4 h-4" />}>
+                New Project
+              </ActionButton>
+            </Link>
+          </div>
         </header>
 
         <GlassPanel className="p-4">

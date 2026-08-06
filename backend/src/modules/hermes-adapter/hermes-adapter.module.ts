@@ -48,9 +48,29 @@ import { ApprovalsModule } from '../approvals/approvals.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MemoryModule } from '../memory/memory.module';
 import { HermesModelLeaseController } from './controllers/hermes-model-lease.controller';
+import { AnalyticsModule } from '../analytics/analytics.module';
+import { AiTwinModule } from '../ai-twin/ai-twin.module';
 
 @Module({
-  imports: [ConfigurationModule, CustomersModule, ProjectsModule, GoalsModule, OrchestrationModule, ApprovalsModule, NotificationsModule, MemoryModule],
+  imports: [
+    ConfigurationModule,
+    CustomersModule,
+    ProjectsModule,
+    GoalsModule,
+    OrchestrationModule,
+    ApprovalsModule,
+    NotificationsModule,
+    MemoryModule,
+    // Phase 10.3 — Creatio AI parity: the scoped-tool gateway injects
+    // parity services as chat tools. AnalyticsModule provides
+    // PredictionService (lead scoring / forecast); AiTwinModule provides
+    // AiTwinService. The other injected services (QuoteService,
+    // CaseTriageService, etc. via Phase7Module; ChannelService via
+    // ChannelsModule) are @Global so they resolve without an explicit
+    // import here.
+    AnalyticsModule,
+    AiTwinModule,
+  ],
   controllers: [
     HermesAdapterController,
     HermeSidecarEventsController,

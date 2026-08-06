@@ -105,6 +105,7 @@ function makeChatService(opts: {
     intentRegistry,
     typingExtractor,
     routingDecisions,
+    {} as never,
   );
 
   // Wire the env flag so the service-gateway fast path activates.
@@ -227,5 +228,34 @@ describe('ChatService — Phase 2 deterministic routing', () => {
 
     // No routing decision recorded.
     expect(harness.recorded).toEqual([]);
+  });
+
+  it('does NOT short-circuit to the service-gateway fast path for a lead-scoring prompt (parity tools stay in legacy allowlist)', async () => {
+    const harness = makeChatService({ serviceGatewayEnabled: true });
+    await harness.svc.send(
+      {
+        message: 'score this lead for me',
+        conversationId: 'conv-1',
+      } as never,
+      'tenant-1',
+      'user-1',
+    );
+    // The agent graph should NOT have received a forced capability: the
+    // parity tool falls through to the legacy allowlist, which keeps
+    // everything (legacy tools + the new nc.score_lead tool).
+    expect(harness.forcedCapabilities).toEqual([]);
+  });
+
+  it('does NOT short-circuit to the service-gateway fast path for a forecast-pipeline prompt', async () => {
+    const harness = makeChatService({ serviceGatewayEnabled: true });
+    await harness.svc.send(
+      {
+        message: 'give me the pipeline forecast for this quarter',
+        conversationId: 'conv-1',
+      } as never,
+      'tenant-1',
+      'user-1',
+    );
+    expect(harness.forcedCapabilities).toEqual([]);
   });
 });
