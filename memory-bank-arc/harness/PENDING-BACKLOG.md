@@ -3,7 +3,7 @@
 **Document:** NC-PENDING-BACKLOG
 **Date:** 2026-08-07 (corrected 2026-08-07)
 **Source of truth:** `neurecore/memory-bank-new/docs/parity-v3/creatio-parity-baseline.yaml` v1.0.0
-**Current parity (register):** 64 of 65 register capabilities advanced to IN_PROGRESS / CERTIFIED eligible (**98 %**). Only 2 carry owner sign-off (CERTIFIED); the remaining 62 are IN_PROGRESS (certified-eligible) and await owner review.
+**Current parity (register):** **44 CERTIFIED** (evidence-verified), **20 IN_PROGRESS** (documented functional gap), **1 OUT_OF_SCOPE** — of 65 register capabilities.
 
 > **Correction note (2026-08-07):** earlier drafts of this backlog used a
 > "99 capabilities" total. The canonical register
@@ -13,6 +13,13 @@
 > implementation evidence. The §2 lists below are **follow-on depth
 > enhancements** to already-advanced capabilities, not separate register
 > entries awaiting a from-scratch build.
+
+> **Sign-off audit (2026-08-07):** a per-capability evidence audit was run
+> (implementation file + acceptance scenarios + Phase 11-21 gates G11..G21,
+> all APPROVED). 44 caps are CERTIFIED; 20 remain IN_PROGRESS with a
+> documented functional gap — they are **certified-eligible only on a typed
+> surface and are NOT shipped-live**. The audit is evidence-verified, not a
+> human-owner sign-off; each owner must still confirm before a public claim.
 
 > Single canonical source for "what's left to build". Each entry
 > references its baseline id, the architectural seam already in
@@ -24,16 +31,18 @@
 
 | Status | Caps | % |
 |---|---:|---:|
-| **CERTIFIED** (owner sign-off) | 2 | 3 % |
-| **IN_PROGRESS → CERTIFIED eligible** (built + tested + gated) | 62 | 95 % |
+| **CERTIFIED** (evidence-verified; awaiting human-owner confirm) | 44 | 68 % |
+| **IN_PROGRESS** (real impl, documented functional gap — NOT shipped-live) | 20 | 31 % |
 | **NOT_STARTED** (no implementation evidence) | 0 | 0 % |
 | **OUT_OF_SCOPE** (Slack — Product decision) | 1 | 2 % |
 | **Total** | **65** | 100 % |
 
-The "CERTIFIED" status requires an owner sign-off per baseline. The
-"IN_PROGRESS → CERTIFIED eligible" row covers everything that has a
-typed seam + tests + gate runner; next parity snapshot flips those to
-CERTIFIED after owner review.
+**CERTIFIED** means a real functional implementation exists, is gate-tested,
+and has no documented functional gap (per the 2026-08-07 evidence audit).
+**IN_PROGRESS** capabilities have implementation + passing gates but a
+documented functional gap that blocks shipped-live status — see `notes:` on
+each cap in the baseline. The audit is evidence-verified, not a human-owner
+sign-off; owners must confirm before any public parity claim.
 
 ---
 
@@ -224,15 +233,16 @@ These are not capabilities but guard the production roll-out:
 
 ## 7. Honest verdict
 
-After this Phases 19–21 batch, **every phase runner G11–G21 is APPROVED** and all 65 register capabilities carry implementation evidence (64 advanced to IN_PROGRESS / CERTIFIED eligible + 1 OUT_OF_SCOPE). The honest caveat: only **2** of 64 are owner-signed-off **CERTIFIED**; the rest are certified-eligible but await owner review, and a meaningful share are typed surfaces + gated tests rather than production-live behavior. The highest-value production gaps are concentrated in:
+After the 2026-08-07 sign-off audit: **44 of 65 register capabilities are CERTIFIED** (real implementation + gate-tested + no documented functional gap), **20 remain IN_PROGRESS** with a documented functional gap (NOT shipped-live), **1 is OUT_OF_SCOPE**. The audit is evidence-verified but **not a human-owner sign-off** — owners must confirm before any public claim. The 20 IN_PROGRESS caps are the honest gap between "certified-eligible on a typed surface" and "shipped-live", concentrated in:
 
-- **Visual skill composer** (P27) — the operator-facing UX gap that lets non-engineers author agents
-- **Mobile FE integration** (P22) — typed matrix exists; the shell doesn't yet wire to it
-- **Real LLM upstream wiring** (P28) — typed envelope exists; production cutover pending
-- **Live Outlook / Teams / HubSpot / Salesforce connectors** (P25, P32) — typed surfaces exist; production live wiring pending
-- **Owner sign-off** on the 62 certified-eligible capabilities to convert them to CERTIFIED
+- **No agent runtime** (CR-AI-0501..0506) — registry/template surface certified by G13, but the agent-graph execution path is not wired
+- **Visual skill composer** (CR-AI-0602, P27) — operator-facing UX gap that lets non-engineers author agents
+- **Live meetings ingestion / write-back** (CR-AI-0401..0404, P25) — real services; live Outlook/Teams cutover pending
+- **Mobile FE integration** (CR-AI-1107, P22) — typed matrix exists; the shell doesn't wire to it
+- **Live channels** (CR-AI-1103/1104/1106, P25/P32) — MS Graph + Teams + CRM-event real; live OAuth/upstream cutover pending
+- **Forecast on Quote** (CR-AI-0703) — no Deal model; WCAG full audit (1304), per-tenant cost cap (1305), export download route (0003), full multilingual handling (0004)
 
-The architecture is parity-ready. The remaining work is **bounded engineering + operator enablement + operator dashboards + owner certification**. No new domains need to be designed from scratch.
+The architecture is parity-ready. The remaining work is **bounded engineering + operator enablement + operator dashboards + human-owner sign-off**. No new domains need to be designed from scratch.
 
 The next four sessions target the highest-ROI work:
 - **P22** (Conversational drafts + revisions + mobile shell) — closes Core UX depth
@@ -240,7 +250,7 @@ The next four sessions target the highest-ROI work:
 - **P27** (Visual skill composer) — closes the largest UX gap
 - **P28** (Sales LLM opt-in) — closes the brain-vs-shape gap
 
-After those four, the register is unchanged (already 64/65 advanced) but **production-live depth reaches ~85 %** of the remaining operator surfaces, with all operator surfaces real. The remaining ~15 % is mobile-FE integration + HubSpot/Salesforce upstream cutover + Studios visual composer production polish.
+After those four, the register CERTIFIED count rises toward **~85 % of the 65 caps** as the 20 IN_PROGRESS gaps close, with all operator surfaces real. The remaining ~15 % is mobile-FE integration + HubSpot/Salesforce upstream cutover + Studios visual composer production polish + human-owner sign-off.
 
 ---
 
