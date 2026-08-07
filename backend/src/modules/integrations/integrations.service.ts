@@ -10,6 +10,9 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import {
   PrismaIntegrationCredentialStore,
   GoogleCredentials,
+  BrevoCredentials,
+  ZoomOAuthCredentials,
+  TwilioBasicCredentials,
 } from './services/integration-credential.store';
 import { GoogleAuthClient } from './google/google-auth.client';
 
@@ -373,7 +376,7 @@ export class IntegrationsService {
   async getDecryptedCredentials(
     tenantId: string,
     provider: IntegrationProvider,
-  ): Promise<GoogleCredentials | { apiKey: string } | null> {
+  ): Promise<GoogleCredentials | BrevoCredentials | ZoomOAuthCredentials | TwilioBasicCredentials | null> {
     return this.credentialStore.get(tenantId, provider);
   }
 }

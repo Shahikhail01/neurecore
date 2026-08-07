@@ -112,11 +112,15 @@ import {
   // surface at first render.
   Heart,
   Tractor,
+  // Phase 10.6 R1 — Sales rail surfaces.
+  Handshake,
+  UserPlus,
+  Mail,
 } from 'lucide-react';
 import { OrgTree } from '@/components/sidebar/OrgTree';
 import { RailCustomizeModal } from '@/components/layout/RailCustomizeModal';
 import { useRailPreferencesStore, type ItemId, type SectionId } from '@/stores/railPreferencesStore';
-import { getIndustryNavConfig } from '@/lib/industryNavigation';
+import { getIndustryNavConfig, DEFAULT_SALES_EXTRAS } from '@/lib/industryNavigation';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
 // Part 9 N3 — TenantStore replaces the per-component `tenantsService.getCurrent()`
 // call + local `tenantIndustryGroup` state. Single source of truth, single fetch.
@@ -161,6 +165,10 @@ const INDUSTRY_ICON_MAP: Record<string, React.ComponentType<{ className?: string
   Activity: ActivityIcon,
   PlusSquare,
   Stethoscope,
+  // Phase 10.6 R1 — Sales rail icons (referenced by industryNavigation.ts).
+  Handshake,
+  UserPlus,
+  Mail,
 };
 
 interface RailItem {
@@ -267,6 +275,29 @@ export function buildRailSections(
         ...industryExtras,
         { id: 'customers',    label: customersLabel, href: '/customers', icon: customersIcon },
       ],
+    },
+    // Phase 10.6 R1 — Sales section. Reads items from industryNavigation.ts
+    // so per-group overrides (e.g. hide Quotes for healthcare) flow through
+    // the same single-source-of-truth.
+    {
+      id: 'sales',
+      label: 'Sales',
+      items: (navConfig.salesExtras ?? DEFAULT_SALES_EXTRAS).map((item) => ({
+        id: item.id as ItemId,
+        label: item.label,
+        href: item.href,
+        icon: (() => {
+          const resolved = INDUSTRY_ICON_MAP[item.iconName];
+          if (!resolved && process.env.NODE_ENV !== 'production') {
+             
+            console.error(
+              `[IconRail] unknown iconName "${item.iconName}" — falling back to BriefcaseIcon. ` +
+                `Add it to INDUSTRY_ICON_MAP.`,
+            );
+          }
+          return resolved ?? BriefcaseIcon;
+        })(),
+      })),
     },
     {
       id: 'marketplace',

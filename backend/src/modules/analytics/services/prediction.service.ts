@@ -49,6 +49,15 @@ export class PredictionService implements IPredictionProvider {
   async predict(input: PredictionInput): Promise<Prediction> {
     const { tenantId, subject, predictionType } = input;
 
+    // Phase 19 — CR-AI-1002 tenant-scope assertion (P-1).
+    // Refuse wildcard + empty before any DB call so the heuristic
+    // path can never read cross-tenant.
+    if (!tenantId || tenantId === '*') {
+      throw new PredictionTenantScopeError(
+        `predict: tenantId "${tenantId}" is forbidden`,
+      );
+    }
+
     const recent = await this.snapshots.listRecent(
       tenantId,
       subject.type,
@@ -180,5 +189,12 @@ export class PredictionService implements IPredictionProvider {
       explanation: [reason],
       limitations: ['abstention — insufficient evidence to score'],
     };
+  }
+}
+
+export class PredictionTenantScopeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PredictionTenantScopeError';
   }
 }

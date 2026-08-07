@@ -26,28 +26,37 @@ function makeService(): {
   return { service, prisma };
 }
 
-describe('AgentsService.findAll — tenant isolation (P0-001)', () => {
-  it('throws TENANT_WILDCARD_FORBIDDEN when tenantId is "*"', async () => {
+describe('AgentsService.findAll — tenant isolation (P0-001, closed by Phase 18)', () => {
+  it('throws AgentTenantScopeError(CROSS_TENANT) when tenantId is "*"', async () => {
     const { service, prisma } = makeService();
-    await expect(service.findAll({ page: 1, limit: 20 }, '*')).rejects.toThrow(
-      'TENANT_WILDCARD_FORBIDDEN',
-    );
+    await expect(
+      service.findAll({ page: 1, limit: 20 }, '*'),
+    ).rejects.toMatchObject({
+      name: 'AgentTenantScopeError',
+      reason: 'CROSS_TENANT',
+    });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('throws TENANT_ID_REQUIRED when tenantId is undefined', async () => {
+  it('throws AgentTenantScopeError(MISSING_TENANT) when tenantId is undefined', async () => {
     const { service, prisma } = makeService();
     await expect(
       service.findAll({ page: 1, limit: 20 }, undefined),
-    ).rejects.toThrow('TENANT_ID_REQUIRED');
+    ).rejects.toMatchObject({
+      name: 'AgentTenantScopeError',
+      reason: 'MISSING_TENANT',
+    });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('throws TENANT_ID_REQUIRED when tenantId is empty string', async () => {
+  it('throws AgentTenantScopeError(MISSING_TENANT) when tenantId is empty string', async () => {
     const { service, prisma } = makeService();
-    await expect(service.findAll({ page: 1, limit: 20 }, '')).rejects.toThrow(
-      'TENANT_ID_REQUIRED',
-    );
+    await expect(
+      service.findAll({ page: 1, limit: 20 }, ''),
+    ).rejects.toMatchObject({
+      name: 'AgentTenantScopeError',
+      reason: 'MISSING_TENANT',
+    });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 

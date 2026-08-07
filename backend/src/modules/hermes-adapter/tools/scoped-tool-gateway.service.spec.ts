@@ -142,6 +142,29 @@ function makeSvc(opts: { prisma?: object } = {}) {
     })),
   } as never;
   const aiTwin = {} as never;
+  const twinGraphExecutor = {
+    invoke: jest.fn(async (params: Record<string, unknown>) => ({
+      runId: 'run-test',
+      twinId: params['twinId'],
+      status: 'completed',
+      intent: params['intent'],
+      output: { text: 'graph ran' },
+      toolCalls: [],
+      checkpoints: [],
+      durationMs: 12,
+      correlationId: `twin_${params['twinId']}_run-test`,
+    })),
+  } as never;
+  const dealsService = {
+    forecastForTenant: jest.fn(async () => ({
+      byStage: [],
+      weightedTotal: 0,
+      committedTotal: 0,
+      bestCaseTotal: 0,
+      totalAmount: 0,
+      dealsCount: 0,
+    })),
+  } as never;
   const channelService = {
     dispatch: jest.fn(async () => ({ ok: true, providerId: 'msg-1' })),
   } as never;
@@ -163,9 +186,15 @@ function makeSvc(opts: { prisma?: object } = {}) {
       knowledgeGap,
       customerTouchpoint,
       aiTwin,
+      twinGraphExecutor,
+      dealsService,
       channelService,
     ),
-    mocks: { prediction, quoteService, caseTriage, realTimeGuidance, knowledgeGap, customerTouchpoint, channelService, prisma },
+    mocks: {
+      prediction, quoteService, caseTriage, realTimeGuidance,
+      knowledgeGap, customerTouchpoint, channelService, prisma,
+      twinGraphExecutor, dealsService,
+    },
   };
 }
 
@@ -386,7 +415,7 @@ describe('ScopedToolGatewayService — Creatio parity nc.* tools', () => {
     expect((result.data as { tenantId: string }).tenantId).toBe(TENANT_ID);
   });
 
-  it('dispatches nc.run_ai_twin and writes an audit row', async () => {
+  it('dispatches nc.run_ai_twin through TwinGraphExecutor (real LangGraph run, not audit stub)', async () => {
     const { svc, mocks } = makeSvc();
     const twinId = '88888888-8888-4888-8888-888888888888';
     const result = await svc.execute(
@@ -396,9 +425,29 @@ describe('ScopedToolGatewayService — Creatio parity nc.* tools', () => {
       APPROVAL_ID,
     );
     expect(result.success).toBe(true);
-    expect(mocks.prisma.auditLog.create).toHaveBeenCalled();
-    expect((result.data as { twinId: string }).twinId).toBe('twin-1');
-    expect((result.data as { intent: string }).intent).toBe('summarise my week');
+    // The LangGraph executor is invoked with the correct tenant + actor
+    expect(mocks.twinGraphExecutor.invoke).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      actorId: USER_ID,
+      twinId,
+      intent: 'summarise my week',
+    });
+    // The audit-only stub path (prisma.auditLog.create for ai_twin) is no longer reachable
+    const aiTwinAuditCalls = (mocks.prisma.auditLog.create as jest.Mock).mock.calls.filter(
+      (c) => (c[0]?.data?.action ?? '') === 'autonomous.ai_twin.run',
+    );
+    expect(aiTwinAuditCalls).toHaveLength(0);
+    // The new shape carries runId + output + toolCalls + correlationId
+    const data = result.data as {
+      twinId: string; runId: string; status: string;
+      intent: string; output: unknown; toolCalls: unknown[];
+      durationMs: number; correlationId: string;
+    };
+    expect(data.twinId).toBe(twinId);
+    expect(data.runId).toBe('run-test');
+    expect(data.status).toBe('completed');
+    expect(data.intent).toBe('summarise my week');
+    expect(data.correlationId).toContain(twinId);
   });
 
   it('dispatches nc.dispatch_channel with a valid ChannelKind', async () => {

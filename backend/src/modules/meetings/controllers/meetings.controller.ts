@@ -1,134 +1,195 @@
 /**
- * Meetings REST controller (P3).
+ * Phase 16 — MeetingsController.
  *
- * Endpoints:
- *   POST /meetings/transcripts        — ingest
- *   GET  /meetings/:id/summary        — typed summary
- *   GET  /meetings/:id/actions        — extracted action items
- *   POST /meetings/:id/link-crm       — queue WorkRun
- *   POST /meetings/:id/follow-up      — compose + queue WorkRun
- *   POST /meetings/:id/corrections    — record correction
+ * Source plan: IMPLEMENTATION-PLAN-PHASE-15-18.md §2.
  *
- * Auth: tenant id is read from the request context. Controllers
- * remain thin; all logic lives in the injected services.
+ * Exposes the meetings surface under `/api/v1/meetings/*`. Routes
+ * are tenant-scoped (JWT-derived) and routed through the four
+ * services declared in the module.
  */
+
 import {
   Body,
   Controller,
   Get,
-  Headers,
   HttpCode,
-  Logger,
+  HttpStatus,
   Param,
   Post,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { TranscriptIngestionService } from '../services/transcript-ingestion.service';
-import { MeetingService } from '../services/meeting.service';
-import { MeetingAuditService } from '../services/meeting-audit.service';
-import type {
-  MeetingLink,
-  MeetingProvider,
-  SummaryTemplateKey,
-} from '../schemas/meeting.types';
+import { SummaryTemplatesService } from '../services/summary-templates.service';
+import { ActionExtractorService } from '../services/action-extractor.service';
+import { CrmLinkerService } from '../services/crm-linker.service';
+import type { MeetingProvider } from '@prisma/client';
 
-interface AuthenticatedRequest extends Request {
-  user: { tenantId: string; id: string };
+interface AuthedRequest extends Request {
+  user: { sub: string; tenantId?: string; role: string };
 }
 
-@Controller('meetings')
-export class MeetingsController {
-  private readonly logger = new Logger(MeetingsController.name);
+function actor(req: AuthedRequest): { sub: string; tenantId: string } {
+  const u = req.user;
+  if (!u?.tenantId) throw new Error('tenant context required');
+  return { sub: u.sub, tenantId: u.tenantId };
+}
 
+interface IngestDto {
+  provider: MeetingProvider;
+  providerMeetingId: string;
+  title: string;
+  scheduledAt: string;
+  durationSeconds: number;
+  transcriptText: string;
+  languageCode?: string;
+  jurisdiction?: string;
+  participants?: ReadonlyArray<{ userId?: string; name?: string; email?: string }>;
+}
+
+interface TemplateDto {
+  name: string;
+  meetingType: string;
+  sections: { decisions: string; actions: string; risks: string; sentiment: string };
+  isDefault?: boolean;
+}
+
+interface LinkDto {
+  recordType: 'account' | 'contact' | 'lead' | 'opportunity' | 'case';
+  recordId: string;
+}
+
+interface PersistActionsDto {
+  items: ReadonlyArray<{
+    description: string;
+    ownerUserId?: string | null;
+    ownerHint?: string | null;
+    dueDate?: string | null;
+    confidencePercent?: number;
+    ambiguousOwner?: boolean;
+  }>;
+}
+
+@Controller({ path: 'meetings', version: '1' })
+@UseGuards(JwtAuthGuard)
+export class MeetingsController {
   constructor(
     private readonly ingestion: TranscriptIngestionService,
-    private readonly meeting: MeetingService,
-    private readonly audit: MeetingAuditService,
+    private readonly templates: SummaryTemplatesService,
+    private readonly extractor: ActionExtractorService,
+    private readonly linker: CrmLinkerService,
   ) {}
 
+  /** CR-AI-0401 — ingest a transcript. */
   @Post('transcripts')
-  @HttpCode(202)
-  async ingestTranscript(
-    @Req() req: AuthenticatedRequest,
-    @Headers('x-provider') provider: MeetingProvider,
-    @Headers('x-provider-signature') signature: string | undefined,
-    @Body() body: { externalId: string; consent: unknown; rawBody?: string },
-  ) {
-    const { tenantId, id: actorId } = req.user;
-    const transcript = await this.ingestion.ingest({
+  @HttpCode(HttpStatus.CREATED)
+  async ingest(@Req() req: AuthedRequest, @Body() body: IngestDto) {
+    const { tenantId, sub } = actor(req);
+    return this.ingestion.ingest({
       tenantId,
-      actorId,
-      provider,
-      externalId: body.externalId,
-      consent: body.consent as never,
-      rawBody: body.rawBody,
-      signature,
+      userId: sub,
+      provider: body.provider,
+      providerMeetingId: body.providerMeetingId,
+      title: body.title,
+      scheduledAt: new Date(body.scheduledAt),
+      durationSeconds: body.durationSeconds,
+      transcriptText: body.transcriptText,
+      languageCode: body.languageCode,
+      jurisdiction: body.jurisdiction,
+      participants: body.participants,
     });
-    await this.meeting.saveTranscript(transcript);
-    return {
-      meetingId: transcript.id,
+  }
+
+  @Get('transcripts/:id')
+  @HttpCode(HttpStatus.OK)
+  async getTranscript(@Req() req: AuthedRequest, @Param('id') id: string) {
+    const { tenantId } = actor(req);
+    const out = await this.ingestion.getById(tenantId, id);
+    if (!out) throw new Error('transcript not found');
+    return out;
+  }
+
+  /** CR-AI-0402 — summary templates. */
+  @Get('summary-templates')
+  @HttpCode(HttpStatus.OK)
+  async listTemplates(@Req() req: AuthedRequest) {
+    const { tenantId } = actor(req);
+    return this.templates.list(tenantId);
+  }
+
+  @Post('summary-templates')
+  @HttpCode(HttpStatus.OK)
+  async createTemplate(@Req() req: AuthedRequest, @Body() body: TemplateDto) {
+    const { tenantId } = actor(req);
+    return this.templates.create(
       tenantId,
-      provider: transcript.provider,
-    };
-  }
-
-  @Get(':id/summary')
-  async getSummary(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
-    @Query('template') template: SummaryTemplateKey = 'overview',
-  ) {
-    return this.meeting.getSummary(req.user.tenantId, id, template);
-  }
-
-  @Get(':id/actions')
-  async getActions(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.meeting.getActions(req.user.tenantId, id);
-  }
-
-  @Post(':id/link-crm')
-  async linkCrm(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
-    @Body() body: { links: MeetingLink[] },
-  ) {
-    return this.meeting.linkToCrm(
-      req.user.tenantId,
-      req.user.id,
-      id,
-      body.links,
+      body.name,
+      body.meetingType,
+      body.sections,
+      body.isDefault ?? false,
     );
   }
 
-  @Post(':id/follow-up')
-  async followUp(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.meeting.requestFollowup(req.user.tenantId, req.user.id, id);
+  @Post('summary-templates/ensure-defaults')
+  @HttpCode(HttpStatus.OK)
+  async ensureDefaults(@Req() req: AuthedRequest) {
+    const { tenantId } = actor(req);
+    return this.templates.ensureDefaults(tenantId);
   }
 
-  @Post(':id/corrections')
-  async corrections(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
-    @Body()
-    body: {
-      field: 'actionItem' | 'summarySection' | 'participant';
-      targetId: string;
-      before: unknown;
-      after: unknown;
-      reason: string;
-    },
+  @Get('summary-templates/pick')
+  @HttpCode(HttpStatus.OK)
+  async pickTemplate(
+    @Req() req: AuthedRequest,
+    @Query('meetingType') meetingType: string,
   ) {
-    return this.audit.recordCorrection({
-      tenantId: req.user.tenantId,
-      actorId: req.user.id,
-      meetingId: id,
-      field: body.field,
-      targetId: body.targetId,
-      before: body.before,
-      after: body.after,
-      reason: body.reason,
+    const { tenantId } = actor(req);
+    return this.templates.pickFor(tenantId, meetingType);
+  }
+
+  /** CR-AI-0403 — extract action items from a transcript. */
+  @Post('transcripts/:id/extract-actions')
+  @HttpCode(HttpStatus.OK)
+  async extractActions(
+    @Req() req: AuthedRequest,
+    @Param('id') id: string,
+    @Query('persist') persist: string | undefined,
+    @Body() body: PersistActionsDto | undefined,
+  ) {
+    const { tenantId } = actor(req);
+    const transcript = await this.ingestion.getById(tenantId, id);
+    if (!transcript) throw new Error('transcript not found');
+    const items = this.extractor.extract({
+      tenantId,
+      transcriptId: id,
+      transcriptText: transcript.transcriptText,
+    });
+    if (persist === 'true') {
+      return this.linker.persistActionItems({
+        tenantId,
+        transcriptId: id,
+        items: body?.items ?? items,
+      });
+    }
+    return { items };
+  }
+
+  /** CR-AI-0404 — link a transcript to a CRM record. */
+  @Post('transcripts/:id/link')
+  @HttpCode(HttpStatus.OK)
+  async link(
+    @Req() req: AuthedRequest,
+    @Param('id') id: string,
+    @Body() body: LinkDto,
+  ) {
+    const { tenantId } = actor(req);
+    return this.linker.link({
+      tenantId,
+      transcriptId: id,
+      recordType: body.recordType,
+      recordId: body.recordId,
     });
   }
 }

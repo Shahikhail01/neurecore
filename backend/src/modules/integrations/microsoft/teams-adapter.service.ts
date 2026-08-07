@@ -137,19 +137,15 @@ export class TeamsAdapterService {
 
       await this.transcriptIngestion.ingest({
         tenantId: input.tenantId,
-        actorId: input.actorId,
+        userId: input.actorId,
         provider: 'TEAMS',
-        externalId: transcriptId,
-        rawBody: input.rawBody,
-        signature: input.signature,
-        consent: {
-          tenantId: input.tenantId,
-          userId: input.actorId,
-          scope: 'TRANSCRIPT_INGEST',
-          jurisdiction: 'OTHER',
-          grantedAt: new Date().toISOString(),
-          provider: 'TEAMS',
-        },
+        providerMeetingId: transcriptId,
+        title: `Teams meeting ${meetingId}`,
+        scheduledAt: new Date(),
+        durationSeconds: 0,
+        transcriptText: input.rawBody ?? '',
+        languageCode: 'en',
+        jurisdiction: 'OTHER',
       });
 
       ingested.push({

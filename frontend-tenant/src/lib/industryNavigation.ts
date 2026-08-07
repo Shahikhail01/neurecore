@@ -57,11 +57,31 @@ export interface IndustryNavConfig {
   groupLabel: string;
   /** Items appended to the Workspace section. */
   workspaceExtras: RailItem[];
+  /**
+   * Phase 10.6 (R1-BACKLOG) — sales domain surfaces shown in a dedicated
+   * "Sales" rail section. Defaults to the full 5-item set when omitted.
+   * Each item is a top-level pipeline surface (deals, leads,
+   * opportunities, quotes, emails).
+   */
+  salesExtras?: RailItem[];
   /** Customers section label override (null = keep default "Customers"). */
   customersLabel: string | null;
   /** Customers section icon override (null = keep default). */
   customersIcon: string | null;
 }
+
+/**
+ * Phase 10.6 — default Sales rail items. Per-group configs can override
+ * via `salesExtras` if a vertical needs different ordering/hiding (e.g.
+ * healthcare tenants don't see Quotes). When omitted, this set is used.
+ */
+export const DEFAULT_SALES_EXTRAS: RailItem[] = [
+  { id: 'deals',         label: 'Deals',         href: '/deals',         iconName: 'Handshake',     description: 'Pipeline from Lead to Won with weighted forecast.', plannedPhase: 'Phase 10.6 (shipped)' },
+  { id: 'leads',         label: 'Leads',         href: '/leads',         iconName: 'UserPlus',      description: 'Top-of-funnel prospects, source attribution, qualification score.', plannedPhase: 'Phase 11 (planned)' },
+  { id: 'opportunities', label: 'Opportunities', href: '/opportunities', iconName: 'Target',        description: 'Qualified deals in motion; mirrors deals with extra qualification metadata.', plannedPhase: 'Phase 11 (planned)' },
+  { id: 'quotes',        label: 'Quotes',        href: '/quotes',        iconName: 'FileText',      description: 'Quote → counter-signature lifecycle tied to deals.', plannedPhase: 'Phase 11 (planned)' },
+  { id: 'emails',        label: 'Emails',        href: '/emails',        iconName: 'Mail',          description: 'Outreach sequences, replies, meeting-booked signals.', plannedPhase: 'Phase 11 (planned)' },
+];
 
 /** Default fallback (when tenant has no industryGroup). */
 const FALLBACK: IndustryNavConfig = {

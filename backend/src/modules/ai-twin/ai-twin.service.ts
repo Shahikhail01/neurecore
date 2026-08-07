@@ -403,6 +403,43 @@ export class AiTwinService {
     });
   }
 
+  /**
+   * Record a twin graph run in the audit log. Used by TwinGraphExecutor
+   * after each `nc.run_ai_twin` invocation. Public so the executor
+   * (DI'd separately) can call it directly.
+   *
+   * SOLID/ISP: the executor depends only on this method, not on the
+   * internal `recordActionAudit` (which is intentionally private).
+   */
+  async recordRunAudit(args: {
+    tenantId: string;
+    twinId: string;
+    actor: JwtPayload;
+    runId: string;
+    correlationId: string;
+    envelope: Record<string, unknown>;
+    result: unknown;
+  }): Promise<void> {
+    await this.repo.appendAudit({
+      tenantId: args.tenantId,
+      twinId: args.twinId,
+      actorUserId: args.actor.sub,
+      action: TwinActionIntent.TOOL_INVOKED,
+      outcome: TwinActionOutcome.SUCCESS,
+      envelope: {
+        tenantId: args.tenantId,
+        actorUserId: args.actor.sub,
+        intent: TwinActionIntent.TOOL_INVOKED,
+        occurredAt: new Date().toISOString(),
+        correlationId: args.correlationId,
+        runId: args.runId,
+        envelope: args.envelope,
+        result: args.result,
+      } as unknown as Prisma.InputJsonValue,
+      reason: `twin graph run ${args.runId}`,
+    });
+  }
+
   private requireOwner(actor: JwtPayload): void {
     if (actor.role !== TWIN_OWNER_MIN_ROLE && !TWIN_PLATFORM_ROLES.has(actor.role)) {
       throw new ForbiddenException(

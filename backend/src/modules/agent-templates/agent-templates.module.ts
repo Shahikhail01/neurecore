@@ -18,14 +18,18 @@ import {
 import { SkillSimulationService } from './services/skill-simulation.service';
 import { SkillVersionDiffService } from './services/skill-version-diff.service';
 import { SkillComposerController } from './controllers/skill-composer.controller';
+import { AgentsController } from './controllers/agents.controller';
+import { AgentRegistry } from './agents.registry';
 
 @Module({
   controllers: [
     AgentTemplatesController,
     AgentSkillsController,
     SkillComposerController,
+    AgentsController,
   ],
   providers: [
+    AgentRegistry,
     AgentTemplatesService,
     AgentTemplateVersionRepository,
     AgentSkillDefinitionRepository,
@@ -42,6 +46,7 @@ import { SkillComposerController } from './controllers/skill-composer.controller
     { provide: DRAFT_SYNTHESIZER, useExisting: DeterministicDraftSynthesizer },
   ],
   exports: [
+    AgentRegistry,
     AgentTemplatesService,
     AgentTemplateLifecycleService,
     AgentSkillBuilderService,

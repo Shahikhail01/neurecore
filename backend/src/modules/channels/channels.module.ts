@@ -1,34 +1,23 @@
 /**
- * Channels — Module.
+ * Phase 20 — Channels module.
  *
- * Phase 5 of the Creatio AI parity program. Source plan: §5.16.
+ * Composes the typed channel surfaces:
+ *   - SlackAdapterService          (CR-AI-1105 — typed OUT_OF_SCOPE)
+ *   - CrmEventTriggerService       (CR-AI-1106)
  *
- * Registers all 12 OOB channel adapters on boot, exports the registry
- * + service so chat / hermes / agents can dispatch outbound + ingest
- * inbound events.
+ * The Outlook / Teams / Gmail / Google Calendar adapters are already
+ * mounted via existing modules (Phase 4-5 P5). This module is the
+ * home for new channels as they come in scope.
  */
 
-import { Global, Module, OnModuleInit, Logger } from '@nestjs/common';
-import { ChannelRegistry, registerOobChannelAdapters } from './channel-adapter.registry';
-import { ChannelRepository } from './channel.repository';
-import { ChannelService } from './channel.service';
-import { ChannelsController } from './channel.controller';
+import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { SlackAdapterService } from './slack/slack-adapter.service';
+import { CrmEventTriggerService } from './crm/crm-event-trigger.service';
 
-@Global()
 @Module({
-  controllers: [ChannelsController],
-  providers: [ChannelRegistry, ChannelRepository, ChannelService],
-  exports: [ChannelRegistry, ChannelService],
+  imports: [DatabaseModule],
+  providers: [SlackAdapterService, CrmEventTriggerService],
+  exports: [SlackAdapterService, CrmEventTriggerService],
 })
-export class ChannelsModule implements OnModuleInit {
-  private readonly logger = new Logger(ChannelsModule.name);
-
-  constructor(private readonly registry: ChannelRegistry) {}
-
-  onModuleInit(): void {
-    registerOobChannelAdapters(this.registry);
-    this.logger.log(
-      `ChannelsModule: registered ${this.registry.list().length} OOB adapters`,
-    );
-  }
-}
+export class ChannelsModule {}

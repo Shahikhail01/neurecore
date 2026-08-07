@@ -56,6 +56,7 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { DepartmentTemplatesModule } from './modules/department-templates/department-templates.module';
 import { ModelsModule } from './modules/models/models.module';
 import { AIGatewayModule } from './modules/ai-gateway/ai-gateway.module';
+import { SkillRegistryModule } from './modules/skill-registry/skill-registry.module';
 import { LlmRegistryModule } from './modules/llm-registry/llm-registry.module';
 import { AiTwinModule } from './modules/ai-twin/ai-twin.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
@@ -72,6 +73,8 @@ import { CodingAgentSdkBridgeModule } from './modules/coding-agent-sdk/coding-ag
 import { SalesOutreachModule } from './modules/sales-outreach/sales-outreach.module';
 import { ResidencyModule } from './modules/residency/residency.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { MarketingModule } from './modules/marketing/marketing.module';
+import { ServiceModule } from './modules/service/service.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
@@ -144,6 +147,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { MeetingsModule } from './modules/meetings/meetings.module';
+import { RetentionModule } from './modules/retention/retention.module';
 // Phase 7 — EAOS-5 Solution Packs (Marketplace + install lifecycle)
 import { SolutionPacksModule } from './modules/solution-packs/solution-packs.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
@@ -241,6 +245,7 @@ import { HarnessControlModule } from './harness/phase10/harness-control.module';
     DepartmentTemplatesModule,
     ModelsModule,
     AIGatewayModule,
+    SkillRegistryModule, // Phase 11 — generative productivity (7 skills)
     LlmRegistryModule, // Phase 1 — BYO-LLM + per-tenant model binding
     AiTwinModule, // Phase 1 — AI Twin permission mirror + 4-step wizard
     ComplianceModule, // Phase 2 — Compliance Posture Center
@@ -257,6 +262,9 @@ import { HarnessControlModule } from './harness/phase10/harness-control.module';
     SalesOutreachModule, // Phase 8 — Sales outreach orchestrator + ALM env config + mobile omnichannel sessions
     ResidencyModule, // Phase 9 — Regional residency + drift observability
     ChatModule,
+    MarketingModule,   // Phase 19 — CR-AI-0801..0803 (segment + campaign-brief + bounce-analyzer)
+    ServiceModule,     // Phase 19 — CR-AI-0902..0903 (case-resolve + case-response)
+    // ChannelsModule (Phase 5 P5) also pulls in Phase 20 CR-AI-1105 (Slack stub) + CR-AI-1106 (CRM event) providers via ChannelsModule.
 
     // Phase 4 — Analytics Engine, CRM Connectors, Financial Module & Reliability
     AnalyticsModule,
@@ -352,6 +360,7 @@ import { HarnessControlModule } from './harness/phase10/harness-control.module';
 
     // Parity v3 — Phase P3 (Meeting Intelligence)
     MeetingsModule,
+    RetentionModule,
 
     // Phase 7 — EAOS-5 Solution Packs
     SolutionPacksModule,

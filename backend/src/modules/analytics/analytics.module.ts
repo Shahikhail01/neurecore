@@ -18,6 +18,8 @@ import { OpportunityWinProvider } from './providers/opportunity-win.provider';
 import { ForecastProvider } from './providers/forecast.provider';
 import { ForecastBacktest } from './providers/forecast.backtest';
 import { PipelineHealthProvider } from './providers/pipeline-health.provider';
+import { LlmModelRunner } from './services/model-runner/llm-model-runner';
+import { LlmFeatureFlagService } from './services/model-runner/llm-feature-flag.service';
 import { CaseClassifyProvider } from './providers/case-classify.provider';
 import { ModelLifecycleService } from './services/model-lifecycle.service';
 import { ModelCardService } from './services/model-card.service';
@@ -68,6 +70,9 @@ import { DriftMonitorService } from './services/drift-monitor.service';
     ModelCardService,
     DriftMonitorService,
     LeadScoringCalibration, // Phase 3 P-5: certification gate
+    // Phase 21 — LLM runner (off by default; per-tenant opt-in).
+    LlmModelRunner,
+    LlmFeatureFlagService,
   ],
   exports: [
     AnalyticsService,
@@ -85,6 +90,10 @@ import { DriftMonitorService } from './services/drift-monitor.service';
     ModelCardService,
     DriftMonitorService,
     LeadScoringCalibration,
+    // Phase 21 — exported so chat dispatcher / agent templates can
+    // opt specific tenants in.
+    LlmModelRunner,
+    LlmFeatureFlagService,
   ],
 })
 export class AnalyticsModule {}

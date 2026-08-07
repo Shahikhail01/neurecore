@@ -15,7 +15,28 @@ export interface BrevoCredentials {
   apiKey: string;
 }
 
-export type IntegrationCredentials = GoogleCredentials | BrevoCredentials;
+// R4 — Zoom OAuth credentials (added 2026-08-06; see IMPL_PLAN §R4).
+export interface ZoomOAuthCredentials {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  scope?: string;
+  userId?: string;
+}
+
+// R4 — Twilio HTTP Basic credentials (added 2026-08-06; see IMPL_PLAN §R4).
+export interface TwilioBasicCredentials {
+  accountSid: string;
+  apiKey: string;
+  apiSecret: string;
+  fromNumber?: string;
+}
+
+export type IntegrationCredentials =
+  | GoogleCredentials
+  | BrevoCredentials
+  | ZoomOAuthCredentials
+  | TwilioBasicCredentials;
 
 @Injectable()
 export class PrismaIntegrationCredentialStore implements ICredentialStore {

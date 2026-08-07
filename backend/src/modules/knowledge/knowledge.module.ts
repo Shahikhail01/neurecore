@@ -23,7 +23,7 @@
  *     Chat and Tools modules can consume them through one owner.
  */
 
-import { Module } from '@nestjs/common';
+import { Module, OnApplicationBootstrap, Logger } from '@nestjs/common';
 import { KnowledgeController } from './knowledge.controller';
 import { knowledgeProviders } from './knowledge.providers';
 import { KnowledgeService } from './services/knowledge.service';
@@ -31,6 +31,13 @@ import { RagAskSseService } from './services/rag-ask-sse.service';
 import { KnowledgeRagAskGuard } from './guards/knowledge-rag-ask.guard';
 import { TenantContextModule } from '../../common/context/tenant-context.module';
 import { ModelsModule } from '../models/models.module';
+import { RecordResolver } from './resolvers/record.resolver';
+import { ThreadResolver } from './resolvers/thread.resolver';
+import { FileResolver } from './resolvers/file.resolver';
+import {
+  SourceRefResolverRegistry,
+  SOURCE_REF_RESOLVER_REGISTRY,
+} from './resolvers/source-ref-resolver.registry';
 
 @Module({
   imports: [TenantContextModule, ModelsModule],
@@ -40,12 +47,36 @@ import { ModelsModule } from '../models/models.module';
     KnowledgeService,
     RagAskSseService,
     KnowledgeRagAskGuard,
+    RecordResolver,
+    ThreadResolver,
+    FileResolver,
+    SourceRefResolverRegistry,
+    {
+      provide: SOURCE_REF_RESOLVER_REGISTRY,
+      useExisting: SourceRefResolverRegistry,
+    },
   ],
   exports: [
     KnowledgeService,
     RagAskSseService,
     KnowledgeRagAskGuard,
     ...knowledgeProviders,
+    SourceRefResolverRegistry,
+    SOURCE_REF_RESOLVER_REGISTRY,
   ],
 })
-export class KnowledgeModule {}
+export class KnowledgeModule implements OnApplicationBootstrap {
+  private readonly logger = new Logger(KnowledgeModule.name);
+
+  constructor(
+    private readonly registry: SourceRefResolverRegistry,
+    private readonly record: RecordResolver,
+    private readonly thread: ThreadResolver,
+    private readonly file: FileResolver,
+  ) {}
+
+  onApplicationBootstrap(): void {
+    this.registry.registerAll([this.record, this.thread, this.file]);
+    this.logger.log('KnowledgeModule: registered 3 source-resolvers');
+  }
+}

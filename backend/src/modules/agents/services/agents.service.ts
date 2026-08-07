@@ -8,6 +8,7 @@ import type { AgentStatus, AgentType } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { EventsGateway } from '../../events/events.gateway';
 import { GoogleDriveService } from '../../integrations/google/google-drive.service';
+import { AgentTenantScopeGuard } from '../agents-tenant-scope.guard';
 import type {
   IAgentService,
   AgentFilter,
@@ -48,6 +49,7 @@ export class AgentsService implements IAgentService {
     private readonly prisma: PrismaService,
     private readonly events: EventsGateway,
     @Optional() private readonly driveService?: GoogleDriveService,
+    private readonly tenantScope: AgentTenantScopeGuard = new AgentTenantScopeGuard(),
   ) {}
 
   async findAll(
@@ -70,23 +72,14 @@ export class AgentsService implements IAgentService {
     } = filter;
     const skip = (page - 1) * limit;
 
-    // P9/P0-001: tenantId MUST be a real UUID. The '*' wildcard is
-    // forbidden because it would silently disable the tenant filter
-    // and leak agents across tenants. Platform-level cross-tenant
-    // queries are explicitly out of scope for this method and must
-    // use a dedicated admin surface that does not bypass tenant
-    // scoping. An undefined tenantId is also rejected: the WHERE
-    // clause is required to carry a tenantId value or the query is
-    // fail-closed (Prisma will return zero rows because the agent
-    // table has tenantId NOT NULL).
-    if (tenantId === undefined || tenantId === null || tenantId === '') {
-      throw new Error('TENANT_ID_REQUIRED');
-    }
-    if (tenantId === '*') {
-      throw new Error('TENANT_WILDCARD_FORBIDDEN');
-    }
+    // P9/P0-001 (CLOSED via Phase 18): every public method on
+    // AgentsService routes its `tenantId` argument through
+    // AgentTenantScopeGuard. The guard rejects `*` wildcards and
+    // empty/null/undefined values with typed CR-AI-1301 reasons.
+    const safeTenantId = this.tenantScope.assert('findAll', tenantId);
+
     const where: Record<string, unknown> = {
-      tenantId,
+      tenantId: safeTenantId,
       ...(departmentId ? { departmentId } : {}),
       ...(status && { status }),
       ...(type && { type }),
@@ -140,8 +133,9 @@ export class AgentsService implements IAgentService {
   }
 
   async findOne(id: string, tenantId: string): Promise<unknown> {
+    const safeTenantId = this.tenantScope.assert('findOne', tenantId);
     const agent = await this.prisma.agent.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: safeTenantId },
       include: {
         _count: {
           select: { tasks: true, memoryEntries: true, executionLogs: true },
@@ -157,6 +151,8 @@ export class AgentsService implements IAgentService {
     userId: string,
     tenantId: string,
   ): Promise<unknown> {
+    const safeTenantId = this.tenantScope.assert('create', tenantId);
+    void safeTenantId;
     // S19 (per ai-gateway-imp-plan.md): the default model id for new
     // agents is `DEFAULT_AGENT_MODEL` from env, otherwise the DB
     // default (`gpt-4o-mini`). At LLM-call time the gateway may
@@ -187,7 +183,7 @@ export class AgentsService implements IAgentService {
         permissions: (input.permissions ?? []) as never,
         config: (input.config ?? {}) as never,
         metadata: metadata as never,
-        tenantId,
+        tenantId: safeTenantId,
         createdById: userId,
       },
     });
@@ -195,10 +191,10 @@ export class AgentsService implements IAgentService {
     // Best-effort auto-provision of Drive folders for the new agent
     if (this.driveService) {
       this.driveService
-        .setupAgentFolders(tenantId, agent.id, agent.name)
+        .setupAgentFolders(safeTenantId, agent.id, agent.name)
         .catch((err) => {
           this.logger.warn(
-            `Failed to auto-provision Drive folders for agent ${agent.id} (tenant=${tenantId}): ${(err as Error).message}`,
+            `Failed to auto-provision Drive folders for agent ${agent.id} (tenant=${safeTenantId}): ${(err as Error).message}`,
           );
         });
     }
@@ -211,7 +207,8 @@ export class AgentsService implements IAgentService {
     input: UpdateAgentInput,
     tenantId: string,
   ): Promise<unknown> {
-    await this.assertOwnership(id, tenantId);
+    const safeTenantId = this.tenantScope.assert('update', tenantId);
+    await this.assertOwnership(id, safeTenantId);
 
     // ─── Merge tenant-specific profile overrides into metadata.profile ─────
     // We do this with a read+write so we never clobber existing metadata fields
@@ -286,7 +283,8 @@ export class AgentsService implements IAgentService {
   }
 
   async remove(id: string, tenantId: string): Promise<void> {
-    await this.assertOwnership(id, tenantId);
+    const safeTenantId = this.tenantScope.assert('remove', tenantId);
+    await this.assertOwnership(id, safeTenantId);
     await this.prisma.agent.delete({ where: { id } });
     this.logger.log(`Agent ${id} deleted`);
   }
@@ -296,12 +294,13 @@ export class AgentsService implements IAgentService {
     status: AgentStatus,
     tenantId: string,
   ): Promise<unknown> {
-    await this.assertOwnership(id, tenantId);
+    const safeTenantId = this.tenantScope.assert('updateStatus', tenantId);
+    await this.assertOwnership(id, safeTenantId);
     const agent = await this.prisma.agent.update({
       where: { id },
       data: { status },
     });
-    this.events.emitAgentStatusUpdated(tenantId, id, status);
+    this.events.emitAgentStatusUpdated(safeTenantId, id, status);
     return agent;
   }
 
@@ -310,13 +309,14 @@ export class AgentsService implements IAgentService {
     status: AgentStatus,
     tenantId: string,
   ): Promise<unknown> {
-    await this.assertOwnership(id, tenantId);
+    const safeTenantId = this.tenantScope.assert('setStatus', tenantId);
+    await this.assertOwnership(id, safeTenantId);
     const agent = await this.prisma.agent.update({
       where: { id },
       data: { status },
     });
-    this.events.emitAgentStatusUpdated(tenantId, id, status);
-    this.logger.log(`Agent ${id} (tenant ${tenantId}) status set to ${status}`);
+    this.events.emitAgentStatusUpdated(safeTenantId, id, status);
+    this.logger.log(`Agent ${id} (tenant ${safeTenantId}) status set to ${status}`);
     return agent;
   }
 
@@ -325,13 +325,14 @@ export class AgentsService implements IAgentService {
    * Mirrors the lifecycle in the tool's ArchiveAgentTool.
    */
   async archive(id: string, tenantId: string): Promise<unknown> {
-    await this.assertOwnership(id, tenantId);
+    const safeTenantId = this.tenantScope.assert('archive', tenantId);
+    await this.assertOwnership(id, safeTenantId);
     const agent = await this.prisma.agent.update({
       where: { id },
       data: { status: 'ARCHIVED', isActive: false },
     });
-    this.events.emitAgentStatusUpdated(tenantId, id, 'ARCHIVED');
-    this.logger.log(`Agent ${id} (tenant ${tenantId}) archived`);
+    this.events.emitAgentStatusUpdated(safeTenantId, id, 'ARCHIVED');
+    this.logger.log(`Agent ${id} (tenant ${safeTenantId}) archived`);
     return agent;
   }
 

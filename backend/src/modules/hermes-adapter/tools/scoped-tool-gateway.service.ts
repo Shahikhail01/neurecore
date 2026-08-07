@@ -17,7 +17,9 @@ import {
   RealTimeGuidanceService,
 } from '../../service-ops/service-ops-360.service';
 import { AiTwinService } from '../../ai-twin/ai-twin.service';
+import { TwinGraphExecutor } from '../../ai-twin/twin-graph.executor';
 import { ChannelService } from '../../channels/channel.service';
+import { DealsService } from '../../sales-outreach/deals/deals.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { HermesScopedTokenClaims } from '../services/token.service';
 import { approvalRequiredTools, NC_TOOL_NAMES, ncToolSchemas, type NcToolName } from './scoped-tool.schemas';
@@ -49,6 +51,8 @@ export class ScopedToolGatewayService {
     private readonly knowledgeGap: KnowledgeGapService,
     private readonly customerTouchpoint: CustomerTouchpointService,
     private readonly aiTwin: AiTwinService,
+    private readonly twinGraphExecutor: TwinGraphExecutor,
+    private readonly dealsService: DealsService,
     private readonly channelService: ChannelService,
   ) {}
 
@@ -242,6 +246,14 @@ export class ScopedToolGatewayService {
           throw new ForbiddenException('tenantId "*" is forbidden');
         }
         const horizonDays = a.horizonDays ?? 90;
+
+        // R3: weighted pipeline now derives from the Deal aggregate
+        // (stage × amount × probability) AND the existing Quote
+        // aggregation. The chat tool surfaces both so the user can
+        // see why they differ (legacy LEGACY_BRIDGE deals vs new
+        // commits).
+        const dealForecast = await this.dealsService.forecastForTenant(c.tenantId);
+
         const quotes = await this.prisma.quote.findMany({
           where: { tenantId: c.tenantId },
           select: { id: true, total: true, subtotal: true, status: true, createdAt: true },
@@ -260,14 +272,33 @@ export class ScopedToolGatewayService {
           bucket.total += t;
           byStatus[q.status] = bucket;
         }
+
         return {
           tenantId: c.tenantId,
           quarter: a.quarter ?? null,
           horizonDays,
-          totalQuotes: totalCount,
-          totalPipeline: totalAmount,
-          byStatus,
           generatedAt: new Date().toISOString(),
+          // R3: deal-stage forecast (preferred — first-class sales pipeline)
+          deals: {
+            count: dealForecast.dealsCount,
+            byStage: dealForecast.byStage,
+            weightedTotal: dealForecast.weightedTotal,
+            committedTotal: dealForecast.committedTotal,
+            bestCaseTotal: dealForecast.bestCaseTotal,
+            totalAmount: dealForecast.totalAmount,
+          },
+          // Legacy quote-based pipeline (kept for backwards-compatible chat history)
+          quotes: {
+            count: totalCount,
+            totalAmount,
+            byStatus,
+          },
+          // Human-friendly one-line summary the chat can quote
+          summary:
+            `Weighted forecast ${dealForecast.weightedTotal.toFixed(2)} across ` +
+            `${dealForecast.dealsCount} active deals; ` +
+            `committed ${dealForecast.committedTotal.toFixed(2)} ` +
+            `(negotiation + won).`,
         };
       }
       case 'nc.generate_quote': {
@@ -370,33 +401,27 @@ export class ScopedToolGatewayService {
         if (!c.tenantId || c.tenantId === '*') {
           throw new ForbiddenException('tenantId "*" is forbidden');
         }
-        const twin = await this.prisma.aiTwin.findFirst({
-          where: { id: a.twinId, tenantId: c.tenantId },
-          select: { id: true, slug: true, displayName: true, status: true },
-        });
-        if (!twin) throw new NotFoundException(`twin ${a.twinId} not found for tenant`);
-        await this.prisma.auditLog.create({
-          data: {
-            actor: c.sub,
-            tenantId: c.tenantId,
-            action: 'autonomous.ai_twin.run',
-            resource: 'ai_twin',
-            resourceId: twin.id,
-            result: 'success',
-            correlationId: c.executionId,
-            details: {
-              intent: a.intent,
-              twinSlug: twin.slug,
-            } as Prisma.InputJsonValue,
-          },
+        // R2: replaced audit-log-only stub with real LangGraph execution.
+        // TwinGraphExecutor:
+        //   1. loads the twin + asserts ACTIVE
+        //   2. builds the permission envelope via TwinPermissionMirrorGuard
+        //   3. invokes OfficialAgentGraph with allowedTools + threadId
+        //   4. persists an audit row via AiTwinService.recordRunAudit
+        const result = await this.twinGraphExecutor.invoke({
+          tenantId: c.tenantId,
+          actorId: c.sub,
+          twinId: a.twinId,
+          intent: a.intent,
         });
         return {
-          twinId: twin.id,
-          slug: twin.slug,
-          displayName: twin.displayName,
-          status: twin.status,
+          twinId: result.twinId,
+          runId: result.runId,
+          status: result.status,
           intent: a.intent,
-          acceptedAt: new Date().toISOString(),
+          output: result.output,
+          toolCalls: result.toolCalls,
+          durationMs: result.durationMs,
+          correlationId: result.correlationId,
         };
       }
       case 'nc.dispatch_channel': {

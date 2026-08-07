@@ -3,13 +3,43 @@ import type { PrismaService } from '../../../infrastructure/database/prisma.serv
 import type { FeatureSnapshotRepository } from '../../analytics/services/featureSnapshot.repository';
 import type { CalibratedAnalyticsProvider } from '../../analytics/providers/calibrated.provider';
 
-function buildPrisma(): Pick<PrismaService, 'analyticsModel'> {
+function buildPrisma(opts: { lifecycleReady?: boolean } = {}): Pick<PrismaService, 'analyticsModel'> {
+  // By default the analyticsModel stub returns a model whose lifecycle
+  // is gated-production COMPLETE + monitoring IN_PROGRESS — i.e. ready
+  // for production scoring. Tests that exercise the abstention path due
+  // to lifecycle immaturity pass `lifecycleReady: false`.
+  const ready = opts.lifecycleReady ?? true;
+  const model = ready
+    ? {
+        id: 'model-1',
+        version: 'v1',
+        metadata: {
+          lifecycle: {
+            stages: [
+              { stage: 'gated-production', status: 'COMPLETE' },
+              { stage: 'monitoring', status: 'IN_PROGRESS' },
+            ],
+          },
+        },
+      }
+    : {
+        id: 'model-1',
+        version: 'v1',
+        metadata: {
+          lifecycle: {
+            stages: [
+              { stage: 'gated-production', status: 'IN_PROGRESS' },
+              { stage: 'monitoring', status: 'PENDING' },
+            ],
+          },
+        },
+      };
   return {
     analyticsModel: {
       findFirst: jest
         .fn()
         .mockResolvedValue(
-          null,
+          model,
         ) as unknown as PrismaService['analyticsModel']['findFirst'],
     },
   } as unknown as Pick<PrismaService, 'analyticsModel'>;

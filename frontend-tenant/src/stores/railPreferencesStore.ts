@@ -22,6 +22,7 @@ export type SectionId =
     | 'home'
     | 'workspace'
     | 'marketplace'
+    | 'sales'
     | 'service-desk'
     | 'finance'
     | 'intelligence';
@@ -54,7 +55,9 @@ export type ItemId =
     | 'sites' | 'production' | 'work-orders' | 'equipment' | 'shipments' | 'fleet' | 'warehouses'
     | 'products' | 'orders' | 'inventory' | 'stores' | 'promotions' | 'campaigns' | 'content'
     | 'farms' | 'fields' | 'livestock'
-    | 'operations' | 'assets' | 'documents' | 'custom';
+    | 'operations' | 'assets' | 'documents' | 'custom'
+    // Phase 10.6 — tenant sales domain surfaces (R1-BACKLOG).
+    | 'deals' | 'leads' | 'opportunities' | 'quotes' | 'emails';
 
 interface RailPreferencesState {
     hiddenSections: SectionId[];
@@ -111,7 +114,7 @@ export const useRailPreferencesStore = create<RailPreferencesState>()(
                 const sanitisedSections = Array.isArray(ps.hiddenSections)
                     ? ps.hiddenSections.filter((x): x is SectionId =>
                           typeof x === 'string' &&
-                          ['home', 'workspace', 'marketplace', 'service-desk', 'finance', 'intelligence'].includes(x),
+                          ['home', 'workspace', 'marketplace', 'sales', 'service-desk', 'finance', 'intelligence'].includes(x),
                       )
                     : currentState.hiddenSections;
                 const validItems: ItemId[] = [
@@ -127,6 +130,8 @@ export const useRailPreferencesStore = create<RailPreferencesState>()(
                     'products', 'orders', 'inventory', 'stores', 'promotions', 'campaigns', 'content',
                     'farms', 'fields', 'livestock',
                     'operations', 'assets', 'documents', 'custom',
+                    // Phase 10.6 R1 — Sales domain surfaces.
+                    'deals', 'leads', 'opportunities', 'quotes', 'emails',
                 ];
                 const sanitisedItems = Array.isArray(ps.hiddenItems)
                     ? ps.hiddenItems.filter((x): x is ItemId => typeof x === 'string' && validItems.includes(x as ItemId))

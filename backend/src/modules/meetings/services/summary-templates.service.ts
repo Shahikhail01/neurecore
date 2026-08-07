@@ -1,106 +1,238 @@
 /**
- * Summary templates service — typed catalogue of configurable meeting
- * summary templates (P3).
+ * Phase 16 — SummaryTemplatesService.
  *
- * Eight first-class templates cover the Creatio surface:
- *   overview, decisions, risks, questions, commitments,
- *   actionItems, sentiment, followUp.
+ * Source plan: IMPLEMENTATION-PLAN-PHASE-15-18.md §2.
  *
- * Each template is a typed object; consumers can supply a custom
- * template by passing a {@link SummaryTemplate} to
- * {@link SummaryTemplatesService.render}.
+ * Closes CR-AI-0402 — "Summary templates (decisions, actions,
+ * risks, sentiment)". Provides typed CRUD over a tenant's summary
+ * templates + a `pickFor(meetingType)` helper that selects the
+ * default template for a meeting type, falling back to a system
+ * template when the tenant has no default.
+ *
+ * SRP — owns ONLY the template catalog + selection.
  */
-import { Injectable } from '@nestjs/common';
-import type {
-  SummaryTemplate,
-  SummaryTemplateKey,
-  SummarySection,
-  MeetingTranscript,
-} from '../schemas/meeting.types';
 
-const DEFAULT_TEMPLATES: Record<SummaryTemplateKey, SummaryTemplate> = {
-  overview: {
-    key: 'overview',
-    label: 'Overview',
-    description:
-      'High-level summary of meeting purpose, attendees and outcomes.',
-    sections: ['Purpose', 'Attendees', 'Key Outcomes'],
-  },
-  decisions: {
-    key: 'decisions',
-    label: 'Decisions',
-    description: 'Decisions taken during the meeting, with attribution.',
-    sections: ['Decisions Made', 'Owners', 'Rationale'],
-  },
-  risks: {
-    key: 'risks',
-    label: 'Risks',
-    description: 'Identified risks and open issues.',
-    sections: ['Identified Risks', 'Likelihood', 'Mitigations'],
-  },
-  questions: {
-    key: 'questions',
-    label: 'Questions',
-    description: 'Open questions raised during the meeting.',
-    sections: ['Open Questions', 'Assigned To', 'Deadline'],
-  },
-  commitments: {
-    key: 'commitments',
-    label: 'Commitments',
-    description: 'Explicit commitments made by participants.',
-    sections: ['Commitment', 'Owner', 'Due Date'],
-  },
-  actionItems: {
-    key: 'actionItems',
-    label: 'Action Items',
-    description: 'Concrete action items with owners and due dates.',
-    sections: ['Action', 'Owner', 'Due Date', 'Confidence'],
-  },
-  sentiment: {
-    key: 'sentiment',
-    label: 'Sentiment',
-    description: 'Customer / participant sentiment observed.',
-    sections: ['Overall Sentiment', 'Concerns', 'Positives'],
-  },
-  followUp: {
-    key: 'followUp',
-    label: 'Follow-up',
-    description: 'Suggested follow-up email and calendar event content.',
-    sections: ['Email Subject', 'Email Body', 'Calendar Event'],
-  },
-};
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
+
+export class SummaryTemplateForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SummaryTemplateForbiddenError';
+  }
+}
+
+export interface SummaryTemplateSections {
+  readonly decisions: string;
+  readonly actions: string;
+  readonly risks: string;
+  readonly sentiment: string;
+}
+
+export interface SummaryTemplate {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly name: string;
+  readonly meetingType: string;
+  readonly sections: SummaryTemplateSections;
+  readonly isDefault: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
 
 @Injectable()
 export class SummaryTemplatesService {
-  /** Built-in templates — copy before mutation. */
-  list(): SummaryTemplate[] {
-    return Object.values(DEFAULT_TEMPLATES).map((t) => ({
-      ...t,
-      sections: [...t.sections],
-    }));
+  private readonly logger = new Logger(SummaryTemplatesService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async list(tenantId: string): Promise<ReadonlyArray<SummaryTemplate>> {
+    if (!tenantId || tenantId === '*') return [];
+    const rows = await this.prisma.meetingSummaryTemplate.findMany({
+      where: { tenantId },
+      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+    });
+    return rows.map(mapRow);
   }
 
-  get(key: SummaryTemplateKey): SummaryTemplate {
-    const t = DEFAULT_TEMPLATES[key];
-    return { ...t, sections: [...t.sections] };
+  async create(
+    tenantId: string,
+    name: string,
+    meetingType: string,
+    sections: SummaryTemplateSections,
+    isDefault: boolean,
+  ): Promise<SummaryTemplate> {
+    if (!tenantId || tenantId === '*') {
+      throw new SummaryTemplateForbiddenError('tenantId required');
+    }
+    if (!name || !meetingType) {
+      throw new NotFoundException('name and meetingType required');
+    }
+    const row = await this.prisma.meetingSummaryTemplate.upsert({
+      where: { tenantId_name: { tenantId, name } },
+      create: {
+        tenantId,
+        name,
+        meetingType,
+        sections: sections as never,
+        isDefault,
+      },
+      update: {
+        meetingType,
+        sections: sections as never,
+        isDefault,
+      },
+    });
+    return mapRow(row);
+  }
+
+  async pickFor(
+    tenantId: string,
+    meetingType: string,
+  ): Promise<SummaryTemplate> {
+    if (!tenantId || tenantId === '*') {
+      throw new SummaryTemplateForbiddenError('tenantId required');
+    }
+    const row = await this.prisma.meetingSummaryTemplate.findFirst({
+      where: {
+        tenantId,
+        meetingType,
+        isDefault: true,
+      },
+    });
+    if (row) return mapRow(row);
+
+    // Fallback to system default for the meeting type.
+    return systemDefaultFor(meetingType, tenantId);
   }
 
   /**
-   * Render an empty structure for `template` — used by the summary
-   * service to build a typed skeleton that downstream extractors
-   * populate. Sections are returned in the order declared by the
-   * template.
+   * Phase 16 — renderSkeleton(transcript, templateKey).
+   *
+   * The legacy `meeting.service.ts` (pre-existing skeleton) calls this
+   * to produce a typed `MeetingSummary.sections` shape. We map the
+   * skeleton key to a meeting type and emit the default sections.
+   *
+   * No DB round-trip here; the cache layer in `MeetingService` is
+   * responsible for memoising.
    */
   renderSkeleton(
-    transcript: MeetingTranscript,
-    templateKey: SummaryTemplateKey,
-  ): SummarySection[] {
-    const t = this.get(templateKey);
-    return t.sections.map((title) => ({
-      title,
-      bullets: [
-        `(${transcript.participants.length} participants, ${transcript.utterances.length} utterances)]`,
-      ],
-    }));
+    transcript: { languageCode?: string },
+    templateKey: string,
+  ): SummaryTemplateSections {
+    const type = templateKey;
+    return defaultSections(type);
   }
+
+  /**
+   * Upserts the four default templates (1:1, discovery, standup,
+   * kickoff) for a tenant on first setup.
+   */
+  async ensureDefaults(tenantId: string): Promise<ReadonlyArray<SummaryTemplate>> {
+    if (!tenantId || tenantId === '*') {
+      throw new SummaryTemplateForbiddenError('tenantId required');
+    }
+    const defs: Array<[string, string, SummaryTemplateSections]> = [
+      ['1:1', '1to1', defaultSections('1:1')],
+      ['Discovery', 'discovery', defaultSections('discovery')],
+      ['Standup', 'standup', defaultSections('standup')],
+      ['Kickoff', 'kickoff', defaultSections('kickoff')],
+    ];
+    const out: SummaryTemplate[] = [];
+    for (const [name, type, sections] of defs) {
+      out.push(await this.create(tenantId, name, type, sections, true));
+    }
+    return out;
+  }
+}
+
+function mapRow(r: {
+  id: string;
+  tenantId: string;
+  name: string;
+  meetingType: string;
+  sections: unknown;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}): SummaryTemplate {
+  return {
+    id: r.id,
+    tenantId: r.tenantId,
+    name: r.name,
+    meetingType: r.meetingType,
+    sections: normaliseSections(r.sections),
+    isDefault: r.isDefault,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  };
+}
+
+function normaliseSections(raw: unknown): SummaryTemplateSections {
+  const o = (raw ?? {}) as Record<string, string | undefined>;
+  return {
+    decisions: o['decisions'] ?? '',
+    actions: o['actions'] ?? '',
+    risks: o['risks'] ?? '',
+    sentiment: o['sentiment'] ?? '',
+  };
+}
+
+function defaultSections(meetingType: string): SummaryTemplateSections {
+  switch (meetingType) {
+    case '1to1':
+    case '1:1':
+      return {
+        decisions: 'Decisions taken about the team-member\'s priorities, blockers, and feedback.',
+        actions: 'Action items owned by either party with due dates.',
+        risks: 'Risks to retention, momentum, or context-switching.',
+        sentiment: 'Overall tone of the conversation.',
+      };
+    case 'discovery':
+      return {
+        decisions: 'Scope decisions and qualifying questions answered.',
+        actions: 'Follow-ups to send, demos to schedule, decisions pending.',
+        risks: 'Risks to timeline, budget, fit, or sponsor buy-in.',
+        sentiment: 'Customer engagement + openness to next steps.',
+      };
+    case 'standup':
+      return {
+        decisions: 'Daily blockers resolved and decisions made.',
+        actions: 'Today\'s deliverables and dependencies.',
+        risks: 'Cross-team blockers + delivery risk.',
+        sentiment: 'Team energy and friction.',
+      };
+    case 'kickoff':
+      return {
+        decisions: 'Roles, scope, and timelines agreed.',
+        actions: 'First deliverables + review checkpoints.',
+        risks: 'Scope creep, resource conflicts, external dependencies.',
+        sentiment: 'Stakeholder alignment + commitment.',
+      };
+    default:
+      return {
+        decisions: 'Decisions taken during the meeting.',
+        actions: 'Action items with owners and due dates.',
+        risks: 'Risks raised during the meeting.',
+        sentiment: 'Overall meeting tone.',
+      };
+  }
+}
+
+function systemDefaultFor(
+  meetingType: string,
+  tenantId: string,
+): SummaryTemplate {
+  const sections = defaultSections(meetingType);
+  const id = `system-${meetingType}`;
+  return {
+    id,
+    tenantId,
+    name: `${meetingType} (system default)`,
+    meetingType,
+    sections,
+    isDefault: true,
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(),
+  };
 }

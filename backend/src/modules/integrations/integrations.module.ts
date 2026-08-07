@@ -20,10 +20,14 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { GmailEmailProvider } from './email/gmail-email.provider';
 import { BrevoEmailProvider } from './email/brevo-email.provider';
 import { EmailProviderFactory } from './email/email-provider.factory';
+import { ZoomAuthClient } from './zoom/zoom-auth.client';
+import { TwilioAuthClient } from './twilio/twilio-auth.client';
+import { MicrosoftAuthController } from './microsoft/microsoft-auth.controller';
+import { ConnectorsModule } from '../connectors/connectors.module';
 
 @Module({
-  imports: [NotificationsModule],
-  controllers: [IntegrationsController],
+  imports: [NotificationsModule, ConnectorsModule],
+  controllers: [IntegrationsController, MicrosoftAuthController],
   providers: [
     IntegrationsService,
     PrismaIntegrationCredentialStore,
@@ -44,6 +48,8 @@ import { EmailProviderFactory } from './email/email-provider.factory';
     GmailEmailProvider,
     BrevoEmailProvider,
     EmailProviderFactory,
+    ZoomAuthClient,
+    TwilioAuthClient,
   ],
   exports: [
     IntegrationsService,
@@ -62,6 +68,8 @@ import { EmailProviderFactory } from './email/email-provider.factory';
     DriveCleanupService,
     EmailProviderFactory,
     PrismaIntegrationCredentialStore,
+    ZoomAuthClient,
+    TwilioAuthClient,
   ],
 })
 export class IntegrationsModule {}

@@ -641,6 +641,16 @@ model Tenant {
   // Phase 1 relations (added 2026-08-04)
   llmBindings          TenantLlmBinding[]
   twins                AiTwin[]
+  // R3 — back-relation for sales pipeline deals. Tenant cascade deletes deals.
+  deals                Deal[]               @relation("TenantDeals")
+  // R12 — back-relation for the ArticleDraftSkill output table. Tenant cascade deletes articles.
+  knowledgeArticles    KnowledgeArticle[]   @relation("TenantKnowledgeArticles")
+  // P15 — chat-export metadata table (CR-AI-0003 export/delete/redact + audit)
+  chatExports          ChatExport[]         @relation("TenantChatExports")
+  // P18 — audit-evidence chains (CR-AI-1303 audit + evidence + observability)
+  auditEvidenceChains  AuditEvidenceChain[] @relation("TenantAuditEvidenceChains")
+  // P16 — meeting transcripts (CR-AI-0401..0404)
+  meetingTranscripts   MeetingTranscript[]   @relation("TenantMeetingTranscripts")
   // Phase 2 relations (added 2026-08-04)
   dsrRequests          DsrRequest[]
   currency             String?           @default("USD")
@@ -892,6 +902,9 @@ model User {
   hermesSessions HermesSession[]
   // Phase 1 relations (added 2026-08-04)
   twins                AiTwin[]
+  // R3 — deals owned by this user. ON DELETE SET NULL preserves sales
+  // history when a sales-rep account is deactivated.
+  deals                 Deal[]                @relation("UserDeals")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1821,6 +1834,7 @@ model AnalyticsModel {
   version     String
   description String? @db.Text
   metadata    Json    @default("{}")
+  isPublic     Boolean @default(false)   // Phase 19 — CR-AI-1001 platform-level fallback
 
   tenantId String?
   tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1831,6 +1845,7 @@ model AnalyticsModel {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([isPublic])
   @@map("analytics_models")
 }
 
@@ -2516,6 +2531,9 @@ model Customer {
   // clause; SetNull preserves historical events when a customer is
   // archived.
   timelineEvents        TimelineEvent[]
+  // R3 — back-relation for sales pipeline. Deal.customerId ON DELETE SET NULL
+  // preserves historical deals when a customer is archived.
+  deals                 Deal[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -2541,6 +2559,9 @@ model CustomerContact {
   portalToken          String?
   portalTokenExpiresAt DateTime?
   createdAt            DateTime  @default(now())
+
+  // R3 — back-relation for deals linked to a specific contact.
+  deals Deal[]
 
   @@index([customerId])
   @@map("customer_contacts")
@@ -2756,6 +2777,9 @@ model Project {
   clonedFromProjectId String?
   clonedFromProject   Project?  @relation("ProjectClones", fields: [clonedFromProjectId], references: [id], onDelete: SetNull)
   clones              Project[] @relation("ProjectClones")
+  // R3 — back-relation for the deal-pipeline ↔ project linkage.
+  // A deal may exist before its project is created; deletion is SetNull.
+  deals               Deal[]      @relation("DealProject")
 
   // Status extended
   lostReason String?
@@ -3066,6 +3090,8 @@ enum IntegrationProvider {
   BREVO
   SLACK
   MICROSOFT
+  ZOOM       // R4 — added in 20260806_add_zoom_twilio_providers
+  TWILIO     // R4 — added in 20260806_add_zoom_twilio_providers
 }
 
 enum IntegrationStatus {
@@ -8227,7 +8253,10 @@ model PartnerLeadShare {
 model Quote {
   id            String   @id @default(uuid())
   tenantId      String
+  // R3: dealId is now an FK to Deal.id (set in migration backfill). Still
+  // required at the DB layer to preserve the prior contract.
   dealId        String
+  deal          Deal     @relation(fields: [dealId], references: [id], onDelete: Restrict)
   quoteNumber   String
   // Line items + discounts + totals.
   items         Json     @default("[]")
@@ -8602,3 +8631,309 @@ model AgentEnvelopeExplanation {
   @@index([tenantId, executionId])
   @@map("agent_envelope_explanations")
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// R3 of neurecore/memory-bank-arc/harness/IMPLEMENTATION-PLAN-BACKLOG-R1-R4.md
+//
+// Deal — first-class sales pipeline aggregate. Exists so the parity
+// forecast (nc.forecast_pipeline) can speak about weighted pipeline
+// (stage × amount × probability) instead of relying solely on Quote.total.
+//
+// Quote.dealId is backfilled at migration time: every distinct
+// (tenantId, dealId) combination in Quote becomes a Deal row with
+// source = LEGACY_BRIDGE so the migration is reversible without data loss.
+//
+// Tenant isolation is enforced at every query (Deal.repository +
+// DealsService). Cross-tenant access throws NotFoundException.
+// ─────────────────────────────────────────────────────────────────────
+
+enum DealStage {
+  LEAD
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum DealSource {
+  INBOUND
+  OUTBOUND
+  PARTNER
+  REFERRAL
+  EVENT
+  LEGACY_BRIDGE
+}
+
+model Deal {
+  id                String     @id @default(uuid())
+  tenantId          String
+  customerId        String?
+  contactId         String?
+  projectId         String?
+  ownerUserId       String?
+
+  name              String
+  stage             DealStage  @default(LEAD)
+  source            DealSource @default(INBOUND)
+
+  // Financials
+  amount            Decimal    @default(0) @db.Decimal(18, 2)
+  currency          String     @default("USD") @db.VarChar(3)
+  // Win probability per stage (LEAD:0.10 QUALIFIED:0.25 PROPOSAL:0.50
+  // NEGOTIATION:0.75 WON:1.00 LOST:0.00). Stored explicitly so we can
+  // recompute weighted forecast without re-reading defaults.
+  probability       Decimal    @default(0.10) @db.Decimal(5, 4)
+  expectedCloseDate DateTime?
+
+  // AI scoring — calibrated by analytics services. Null when unscored.
+  aiScore           Decimal?   @db.Decimal(5, 4)
+
+  // Free-form notes
+  notes             String?    @db.Text
+
+  // Soft delete — we never hard-delete deals (evidence trail).
+  deletedAt         DateTime?
+
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  tenant   Tenant    @relation("TenantDeals", fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contact  CustomerContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  project  Project?  @relation("DealProject", fields: [projectId], references: [id], onDelete: SetNull)
+  owner    User?     @relation("UserDeals", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  quotes   Quote[]
+
+  // Soft uniqueness within (tenant, customer, name). Backfilled legacy
+  // bridge rows share a synthetic name so the FK migration succeeds
+  // even when two tenants happen to use the same legacy dealId value.
+  @@unique([tenantId, customerId, name])
+  @@index([tenantId, stage, updatedAt(sort: Desc)])
+  @@index([tenantId, expectedCloseDate])
+  @@index([tenantId, ownerUserId])
+  @@index([tenantId, deletedAt])
+  @@map("deals")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// R12 of neurecore/memory-bank-arc/harness/IMPLEMENTATION-PLAN-PHASE12.md
+//
+// KnowledgeArticle — the canonical storage for `ArticleDraftSkill`
+// outputs and the `KnowledgeHealthSkill` deduplication state.
+//
+// The skill writes here; the chat / admin UI reads from here. Soft
+// publishes are gated by `KnowledgeArticleStatus` so REVIEW-required
+// content is never publicly accessible until an admin approves.
+// ─────────────────────────────────────────────────────────────────────
+
+enum KnowledgeArticleStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+model KnowledgeArticle {
+  id                String         @id @default(cuid())
+  tenantId          String
+
+  title             String
+  intent            String         @default("concept")
+  bodyMarkdown      String         @default("")
+
+  proposedTags      String[]       @default([])
+  sourceChunkIds    String[]       @default([])
+
+  // De-duplication pointer — when non-null, this article is a
+  // near-duplicate of another; the curator UI hides one of them.
+  duplicateOfId     String?
+
+  publishedAt       DateTime?
+  publishedByUserId String?
+
+  status            KnowledgeArticleStatus @default(DRAFT)
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tenant            Tenant         @relation("TenantKnowledgeArticles", fields: [tenantId], references: [id], onDelete: Cascade)
+  duplicateOf       KnowledgeArticle? @relation("ArticleDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates        KnowledgeArticle[] @relation("ArticleDuplicates")
+
+  @@unique([tenantId, title])
+  @@index([tenantId, status, updatedAt(sort: Desc)])
+  @@index([tenantId, duplicateOfId])
+  @@index([publishedAt])
+  @@map("knowledge_articles")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Phase 15 — ChatExport (CR-AI-0003 export/delete/redact + audit)
+//
+// Records per-export state. The export payload itself is stored out-of-band
+// by the storage adapter; this table is the canonical metadata + audit row.
+// Forward-only by design; drops require operator approval in a follow-up.
+// ─────────────────────────────────────────────────────────────────────
+
+model ChatExport {
+  id              String    @id @default(cuid())
+  tenantId        String
+  actorId         String
+  conversationId  String
+  format          String
+  redact          Boolean   @default(false)
+  byteSize        Int       @default(0)
+  storagePath     String    @default("")
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  tenant Tenant @relation("TenantChatExports", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, conversationId, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@map("chat_exports")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Phase 18 — AuditEvidenceChain (CR-AI-1303 audit + evidence + observability)
+//
+// Append-only evidence chain that correlates one correlationId across
+// the skills run, the records read, and the mutations written.
+// Closed (closedAt set) when the conversation / agent run completes.
+// ─────────────────────────────────────────────────────────────────────
+
+model AuditEvidenceChain {
+  id              String    @id @default(cuid())
+  tenantId        String
+  correlationId   String
+  actorId         String
+  skillsJson      Json      @default("[]")
+  readsJson       Json      @default("[]")
+  writesJson      Json      @default("[]")
+  closedAt        DateTime?
+  createdAt       DateTime  @default(now())
+
+  tenant Tenant @relation("TenantAuditEvidenceChains", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, correlationId])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("audit_evidence_chains")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Phase 16 — Meetings (CR-AI-0401..0404)
+//
+// Four tables:
+//   - meeting_provider_consent    (CR-AI-0401 ingestion consent record per provider)
+//   - meeting_transcripts         (raw transcript + metadata + jurisdiction)
+//   - meeting_summary_templates   (CR-AI-0402 per-meeting-type template)
+//   - meeting_action_items         (CR-AI-0403 extracted action items)
+//
+// One table for CR-AI-0404 CRM linkage exists as a relation column on
+// meeting_transcripts (linkedRecordType/linkedRecordId). The CRM
+// linker service writes follow-up tasks via the work-runtime gate.
+// ─────────────────────────────────────────────────────────────────────
+
+enum MeetingProvider {
+  OUTLOOK
+  TEAMS
+  ZOOM
+  GOOGLE_MEET
+  MANUAL
+}
+
+enum MeetingStatus {
+  INGESTED
+  TRANSCRIBED
+  SUMMARIZED
+  ACTIONS_EXTRACTED
+  LINKED
+  FAILED
+}
+
+model MeetingProviderConsent {
+  id                String         @id @default(cuid())
+  tenantId          String
+  userId            String
+  provider          MeetingProvider
+  scopes            String[]
+  jurisdiction      String?        // e.g. "EU-GDPR", "US-CA"
+  grantedAt         DateTime       @default(now())
+  revokedAt         DateTime?
+
+  @@unique([tenantId, userId, provider])
+  @@index([tenantId, userId, provider])
+  @@index([tenantId, revokedAt])
+  @@map("meeting_provider_consents")
+}
+
+model MeetingTranscript {
+  id                String         @id @default(cuid())
+  tenantId          String
+  organizerUserId   String?
+  provider          MeetingProvider
+  providerMeetingId  String         // external id from the recording provider
+  title             String
+  scheduledAt       DateTime
+  durationSeconds   Int            @default(0)
+  languageCode      String         @default("en")
+  jurisdiction      String?
+  transcriptText    String
+  participantsJson  Json           @default("[]")
+  status            MeetingStatus  @default(INGESTED)
+  summaryTemplateId  String?
+
+  // CRM linkage fields (CR-AI-0404)
+  linkedRecordType   String?
+  linkedRecordId     String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Relations
+  tenant            Tenant         @relation("TenantMeetingTranscripts", fields: [tenantId], references: [id], onDelete: Cascade)
+  summaryTemplate   MeetingSummaryTemplate? @relation("MeetingTemplateTranscripts", fields: [summaryTemplateId], references: [id], onDelete: SetNull)
+  actionItems       MeetingActionItem[]     @relation("TranscriptActionItems")
+
+  @@unique([tenantId, provider, providerMeetingId])
+  @@index([tenantId, status, scheduledAt(sort: Desc)])
+  @@index([tenantId, linkedRecordType, linkedRecordId])
+  @@map("meeting_transcripts")
+}
+
+model MeetingSummaryTemplate {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  meetingType     String                  // '1:1' | 'discovery' | 'standup' | 'kickoff' | 'demo' | 'review' | '1to1'
+  sections        Json                     // { decisions: string, actions: string, risks: string, sentiment: string }
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transcripts     MeetingTranscript[]     @relation("MeetingTemplateTranscripts")
+
+  @@unique([tenantId, name])
+  @@map("meeting_summary_templates")
+}
+
+model MeetingActionItem {
+  id                String         @id @default(cuid())
+  tenantId          String
+  transcriptId      String
+  description       String
+  ownerUserId       String?
+  dueDate           DateTime?
+  confidencePercent Int            @default(0)   // 0..100
+  status            String         @default("PENDING")  // PENDING | CREATED | ARCHIVED
+  ambiguousOwner    Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+
+  transcript        MeetingTranscript @relation("TranscriptActionItems", fields: [transcriptId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, transcriptId])
+  @@map("meeting_action_items")
+}
+

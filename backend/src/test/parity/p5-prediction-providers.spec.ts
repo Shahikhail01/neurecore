@@ -16,8 +16,23 @@ import { CaseClassifyProvider } from '../../../src/modules/analytics/providers/c
 describe('P5 — predictive providers', () => {
   const TENANT = 'tenant-abc';
 
+  // The prediction providers depend on PrismaService; for these unit tests
+  // we only need a stable stub. Returning null = "no model registered, so
+  // provider must abstain". The "bounded probability" test returns a model
+  // with weights present.
+  function makePrismaStub(opts: { withModel?: boolean; weights?: Record<string, number> } = {}) {
+    const model = opts.withModel
+      ? { id: 'm', metadata: { weights: opts.weights ?? {} } }
+      : null;
+    return {
+      analyticsModel: { findFirst: jest.fn(async () => model) },
+      deal: { findMany: jest.fn(async () => []) },
+      case: { findMany: jest.fn(async () => []) },
+    } as never;
+  }
+
   it('lead-score abstains when coverage is below threshold', async () => {
-    const provider = new LeadScoreProvider({} as never);
+    const provider = new LeadScoreProvider(makePrismaStub());
     const result = await provider.score({
       tenantId: TENANT,
       modelId: 'm',
@@ -30,7 +45,18 @@ describe('P5 — predictive providers', () => {
   });
 
   it('lead-score returns a bounded probability when coverage is sufficient', async () => {
-    const provider = new LeadScoreProvider({} as never);
+    const provider = new LeadScoreProvider(
+      makePrismaStub({
+        withModel: true,
+        weights: {
+          requested_demo: 0.4,
+          lead_source_email: 0.2,
+          lead_source_referral: 0.3,
+          company_size_log: 0.1,
+          senior_decision_maker: 0.2,
+        },
+      }),
+    );
     const result = await provider.score({
       tenantId: TENANT,
       modelId: 'm',
@@ -50,7 +76,7 @@ describe('P5 — predictive providers', () => {
   });
 
   it('opportunity-win abstains with empty features', async () => {
-    const provider = new OpportunityWinProvider({} as never);
+    const provider = new OpportunityWinProvider(makePrismaStub());
     const result = await provider.score({
       tenantId: TENANT,
       modelId: 'm',
@@ -62,7 +88,7 @@ describe('P5 — predictive providers', () => {
   });
 
   it('forecast abstains on empty pipeline', async () => {
-    const provider = new ForecastProvider({} as never);
+    const provider = new ForecastProvider(makePrismaStub());
     const result = await provider.score({
       tenantId: TENANT,
       modelId: 'm',
@@ -74,7 +100,7 @@ describe('P5 — predictive providers', () => {
   });
 
   it('forecast backtest produces coverage, MAE, MSE', async () => {
-    const provider = new ForecastProvider({} as never);
+    const provider = new ForecastProvider(makePrismaStub());
     const backtest = new ForecastBacktest(provider);
     const report = await backtest.run(TENANT, [
       {
@@ -118,7 +144,7 @@ describe('P5 — predictive providers', () => {
   });
 
   it('case-classify abstains on empty text', async () => {
-    const provider = new CaseClassifyProvider({} as never);
+    const provider = new CaseClassifyProvider(makePrismaStub());
     const result = await provider.score({
       tenantId: TENANT,
       modelId: 'm',

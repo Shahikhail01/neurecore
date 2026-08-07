@@ -112,6 +112,7 @@ export class ChatService {
     private readonly typingExtractor: TypedParameterExtractor,
     private readonly routingDecisions: RoutingDecisionsService,
     private readonly tenantLlmGateway: TenantLlmGateway,
+    private readonly skillRegistry: import('../skill-registry/skill-registry.service').SkillRegistry,
   ) {}
 
   private saveReply(
@@ -359,6 +360,28 @@ export class ChatService {
         result,
       );
       return result;
+    }
+
+    // PHASE 11: SKILL INTENT — short-circuit to the skill registry when
+    // the message is one of the seven Phase-11 generative-productivity
+    // intents. The skill dispatcher runs the LLM through the executor
+    // (NOT through the agent graph) and emits typed SkillOutput. The
+    // reply is the markdown/string content; the helper returns null
+    // when no skill matched so the rest of the dispatcher continues.
+    const skillReply = await this.tryDispatchSkillIntent(
+      dto,
+      conversationId,
+      tenantIdFromJwt,
+      userIdFromJwt,
+    );
+    if (skillReply) {
+      this.saveReply(
+        conversationId,
+        tenantIdForHistory,
+        userIdForHistory,
+        skillReply,
+      );
+      return skillReply;
     }
 
     // PROJECT-CREATION INTENT: bypass the model entirely and drive a
@@ -897,6 +920,342 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
    * graph produces a one-shot createProject call instead of an endless
    * scripted Q&A loop.
    */
+
+  /**
+   * Phase 11 — Skill intent dispatcher.
+   *
+   * Returns the chat reply payload (with skill metadata) when the
+   * message maps to a registered skill; returns null otherwise so the
+   * caller falls through to the next dispatch branch.
+   *
+   * Routing rules (deterministic, no LLM):
+   *   - "/summarize <text>"                → summarize   (text source)
+   *   - "/summarize record:Customer:c-1"   → summarize   (record source)
+   *   - "/rewrite <mode>:<tone>:<text>"    → rewrite     (text)
+   *   - "/translate <locale>:<text>"       → translate
+   *   - "/extract <schema-keys>:<text>"    → extract
+   *   - "/compare <left>|<right>"          → compare
+   *   - "/draft-report <topic>"            → draft-report
+   *   - "/draft-email <recipient>:<intent>"→ draft-email
+   *
+   * Each skill also surfaces metadata (confidence, limits) so the FE
+   * chat panel can show the "limited / partial" badge.
+   */
+  private async tryDispatchSkillIntent(
+    dto: SendChatMessageDto,
+    _conversationId: string,
+    tenantIdFromJwt: string | null | undefined,
+    _userIdFromJwt: string | null | undefined,
+  ): Promise<{
+    reply: string;
+    conversationId: string;
+    tokens: { input: number; output: number; total: number };
+    model: string;
+    provider: string;
+    skill: { id: string; confidence: number; limits: string[]; citations: number };
+  } | null> {
+    const raw = dto.message ?? '';
+    if (!raw.startsWith('/')) return null;
+    const tenantId = tenantIdFromJwt;
+    if (!tenantId) return null;
+
+    const skillId = this.matchSkillIntent(raw);
+    if (!skillId) return null;
+
+    // Best-effort parse of the typed payload out of "/<skill> <payload…>"
+    // Anything richer belongs in the ChatPanel FE; the dispatcher
+    // surfaces what came through HTTP.
+    const payload = this.parseSkillPayload(skillId, raw, tenantId);
+    if (!payload) return null;
+
+    try {
+      const context = {
+        tenantId,
+        isCrossTenant: false,
+        actorRole: 'USER' as const,
+        actorUserId: _userIdFromJwt ?? 'anonymous',
+      };
+      const out = await this.skillRegistry.dispatch(
+        skillId,
+        payload,
+        context,
+      );
+      const content =
+        typeof out.content === 'string'
+          ? out.content
+          : JSON.stringify(out.content, null, 2);
+      const limitsMd =
+        out.citations && out.confidence !== undefined
+          ? `\n\n_Skill: \`${out.skillId}\` · confidence ${out.confidence.toFixed(2)} · ${out.citations.length} citation(s)_`
+          : '';
+      return {
+        reply: `${content}${limitsMd}`,
+        conversationId: _conversationId,
+        tokens: { input: 0, output: 0, total: 0 },
+        model: `skill:${out.skillId}`,
+        provider: 'skill-registry',
+        skill: {
+          id: out.skillId,
+          confidence: out.confidence,
+          limits: [],
+          citations: out.citations.length,
+        },
+      };
+    } catch (err) {
+      // The user typed "/summarize …" and the skill refused (e.g.
+      // wrong schema, cross-tenant source). Reply with a typed
+      // "abstained" message so we never fake success.
+      const reason = err instanceof Error ? err.message : String(err);
+      return {
+        reply: `Skill \`${skillId}\` abstained: ${reason}`,
+        conversationId: _conversationId,
+        tokens: { input: 0, output: 0, total: 0 },
+        model: `skill:${skillId}`,
+        provider: 'skill-registry',
+        skill: {
+          id: skillId,
+          confidence: 0,
+          limits: [reason],
+          citations: 0,
+        },
+      };
+    }
+  }
+
+  /**
+   * Phase 11 — intent matcher.
+   * Recognises the seven Phase-11 skills by slash-prefix token.
+   * Returns null for any other command.
+   */
+  private matchSkillIntent(
+    message: string,
+  ):
+    | null
+    | 'summarize'
+    | 'rewrite'
+    | 'translate'
+    | 'extract'
+    | 'compare'
+    | 'draft-report'
+    | 'draft-email'
+    | 'nl-draft'
+    | 'segment'
+    | 'campaign-brief'
+    | 'case-resolve'
+    | 'case-response'
+    | 'crm-event'
+    | 'crm-webhook' {
+    const head = message.split(/\s+/, 1)[0]?.toLowerCase();
+    switch (head) {
+      case '/summarize':
+        return 'summarize';
+      case '/rewrite':
+        return 'rewrite';
+      case '/translate':
+        return 'translate';
+      case '/extract':
+        return 'extract';
+      case '/compare':
+        return 'compare';
+      case '/draft-report':
+        return 'draft-report';
+      case '/draft-email':
+        return 'draft-email';
+      case '/nl-draft':
+        return 'nl-draft';
+      case '/segment':
+        return 'segment';
+      case '/campaign-brief':
+        return 'campaign-brief';
+      case '/case-resolve':
+        return 'case-resolve';
+      case '/case-response':
+        return 'case-response';
+      case '/crm-event':
+        return 'crm-event';
+      case '/crm-webhook':
+        return 'crm-webhook';
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Phase 11 — best-effort payload parser.
+   * Each skill expects a specific shape; for the chat entry point
+   * we accept the simplest typed payload the user can produce via
+   * the chat textbox. The FE chat composer produces the full shape.
+   */
+  private parseSkillPayload(
+    skillId:
+      | 'summarize'
+      | 'rewrite'
+      | 'translate'
+      | 'extract'
+      | 'compare'
+      | 'draft-report'
+      | 'draft-email'
+      | 'nl-draft'
+      | 'segment'
+      | 'campaign-brief'
+      | 'case-resolve'
+      | 'case-response'
+      | 'crm-event'
+      | 'crm-webhook',
+    raw: string,
+    tenantId: string,
+  ): unknown {
+    const tail = raw.replace(/^\/\S+\s*/, '').trim();
+    if (!tail) return null;
+    switch (skillId) {
+      case 'summarize': {
+        // Phase 12 — also accept /summarize record:Customer:c-1 etc.
+        const refMatch = tail.match(/^(record):(\w+):([\w-]+)\s*$/);
+        if (refMatch) {
+          return {
+            source: {
+              kind: 'record',
+              recordType: refMatch[2]!,
+              recordId: refMatch[3]!,
+            },
+          };
+        }
+        const threadMatch = tail.match(/^(thread):([\w-]+)\s*$/);
+        if (threadMatch) {
+          return { source: { kind: 'thread', threadId: threadMatch[2]! } };
+        }
+        const fileMatch = tail.match(/^(file):([\w-]+)\s*$/);
+        if (fileMatch) {
+          return { source: { kind: 'file', fileId: fileMatch[2]! } };
+        }
+        return { source: { kind: 'text', text: tail } };
+      }
+      case 'rewrite': {
+        // /rewrite tone:formal:<text>  |  /rewrite shorten:<text>  |  /rewrite expand:<text>
+        const m = tail.match(/^(tone:(formal|casual|friendly|urgent|neutral)|shorten|expand)(?::(.+))?$/);
+        if (!m) return null;
+        const head = m[1];
+        const body = m[3] ?? m[2] ?? '';
+        if (!body) return null;
+        if (head === 'shorten' || head === 'expand')
+          return { text: body, mode: head };
+        const tone = head.split(':')[1] as
+          | 'formal'
+          | 'casual'
+          | 'friendly'
+          | 'urgent'
+          | 'neutral';
+        return { text: body, mode: 'tone', targetTone: tone };
+      }
+      case 'translate': {
+        // /translate es:<text>
+        const m = tail.match(/^([a-z]{2}):(.+)$/);
+        if (!m) return null;
+        return { text: m[2], targetLocale: m[1] };
+      }
+      case 'extract': {
+        // /extract name:string,amount:number:<text>
+        const m = tail.match(/^([a-zA-Z_,:0-9]+):(.+)$/);
+        if (!m) return null;
+        const keys = m[1].split(',').filter(Boolean);
+        const schema: Record<string, { type: 'string' | 'number' | 'currency' | 'date' | 'boolean' | 'enum' }> = {};
+        for (const k of keys) {
+          const [name, type] = k.split(':');
+          if (!name || !type) continue;
+          if (
+            type === 'string' ||
+            type === 'number' ||
+            type === 'currency' ||
+            type === 'date' ||
+            type === 'boolean' ||
+            type === 'enum'
+          ) {
+            schema[name] = { type };
+          }
+        }
+        if (Object.keys(schema).length === 0) return null;
+        return {
+          source: { kind: 'text', text: m[2] },
+          schema,
+        };
+      }
+      case 'compare':
+        return null; // compare needs two distinct sources; defer to FE
+      case 'draft-report':
+        return { topic: tail, sources: [{ kind: 'text', text: tail }] };
+      case 'draft-email': {
+        // /draft-email alice@example.com:Confirm Tuesday:<intent>
+        const m = tail.match(/^([^@\s]+@[^@\s]+):(.+)$/);
+        if (!m) return null;
+        return {
+          source: { kind: 'text', text: '' },
+          recipient: { email: m[1] },
+          intent: m[2],
+        };
+      }
+      case 'nl-draft': {
+        // /nl-draft chat:<text>  |  /nl-draft workflow:<text>
+        const m = tail.match(/^(chat|workflow):(.+)$/s);
+        if (!m) return null;
+        return {
+          naturalLanguage: m[2] ?? '',
+          targetMode: (m[1] as 'chat' | 'workflow') ?? 'chat',
+        };
+      }
+      case 'segment': {
+        // /segment <topic>  (optional JSON sources via payload)
+        return { tenantId, topic: tail };
+      }
+      case 'campaign-brief': {
+        // /campaign-brief <topic> [tone:formal|casual|friendly|urgent|neutral] [forbidden:spam,cheap]
+        const fm = tail.match(/^([^\[]+)(?:\[tone:(\w+)\](?:\[forbidden:([^\]]+)\])?)?\s*$/);
+        if (!fm) return null;
+        return {
+          tenantId,
+          topic: fm[1]?.trim() ?? '',
+          brandVoice: fm[2] as 'formal' | 'casual' | 'friendly' | 'urgent' | 'neutral' | undefined,
+          forbiddenPhrases: fm[3]?.split(',') ?? [],
+        };
+      }
+      case 'case-resolve': {
+        // /case-resolve <caseId>: <subject>
+        const parts = tail.split(':', 2);
+        return {
+          tenantId,
+          caseId: parts[0]?.trim() ?? '',
+          subjectText: parts[1]?.trim() ?? '',
+        };
+      }
+      case 'case-response': {
+        // /case-response <caseId>: <subject>
+        const parts = tail.split(':', 2);
+        return {
+          tenantId,
+          caseId: parts[0]?.trim() ?? '',
+          subjectText: parts[1]?.trim() ?? '',
+        };
+      }
+      case 'crm-event': {
+        // /crm-event <source>:<eventType>  |  JSON payload via FE composer
+        const parts = tail.split(':', 2);
+        return {
+          tenantId,
+          source: (parts[0] ?? 'webhook') as 'hubspot' | 'salesforce' | 'webhook',
+          eventType: parts[1] ?? '',
+          payload: {},
+        };
+      }
+      case 'crm-webhook': {
+        // /crm-webhook <eventType>  (signature must be supplied by FE)
+        return {
+          tenantId,
+          eventType: tail,
+          payload: {},
+        };
+      }
+    }
+  }
+
   private handleProjectCreationConversation(
     dto: SendChatMessageDto,
     conversationId: string,

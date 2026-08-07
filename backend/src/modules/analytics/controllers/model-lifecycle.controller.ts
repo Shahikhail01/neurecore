@@ -154,4 +154,47 @@ export class ModelLifecycleController {
       },
     });
   }
+
+  // Phase 19 — CR-AI-1001 challenger compare
+  @Post(':id/compare/:challengerId')
+  @HttpCode(HttpStatus.OK)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.OWNER,
+    UserRole.SUPER_ADMIN,
+    UserRole.PLATFORM_ADMIN,
+  )
+  async compareChallenger(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('challengerId', ParseUUIDPipe) challengerId: string,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.compareChallenger({
+      tenantId: user.tenantId,
+      activeModelId: id,
+      challengerModelId: challengerId,
+    });
+  }
+
+  // Phase 19 — CR-AI-1001 rollback drill
+  @Post(':id/rollback-drill')
+  @HttpCode(HttpStatus.OK)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.OWNER,
+    UserRole.SUPER_ADMIN,
+    UserRole.PLATFORM_ADMIN,
+  )
+  async rollbackDrill(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!user.tenantId) throw new ForbiddenException('Tenant context required');
+    return this.lifecycle.runRollbackDrill({
+      tenantId: user.tenantId,
+      modelId: id,
+      actor: user.sub ?? 'unknown',
+    });
+  }
 }

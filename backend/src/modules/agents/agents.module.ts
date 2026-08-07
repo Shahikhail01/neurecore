@@ -22,6 +22,10 @@ import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { TenantTemplatesModule } from '../tenant-templates/tenant-templates.module';
 import { ChatResponseModule } from '../chat/responses/chat-response.module';
+import {
+  AgentTenantScopeGuard,
+  AGENT_TENANT_SCOPE,
+} from './agents-tenant-scope.guard';
 
 /**
  * AgentsModule
@@ -58,6 +62,8 @@ import { ChatResponseModule } from '../chat/responses/chat-response.module';
     AgentStreamingService,
     OfficialAgentGraph,
     AgentCheckpointService,
+    AgentTenantScopeGuard,
+    { provide: AGENT_TENANT_SCOPE, useExisting: AgentTenantScopeGuard },
   ],
   exports: [
     AgentsService,
@@ -69,6 +75,8 @@ import { ChatResponseModule } from '../chat/responses/chat-response.module';
     AgentStreamingService,
     OfficialAgentGraph,
     AgentCheckpointService,
+    AgentTenantScopeGuard,
+    AGENT_TENANT_SCOPE,
   ],
 })
 export class AgentsModule {}
