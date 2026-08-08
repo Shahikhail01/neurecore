@@ -305,6 +305,7 @@ function CreateProviderForm({
         <input
           type="text"
           placeholder="slug (e.g. openai-prod)"
+          aria-label="Slug"
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
           className="rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
@@ -312,12 +313,14 @@ function CreateProviderForm({
         <input
           type="text"
           placeholder="display name"
+          aria-label="Display name"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           className="rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
         />
         <select
           value={kind}
+          aria-label="Kind"
           onChange={(e) => setKind(e.target.value as LlmProviderKind)}
           className="rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
         >
@@ -330,6 +333,7 @@ function CreateProviderForm({
         <input
           type="text"
           placeholder="base URL (https://...)"
+          aria-label="Base URL"
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.target.value)}
           className="rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
@@ -337,6 +341,7 @@ function CreateProviderForm({
         <input
           type="text"
           placeholder="secret ref (env:OPENAI_API_KEY)"
+          aria-label="Secret ref"
           value={secretRef}
           onChange={(e) => setSecretRef(e.target.value)}
           className="rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white font-mono"
@@ -344,6 +349,7 @@ function CreateProviderForm({
         <input
           type="text"
           placeholder="org id (optional)"
+          aria-label="Org ID"
           value={orgId}
           onChange={(e) => setOrgId(e.target.value)}
           className="rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"

@@ -82,12 +82,14 @@ export function TeamModal({
         )}
         <div className="grid grid-cols-3 gap-2 pt-3 border-t border-surface-border">
           <input
+            aria-label="Actor ID"
             value={actorId}
             onChange={(e) => setActorId(e.target.value)}
             placeholder="actor id"
             className="col-span-3 px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"
           />
           <select
+            aria-label="Actor type"
             value={actorType}
             onChange={(e) =>
               setActorType(e.target.value as 'HUMAN' | 'AI' | 'SYSTEM')
@@ -99,6 +101,7 @@ export function TeamModal({
             <option value="SYSTEM">System</option>
           </select>
           <select
+            aria-label="Project role"
             value={role}
             onChange={(e) => setRole(e.target.value as ProjectRole)}
             className="col-span-2 px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"

@@ -148,6 +148,7 @@ export default function UsersPage() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <input
             type="search"
+            aria-label="Search users"
             placeholder="Search users…"
             value={search}
             onChange={(e) => {
@@ -158,6 +159,7 @@ export default function UsersPage() {
           />
           <input
             type="search"
+            aria-label="Filter by tenant ID"
             placeholder="Filter by tenant ID…"
             value={tenantFilter}
             onChange={(e) => {
@@ -167,6 +169,7 @@ export default function UsersPage() {
             className="rounded-lg border border-[color:var(--accent-500)]/30 bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-500)] min-w-[200px] font-mono text-xs"
           />
           <select
+            aria-label="Filter by role"
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as UserRole | '')}
             className="rounded-lg border border-[color:var(--accent-500)]/30 bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-500)]"
@@ -179,6 +182,7 @@ export default function UsersPage() {
             ))}
           </select>
           <select
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')

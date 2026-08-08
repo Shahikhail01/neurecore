@@ -1,48 +1,64 @@
-import { ICRMConnector } from '../interfaces/ICRMConnector';
-
 /**
- * SalesforceConnector
+ * LiveSalesforceConnector — Phase 27 (P27) live connector (CR-AI-1106).
  *
- * PRODUCTION-BLOCKED: PD-21 — OAuth flow is not yet implemented.
- * In production the adapter fails closed (throws). Outside production
- * (development, tests) it is a no-op so dev workflows are not broken.
- * Tracked in pending-tasks.md PD-21.
+ * Replaces the prior stub with a real Salesforce
+ * connector that exchanges OAuth tokens and queries Contacts/Leads
+ * via SOQL through the live `ISalesforceClient`.
+ *
+ * SOLID design mirrors `LiveHubSpotConnector` (SRP / OCP / LSP / DIP).
+ * Tenant isolation: rejects wildcard `*` tenantId on every call.
  */
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { ICRMConnector } from '../interfaces/ICRMConnector';
+import type { ISalesforceClient } from './live/salesforce-client';
 
-export class SalesforceConnector implements ICRMConnector {
-  name = 'salesforce';
+@Injectable()
+export class LiveSalesforceConnector implements ICRMConnector {
+  readonly name = 'salesforce';
 
-  async connect(_config: Record<string, unknown>): Promise<void> {
-    // PRODUCTION-BLOCKED: OAuth flow not implemented (PD-21)
-    // TODO: implement OAuth flow and token storage
-    if (process.env['NODE_ENV'] === 'production') {
-      throw new Error(
-        'SalesforceConnector: OAuth flow not implemented (PD-21). ' +
-          'Do not enable in production.',
+  private readonly logger = new Logger(LiveSalesforceConnector.name);
+
+  constructor(private readonly client: ISalesforceClient) {}
+
+  async connect(config: Record<string, unknown>): Promise<void> {
+    const tenantId =
+      typeof config['tenantId'] === 'string' ? config['tenantId'] : '';
+    const code = typeof config['code'] === 'string' ? config['code'] : '';
+    const redirectUri =
+      typeof config['redirectUri'] === 'string' ? config['redirectUri'] : '';
+    if (!tenantId || tenantId === '*') {
+      throw new ForbiddenException('Salesforce connect requires tenantId');
+    }
+    if (!code || !redirectUri) {
+      throw new ForbiddenException(
+        'Salesforce connect requires code and redirectUri',
       );
     }
-    return Promise.resolve();
+    await this.client.exchangeCode({ tenantId, code, redirectUri });
+    this.logger.log(`Salesforce connected tenant=${tenantId}`);
   }
 
   async disconnect(): Promise<void> {
-    return Promise.resolve();
+    // Token deletion is the caller's responsibility.
   }
 
-  async syncContacts(_tenantId: string): Promise<void> {
-    if (process.env['NODE_ENV'] === 'production') {
-      throw new Error(
-        'SalesforceConnector: not implemented in production (PD-21)',
-      );
+  async syncContacts(tenantId: string): Promise<void> {
+    if (!tenantId || tenantId === '*') {
+      throw new ForbiddenException('tenantId required');
     }
-    return Promise.resolve();
+    const contacts = await this.client.queryContacts(tenantId, 200);
+    this.logger.log(
+      `Salesforce syncContacts tenant=${tenantId} count=${contacts.length}`,
+    );
   }
 
-  async syncLeads(_tenantId: string): Promise<void> {
-    if (process.env['NODE_ENV'] === 'production') {
-      throw new Error(
-        'SalesforceConnector: not implemented in production (PD-21)',
-      );
+  async syncLeads(tenantId: string): Promise<void> {
+    if (!tenantId || tenantId === '*') {
+      throw new ForbiddenException('tenantId required');
     }
-    return Promise.resolve();
+    const leads = await this.client.queryLeads(tenantId, 200);
+    this.logger.log(
+      `Salesforce syncLeads tenant=${tenantId} count=${leads.length}`,
+    );
   }
 }

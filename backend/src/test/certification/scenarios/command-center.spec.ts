@@ -103,12 +103,12 @@ describe('P8 — Command Center (Gate P8)', () => {
       expect(s.abstentionCount).toBe(1);
     });
 
-    it('counts corrections as REJECTED + REVISION reviews', () => {
+    it('counts corrections as REJECTED + REVISION_REQUESTED reviews', () => {
       const s = computeQualitySummary(
         [],
         [
           { decision: 'REJECTED', comment: 'wrong' },
-          { decision: 'REVISION', comment: 'redo' },
+          { decision: 'REVISION_REQUESTED', comment: 'redo' },
           { decision: 'APPROVED', comment: null },
         ],
         1,

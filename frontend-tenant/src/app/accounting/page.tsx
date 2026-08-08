@@ -482,6 +482,7 @@ function ComputeTab() {
           <input
             type="number"
             step="0.001"
+            aria-label="Discount rate"
             value={rate}
             onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
             className="w-full mt-1 px-3 py-2 bg-surface-overlay border border-surface-border rounded text-sm font-mono text-zinc-100"
@@ -492,6 +493,7 @@ function ComputeTab() {
             Cashflows (comma- or space-separated)
           </label>
           <textarea
+            aria-label="Cashflows"
             value={cashflowsText}
             onChange={(e) => setCashflowsText(e.target.value)}
             rows={4}
@@ -737,6 +739,7 @@ function ReportsTab() {
             </label>
             <input
               type="date"
+              aria-label="As of date"
               value={asOf}
               onChange={(e) => setAsOf(e.target.value)}
               className="w-full mt-1 px-3 py-2 bg-surface-overlay border border-surface-border rounded text-sm font-mono text-zinc-100"

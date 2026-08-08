@@ -238,6 +238,23 @@ export class ChatService implements IChatService {
     }
   }
 
+  async createExport(input: {
+    conversationId: string;
+    format: 'json' | 'csv' | 'markdown';
+    redact: boolean;
+  }): Promise<{ exportId: string; byteSize: number; expiresAt: string; redacted: boolean }> {
+    const res = await this.apiClient.post<{
+      exportId: string;
+      byteSize: number;
+      expiresAt: string;
+      redacted: boolean;
+    }>('/chat/export', input);
+    if (!res.data) {
+      throw new Error(res.error?.message ?? 'createExport failed');
+    }
+    return res.data;
+  }
+
   async getSuggestions(_query: string, _context?: string): Promise<string[]> {
     try {
       const apiResponse = await this.apiClient.post<{ suggestions?: string[] }>('/chat/suggestions', {

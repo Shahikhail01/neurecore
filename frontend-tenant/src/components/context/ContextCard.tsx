@@ -198,6 +198,7 @@ const ContextCardComponent: FC<ContextCardProps> = ({
             {/* View Details Button */}
             {onViewDetails && (
                 <motion.button
+                    type="button"
                     whileHover={{ x: 2 }}
                     whileTap={{ x: 0 }}
                     onClick={onViewDetails}

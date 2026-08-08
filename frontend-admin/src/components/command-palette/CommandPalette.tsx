@@ -60,7 +60,7 @@ export function CommandPalette() {
           className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
         >
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/60" onClick={closePalette} />
+          <div className="absolute inset-0 bg-black/60" onClick={closePalette} role="button" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closePalette(); } }} />
 
           {/* Palette */}
           <motion.div
@@ -79,8 +79,11 @@ export function CommandPalette() {
                   autoFocus
                 />
                 <kbd
+                  role="button"
+                  tabIndex={0}
                   className="text-[10px] text-zinc-600 bg-surface-muted border border-surface-border px-1.5 py-0.5 rounded cursor-pointer"
                   onClick={closePalette}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closePalette(); } }}
                 >
                   ESC
                 </kbd>

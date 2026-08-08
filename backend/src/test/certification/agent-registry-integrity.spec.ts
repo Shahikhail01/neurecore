@@ -23,6 +23,14 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 
 const SR_ROOT = path.join(__dirname, '..', '..', 'modules', 'agent-templates');
 const INSTANCES_DIR = path.join(SR_ROOT, 'instances');
+const RUNTIME_EXECUTORS_DIR = path.join(
+  __dirname,
+  '..',
+  '..',
+  'modules',
+  'agent-runtime',
+  'executors',
+);
 
 function listAgentFiles(): string[] {
   if (!statSync(INSTANCES_DIR, { throwIfNoEntry: false })) return [];
@@ -109,6 +117,47 @@ describe('Phase 13 — AgentRegistryImplementsFlag', () => {
       const ok =
         f === 'index.ts' || /^[A-Z_]+\.agent\.ts$/.test(f);
       if (!ok) throw new Error(`${f} breaks the naming convention`);
+    }
+  });
+
+  it('Phase 23 — every OOB agent type has a runtime executor file', () => {
+    if (!statSync(RUNTIME_EXECUTORS_DIR, { throwIfNoEntry: false })) {
+      throw new Error(
+        `phase 23 runtime executors dir missing: ${RUNTIME_EXECUTORS_DIR}`,
+      );
+    }
+    const executorFiles = readdirSync(RUNTIME_EXECUTORS_DIR).filter(
+      (f) => f.endsWith('-agent.executor.ts'),
+    );
+    const types = readAllAgents()
+      .map((a) => a.type)
+      .filter((t): t is string => Boolean(t));
+    for (const type of types) {
+      const lc = type.toLowerCase();
+      const match = executorFiles.find((f) => f.startsWith(`${lc}-agent.`));
+      if (!match) {
+        throw new Error(
+          `agent type ${type} has no runtime executor under ${RUNTIME_EXECUTORS_DIR}`,
+        );
+      }
+    }
+  });
+
+  it('Phase 23 — every executor declares its agentId as a typed string literal', () => {
+    const executorFiles = readdirSync(RUNTIME_EXECUTORS_DIR).filter(
+      (f) => f.endsWith('-agent.executor.ts'),
+    );
+    for (const f of executorFiles) {
+      const content = readFileSync(
+        path.join(RUNTIME_EXECUTORS_DIR, f),
+        'utf-8',
+      );
+      const m = content.match(/agentId:\s*AgentId\s*=\s*'CR-AI-\d{4}'/);
+      if (!m) {
+        throw new Error(
+          `${f} does not declare a typed AgentId literal — violates SOLID-OCP`,
+        );
+      }
     }
   });
 });

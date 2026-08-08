@@ -71,8 +71,9 @@ export default function CostSummaryPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-zinc-400">Window:</label>
+          <label htmlFor="cost-summary-window" className="text-sm text-zinc-400">Window:</label>
           <select
+            id="cost-summary-window"
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
             className="px-2 py-1 rounded bg-surface-sunken text-sm text-zinc-100"

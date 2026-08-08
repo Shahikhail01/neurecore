@@ -184,6 +184,7 @@ export const AgentOrchestrationBoardComponent: React.FC<AgentOrchestrationBoardP
                         {filterOptions.map(option => (
                             <motion.button
                                 key={option.value}
+                                type="button"
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() =>
@@ -212,6 +213,7 @@ export const AgentOrchestrationBoardComponent: React.FC<AgentOrchestrationBoardP
                 {/* View Mode Toggle */}
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
                     <motion.button
+                        type="button"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => setViewMode('grid')}
@@ -223,6 +225,7 @@ export const AgentOrchestrationBoardComponent: React.FC<AgentOrchestrationBoardP
                         <Grid className="w-5 h-5" />
                     </motion.button>
                     <motion.button
+                        type="button"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => setViewMode('list')}

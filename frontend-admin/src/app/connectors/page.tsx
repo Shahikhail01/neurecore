@@ -49,12 +49,14 @@ export default function ConnectorsPage() {
         <div className="rounded-xl border border-surface-border bg-surface-raised p-4 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input
+              aria-label="Connector name"
               className="w-full rounded-md bg-surface px-3 py-2 text-sm border border-surface-border text-zinc-200"
               placeholder="Connector name"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
             <select
+              aria-label="Connector provider"
               className="w-full rounded-md bg-surface px-3 py-2 text-sm border border-surface-border text-zinc-200"
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
@@ -79,7 +81,7 @@ export default function ConnectorsPage() {
 
         <div className="rounded-xl border border-surface-border bg-surface-raised">
           <div className="px-4 py-3 border-b border-surface-border flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-200">Connectors</h3>
+            <h2 className="text-sm font-semibold text-zinc-200">Connectors</h2>
             <button
               className="text-xs text-zinc-400 hover:text-white"
               onClick={() => void fetchAll()}

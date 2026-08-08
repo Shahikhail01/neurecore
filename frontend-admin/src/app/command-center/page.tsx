@@ -267,6 +267,10 @@ const commandCenterAdmin: CommandCenterAdminService = {
 
 // ─── Page ─────────────────────────────────────────────────────────────────
 
+import { CostCeilingCard } from '@/components/command-center/CostCeilingCard';
+import { costCeilingClient } from '@/components/command-center/cost-ceiling.client';
+import type { CostResilienceDashboard } from '@/components/command-center/cost-ceiling.types';
+
 interface CardState<T> {
   loading: boolean;
   data: T | null;
@@ -282,6 +286,7 @@ export default function AdminCommandCenterPage() {
   const [inventory, setInventory] = useState<CardState<AdminInventoryResponse>>(INITIAL);
   const [audit, setAudit] = useState<CardState<AdminAuditCorrelation>>(INITIAL);
   const [killSwitches, setKillSwitches] = useState<CardState<AdminKillSwitchListResponse>>(INITIAL);
+  const [costCeilings, setCostCeilings] = useState<CardState<CostResilienceDashboard>>(INITIAL);
   const [toggling, setToggling] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
 
@@ -290,6 +295,7 @@ export default function AdminCommandCenterPage() {
     setInventory({ loading: true, data: null, error: null });
     setAudit({ loading: true, data: null, error: null });
     setKillSwitches({ loading: true, data: null, error: null });
+    setCostCeilings({ loading: true, data: null, error: null });
 
     const [s, inv, ac, ks] = await Promise.all([
       commandCenterAdmin.getSummary(),
@@ -301,6 +307,20 @@ export default function AdminCommandCenterPage() {
     setInventory({ loading: false, data: inv, error: null });
     setAudit({ loading: false, data: ac, error: null });
     setKillSwitches({ loading: false, data: ks, error: null });
+
+    // Phase 30 — the ceiling dashboard is best-effort: a tenant with no
+    // ceiling configured must never break the rest of the console.
+    try {
+      const ceilings = await costCeilingClient.getDashboard();
+      setCostCeilings({ loading: false, data: ceilings, error: null });
+    } catch (err: unknown) {
+      setCostCeilings({
+        loading: false,
+        data: null,
+        error:
+          err instanceof Error ? err.message : 'Failed to load cost ceilings',
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -312,6 +332,7 @@ export default function AdminCommandCenterPage() {
       setInventory(errorState);
       setAudit(errorState);
       setKillSwitches(errorState);
+      setCostCeilings(errorState);
     });
   }, [user, loadAll]);
 
@@ -412,6 +433,17 @@ export default function AdminCommandCenterPage() {
             Audit correlation
           </h2>
           <AuditCard state={audit} />
+        </section>
+
+        <section aria-labelledby="cc-admin-cost-ceiling-heading">
+          <h2 id="cc-admin-cost-ceiling-heading" className="text-sm font-semibold text-zinc-300 mb-3">
+            Cost ceilings &amp; resilience
+          </h2>
+          <CostCeilingCard
+            loading={costCeilings.loading}
+            error={costCeilings.error}
+            data={costCeilings.data}
+          />
         </section>
 
         <section aria-labelledby="cc-admin-killswitch-heading">

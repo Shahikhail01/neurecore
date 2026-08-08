@@ -25,6 +25,7 @@ export function StepDescription({ form, patch }: Props) {
           Task Title
         </label>
         <input
+          aria-label="Task title"
           value={form.title}
           onChange={(e) => patch({ title: e.target.value })}
           placeholder="e.g. Generate monthly cost report"
@@ -38,6 +39,7 @@ export function StepDescription({ form, patch }: Props) {
           Description
         </label>
         <textarea
+          aria-label="Description"
           value={form.description}
           onChange={(e) => patch({ description: e.target.value })}
           rows={4}

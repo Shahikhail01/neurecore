@@ -67,6 +67,10 @@ import { StudioModule } from './modules/studio/studio.module';
 import { AlwaysOnModule } from './modules/always-on/always-on.module';
 import { MobileCompanionModule } from './modules/mobile/mobile-companion.module';
 import { LocalizationModule } from './modules/localization/localization.module';
+// Phase 29 (CR-AI-1304) — WCAG 2.2 AA audit tooling
+import { AccessibilityModule } from './modules/accessibility/accessibility.module';
+// Phase 30 (CR-AI-1305) — resilience + per-tenant cost ceiling
+import { CostCeilingModule } from './modules/cost-ceiling/cost-ceiling.module';
 import { Phase6Module } from './modules/studio/phase6.module';
 import { Phase7Module } from './modules/service-ops/phase7.module';
 import { CodingAgentSdkBridgeModule } from './modules/coding-agent-sdk/coding-agent-sdk-bridge.module';
@@ -83,6 +87,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { ReliabilityModule } from './modules/reliability/reliability.module';
 import { AgentTemplatesModule } from './modules/agent-templates/agent-templates.module';
+import { AgentRuntimeModule } from './modules/agent-runtime/agent-runtime.module';
 import { RoutinesModule } from './modules/routines/routines.module';
 import { CostsModule } from './modules/costs/costs.module';
 import { InboxModule } from './modules/inbox/inbox.module';
@@ -255,7 +260,9 @@ import { HarnessControlModule } from './harness/phase10/harness-control.module';
     StudioModule, // Phase 5 — Business Studio no-code authoring
     AlwaysOnModule, // Phase 5 — Always-on CRM triad (Freedom UI / Productivity / Conversational)
     MobileCompanionModule, // Phase 5 — Mobile companion device registry
-    LocalizationModule, // Phase 5 — Localization (16 locales)
+    LocalizationModule, // Phase 5 — Localization (16 locales) + Phase 29 locale format policy
+    AccessibilityModule, // Phase 29 — CR-AI-1304 WCAG 2.2 AA audit engine
+    CostCeilingModule, // Phase 30 — CR-AI-1305 per-tenant cost ceiling + resilience dashboard
     Phase6Module, // Phase 6 — Studio codegen + marketplace + scheduler + SLA + service ops
     Phase7Module, // Phase 7 — Customer 360 + triage + guidance + self-service + knowledge gaps + sales extras + governance authoring + XAI
     CodingAgentSdkBridgeModule, // Phase 8 — Coding Agent SDK Bridge (Claude Code / Codex / Cursor / Continue.dev)
@@ -276,6 +283,7 @@ import { HarnessControlModule } from './harness/phase10/harness-control.module';
     // Cross-cutting
     AuditModule, // @Global — AuditService available everywhere
     AgentTemplatesModule, // Phase 2 — template library
+    AgentRuntimeModule, // Phase 23 — real agent runtime execution (CR-AI-0501..0506)
 
     // Settings — Admin configuration
     SettingsModule,

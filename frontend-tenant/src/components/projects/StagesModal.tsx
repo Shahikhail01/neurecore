@@ -78,6 +78,7 @@ export function StagesModal({
         )}
         <div className="flex gap-2 pt-3 border-t border-surface-border">
           <input
+            aria-label="New stage name"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="New stage name"

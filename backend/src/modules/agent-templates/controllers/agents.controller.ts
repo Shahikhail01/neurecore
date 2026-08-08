@@ -1,5 +1,5 @@
 /**
- * AgentsController — Phase 13 HTTP surface.
+ * AgentCatalogController — Phase 13 HTTP surface.
  *
  * Source plan: IMPLEMENTATION-PLAN-PHASE-13-14.md §3.
  *
@@ -8,10 +8,16 @@
  * `implemented` as a derived flag from the runtime registry so we
  * never advertise a skill/agent that's not actually wired.
  *
+ * The catalog surface is mounted under `/agent-catalog`, NOT `/agents`,
+ * to avoid colliding with the tenant agent management controller
+ * (`src/modules/agents/agents.controller.ts`). The management surface
+ * owns `/agents` (list/detail/pause/resume/archive…); this read-only
+ * OOB catalog is a distinct concern and gets a distinct route.
+ *
  * Routes:
- *   GET /api/v1/agents         → list
- *   GET /api/v1/agents/:id     → detail
- *   GET /api/v1/agents/:id/skills → { agentId, skills: [...] } sub-shape
+ *   GET /api/v1/agent-catalog   → list
+ *   GET /api/v1/agent-catalog/:id → detail
+ *   GET /api/v1/agent-catalog/:id/skills → { agentId, skills: [...] } sub-shape
  */
 
 import {
@@ -33,9 +39,9 @@ import {
   PHASE_13_OOB_AGENT_IDS,
 } from '../agents.registry';
 
-@Controller({ path: 'agents', version: '1' })
+@Controller({ path: 'agent-catalog', version: '1' })
 @UseGuards(JwtAuthGuard)
-export class AgentsController {
+export class AgentCatalogController {
   constructor(private readonly registry: AgentRegistry) {}
 
   /** Public listing — returns the 6 OOB agents. */

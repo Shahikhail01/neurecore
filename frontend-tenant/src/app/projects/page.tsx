@@ -107,6 +107,7 @@ export default function ProjectsPage() {
             <input
               className="w-full pl-9 pr-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"
               placeholder="Search projects by name or customer"
+              aria-label="Search projects by name or customer"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

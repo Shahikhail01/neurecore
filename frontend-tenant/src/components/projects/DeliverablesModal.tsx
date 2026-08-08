@@ -127,12 +127,14 @@ export function DeliverablesModal({
         )}
         <div className="flex flex-col gap-2 pt-3 border-t border-surface-border">
           <input
+            aria-label="Deliverable name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Deliverable name"
             className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"
           />
           <input
+            aria-label="Description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Description (optional)"

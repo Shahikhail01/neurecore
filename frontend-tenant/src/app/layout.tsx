@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/shared/components/ThemeProvider';
 import { ServiceWorkerRegistrar } from '@/shared/components/ServiceWorkerRegistrar';
 import { AuthProvider } from '@/auth';
 import { PageContextProvider } from '@/shared/contexts/page-context';
+import { MobileProvider } from '@/shared/mobile';
 
 export const metadata: Metadata = {
   title: 'NeureCore — Tenant Portal',
@@ -46,7 +47,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ThemeProvider />
             <AppInitializer />
             <ServiceWorkerRegistrar />
-            {children}
+            <MobileProvider>
+              {children}
+            </MobileProvider>
           </PageContextProvider>
         </AuthProvider>
       </body>

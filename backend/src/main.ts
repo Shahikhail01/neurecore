@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { AppModule } from './app.module';
 import { initTracing } from './infrastructure/tracing/tracing';
 import { MetricsService } from './modules/metrics/metrics.service';
+import { SharedSocketIoAdapter } from './common/socket/shared-socket-io-adapter';
 
 // Initialise tracing before the app bootstraps.
 void initTracing();
@@ -21,13 +22,10 @@ void initTracing();
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log', 'debug'],
-    // FIX D12.2 — disable Nest's auto body-parser so we can mount our own
-    // FIRST in the middleware chain. Observed: with Nest defaults, controllers
-    // imported via `forwardRef(AgentsModule)` could receive `req.body = undefined`,
-    // breaking @Body() binding in PackagesModule routes
-    // (`POST /api/v1/packages/deploy`, `POST /api/v1/departments`).
     bodyParser: false,
   });
+
+  app.useWebSocketAdapter(new SharedSocketIoAdapter(app));
 
   const config = app.get(ConfigService);
 

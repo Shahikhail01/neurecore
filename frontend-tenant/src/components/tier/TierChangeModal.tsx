@@ -147,6 +147,9 @@ export function TierChangeModal({ open, onClose, currentTier }: TierChangeModalP
             className="absolute inset-0 bg-black/60"
             onClick={onClose}
             data-testid="tier-change-modal-backdrop"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(); } }}
           />
 
           <motion.div

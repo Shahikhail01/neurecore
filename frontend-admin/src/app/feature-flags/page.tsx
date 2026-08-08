@@ -300,8 +300,9 @@ export default function FeatureFlagsAdminPage() {
 
         <section className="rounded-xl border border-surface-border bg-surface-raised p-5 space-y-4">
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Tenant</label>
+            <label htmlFor="ff-tenant-select" className="text-xs text-zinc-400 mb-1 block">Tenant</label>
             <select
+              id="ff-tenant-select"
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value)}
               className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"

@@ -47,6 +47,7 @@ export function useChat(
 
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
+  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendMessageRef = useRef<((content: string) => Promise<void>) | null>(null);
   const storedEnvelopeRef = useRef<Envelope | undefined>(undefined);
 
@@ -59,6 +60,11 @@ export function useChat(
 
       if (abortRef.current) {
         abortRef.current();
+        abortRef.current = null;
+      }
+      if (safetyTimerRef.current) {
+        clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
       }
 
       const userMsg: ChatMessage = {
@@ -116,6 +122,10 @@ export function useChat(
       const accumulatedContent: string[] = [];
       storedEnvelopeRef.current = undefined;
 
+      safetyTimerRef.current = setTimeout(() => {
+        setSending(false);
+      }, 90_000);
+
       const cleanup = chatService.sendMessageStream(
         {
           message: content.trim(),
@@ -156,6 +166,10 @@ export function useChat(
           setError(errorMessage ?? 'Sorry, something went wrong. Please try again.');
         },
         () => {
+          if (safetyTimerRef.current) {
+            clearTimeout(safetyTimerRef.current);
+            safetyTimerRef.current = null;
+          }
           setSending(false);
         },
         (envelope) => {
@@ -172,7 +186,13 @@ export function useChat(
         },
       );
 
-      abortRef.current = cleanup ?? null;
+      abortRef.current = () => {
+        if (safetyTimerRef.current) {
+          clearTimeout(safetyTimerRef.current);
+          safetyTimerRef.current = null;
+        }
+        cleanup?.();
+      };
     },
     [
       chatService,

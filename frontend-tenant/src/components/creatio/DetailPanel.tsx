@@ -66,6 +66,9 @@ export function DetailPanel({
             transition={{ duration: 0.2 }}
             className="fixed inset-0 bg-black/40 z-40"
             onClick={onClose}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(); } }}
           />
 
           {/* Panel */}

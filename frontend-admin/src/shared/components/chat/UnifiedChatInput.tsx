@@ -91,6 +91,7 @@ export function UnifiedChatInput({
 
       <div className="flex gap-2 items-end border-t border-surface-border p-3">
         <textarea
+          aria-label="Chat message"
           rows={1}
           value={value}
           onChange={(e) => handleChange(e.target.value)}

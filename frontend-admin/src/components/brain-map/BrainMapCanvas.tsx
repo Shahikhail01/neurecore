@@ -164,11 +164,14 @@ function AgentNode({ node, hovered, animState, onHover, onLeave, onClick }: Agen
 
   return (
     <g
+      role="button"
+      tabIndex={0}
       transform={`translate(${node.x},${node.y})`}
       style={{ cursor: 'pointer' }}
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
     >
       {/* Error glow */}
       {isError && (

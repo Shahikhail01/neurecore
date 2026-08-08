@@ -35,10 +35,17 @@ import { UnifiedChatPanel } from '@/shared/components/chat/UnifiedChatPanel';
 import { chatService, slashCommands, jsonExtractor, envelopeParser, tenantChatConfig } from '@/core/services/chat/chat.factory';
 import { ThingsToDoPanel } from '@/components/checklist/ThingsToDoPanel';
 import { MobileNav } from '@/components/layout/MobileNav';
+import { MobileNav as GatedMobileNav, type MobileNavItem } from '@/shared/mobile/mobile-nav';
+import { useMobileActionGate } from '@/shared/mobile/mobile-provider';
 import { useActivityStream } from '@/hooks/useActivityStream';
 import { registerTenantCommands } from '@/services/register-commands';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { useTenantStore } from '@/stores/tenantStore';
+import { SkipLink } from '@/shared/a11y/SkipLink';
+import { MAIN_CONTENT_ID } from '@/shared/a11y/landmarks';
+import { AnnouncerProvider } from '@/shared/a11y/Announcer';
+import { LocaleProvider } from '@/shared/i18n/LocaleProvider';
+import { useLocalePreferences } from '@/shared/i18n/useLocalePreferences';
 
 export default function TenantShell({
   user,
@@ -57,6 +64,7 @@ export default function TenantShell({
   const industry = useTenantStore((s) => s.industry);
   const tenantLoading = useTenantStore((s) => s.loading);
   const tenantError = useTenantStore((s) => s.error);
+  const localePreferences = useLocalePreferences();
 
   useActivityStream();
 
@@ -91,7 +99,10 @@ export default function TenantShell({
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen overflow-hidden bg-surface text-zinc-100">
+      <LocaleProvider preferences={localePreferences}>
+        <AnnouncerProvider>
+          <SkipLink />
+          <div className="flex h-screen overflow-hidden bg-surface text-zinc-100">
         {/* Desktop: persistent IconRail. h-full lets the rail stretch the
             full viewport height so the inner <nav> can scroll independently. */}
         <div className="hidden md:block shrink-0 h-full">
@@ -100,6 +111,14 @@ export default function TenantShell({
 
         {/* Mobile: drawer with the same IconRail. */}
         <MobileNav open={mobileNavOpen} onClose={() => setMobileNavOpen(false)}>
+          <div className="p-4 border-b border-surface-border">
+            <span className="text-xs font-bold tracking-widest text-accent-500 uppercase">
+              Quick actions
+            </span>
+            <div className="mt-2">
+              <MobileActionsNav />
+            </div>
+          </div>
           {isTenantReady ? <IconRail /> : <RailSkeleton />}
         </MobileNav>
 
@@ -112,7 +131,11 @@ export default function TenantShell({
             onLogout={handleLogout}
           />
 
-          <main className="flex-1 overflow-auto px-3 py-4 md:p-6">
+          <main
+            id={MAIN_CONTENT_ID}
+            tabIndex={-1}
+            className="flex-1 overflow-auto px-3 py-4 md:p-6"
+          >
             {children}
           </main>
 
@@ -135,7 +158,9 @@ export default function TenantShell({
           envelopeParser={envelopeParser}
           config={tenantChatConfig}
         />
-      </div>
+          </div>
+        </AnnouncerProvider>
+      </LocaleProvider>
     </ErrorBoundary>
   );
 }
@@ -166,4 +191,31 @@ function RailSkeleton() {
       </div>
     </div>
   );
+}
+
+/**
+ * MobileActionsNav — Phase 28 (P28) — CR-AI-1107.
+ *
+ * Real UI surface that exercises the `MobileActionGate`: renders the
+ * matrix-declared actions, filtered by the current viewport. Actions
+ * the matrix blocks on mobile are hidden automatically by the gate
+ * (e.g. `view-forecast` is desktop-only). This is the first app
+ * surface to consume the gate, closing the "gate never used in real
+ * UI" gap.
+ *
+ * SRP — render only; the gate decides what is allowed.
+ */
+const MOBILE_ACTION_ITEMS: ReadonlyArray<MobileNavItem> = [
+  { action: 'view-customer', label: 'Customers', href: '/customers' },
+  { action: 'access-meetings', label: 'Meetings', href: '/meetings' },
+  { action: 'manage-tasks', label: 'Tasks', href: '/tasks' },
+  { action: 'view-forecast', label: 'Forecast', href: '/deals' },
+];
+
+function MobileActionsNav() {
+  const gate = useMobileActionGate();
+  const items = MOBILE_ACTION_ITEMS.filter((item) =>
+    gate.isAllowed(item.action),
+  );
+  return <GatedMobileNav items={items} />;
 }

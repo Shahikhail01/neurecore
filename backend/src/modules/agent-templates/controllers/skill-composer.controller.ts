@@ -18,10 +18,13 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -38,6 +41,16 @@ import {
 } from '../services/nl-draft.service';
 import { SkillSimulationService } from '../services/skill-simulation.service';
 import { SkillVersionDiffService } from '../services/skill-version-diff.service';
+import {
+  SKILL_GRAPH_REPOSITORY,
+  type ISkillGraphRepository,
+} from '../services/skill-graph.repository';
+import {
+  SKILL_PREVIEW_SERVICE,
+  type ISkillPreviewService,
+} from '../services/skill-preview.service';
+import { type SkillId } from '../../skill-registry/interfaces/skill.interface';
+import type { TenantContext } from '@/common/context/tenant-context';
 import { SkillGraph } from '../schemas/skill-graph.schema';
 
 interface ValidateBody {
@@ -82,6 +95,10 @@ export class SkillComposerController {
     private readonly nlDraft: NlDraftService,
     private readonly simulation: SkillSimulationService,
     private readonly diff: SkillVersionDiffService,
+    @Inject(SKILL_GRAPH_REPOSITORY)
+    private readonly repository: ISkillGraphRepository,
+    @Inject(SKILL_PREVIEW_SERVICE)
+    private readonly preview: ISkillPreviewService,
   ) {}
 
   @Post('validate')
@@ -204,6 +221,107 @@ export class SkillComposerController {
       kind: 'deterministic',
       instance: new DeterministicDraftSynthesizer(),
     };
+  }
+
+  /**
+   * P24 — list saved draft graphs (tenant-scoped). Newest first.
+   */
+  @Get('graphs')
+  @HttpCode(HttpStatus.OK)
+  async listGraphs(@CurrentUser() user: JwtPayload) {
+    this.requireTenant(user);
+    return this.repository.list(user.tenantId!);
+  }
+
+  /**
+   * P24 — persist a validated draft graph. The graph MUST validate
+   * first; the orchestrator runs R1..R10 before writing.
+   */
+  @Post('graphs')
+  @HttpCode(HttpStatus.OK)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.OWNER,
+    UserRole.SUPER_ADMIN,
+    UserRole.PLATFORM_ADMIN,
+  )
+  async saveGraph(
+    @Body() body: { name: string; graph: SkillGraph },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.requireTenant(user);
+    if (!body.name || body.name.trim().length === 0) {
+      throw new BadRequestException('name is required');
+    }
+    const validation = this.graphs.validate(body.graph, false);
+    if (!validation.ok) {
+      throw new BadRequestException({
+        code: 'SKILL_GRAPH_INVALID',
+        issues: validation.issues,
+      });
+    }
+    return this.repository.save({
+      tenantId: user.tenantId!,
+      name: body.name.trim(),
+      graph: body.graph,
+      createdById: user.sub,
+    });
+  }
+
+  /**
+   * P24 — load a saved graph by id (tenant-scoped).
+   */
+  @Get('graphs/:id')
+  async loadGraph(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.requireTenant(user);
+    const row = await this.repository.load(user.tenantId!, id);
+    if (!row) throw new NotFoundException('graph not found');
+    return row;
+  }
+
+  /**
+   * P24 — delete a saved draft graph (tenant-scoped).
+   */
+  @Delete('graphs/:id')
+  @HttpCode(HttpStatus.OK)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.OWNER,
+    UserRole.SUPER_ADMIN,
+    UserRole.PLATFORM_ADMIN,
+  )
+  async deleteGraph(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.requireTenant(user);
+    const deleted = await this.repository.remove(user.tenantId!, id);
+    return { id, deleted };
+  }
+
+  /**
+   * P24 — non-mutating preview of a skill against arbitrary input.
+   * Returns the registry's typed result with `nonMutating: true`.
+   * Used by the composer's live node-preview panel.
+   */
+  @Post('skills/:skillId/preview')
+  @HttpCode(HttpStatus.OK)
+  async previewSkill(
+    @Param('skillId') skillId: string,
+    @Body() body: { input: unknown },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.requireTenant(user);
+    const ctx: TenantContext = {
+      tenantId: user.tenantId!,
+      isCrossTenant: false,
+      actorUserId: user.sub,
+      actorRole: user.role as never,
+    };
+    return this.preview.preview(skillId as SkillId, body.input, ctx);
   }
 
   @Get(':draftId')

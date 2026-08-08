@@ -183,19 +183,12 @@ function OverviewTab() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [costRes, budgetRes] = await Promise.all([
-        fetch('/api/v1/costs/summary', { credentials: 'include' }),
-        fetch('/api/v1/costs/budgets', { credentials: 'include' }),
+      const [costData, budgetData] = await Promise.all([
+        financeService.getCostSummary(),
+        financeService.getBudgets(),
       ]);
-      if (costRes.ok) {
-        const data = await costRes.json();
-        setCosts(data?.data ?? null);
-      }
-      if (budgetRes.ok) {
-        const data = await budgetRes.json();
-        const list = Array.isArray(data?.data) ? data.data : [];
-        setBudgets(list);
-      }
+      setCosts(costData);
+      setBudgets(budgetData as unknown as BudgetPolicy[]);
     } catch {
       // ignore
     } finally {
@@ -590,22 +583,12 @@ function BudgetsTab() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const token = null;
-      const headers: Record<string, string> = { 'X-Requested-With': 'fetch' };
-
-      const [budgetRes, incidentRes] = await Promise.all([
-        fetch('/api/v1/costs/budgets', { headers }),
-        fetch('/api/v1/costs/incidents', { headers }),
+      const [budgetData, incidentData] = await Promise.all([
+        financeService.getBudgets(),
+        financeService.getCostIncidents(),
       ]);
-
-      if (budgetRes.ok) {
-        const data = await budgetRes.json();
-        setBudgets(Array.isArray(data?.data) ? data.data : []);
-      }
-      if (incidentRes.ok) {
-        const data = await incidentRes.json();
-        setIncidents(Array.isArray(data?.data) ? data.data : []);
-      }
+      setBudgets(budgetData as unknown as BudgetPolicy[]);
+      setIncidents(incidentData as unknown as BudgetIncident[]);
     } catch {
       // ignore
     } finally {

@@ -35,6 +35,7 @@ export function StageEditor({
     <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-overlay p-2">
       <span className="text-[10px] text-zinc-600 w-4">{index + 1}.</span>
       <input
+        aria-label="Stage name"
         value={stage.name}
         onChange={(e) => onChange({ name: e.target.value })}
         placeholder="Stage name"
@@ -42,6 +43,7 @@ export function StageEditor({
         className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
       />
       <input
+        aria-label="Default duration days"
         type="number"
         value={stage.defaultDurationDays || ''}
         onChange={(e) =>

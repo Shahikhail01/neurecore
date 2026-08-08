@@ -147,14 +147,22 @@ const PRIORITY_COLOR: Record<string, string> = {
 export default function ServiceDeskPage() {
   const user = useTenantAuth();
 
-  const [activeTab, setActiveTab] = useState<ServiceDeskTab>('inbox');
+  const [activeTab, setActiveTab] = useState<ServiceDeskTab>(() => {
+    if (typeof window === 'undefined') return 'inbox';
+    const t = new URL(window.location.href).searchParams.get('tab') as ServiceDeskTab | null;
+    return (t && TABS.find((tab) => tab.id === t)) ? t : 'inbox';
+  });
 
-  // Read tab from URL
+  // Sync tab to URL on change (no init effect — state is already correct)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const t = new URL(window.location.href).searchParams.get('tab') as ServiceDeskTab | null;
-    if (t && TABS.find((tab) => tab.id === t)) setActiveTab(t);
-  }, []);
+    const current = new URL(window.location.href).searchParams.get('tab') as ServiceDeskTab | null;
+    if (current !== activeTab) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', activeTab);
+      window.history.replaceState(null, '', url.toString());
+    }
+  }, [activeTab]);
 
   const setTab = (t: ServiceDeskTab) => {
     setActiveTab(t);
@@ -323,6 +331,7 @@ function InboxTab() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search inbox…"
+            aria-label="Search inbox"
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-accent-500"
           />
         </div>
@@ -368,6 +377,9 @@ function InboxTab() {
               <div
                 key={item.id}
                 onClick={() => item.status === 'UNREAD' && markRead(item.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (item.status === 'UNREAD') markRead(item.id); } }}
+                role="button"
+                tabIndex={0}
                 className={`flex items-start gap-3 p-4 hover:bg-surface-overlay cursor-pointer transition ${
                   item.status === 'UNREAD' ? 'bg-accent-500/[0.03]' : ''
                 }`}
@@ -646,7 +658,7 @@ function ApprovalDetailModal({
         <div className="flex items-start justify-between gap-4 border-b border-surface-border px-5 py-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-zinc-500">Approval details</p>
-            <h3 className="text-lg font-semibold text-zinc-100 mt-1">{approval.title}</h3>
+            <h2 className="text-lg font-semibold text-zinc-100 mt-1">{approval.title}</h2>
           </div>
           <button onClick={onClose} className="rounded-md p-2 text-zinc-500 hover:bg-surface-overlay hover:text-zinc-100">
             <X className="h-4 w-4" />
@@ -721,9 +733,11 @@ function RejectApprovalModal({
             Add a rejection reason so the requester and audit trail have clear context.
           </p>
           <textarea
+            id="reject-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={4}
+            aria-label="Rejection reason"
             className="w-full rounded-xl border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-accent-500"
             placeholder="Explain why this approval should be rejected..."
           />
@@ -790,6 +804,7 @@ function AuditTab() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search audit log by action, entity, or actor…"
+            aria-label="Search audit log"
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-accent-500"
           />
         </div>

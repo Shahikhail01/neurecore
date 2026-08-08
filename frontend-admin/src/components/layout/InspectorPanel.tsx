@@ -32,11 +32,14 @@ export function InspectorPanel() {
         <>
           {/* Backdrop */}
           <motion.div
+            role="button"
+            tabIndex={-1}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/40 z-30"
             onClick={closeInspector}
+            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeInspector(); } }}
           />
           {/* Panel */}
           <motion.aside

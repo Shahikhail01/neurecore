@@ -22,6 +22,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Bell,
@@ -67,6 +68,7 @@ export function TopBar({ title, departmentName, onMobileNavToggle, user: userPro
   const { openPalette } = useCommandStore();
   const { events } = useActivityStore();
   const { theme, setTheme } = useUIPreferencesStore();
+  const router = useRouter();
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   // Phase 6 — tier badge + change-modal state. We resolve the tenant's
   // current tier via tenantsService.getCurrent() (which exposes tierId)
@@ -148,7 +150,10 @@ export function TopBar({ title, departmentName, onMobileNavToggle, user: userPro
 
         {/* ── Right: tier badge (Phase 6) ────────────────────── */}
         {currentTier && (
-          <TierBadge tier={currentTier} onClick={() => setTierModalOpen(true)} />
+          <>
+            <TierBadge tier={currentTier} onClick={() => setTierModalOpen(true)} />
+            <div className="w-px h-6 bg-surface-border mx-1" aria-hidden="true" />
+          </>
         )}
 
         {/* ── Right: secondary icons ──────────────────────────── */}
@@ -180,6 +185,7 @@ export function TopBar({ title, departmentName, onMobileNavToggle, user: userPro
 
         {/* ── Notifications ─────────────────────────────────────── */}
         <button
+          onClick={() => router.push('/service-desk?tab=inbox')}
           className="relative w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-surface-overlay transition"
           title="Notifications"
           aria-label="Notifications"
@@ -225,6 +231,9 @@ export function TopBar({ title, departmentName, onMobileNavToggle, user: userPro
                 <div
                   className="fixed inset-0 z-30"
                   onClick={() => setAvatarMenuOpen(false)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAvatarMenuOpen(false); } }}
                 />
                 <div className="absolute right-0 top-full mt-1 w-56 card-surface border border-surface-border shadow-creatio-md py-1 z-40">
                   <div className="px-3 py-2 border-b border-surface-border">

@@ -132,6 +132,7 @@ export const TimelineFilter: FC<TimelineFilterProps> = ({
                     return (
                         <motion.button
                             key={option.value}
+                            type="button"
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => handleFilterChange(option.value)}
@@ -142,7 +143,6 @@ export const TimelineFilter: FC<TimelineFilterProps> = ({
                                     ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-sm'
                                     : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300',
                             )}
-                            type="button"
                             aria-pressed={isActive}
                             title={option.description}
                         >
@@ -183,11 +183,11 @@ export const TimelineFilter: FC<TimelineFilterProps> = ({
                         />
                         {searchTerm && (
                             <motion.button
+                                type="button"
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 onClick={handleSearchClear}
                                 className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
-                                type="button"
                                 aria-label="Clear search"
                             >
                                 <X className="w-4 h-4 text-gray-500" />

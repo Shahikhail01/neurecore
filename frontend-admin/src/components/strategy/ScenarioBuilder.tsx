@@ -85,10 +85,11 @@ export function ScenarioBuilder({ onRun, loading }: Props) {
     <div className="flex flex-col gap-5">
       {/* Scenario name */}
       <div>
-        <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
+        <label htmlFor="scenario-name" className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
           Scenario Name
         </label>
         <input
+          id="scenario-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="mt-1.5 w-full bg-surface-overlay border border-surface-border rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[color:var(--accent-500)] transition"
@@ -99,14 +100,15 @@ export function ScenarioBuilder({ onRun, loading }: Props) {
       {SLIDERS.map(({ key, label, min, max, step, format }) => (
         <div key={key}>
           <div className="flex justify-between mb-1.5">
-            <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
+            <label htmlFor={`scenario-slider-${key}`} className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
               {label}
-            </span>
+            </label>
             <span className={`text-xs font-mono font-semibold ${accentClass(params[key], key === 'automationSavings' ? 0 : -1)}`}>
               {format(params[key])}
             </span>
           </div>
           <input
+            id={`scenario-slider-${key}`}
             type="range"
             min={min}
             max={max}

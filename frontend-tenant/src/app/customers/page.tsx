@@ -23,6 +23,7 @@ export default function CustomersPage() {
   const [items, setItems] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ACTIVE');
   // Phase 4 — F&C discriminator filter. When the tenant's industry is
@@ -57,13 +58,11 @@ export default function CustomersPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const { items, total } = await customersService.list({
         search: search || undefined,
         status: statusFilter || undefined,
-        // Phase 4 G4 — pass financialSubType only when set + when tenant
-        // is in the F&C group (defence-in-depth: BE would ignore the
-        // value for non-F&C tenants anyway, but FE should not send it).
         ...(isFinancialTenant && financialSubTypeFilter
           ? { financialSubType: financialSubTypeFilter as 'BANKING' }
           : {}),
@@ -77,6 +76,7 @@ export default function CustomersPage() {
     } catch {
       setItems([]);
       setTotal(0);
+      setError('Failed to load customers. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -197,6 +197,7 @@ export default function CustomersPage() {
       accessor: (c) => (
         <div
           className="flex justify-end gap-1"
+          role="presentation"
           onClick={(e) => e.stopPropagation()}
         >
           <span title="AI: summarize / 360 view">
@@ -262,6 +263,7 @@ export default function CustomersPage() {
               <input
                 className="w-full pl-9 pr-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"
                 placeholder="Search by name, industry, or email"
+                aria-label="Search customers by name, industry, or email"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -272,6 +274,7 @@ export default function CustomersPage() {
             <select
               className="px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"
               value={statusFilter}
+              aria-label="Filter customers by status"
               onChange={(e) => {
                 setStatusFilter(e.target.value);
                 setPage(1);
@@ -304,6 +307,7 @@ export default function CustomersPage() {
             <select
               className="px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"
               value={pageSize}
+              aria-label="Customers per page"
               onChange={(e) => {
                 setPageSize(Number(e.target.value));
                 setPage(1);
@@ -317,6 +321,7 @@ export default function CustomersPage() {
             <select
               className="px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"
               value={sortKey}
+              aria-label="Sort customers"
               onChange={(e) => {
                 setSortKey(e.target.value as typeof sortKey);
                 setPage(1);
@@ -359,14 +364,22 @@ export default function CustomersPage() {
             }}
             renderEmpty={() => (
               <div className="p-12 text-center text-sm text-zinc-500">
-                No customers yet.{' '}
-                <button
-                  className="text-primary hover:underline"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  Create the first one
-                </button>
-                .
+                {error ? (
+                  <span className="text-state-danger">{error}</span>
+                ) : statusFilter && total === 0 ? (
+                  <>No customers found with status &ldquo;{statusFilter}&rdquo;. Try a different filter.</>
+                ) : (
+                  <>
+                    No customers yet.{' '}
+                    <button
+                      className="text-primary hover:underline"
+                      onClick={() => setCreateOpen(true)}
+                    >
+                      Create the first one
+                    </button>
+                    .
+                  </>
+                )}
               </div>
             )}
           />

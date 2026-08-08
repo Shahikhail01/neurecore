@@ -29,6 +29,7 @@ export function StepParameters({ form, patch }: Props) {
         </label>
         <input
           type="datetime-local"
+          aria-label="Deadline"
           value={form.deadline}
           onChange={(e) => patch({ deadline: e.target.value })}
           className="w-full bg-surface-overlay border border-surface-border rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-violet-500 transition"
@@ -45,6 +46,7 @@ export function StepParameters({ form, patch }: Props) {
         </div>
         <input
           type="range"
+          aria-label="Max retries"
           min={0}
           max={10}
           step={1}
@@ -65,6 +67,7 @@ export function StepParameters({ form, patch }: Props) {
         </label>
         <div className="flex gap-2">
           <input
+            aria-label="Add tag"
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addTag()}

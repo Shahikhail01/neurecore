@@ -122,6 +122,9 @@ export function DailyBriefingModal({ isOpen, onClose }: DailyBriefingModalProps)
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(); } }}
           />
 
           {/* Panel */}

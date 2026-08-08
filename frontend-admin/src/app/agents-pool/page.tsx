@@ -638,18 +638,21 @@ function AgentSandboxModal({
     : null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
       <motion.div
-        initial={{ scale: 0.96, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }}
-        className="w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl border border-surface-border bg-surface-raised p-6 shadow-2xl"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        role="button"
+        tabIndex={0}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+        onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } }}
+      >
+        <motion.div
+          initial={{ scale: 0.96, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.96, opacity: 0 }}
+          className="w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl border border-surface-border bg-surface-raised p-6 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
@@ -670,8 +673,9 @@ function AgentSandboxModal({
           <div className="space-y-4">
             <div className="rounded-xl border border-surface-border bg-surface-overlay/40 p-4 space-y-3">
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Prompt preset</label>
+                <label htmlFor="sandbox-prompt-preset" className="text-xs text-zinc-400 mb-1 block">Prompt preset</label>
                 <select
+                  id="sandbox-prompt-preset"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)] mb-3"
@@ -682,8 +686,9 @@ function AgentSandboxModal({
                     </option>
                   ))}
                 </select>
-                <label className="text-xs text-zinc-400 mb-1 block">Prompt</label>
+                <label htmlFor="sandbox-prompt" className="text-xs text-zinc-400 mb-1 block">Prompt</label>
                 <textarea
+                  id="sandbox-prompt"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   rows={8}
@@ -691,8 +696,9 @@ function AgentSandboxModal({
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Model override</label>
+                <label htmlFor="sandbox-model-override" className="text-xs text-zinc-400 mb-1 block">Model override</label>
                 <input
+                  id="sandbox-model-override"
                   value={modelOverride}
                   onChange={(e) => setModelOverride(e.target.value)}
                   placeholder={target.model}
@@ -700,8 +706,9 @@ function AgentSandboxModal({
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Extra knowledge sources</label>
+                <label htmlFor="sandbox-knowledge" className="text-xs text-zinc-400 mb-1 block">Extra knowledge sources</label>
                 <textarea
+                  id="sandbox-knowledge"
                   value={knowledgeText}
                   onChange={(e) => setKnowledgeText(e.target.value)}
                   rows={4}
@@ -840,6 +847,7 @@ function AgentSandboxModal({
               <h3 className="text-sm font-semibold text-zinc-100 mb-3">Compare runs</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <select
+                  aria-label="Select baseline run"
                   value={compareLeftId}
                   onChange={(e) => setCompareLeftId(e.target.value)}
                   className="rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm"
@@ -852,6 +860,7 @@ function AgentSandboxModal({
                   ))}
                 </select>
                 <select
+                  aria-label="Select comparison run"
                   value={compareRightId}
                   onChange={(e) => setCompareRightId(e.target.value)}
                   className="rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm"
@@ -1069,18 +1078,21 @@ function AgentPoolFormModal({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
       <motion.div
-        initial={{ scale: 0.96, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }}
-        className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border border-surface-border bg-surface-raised p-6 shadow-2xl"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        role="button"
+        tabIndex={0}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+        onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } }}
+      >
+        <motion.div
+          initial={{ scale: 0.96, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.96, opacity: 0 }}
+          className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border border-surface-border bg-surface-raised p-6 shadow-2xl"
       >
         <h2 className="text-base font-semibold text-zinc-100 mb-5">
           {target ? `Edit: ${target.name}` : 'Create Agent Template'}
@@ -1107,17 +1119,18 @@ function AgentPoolFormModal({
               <h3 className="text-xs uppercase tracking-wider text-zinc-500">Identity</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Name *</label>
+                  <label htmlFor="agent-name" className="text-xs text-zinc-400 mb-1 block">Name *</label>
                   <input
+                    id="agent-name"
                     value={(form as AgentTemplate).name}
                     onChange={(e) => setForm((f) => ({ ...(f as object), name: e.target.value } as AgentTemplate))}
                     className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Type</label>
+                  <label htmlFor="agent-type" className="text-xs text-zinc-400 mb-1 block">Type</label>
                   <select
-                    value={(form as AgentTemplate).type}
+                    id="agent-type"
                     onChange={(e) =>
                       setForm((f) => ({ ...(f as object), type: e.target.value } as AgentTemplate))
                     }
@@ -1133,8 +1146,9 @@ function AgentPoolFormModal({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Model</label>
+                  <label htmlFor="agent-model" className="text-xs text-zinc-400 mb-1 block">Model</label>
                   <input
+                    id="agent-model"
                     value={(form as AgentTemplate).model ?? ''}
                     onChange={(e) =>
                       setForm((f) => ({ ...(f as object), model: e.target.value } as AgentTemplate))
@@ -1144,8 +1158,9 @@ function AgentPoolFormModal({
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Version</label>
+                  <label htmlFor="agent-version" className="text-xs text-zinc-400 mb-1 block">Version</label>
                   <input
+                    id="agent-version"
                     value={(form as AgentTemplate).version ?? ''}
                     onChange={(e) =>
                       setForm((f) => ({ ...(f as object), version: e.target.value } as AgentTemplate))
@@ -1156,8 +1171,9 @@ function AgentPoolFormModal({
                 </div>
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Description</label>
+                <label htmlFor="agent-description" className="text-xs text-zinc-400 mb-1 block">Description</label>
                 <textarea
+                  id="agent-description"
                   value={(form as AgentTemplate).description ?? ''}
                   onChange={(e) =>
                     setForm((f) => ({ ...(f as object), description: e.target.value } as AgentTemplate))
@@ -1167,8 +1183,9 @@ function AgentPoolFormModal({
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Tags (one per line)</label>
+                <label htmlFor="agent-tags" className="text-xs text-zinc-400 mb-1 block">Tags (one per line)</label>
                 <textarea
+                  id="agent-tags"
                   value={tagsText}
                   onChange={(e) => {
                     setTagsText(e.target.value);
@@ -1186,8 +1203,9 @@ function AgentPoolFormModal({
             <section className="space-y-3">
               <h3 className="text-xs uppercase tracking-wider text-zinc-500">Behavior</h3>
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">System Prompt</label>
+                <label htmlFor="agent-system-prompt" className="text-xs text-zinc-400 mb-1 block">System Prompt</label>
                 <textarea
+                  id="agent-system-prompt"
                   value={(form as AgentTemplate).systemPrompt ?? ''}
                   onChange={(e) =>
                     setForm((f) => ({ ...(f as object), systemPrompt: e.target.value } as AgentTemplate))
@@ -1197,8 +1215,9 @@ function AgentPoolFormModal({
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Instructions (optional)</label>
+                <label htmlFor="agent-instructions" className="text-xs text-zinc-400 mb-1 block">Instructions (optional)</label>
                 <textarea
+                  id="agent-instructions"
                   value={(form as AgentTemplate).instructions ?? ''}
                   onChange={(e) =>
                     setForm((f) => ({ ...(f as object), instructions: e.target.value } as AgentTemplate))
@@ -1209,8 +1228,9 @@ function AgentPoolFormModal({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Memory policy</label>
+                  <label htmlFor="agent-memory-policy" className="text-xs text-zinc-400 mb-1 block">Memory policy</label>
                   <select
+                    id="agent-memory-policy"
                     value={structuredConfig.memoryPolicy}
                     onChange={(e) => updateStructuredConfig('memoryPolicy', e.target.value as MemoryPolicy)}
                     className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
@@ -1223,8 +1243,9 @@ function AgentPoolFormModal({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Escalation mode</label>
+                  <label htmlFor="agent-escalation-mode" className="text-xs text-zinc-400 mb-1 block">Escalation mode</label>
                   <select
+                    id="agent-escalation-mode"
                     value={structuredConfig.escalationMode}
                     onChange={(e) => updateStructuredConfig('escalationMode', e.target.value as EscalationMode)}
                     className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
@@ -1237,8 +1258,9 @@ function AgentPoolFormModal({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Max actions / run</label>
+                  <label htmlFor="agent-max-actions" className="text-xs text-zinc-400 mb-1 block">Max actions / run</label>
                   <input
+                    id="agent-max-actions"
                     type="number"
                     min={1}
                     max={100}
@@ -1255,8 +1277,9 @@ function AgentPoolFormModal({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Channels (one per line)</label>
+                  <label htmlFor="agent-channels" className="text-xs text-zinc-400 mb-1 block">Channels (one per line)</label>
                   <textarea
+                    id="agent-channels"
                     value={channelsText}
                     onChange={(e) => {
                       setChannelsText(e.target.value);
@@ -1268,8 +1291,9 @@ function AgentPoolFormModal({
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Handoff targets (one per line)</label>
+                  <label htmlFor="agent-handoff-targets" className="text-xs text-zinc-400 mb-1 block">Handoff targets (one per line)</label>
                   <textarea
+                    id="agent-handoff-targets"
                     value={handoffTargetsText}
                     onChange={(e) => {
                       setHandoffTargetsText(e.target.value);
@@ -1289,8 +1313,9 @@ function AgentPoolFormModal({
               <h3 className="text-xs uppercase tracking-wider text-zinc-500">Governance</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Authority level</label>
+                  <label htmlFor="agent-authority-level" className="text-xs text-zinc-400 mb-1 block">Authority level</label>
                   <select
+                    id="agent-authority-level"
                     value={structuredConfig.authorityLevel}
                     onChange={(e) => updateStructuredConfig('authorityLevel', e.target.value as AuthorityLevel)}
                     className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--accent-500)]"
@@ -1303,8 +1328,9 @@ function AgentPoolFormModal({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Permissions (one per line)</label>
+                  <label htmlFor="agent-permissions" className="text-xs text-zinc-400 mb-1 block">Permissions (one per line)</label>
                   <textarea
+                    id="agent-permissions"
                     value={permissionsText}
                     onChange={(e) => setPermissionsText(e.target.value)}
                     rows={4}
@@ -1315,8 +1341,9 @@ function AgentPoolFormModal({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Allowed tools (one per line)</label>
+                  <label htmlFor="agent-allowed-tools" className="text-xs text-zinc-400 mb-1 block">Allowed tools (one per line)</label>
                   <textarea
+                    id="agent-allowed-tools"
                     value={allowedToolsText}
                     onChange={(e) => {
                       setAllowedToolsText(e.target.value);
@@ -1328,8 +1355,9 @@ function AgentPoolFormModal({
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Blocked tools (one per line)</label>
+                  <label htmlFor="agent-blocked-tools" className="text-xs text-zinc-400 mb-1 block">Blocked tools (one per line)</label>
                   <textarea
+                    id="agent-blocked-tools"
                     value={blockedToolsText}
                     onChange={(e) => {
                       setBlockedToolsText(e.target.value);
@@ -1375,8 +1403,9 @@ function AgentPoolFormModal({
               <h3 className="text-xs uppercase tracking-wider text-zinc-500">Knowledge</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Knowledge sources (one per line)</label>
+                  <label htmlFor="agent-knowledge-sources" className="text-xs text-zinc-400 mb-1 block">Knowledge sources (one per line)</label>
                   <textarea
+                    id="agent-knowledge-sources"
                     value={knowledgeSourcesText}
                     onChange={(e) => {
                       setKnowledgeSourcesText(e.target.value);
@@ -1424,6 +1453,7 @@ function AgentPoolFormModal({
                 Structured fields mirror into JSON automatically. Advanced JSON remains available for backward-compatible extension.
               </div>
               <textarea
+                aria-label="Advanced JSON configuration"
                 value={configText}
                 onChange={(e) => setConfigText(e.target.value)}
                 rows={16}

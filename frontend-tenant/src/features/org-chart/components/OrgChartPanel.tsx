@@ -88,6 +88,7 @@ export function OrgChartPanel() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             <input
               type="search"
+              aria-label="Search employees or departments"
               placeholder="Search employees or departments…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -156,6 +157,9 @@ export function OrgChartPanel() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setConfirmMove(null)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConfirmMove(null); } }}
             />
             <motion.div
               className="fixed left-1/2 top-1/2 z-[60] w-80 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl"

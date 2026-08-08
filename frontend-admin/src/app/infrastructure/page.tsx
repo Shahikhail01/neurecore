@@ -381,10 +381,13 @@ function LogsModal({ open, serviceName, text, loading, onClose }: LogsModalProps
   if (!open) return null;
   // Lightweight inline modal — no portal/overlay dependency.
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose} role="button" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } }}>
       <div
         className="bg-gray-900 border border-gray-700 rounded-xl max-w-4xl w-full max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        role="button"
+        tabIndex={-1}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); } }}
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-800">
           <div>

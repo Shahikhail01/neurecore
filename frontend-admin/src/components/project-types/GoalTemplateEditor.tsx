@@ -46,6 +46,7 @@ export function GoalTemplateEditor({
         >
           <div className="flex items-center gap-2">
             <input
+              aria-label="Goal title"
               value={g.title}
               onChange={(e) => update(idx, { title: e.target.value })}
               placeholder="Goal title"
@@ -64,6 +65,7 @@ export function GoalTemplateEditor({
             )}
           </div>
           <input
+            aria-label="Measurable criteria"
             value={g.measurableCriteria ?? ''}
             onChange={(e) =>
               update(idx, { measurableCriteria: e.target.value })

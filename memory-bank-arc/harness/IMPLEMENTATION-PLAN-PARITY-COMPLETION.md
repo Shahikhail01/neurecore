@@ -434,5 +434,11 @@ Suggested delivery order to de-risk: **P22 + P26 + P28 + P29 first (fast wins), 
 ## 17. Document control
 
 - 2026-08-07 — created. Author: parity completion planning after the 2026-08-07 sign-off audit (`6d204b77`).
+- 2026-08-08 — **P29 and P30 delivered.** G29 APPROVED (13/13), G30 APPROVED (15/15),
+  `parity-completion/solid-integrity-guard-p29-p30.spec.ts` PASS (53 new files).
+  CR-AI-1304 and CR-AI-1305 moved to CERTIFIED in `SIGNOFF-MATRIX.md`.
+  Evidence and the honest statement of what remains open (a 342-finding
+  accessibility backlog outside the six certified screens) are in
+  `P29-P30-COMPLETION-REPORT.md`.
 - Owner: `@planning`, `@agents`, `@chat-product`, `@integrations`, `@platform`, `@frontend`, `@meetings`, `@analytics`, `@marketing`, `@service`, `@knowledge`, `@skills`, `@command-center`.
 - Supersedes the sequential P22→P32 depth list in `PENDING-BACKLOG.md` as the canonical **completion** plan; `PENDING-BACKLOG.md` remains the capability/depth backlog reference.

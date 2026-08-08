@@ -141,6 +141,7 @@ export function FilterPanel({
                             <input
                                 key={field.id}
                                 type="text"
+                                aria-label={field.placeholder || field.label || 'Search'}
                                 placeholder={field.placeholder || 'Search...'}
                                 value={(field.value as string) || ''}
                                 onChange={(e) => field.onChange(e.target.value)}
@@ -167,6 +168,7 @@ export function FilterPanel({
                                 </label>
                                 {field.type === 'select' && (
                                     <select
+                                        aria-label={field.label}
                                         value={(field.value as string) || ''}
                                         onChange={(e) => field.onChange(e.target.value)}
                                         className="w-full px-2 py-1 rounded bg-surface-overlay/50 border border-surface-border text-zinc-300 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition"
@@ -230,6 +232,7 @@ export function FilterPanel({
                         {dateFields.map((field) => (
                             <input
                                 key={field.id}
+                                aria-label={field.label}
                                 type={field.type === 'daterange' ? 'text' : 'date'}
                                 value={(field.value as string) || ''}
                                 onChange={(e) => field.onChange(e.target.value)}

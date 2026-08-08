@@ -75,6 +75,7 @@ export function ApprovalTemplateEditor({
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-zinc-600 w-6">#{step.stepOrder}</span>
             <select
+              aria-label="Approver role"
               value={step.approverRole}
               onChange={(e) => update(idx, { approverRole: e.target.value })}
               disabled={readOnly}
@@ -87,6 +88,7 @@ export function ApprovalTemplateEditor({
               ))}
             </select>
             <select
+              aria-label="Approval type"
               value={step.approvalType}
               onChange={(e) =>
                 update(idx, { approvalType: e.target.value as ApprovalStep['approvalType'] })

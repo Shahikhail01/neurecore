@@ -94,6 +94,7 @@ export default function AdminBrevoTenantsPage() {
       <div className="flex items-center gap-3 mb-4">
         <input
           type="search"
+          aria-label="Search tenants"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by tenant name, id, sender…"

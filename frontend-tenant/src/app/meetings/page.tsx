@@ -74,7 +74,7 @@ export default function MeetingsPage() {
               href={`/meetings/${t.id}`}
               className="block rounded border border-border bg-background p-4 hover:shadow-sm transition-shadow"
             >
-              <h3 className="font-medium text-foreground">{t.title}</h3>
+              <h2 className="font-medium text-foreground">{t.title}</h2>
               <p className="mt-1 text-xs text-foreground-muted">
                 {t.status} · {t.languageCode} · {t.jurisdiction ?? 'unscoped'}
               </p>

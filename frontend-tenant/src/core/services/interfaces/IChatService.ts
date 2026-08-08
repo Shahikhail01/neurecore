@@ -19,6 +19,11 @@ export interface IChatService {
   getSuggestions(query: string, context?: string): Promise<string[]>;
   isAvailable(): boolean;
   submitAutonomousApproval(executionId: string, approvalId: string, decision: 'approve' | 'reject'): Promise<ChatResponse['autonomousExecution']>;
+  createExport(input: {
+    conversationId: string;
+    format: 'json' | 'csv' | 'markdown';
+    redact: boolean;
+  }): Promise<{ exportId: string; byteSize: number; expiresAt: string; redacted: boolean }>;
 }
 
 export interface ISlashCommandProvider {

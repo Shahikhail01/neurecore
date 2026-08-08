@@ -76,10 +76,11 @@ export default function NewProjectTypePage() {
 
         <div className="rounded-xl border border-surface-border bg-surface-raised p-5 space-y-4">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1.5">
+            <label htmlFor="pt-new-name" className="block text-xs text-zinc-400 mb-1.5">
               Name <span className="text-[color:var(--state-danger)]">*</span>
             </label>
             <input
+              id="pt-new-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Tax Return (US 1040)"
@@ -88,8 +89,9 @@ export default function NewProjectTypePage() {
           </div>
 
           <div>
-            <label className="block text-xs text-zinc-400 mb-1.5">Industry</label>
+            <label htmlFor="pt-new-industry" className="block text-xs text-zinc-400 mb-1.5">Industry</label>
             <select
+              id="pt-new-industry"
               value={industry}
               onChange={(e) => setIndustry(e.target.value)}
               className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)]"
@@ -104,11 +106,12 @@ export default function NewProjectTypePage() {
           </div>
 
           <div>
-            <label className="block text-xs text-zinc-400 mb-1.5">
+            <label htmlFor="pt-new-classification" className="block text-xs text-zinc-400 mb-1.5">
               Classification
               <span className="ml-1 text-[10px] text-zinc-500">(3-class taxonomy)</span>
             </label>
             <select
+              id="pt-new-classification"
               value={classification}
               onChange={(e) =>
                 setClassification(e.target.value as ProjectTypeClassification | '')

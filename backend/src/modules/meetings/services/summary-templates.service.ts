@@ -144,6 +144,85 @@ export class SummaryTemplatesService {
     }
     return out;
   }
+
+  /**
+   * Phase 25 — live editor surface. Update an existing template
+   * atomically. The update is tenant-scoped: cross-tenant writes
+   * raise `SummaryTemplateForbiddenError`.
+   */
+  async update(
+    tenantId: string,
+    templateId: string,
+    input: {
+      name?: string;
+      meetingType?: string;
+      sections?: SummaryTemplateSections;
+      isDefault?: boolean;
+    },
+  ): Promise<SummaryTemplate> {
+    if (!tenantId || tenantId === '*') {
+      throw new SummaryTemplateForbiddenError('tenantId required');
+    }
+    const owned = await this.prisma.meetingSummaryTemplate.findFirst({
+      where: { id: templateId, tenantId },
+      select: { id: true },
+    });
+    if (!owned) {
+      throw new NotFoundException(
+        `summary template ${templateId} not found in tenant ${tenantId}`,
+      );
+    }
+    const row = await this.prisma.meetingSummaryTemplate.update({
+      where: { id: templateId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.meetingType !== undefined ? { meetingType: input.meetingType } : {}),
+        ...(input.sections !== undefined ? { sections: input.sections as never } : {}),
+        ...(input.isDefault !== undefined ? { isDefault: input.isDefault } : {}),
+      },
+    });
+    return mapRow(row);
+  }
+
+  /**
+   * Phase 25 — delete a summary template. Used by the live editor
+   * when an admin retires a custom template. Refuses to delete
+   * the last default for a meeting type (the operator must
+   * promote another first).
+   */
+  async delete(tenantId: string, templateId: string): Promise<{ id: string }> {
+    if (!tenantId || tenantId === '*') {
+      throw new SummaryTemplateForbiddenError('tenantId required');
+    }
+    const row = await this.prisma.meetingSummaryTemplate.findFirst({
+      where: { id: templateId, tenantId },
+      select: { id: true, meetingType: true, isDefault: true },
+    });
+    if (!row) {
+      throw new NotFoundException(
+        `summary template ${templateId} not found in tenant ${tenantId}`,
+      );
+    }
+    if (row.isDefault) {
+      // ensure another default exists for the same meetingType
+      const sibling = await this.prisma.meetingSummaryTemplate.findFirst({
+        where: {
+          tenantId,
+          meetingType: row.meetingType,
+          isDefault: true,
+          NOT: { id: templateId },
+        },
+        select: { id: true },
+      });
+      if (!sibling) {
+        throw new SummaryTemplateForbiddenError(
+          `cannot delete last default template for meetingType ${row.meetingType}`,
+        );
+      }
+    }
+    await this.prisma.meetingSummaryTemplate.delete({ where: { id: templateId } });
+    return { id: templateId };
+  }
 }
 
 function mapRow(r: {

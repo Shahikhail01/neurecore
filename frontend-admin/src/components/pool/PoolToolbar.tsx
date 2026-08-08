@@ -29,6 +29,7 @@ export function PoolToolbar({
   return (
     <div className="flex flex-wrap gap-3 items-center">
       <input
+        aria-label="Search"
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder={searchPlaceholder}

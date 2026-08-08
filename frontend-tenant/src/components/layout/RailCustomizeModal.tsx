@@ -96,7 +96,13 @@ export function RailCustomizeModal({ open, onClose, industryGroup, industrySlug 
           aria-label="Customize navigation rail"
         >
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={onClose}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(); } }}
+          />
 
           {/* Panel */}
           <motion.div

@@ -49,7 +49,7 @@ interface Tile {
 interface TileTypeSpec {
   id: string;
   label: string;
-  icon: JSX.Element;
+  icon: React.ReactElement;
   defaultTitle: string;
   defaultProps: Record<string, string>;
 }
@@ -157,6 +157,7 @@ export default function StudioPage() {
           <div className="flex gap-2">
             <input
               type="text"
+              aria-label="Tenant ID"
               value={tenantId}
               onChange={(e) => setTenantId(e.target.value)}
               placeholder="tenant id"
@@ -275,7 +276,7 @@ export default function StudioPage() {
           {/* Inspector */}
           <aside className="col-span-3">
             <div className="rounded-md border border-white/10 bg-white/5 p-3">
-              <h3 className="text-xs font-semibold text-white mb-2">Inspector</h3>
+              <h2 className="text-xs font-semibold text-white mb-2">Inspector</h2>
               {!selected && (
                 <p className="text-xs text-white/40">Select a tile to edit.</p>
               )}

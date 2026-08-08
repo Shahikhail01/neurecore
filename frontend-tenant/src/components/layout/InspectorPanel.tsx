@@ -46,6 +46,9 @@ export function InspectorPanel() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/40 z-30"
             onClick={closeInspector}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeInspector(); } }}
           />
           {/* Panel */}
           <motion.aside

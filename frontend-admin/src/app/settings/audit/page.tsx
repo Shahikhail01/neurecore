@@ -177,14 +177,15 @@ export default function AuditLogsPage() {
           <input
             type="search"
             placeholder="Search logs..."
+            aria-label="Search logs"
             value={filters.search}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, search: e.target.value }))
+            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))
             }
             className="w-full max-w-sm rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[color:var(--accent-500)]"
           />
         </div>
         <select
+          aria-label="Level filter"
           value={filters.level}
           onChange={(e) =>
             setFilters((f) => ({
@@ -202,6 +203,7 @@ export default function AuditLogsPage() {
           ))}
         </select>
         <select
+          aria-label="Category filter"
           value={filters.category}
           onChange={(e) =>
             setFilters((f) => ({
@@ -250,10 +252,13 @@ export default function AuditLogsPage() {
               safeLogs.map((log) => (
                 <motion.tr
                   key={log.id}
+                  role="button"
+                  tabIndex={0}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="hover:bg-zinc-900/50 transition cursor-pointer"
                   onClick={() => setSelectedLog(log)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedLog(log); } }}
                 >
                   <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">
                     {new Date(log.timestamp).toLocaleString()}
@@ -304,14 +309,20 @@ export default function AuditLogsPage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
+          role="button"
+          tabIndex={0}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
           onClick={() => setSelectedLog(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setSelectedLog(null); } }}
         >
           <motion.div
             initial={{ scale: 0.96 }}
             animate={{ scale: 1 }}
+            role="button"
+            tabIndex={0}
             className="w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl max-h-[80vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); } }}
           >
             <div className="flex items-start justify-between mb-4">
               <h3 className="text-lg font-semibold text-zinc-100">

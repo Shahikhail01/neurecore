@@ -316,6 +316,7 @@ function MyAgentsTab({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search agents by name or description…"
+            aria-label="Search agents"
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-accent-500 transition"
           />
         </div>
@@ -481,7 +482,7 @@ function AgentTemplatesTab({ router }: { router: ReturnType<typeof useRouter> })
           <div className="flex items-center gap-3">
             <Sparkles className="w-6 h-6 text-accent-500" />
             <div>
-              <h3 className="text-sm font-semibold text-zinc-100">{templates.length} prebuilt AI agent templates</h3>
+              <h2 className="text-sm font-semibold text-zinc-100">{templates.length} prebuilt AI agent templates</h2>
               <p className="text-xs text-zinc-500">Each template is a complete agent definition ready to deploy into your tenant.</p>
             </div>
           </div>
@@ -504,12 +505,14 @@ function AgentTemplatesTab({ router }: { router: ReturnType<typeof useRouter> })
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search templates by name or description…"
+            aria-label="Search templates"
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-accent-500 transition"
           />
         </div>
         <select
           value={deptFilter}
           onChange={(e) => setDeptFilter(e.target.value)}
+          aria-label="Department filter"
           className="px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-xs text-zinc-200 focus:outline-none focus:border-accent-500"
         >
           {DEPARTMENT_FILTERS.map((d) => (
@@ -519,6 +522,7 @@ function AgentTemplatesTab({ router }: { router: ReturnType<typeof useRouter> })
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
+          aria-label="Type filter"
           className="px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-xs text-zinc-200 focus:outline-none focus:border-accent-500"
         >
           <option value="ALL">All types</option>
@@ -719,6 +723,10 @@ function SpawnAgentModal({
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/50 z-50"
         onClick={onClose}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(); } }}
+        aria-label="Close spawn agent modal"
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -729,7 +737,7 @@ function SpawnAgentModal({
       >
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-zinc-100">Spawn Agent</h3>
+            <h2 className="text-lg font-semibold text-zinc-100">Spawn Agent</h2>
             <p className="text-xs text-zinc-500 mt-0.5">From template: <span className="text-zinc-300">{template.name}</span></p>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-100 transition">
@@ -739,8 +747,9 @@ function SpawnAgentModal({
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-zinc-400">Agent name</label>
+            <label htmlFor="spawn-agent-name" className="text-xs font-medium text-zinc-400">Agent name</label>
             <input
+              id="spawn-agent-name"
               type="text"
               required
               value={agentName}
@@ -750,8 +759,9 @@ function SpawnAgentModal({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-zinc-400">Department (optional)</label>
+            <label htmlFor="spawn-agent-dept" className="text-xs font-medium text-zinc-400">Department (optional)</label>
             <select
+              id="spawn-agent-dept"
               value={departmentId}
               onChange={(e) => setDepartmentId(e.target.value)}
               className="mt-1 w-full px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-200 focus:outline-none focus:border-accent-500"
@@ -764,8 +774,9 @@ function SpawnAgentModal({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-zinc-400">Daily budget ($)</label>
+            <label htmlFor="spawn-agent-budget" className="text-xs font-medium text-zinc-400">Daily budget ($)</label>
             <input
+              id="spawn-agent-budget"
               type="number"
               min="1"
               step="1"
@@ -1027,6 +1038,10 @@ function DeployPackageModal({
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/50 z-50"
         onClick={onClose}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(); } }}
+        aria-label="Close deploy package modal"
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -1037,7 +1052,7 @@ function DeployPackageModal({
       >
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-zinc-100">Deploy Package</h3>
+            <h2 className="text-lg font-semibold text-zinc-100">Deploy Package</h2>
             <p className="text-xs text-zinc-500 mt-0.5">{pkg.name}</p>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-100 transition">
@@ -1089,8 +1104,9 @@ function DeployPackageModal({
                     Deploy head agents
                   </label>
                   <div>
-                    <label className="text-xs font-medium text-zinc-400">Authority level</label>
+                    <label htmlFor="deploy-authority" className="text-xs font-medium text-zinc-400">Authority level</label>
                     <select
+                      id="deploy-authority"
                       value={authorityLevel}
                       onChange={(e) => setAuthorityLevel(e.target.value as typeof authorityLevel)}
                       className="mt-1 w-full px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-200 focus:outline-none focus:border-accent-500"
@@ -1289,8 +1305,9 @@ function ConnectorsTab() {
           </h3>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="text-xs font-medium text-zinc-400">Name</label>
+              <label htmlFor="connector-name" className="text-xs font-medium text-zinc-400">Name</label>
               <input
+                id="connector-name"
                 type="text"
                 required
                 value={name}
@@ -1300,8 +1317,9 @@ function ConnectorsTab() {
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-zinc-400">Provider</label>
+              <label htmlFor="connector-provider" className="text-xs font-medium text-zinc-400">Provider</label>
               <select
+                id="connector-provider"
                 required
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}

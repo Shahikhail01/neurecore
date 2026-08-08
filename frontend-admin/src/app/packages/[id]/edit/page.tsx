@@ -21,7 +21,7 @@ import { PackagePreview } from '@/components/package/PackagePreview';
 import { PackageInheritanceBanner } from '@/components/packages/PackageInheritanceBanner';
 
 const EMPTY_PREVIEW = {
-  readiness: { score: 0, label: 'NEEDS_REVIEW' as const },
+  readiness: { score: 0, label: 'NEEDS_REVIEW' as 'NEEDS_REVIEW' | 'READY' | 'AT_RISK' },
   totals: { departments: 0, agents: 0, features: 0 },
   missing: { departments: [] as string[], agents: [] as string[], features: [] as string[] },
   categories: {} as Record<string, number>,
@@ -381,10 +381,11 @@ function PickerGroup({
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
-        <label className="text-xs text-zinc-400">{title}</label>
+        <label htmlFor={`pkg-edit-filter-${title}`} className="text-xs text-zinc-400">{title}</label>
         <span className="text-[10px] text-zinc-600">{selected.length} selected</span>
       </div>
       <input
+        id={`pkg-edit-filter-${title}`}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder={`Filter ${title.toLowerCase()}…`}

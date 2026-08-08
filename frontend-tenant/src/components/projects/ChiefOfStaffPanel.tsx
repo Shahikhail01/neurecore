@@ -107,6 +107,7 @@ export function ChiefOfStaffPanel({ projectId, projectName }: CosPanelProps) {
       <div className="border-t p-3 flex gap-2">
         <input
           type="text"
+          aria-label="Message input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}

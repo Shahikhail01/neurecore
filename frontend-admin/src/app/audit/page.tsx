@@ -45,7 +45,10 @@ function getActionColor(action: string): string {
 function AuditRow({ log, onClick }: { log: AuditLog; onClick: () => void }) {
   return (
     <tr
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
       className="border-t border-surface-border hover:bg-surface-overlay transition cursor-pointer group"
     >
       {/* Timestamp */}
@@ -127,6 +130,7 @@ export default function AuditPage() {
 
         {/* ── Search ── */}
         <input
+          aria-label="Filter audit logs"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter by action, actor, or resource…"

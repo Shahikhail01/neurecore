@@ -1,20 +1,5 @@
 "use client";
 
-/**
- * /phase7 — Phase 7 console.
- *
- * Single-page tab navigator over the Phase 7 surfaces:
- *   • Customer 360 (5.9.1)
- *   • Triage rules (5.9.2)
- *   • Chatbot personas (5.9.4)
- *   • Knowledge gaps (5.9.8)
- *   • Governance (custom rules + operational + internal + security)
- *   • XAI "why this action" demo (5.4.17)
- *
- * Solid (frontend):
- *   • SRP — page composes sub-views; no business logic.
- */
-
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -67,7 +52,7 @@ export default function Phase7Page() {
     }
   }, [user, tenantId]);
 
-  const tabs: { id: Tab; label: string; icon: JSX.Element }[] = [
+  const tabs: { id: Tab; label: string; icon: React.ReactElement }[] = [
     { id: 'crm360', label: 'Customer 360', icon: <Users className="h-4 w-4" /> },
     { id: 'triage', label: 'Triage Rules', icon: <ShieldAlert className="h-4 w-4" /> },
     { id: 'personas', label: 'Chatbot Personas', icon: <Bot className="h-4 w-4" /> },
@@ -85,8 +70,9 @@ export default function Phase7Page() {
             Service 360 / contact center / knowledge self-curation / governance authoring / XAI.
           </p>
           <div className="mt-3">
-            <label className="text-xs text-white/40 mr-2">Tenant:</label>
+            <label htmlFor="phase7-tenant" className="text-xs text-white/40 mr-2">Tenant:</label>
             <input
+              id="phase7-tenant"
               type="text"
               value={tenantId}
               onChange={(e) => setTenantId(e.target.value)}
@@ -142,8 +128,6 @@ export default function Phase7Page() {
   );
 }
 
-// ─── Customer 360 ───────────────────────────────────────────────
-
 function Crm360Tab({ tenantId }: { tenantId: string }) {
   const [customerId, setCustomerId] = useState('');
   const [view, setView] = useState<Customer360 | null>(null);
@@ -170,6 +154,7 @@ function Crm360Tab({ tenantId }: { tenantId: string }) {
           value={customerId}
           onChange={(e) => setCustomerId(e.target.value)}
           placeholder="customer id"
+          aria-label="Customer ID"
           className="flex-1 rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
         />
         <button
@@ -204,8 +189,6 @@ function KpiTile({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-// ─── Triage rules ───────────────────────────────────────────────
 
 function TriageTab({ tenantId }: { tenantId: string }) {
   const [rules, setRules] = useState<TriageRule[]>([]);
@@ -267,8 +250,6 @@ function PriorityChip({ priority }: { priority: TriageRule['priority'] }) {
   return <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${colors[priority]}`}>{priority}</span>;
 }
 
-// ─── Chatbot personas ──────────────────────────────────────────
-
 function PersonaTab({ tenantId }: { tenantId: string }) {
   const [personas, setPersonas] = useState<ChatbotPersona[]>([]);
   const refresh = useCallback(async () => {
@@ -308,8 +289,6 @@ function PersonaTab({ tenantId }: { tenantId: string }) {
   );
 }
 
-// ─── Knowledge gaps ────────────────────────────────────────────
-
 function KnowledgeTab({ tenantId }: { tenantId: string }) {
   const [gaps, setGaps] = useState<KnowledgeGap[]>([]);
   const [topic, setTopic] = useState('');
@@ -337,6 +316,7 @@ function KnowledgeTab({ tenantId }: { tenantId: string }) {
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="topic to detect"
+          aria-label="Topic"
           className="flex-1 rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
         />
         <button
@@ -376,8 +356,6 @@ function KnowledgeTab({ tenantId }: { tenantId: string }) {
     </div>
   );
 }
-
-// ─── Governance ────────────────────────────────────────────────
 
 function GovernanceTab({ tenantId }: { tenantId: string }) {
   const [rules, setRules] = useState<CustomGovRule[]>([]);
@@ -482,7 +460,7 @@ function Section({
 }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-white/80 mb-2">{title}</h3>
+      <h2 className="text-sm font-semibold text-white/80 mb-2">{title}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {rows.length === 0 && (
           <p className="text-xs text-white/40 col-span-2 py-2 text-center">
@@ -503,8 +481,6 @@ function Section({
   );
 }
 
-// ─── XAI ──────────────────────────────────────────────────────
-
 function XaiTab({ tenantId }: { tenantId: string }) {
   const [intent, setIntent] = useState('send-quote');
   const [features, setFeatures] = useState<Array<{ factor: string; value: number }>>([
@@ -523,7 +499,7 @@ function XaiTab({ tenantId }: { tenantId: string }) {
   const run = async () => {
     setLoading(true);
     try {
-      const p = await fetchWhyPanel({ tenantId, intent, factors });
+      const p = await fetchWhyPanel({ tenantId, intent, factors: features });
       setPanel(p);
     } finally {
       setLoading(false);
@@ -534,9 +510,10 @@ function XaiTab({ tenantId }: { tenantId: string }) {
     <div className="space-y-4">
       <div className="rounded border border-white/10 p-3 space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label className="text-xs text-white/60">
+          <label htmlFor="xai-intent" className="text-xs text-white/60">
             Intent
             <input
+              id="xai-intent"
               type="text"
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
@@ -556,6 +533,7 @@ function XaiTab({ tenantId }: { tenantId: string }) {
                       next[i] = { ...next[i], factor: e.target.value };
                       setFeatures(next);
                     }}
+                    aria-label="Factor"
                     className="flex-1 rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
                   />
                   <input
@@ -567,6 +545,7 @@ function XaiTab({ tenantId }: { tenantId: string }) {
                       next[i] = { ...next[i], value: Number(e.target.value) };
                       setFeatures(next);
                     }}
+                    aria-label="Value"
                     className="w-24 rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
                   />
                 </div>

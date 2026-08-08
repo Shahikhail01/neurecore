@@ -61,7 +61,10 @@ export function ScenarioComparison({ scenarios, currentId, onSelect, onDelete }:
             return (
               <tr
                 key={s.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelect(s.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(s.id); } }}
                 className={`cursor-pointer border-t border-surface-border transition ${
                   active ? 'bg-surface-overlay' : 'hover:bg-surface-raised/60'
                 }`}

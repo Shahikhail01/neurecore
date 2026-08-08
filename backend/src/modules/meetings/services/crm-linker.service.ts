@@ -1,30 +1,33 @@
 /**
- * Phase 16 — CrmLinkerService.
+ * Phase 25 — CrmLinkerService.
  *
- * Source plan: IMPLEMENTATION-PLAN-PHASE-15-18.md §2.
+ * Source plan: IMPLEMENTATION-PLAN-PHASE-15-18.md §2 + P25 upgrade.
  *
  * Closes CR-AI-0404 — "CRM linkage + governed follow-up writes".
  *
- * Two responsibilities:
- *   1. Link a transcript to a CRM record (account / contact /
- *      lead / opportunity / case). The linkage is tenant-scoped
- *      and the target record is verified via Prisma before the link
- *      is recorded.
- *   2. Persist extracted action items + queue follow-up Tasks
- *      through the existing `Task` model with the standard
- *      Phase-1 approval gate (creates a TASK in PENDING_APPROVAL).
+ * Phase 25 upgrade: write-back to live CRM records. The service
+ * already linked a transcript to a CRM row. It now also appends
+ * the meeting-derived touchpoint to `customer_touchpoint_events`
+ * (idempotent on `(tenantId, channelKind, externalId)`) so the
+ * downstream pipeline (cases, lifecycle, sales agent) sees the
+ * meeting event as a live CRM signal.
  *
- * SRP — owns ONLY the linkage + follow-up-write pipeline. The
- * approval gate is reused from `chat.controller`'s existing pattern
- * via the `Task` model's `requiresApproval` field.
+ * SOLID:
+ *   - SRP — owns ONLY the linkage + write-back. Approval gating
+ *     is the operator's call (the meeting notes do NOT auto-mutate
+ *     `Deal.amount` or `Deal.stage`; those stay operator-driven).
+ *   - DIP — depends only on injected `PrismaService` and the
+ *     `AuditService` seam for evidence. No HTTP, no LLM, no
+ *     global state.
  *
- * SECURITY — tenant scope enforced at every Prisma call. Cross-tenant
- * record references are rejected with a typed
- * CrmLinkerForbiddenError.
+ * SECURITY — tenant scope enforced at every Prisma call. The
+ * `tenantScopedOwnerCheck` is the structural guard: cross-tenant
+ * record references are rejected with `CrmLinkerForbiddenError`.
  */
 
 import {
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -66,6 +69,21 @@ export interface PersistActionInput {
   }>;
 }
 
+export interface WriteBackInput {
+  readonly tenantId: string;
+  readonly transcriptId: string;
+  readonly channelKind: string;
+  readonly subject: string;
+  readonly body?: string;
+  readonly occurredAt: Date;
+  readonly tags?: ReadonlyArray<string>;
+}
+
+export interface WriteBackResult {
+  readonly touchpointId: string;
+  readonly idempotent: boolean;
+}
+
 const SUPPORTED_TYPES = new Set<CrmRecordType>([
   'account',
   'contact',
@@ -78,12 +96,8 @@ const SUPPORTED_TYPES = new Set<CrmRecordType>([
 export class CrmLinkerService {
   private readonly logger = new Logger(CrmLinkerService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  /**
-   * Link a transcript to a CRM record. The link is written on the
-   * transcript row (linkedRecordType / linkedRecordId). Idempotent.
-   */
   async link(input: LinkInput): Promise<{ transcriptId: string }> {
     if (!input.tenantId || input.tenantId === '*') {
       throw new CrmLinkerForbiddenError('tenantId required');
@@ -94,7 +108,6 @@ export class CrmLinkerService {
       );
     }
 
-    // Verify the transcript + target record belong to this tenant
     const transcript = await this.prisma.meetingTranscript.findFirst({
       where: { tenantId: input.tenantId, id: input.transcriptId },
       select: { id: true },
@@ -127,14 +140,6 @@ export class CrmLinkerService {
     return { transcriptId: input.transcriptId };
   }
 
-  /**
-   * Legacy envelope — `linker.link(tenantId, actorId, transcript, links)`
-   * called by the pre-existing `meeting.service.ts`. Each `MeetingLink`
-   * carries a recordType + recordId; we iterate and link.
-   *
-   * Returns a synthetic workRunId so the legacy caller can map it
-   * back to the transcript id. No WorkRun is actually queued.
-   */
   async linkLegacy(
     tenantId: string,
     actorId: string,
@@ -160,15 +165,6 @@ export class CrmLinkerService {
     return { workRunId: `link_${transcript.id}_${Date.now()}` };
   }
 
-  /**
-   * Persist extracted action items as `meeting_action_items` rows.
-   * Each item carries the owner hint + ambiguous flag.
-   *
-   * The follow-up Task write is **not** auto-attached to the CRM
-   * record — that's the operator's call (per P-1: no automatic
-   * CRM mutations). The returned IDs let the operator wire follow-ups
-   * via the standard `Task` API.
-   */
   async persistActionItems(
     input: PersistActionInput,
   ): Promise<{ writtenIds: ReadonlyArray<string> }> {
@@ -184,11 +180,11 @@ export class CrmLinkerService {
           tenantId: input.tenantId,
           transcriptId: input.transcriptId,
           description: item.description,
-          ownerUserId: item.ownerUserId,
+          ownerUserId: item.ownerUserId ?? null,
           dueDate: item.dueDate ? new Date(item.dueDate) : null,
-          confidencePercent: item.confidencePercent,
+          confidencePercent: item.confidencePercent ?? 0,
           status: 'PENDING',
-          ambiguousOwner: item.ambiguousOwner,
+          ambiguousOwner: item.ambiguousOwner ?? false,
         },
         select: { id: true },
       });
@@ -198,10 +194,112 @@ export class CrmLinkerService {
   }
 
   /**
-   * Tenant-scoped owner check. Each `recordType` has its own
-   * Prisma model. Returns true when the record exists in the
-   * tenant, false otherwise. Unknown types fail closed.
+   * Phase 25 — write-back to live CRM records. Appends a row to
+   * `customer_touchpoint_events` keyed by
+   * `(tenantId, channelKind, externalId=transcriptId)` so the
+   * downstream pipeline (lifecycle, sales agent) sees the meeting
+   * event as a touchpoint.
+   *
+   * Idempotent: replays of the same transcript touchpoint return
+   * the existing row with `idempotent=true`.
    */
+  async writeBack(input: WriteBackInput): Promise<WriteBackResult> {
+    if (!input.tenantId || input.tenantId === '*') {
+      throw new CrmLinkerForbiddenError('tenantId required');
+    }
+    const transcript = await this.prisma.meetingTranscript.findFirst({
+      where: { tenantId: input.tenantId, id: input.transcriptId },
+      select: {
+        id: true,
+        linkedRecordType: true,
+        linkedRecordId: true,
+      },
+    });
+    if (!transcript) {
+      throw new NotFoundException(
+        `transcript ${input.transcriptId} not found in tenant ${input.tenantId}`,
+      );
+    }
+    // Determine the customer id from the linked record.
+    const customerId = await this.resolveCustomerId(
+      input.tenantId,
+      transcript.linkedRecordType as CrmRecordType | null,
+      transcript.linkedRecordId,
+    );
+    if (!customerId) {
+      // No linked record — the write-back is rejected with a
+      // typed error so the operator links the transcript first.
+      throw new CrmLinkerForbiddenError(
+        `transcript ${input.transcriptId} has no linked CRM record; call link() before writeBack()`,
+      );
+    }
+    const existing = await this.prisma.customerTouchpointEvent.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        channelKind: input.channelKind,
+        externalId: input.transcriptId,
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      return { touchpointId: existing.id, idempotent: true };
+    }
+    const created = await this.prisma.customerTouchpointEvent.create({
+      data: {
+        tenantId: input.tenantId,
+        customerId,
+        channelKind: input.channelKind,
+        externalId: input.transcriptId,
+        payload: {
+          subject: input.subject,
+          body: input.body ?? '',
+          transcriptId: input.transcriptId,
+          tags: [...(input.tags ?? [])],
+        },
+        occurredAt: input.occurredAt,
+        tags: [...(input.tags ?? [])],
+      },
+      select: { id: true },
+    });
+    return { touchpointId: created.id, idempotent: false };
+  }
+
+  private async resolveCustomerId(
+    tenantId: string,
+    recordType: CrmRecordType | null,
+    recordId: string | null,
+  ): Promise<string | null> {
+    if (!recordType || !recordId) return null;
+    switch (recordType) {
+      case 'account': {
+        const c = await this.prisma.customer.findFirst({
+          where: { id: recordId, tenantId },
+          select: { id: true },
+        });
+        return c?.id ?? null;
+      }
+      case 'contact': {
+        const c = await this.prisma.customerContact.findFirst({
+          where: { id: recordId, customer: { tenantId } },
+          select: { customerId: true },
+        });
+        return c?.customerId ?? null;
+      }
+      case 'opportunity': {
+        const d = await this.prisma.deal.findFirst({
+          where: { id: recordId, tenantId, deletedAt: null },
+          select: { customerId: true },
+        });
+        return d?.customerId ?? null;
+      }
+      case 'lead':
+      case 'case':
+        return null;
+      default:
+        return null;
+    }
+  }
+
   private async tenantScopedOwnerCheck(
     tenantId: string,
     recordType: CrmRecordType,
@@ -223,9 +321,6 @@ export class CrmLinkerService {
         return Boolean(r);
       }
       case 'lead': {
-        // `Lead` may not exist on every installation; fail closed
-        // until the leads module is wired. The Phase 16 PR surfaces
-        // the linkage failure rather than fabricating a tenant claim.
         return false;
       }
       case 'opportunity': {
@@ -236,7 +331,6 @@ export class CrmLinkerService {
         return Boolean(r);
       }
       case 'case': {
-        // `Case` may not exist on every installation; fail closed.
         const any = this.prisma as unknown as {
           case?: { findFirst: (args: unknown) => Promise<{ id: string } | null> };
         };

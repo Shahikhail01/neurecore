@@ -332,6 +332,9 @@ function FolderRow({ folder, depth }: { folder: DriveFolder; depth: number }) {
         className="flex items-center gap-2 py-1 text-sm hover:bg-muted/50 rounded px-1 cursor-pointer"
         style={{ paddingLeft: depth * 16 }}
         onClick={() => setExpanded((v) => !v)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((v) => !v); } }}
       >
         <Folder className="w-3.5 h-3.5 text-muted-foreground" />
         <span>{folder.name}</span>

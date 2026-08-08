@@ -241,6 +241,7 @@ function ProvidersTab({
         <div className="rounded-lg border border-surface-border bg-surface-raised p-4 grid grid-cols-2 gap-3">
           <input
             placeholder="slug (e.g. openai)"
+            aria-label="Provider slug"
             value={draft.slug}
             onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
             className="px-2 py-1 rounded bg-surface-sunken text-sm text-zinc-100"
@@ -250,21 +251,25 @@ function ProvidersTab({
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             className="px-2 py-1 rounded bg-surface-sunken text-sm text-zinc-100"
+            aria-label="Display name"
           />
           <input
             placeholder="API base URL"
             value={draft.apiBaseUrl}
             onChange={(e) => setDraft({ ...draft, apiBaseUrl: e.target.value })}
             className="col-span-2 px-2 py-1 rounded bg-surface-sunken text-sm text-zinc-100"
+            aria-label="API base URL"
           />
           <input
             placeholder="Env var name (e.g. OPENAI_API_KEY)"
             value={draft.apiKeyEnv}
             onChange={(e) => setDraft({ ...draft, apiKeyEnv: e.target.value })}
             className="col-span-2 px-2 py-1 rounded bg-surface-sunken text-sm text-zinc-100"
+            aria-label="Env var name"
           />
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label htmlFor="provider-active" className="flex items-center gap-2 text-sm text-zinc-300">
             <input
+              id="provider-active"
               type="checkbox"
               checked={draft.isActive}
               onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
@@ -376,6 +381,7 @@ function ModelsTab({
     <div className="space-y-3">
       <input
         placeholder="Filter by model id, name, provider, capability…"
+        aria-label="Filter models"
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         className="w-full px-3 py-1.5 rounded bg-surface-sunken text-sm text-zinc-100"
@@ -492,11 +498,13 @@ function OverridesTab({
         </p>
         <input
           placeholder="Tenant ID"
+          aria-label="Tenant ID"
           value={tenantId}
           onChange={(e) => setTenantId(e.target.value)}
           className="w-full px-2 py-1 rounded bg-surface-sunken text-sm text-zinc-100"
         />
         <select
+          aria-label="Capability"
           value={capability}
           onChange={(e) => setCapability(e.target.value)}
           className="w-full px-2 py-1 rounded bg-surface-sunken text-sm text-zinc-100"
@@ -508,6 +516,7 @@ function OverridesTab({
           ))}
         </select>
         <select
+          aria-label="Model"
           value={aiModelId}
           onChange={(e) => setAiModelId(e.target.value)}
           className="w-full px-2 py-1 rounded bg-surface-sunken text-sm text-zinc-100"

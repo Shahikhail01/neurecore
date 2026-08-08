@@ -149,6 +149,7 @@ function CalendarContent() {
         {connected && (
           <div className="flex items-center gap-2">
             <select
+              aria-label="Select calendar"
               className="bg-background border rounded-md px-2 py-1 text-sm"
               value={calendarId}
               onChange={(e) => setCalendarId(e.target.value)}

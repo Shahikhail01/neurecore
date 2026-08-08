@@ -202,7 +202,11 @@ export class Phase16CertificationRunner {
 
     // G16-M-007 — extractor surfaces owners + ambiguity
     {
-      const svc = new ActionExtractorService();
+      const noopResolver = {
+        resolve: async () => null,
+        candidates: async () => [],
+      };
+      const svc = new ActionExtractorService(noopResolver as never);
       try {
         const owned = svc.extract({
           tenantId: 't',

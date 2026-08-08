@@ -264,6 +264,7 @@ export function PackagePreview({
           ))}
           {onDismissSuggested && rules.suggestedFeatureKeys.length > 0 && (
             <textarea
+              aria-label="Dismiss reason"
               value={dismissReason}
               onChange={(event) => setDismissReason(event.target.value)}
               rows={3}
@@ -274,6 +275,7 @@ export function PackagePreview({
           {onSnoozeSuggested && rules.suggestedFeatureKeys.length > 0 && (
             <div className="space-y-2 rounded-lg border border-sky-800/40 bg-sky-950/20 p-2">
               <textarea
+                aria-label="Snooze reason"
                 value={snoozeReason}
                 onChange={(event) => setSnoozeReason(event.target.value)}
                 rows={2}
@@ -281,6 +283,7 @@ export function PackagePreview({
                 className="w-full rounded-lg border border-sky-800/50 bg-sky-950/10 px-3 py-2 text-xs text-sky-100 placeholder-sky-300/60 focus:outline-none"
               />
               <input
+                aria-label="Snooze until date"
                 type="date"
                 value={snoozeUntil}
                 min="2026-08-04"

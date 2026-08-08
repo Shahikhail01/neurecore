@@ -75,6 +75,7 @@ export function CustomerFieldEditor({
               className="flex-1 min-w-[120px]"
             />
             <select
+              aria-label="Field type"
               value={field.type}
               onChange={(e) => updateField(i, 'type', e.target.value)}
               className="w-28 rounded-md border border-input bg-background px-2 py-2 text-sm"

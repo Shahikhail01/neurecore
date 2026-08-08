@@ -48,6 +48,12 @@ interface TenantState {
   industryGroup: string | null;
   /** The tenant's industry slug (e.g. 'accounting-audit-services'). null while loading. */
   industry: string | null;
+  /** Phase 29 (CR-AI-1304) — BCP-47 locale the tenant prefers. null while loading. */
+  locale: string | null;
+  /** Phase 29 (CR-AI-1304) — IANA time zone the tenant prefers. null while loading. */
+  timezone: string | null;
+  /** Phase 29 (CR-AI-1304) — ISO-4217 currency the tenant bills in. null while loading. */
+  currency: string | null;
   /** When we last fetched (epoch ms). Used for TTL-based staleness checks. */
   lastFetchedAt: number | null;
   /** True while a fetch is in flight. */
@@ -69,6 +75,9 @@ const STALE_AFTER_MS = 30_000;
 export const useTenantStore = create<TenantState>((set, get) => ({
   industryGroup: null,
   industry: null,
+  locale: null,
+  timezone: null,
+  currency: null,
   lastFetchedAt: null,
   loading: false,
   error: null,
@@ -89,6 +98,9 @@ export const useTenantStore = create<TenantState>((set, get) => ({
       set({
         industryGroup: t.industryGroup ?? null,
         industry: t.industry ?? null,
+        locale: t.locale ?? null,
+        timezone: t.timezone ?? null,
+        currency: t.currency ?? null,
         lastFetchedAt: Date.now(),
         loading: false,
         error: null,
@@ -105,6 +117,9 @@ export const useTenantStore = create<TenantState>((set, get) => ({
     set({
       industryGroup: null,
       industry: null,
+      locale: null,
+      timezone: null,
+      currency: null,
       lastFetchedAt: null,
       loading: false,
       error: null,

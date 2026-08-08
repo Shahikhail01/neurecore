@@ -7,7 +7,7 @@
  * page groups them visually while keeping a single flat search.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AdminShell from '@/components/AdminShell';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
@@ -276,6 +276,9 @@ function FeatureFormModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(); } }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
@@ -362,10 +365,13 @@ function FeatureFormModal({
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const fieldId = `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Math.random().toString(36).slice(2, 7)}`;
   return (
     <div>
-      <label className="text-xs text-zinc-400 mb-1 block">{label}</label>
-      {children}
+      <label htmlFor={fieldId} className="text-xs text-zinc-400 mb-1 block">{label}</label>
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child) ? React.cloneElement(child as React.ReactHTMLElement<HTMLElement>, { id: fieldId }) : child
+      )}
     </div>
   );
 }

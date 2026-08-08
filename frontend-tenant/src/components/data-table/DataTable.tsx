@@ -91,6 +91,9 @@ export function DataTable<T extends { id?: string }>({
                   transition={{ delay: i * 0.02 }}
                   className={`border-b border-surface-border/60 transition-colors ${onRowClick ? 'cursor-pointer hover:bg-surface-raised' : ''}`}
                   onClick={() => onRowClick?.(row)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick?.(row); } }}
                 >
                   {columns.map((col) => (
                     <td key={col.key} className="px-4 py-3 text-zinc-300">

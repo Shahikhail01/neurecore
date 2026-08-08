@@ -73,11 +73,14 @@ export function UnifiedChatPanel({
           <>
             {/* Mobile backdrop */}
             <motion.div
+              role="button"
+              tabIndex={-1}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-30 bg-black/40 md:hidden"
               onClick={() => setOpen(false)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setOpen(false); } }}
             />
 
             <motion.div

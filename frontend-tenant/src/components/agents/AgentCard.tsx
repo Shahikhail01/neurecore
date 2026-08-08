@@ -113,6 +113,7 @@ export const AgentCardComponent: React.FC<AgentCardProps> = ({
                         </p>
                     </div>
                     <motion.button
+                        type="button"
                         whileHover={{ rotate: 90 }}
                         className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
                         onClick={onViewDetails}

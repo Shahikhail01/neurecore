@@ -84,6 +84,7 @@ export function LogoUploader({
         <input
           ref={inputRef}
           type="file"
+          aria-label="Upload logo"
           accept={LOGO_UPLOAD.allowedTypes.join(',')}
           className="hidden"
           onChange={(e) => void handleFile(e.target.files?.[0])}

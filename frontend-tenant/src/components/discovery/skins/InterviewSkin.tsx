@@ -57,6 +57,7 @@ export function InterviewSkin({
       <form ref={formRef} onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="text"
+          aria-label="Your answer"
           value={reply}
           onChange={(e) => setReply(e.target.value)}
           disabled={disabled || submitting}

@@ -47,6 +47,9 @@ export function AgentNode({
     <motion.div
       layout
       draggable
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(node.id); } }}
       onDragStart={(e) => {
         (e as unknown as DragEvent).dataTransfer?.setData('agentId', node.id);
         onDragStart(node.id);

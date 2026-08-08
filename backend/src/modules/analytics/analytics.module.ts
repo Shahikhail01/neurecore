@@ -12,6 +12,8 @@ import { CalibratedAnalyticsProvider } from './providers/calibrated.provider';
 import { PredictionService } from './services/prediction.service';
 import { RecommendationService } from './services/recommendation.service';
 import { WorkRuntimeModule } from '../work-runtime/work-runtime.module';
+// Phase 30 — cost ceiling enforcement on the LLM spend hook
+import { CostCeilingModule } from '../cost-ceiling/cost-ceiling.module';
 import { MODEL_RUNNER } from './interfaces/IAnalyticsProvider';
 import { LeadScoreProvider } from './providers/lead-score.provider';
 import { OpportunityWinProvider } from './providers/opportunity-win.provider';
@@ -24,6 +26,12 @@ import { CaseClassifyProvider } from './providers/case-classify.provider';
 import { ModelLifecycleService } from './services/model-lifecycle.service';
 import { ModelCardService } from './services/model-card.service';
 import { DriftMonitorService } from './services/drift-monitor.service';
+// Phase 26 — forecast source registry + orchestrator
+import { DealPipelineSource } from './sources/deal-pipeline.source';
+import { QuoteAggregateSource } from './sources/quote-aggregate.source';
+import { ForecastSourceRegistry } from './orchestrator/forecast-source.registry';
+import { ForecastOrchestrator } from './orchestrator/forecast.orchestrator';
+import { FORECAST_SOURCE } from './interfaces/IForecastSource';
 
 /**
  * AnalyticsModule — Phase 5 P5
@@ -44,7 +52,7 @@ import { DriftMonitorService } from './services/drift-monitor.service';
  *   - ModelLifecycleController (REST endpoints)
  */
 @Module({
-  imports: [WorkRuntimeModule],
+  imports: [WorkRuntimeModule, CostCeilingModule],
   controllers: [
     AnalyticsController,
     ModelLifecycleController,
@@ -73,6 +81,16 @@ import { DriftMonitorService } from './services/drift-monitor.service';
     // Phase 21 — LLM runner (off by default; per-tenant opt-in).
     LlmModelRunner,
     LlmFeatureFlagService,
+    // Phase 26 — forecast source registry + orchestrator
+    DealPipelineSource,
+    QuoteAggregateSource,
+    {
+      provide: FORECAST_SOURCE,
+      useFactory: (deal: DealPipelineSource, quote: QuoteAggregateSource) => [deal, quote],
+      inject: [DealPipelineSource, QuoteAggregateSource],
+    },
+    ForecastSourceRegistry,
+    ForecastOrchestrator,
   ],
   exports: [
     AnalyticsService,
@@ -94,6 +112,12 @@ import { DriftMonitorService } from './services/drift-monitor.service';
     // opt specific tenants in.
     LlmModelRunner,
     LlmFeatureFlagService,
+    // Phase 26 — exported so the deals / chat surfaces can compose
+    // the weighted forecast through the registry.
+    DealPipelineSource,
+    QuoteAggregateSource,
+    ForecastSourceRegistry,
+    ForecastOrchestrator,
   ],
 })
 export class AnalyticsModule {}

@@ -53,6 +53,9 @@ export function AgentCard({ agent, variant = 'full', onAction, selected = false,
         animate={{ opacity: 1, scale: 1 }}
         className={`flex items-center gap-3 p-3 rounded-xl border border-surface-border bg-surface-raised hover:bg-surface-overlay cursor-pointer transition-colors ${selected ? 'ring-1 ring-status-ops' : ''} ${className}`}
         onClick={() => handleAction('inspect')}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAction('inspect'); } }}
       >
         <AgentAvatar name={agent.name} avatarUrl={agent.avatarUrl} emoji={agent.emoji} color={agent.color} size={28} />
         <div className="min-w-0 flex-1">

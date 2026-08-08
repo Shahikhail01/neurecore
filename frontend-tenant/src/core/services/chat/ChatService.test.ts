@@ -74,6 +74,7 @@ describe('ChatService.sendMessage', () => {
         systemPrompt: 'system prompt',
         history: [],
       }),
+      { timeoutMs: undefined },
     );
   });
 

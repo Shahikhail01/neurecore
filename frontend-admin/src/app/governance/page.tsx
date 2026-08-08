@@ -19,7 +19,7 @@ import {
   type GovernanceDomainSummary,
 } from '@/services/governance.service';
 
-const DOMAIN_ICONS: Record<string, JSX.Element> = {
+const DOMAIN_ICONS: Record<string, React.ReactElement> = {
   data: <Database className="h-5 w-5" />,
   'user-access': <ShieldAlert className="h-5 w-5" />,
   operational: <ServerCog className="h-5 w-5" />,
@@ -121,7 +121,7 @@ export default function GovernancePage() {
             >
               <div className="flex items-center gap-2 mb-2 text-white">
                 {DOMAIN_ICONS[d.domain] ?? <Lock className="h-5 w-5" />}
-                <h3 className="text-base font-semibold">{d.displayName}</h3>
+                <h2 className="text-base font-semibold">{d.displayName}</h2>
               </div>
               <div className="grid grid-cols-3 gap-2 text-xs text-white/60">
                 <div>

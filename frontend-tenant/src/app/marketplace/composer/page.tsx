@@ -9,7 +9,7 @@
  * empty state when the role is not eligible.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import TenantShell from '@/components/TenantShell';
 import { useTenantAuth } from '@/hooks/useTenantAuth';
@@ -17,6 +17,8 @@ import { PageShell, PageHero } from '@neurecore/ui-visual';
 import { Sparkles, ShieldAlert } from 'lucide-react';
 import NlDraftPanel from './components/NlDraftPanel';
 import SimulationPanel from './components/SimulationPanel';
+import { SkillGraphControls } from './components/SkillGraphControls';
+import { SkillGraphHttpClient } from './components/SkillGraphClient';
 import type { Edge, Node } from 'reactflow';
 import type { SkillComposerNodeData } from './components/SkillNode';
 
@@ -48,11 +50,25 @@ export default function ComposerPage() {
   const user = useTenantAuth();
   const [nodes, setNodes] = useState<Node<SkillComposerNodeData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [mode, setMode] = useState<'chat' | 'workflow'>('workflow');
+  const graphClient = useMemo(() => new SkillGraphHttpClient(), []);
 
   const handleGraphChange = useCallback(
-    (graph: { nodes: Node<SkillComposerNodeData>[]; edges: Edge[] }) => {
+    (graph: {
+      nodes: Node<SkillComposerNodeData>[];
+      edges: Edge[];
+      mode?: 'chat' | 'workflow';
+    }) => {
       setNodes(graph.nodes);
       setEdges(graph.edges);
+      if (graph.mode) setMode(graph.mode);
+    },
+    [],
+  );
+
+  const handleLoad = useCallback(
+    (row: { graph: { mode: 'chat' | 'workflow' } }) => {
+      setMode(row.graph.mode);
     },
     [],
   );
@@ -99,6 +115,13 @@ export default function ComposerPage() {
             aria-label="Composer side panels"
             style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
           >
+            <SkillGraphControls
+              client={graphClient}
+              nodes={nodes}
+              edges={edges}
+              mode={mode}
+              onLoad={handleLoad}
+            />
             <NlDraftPanel />
             <SimulationPanel nodes={nodes} edges={edges} />
             <section

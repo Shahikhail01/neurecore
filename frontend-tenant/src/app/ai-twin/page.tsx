@@ -258,6 +258,7 @@ function NewTwinForm({
       <input
         type="text"
         placeholder="slug (lowercase, dashes ok)"
+        aria-label="Twin slug"
         value={slug}
         onChange={(e) => setSlug(e.target.value)}
         className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
@@ -265,12 +266,14 @@ function NewTwinForm({
       <input
         type="text"
         placeholder="display name"
+        aria-label="Twin display name"
         value={displayName}
         onChange={(e) => setDisplayName(e.target.value)}
         className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
       />
       <textarea
         placeholder="what should your twin do?"
+        aria-label="Twin goal"
         value={goal}
         onChange={(e) => setGoal(e.target.value)}
         rows={2}
@@ -576,6 +579,7 @@ function WizardStepEditor({
                 onChange={(e) => setText(e.target.value)}
                 rows={3}
                 placeholder="e.g. summarise every new CRM contact and ping me on Slack"
+                aria-label="Describe your goal"
                 className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
               />
             </>
@@ -590,6 +594,7 @@ function WizardStepEditor({
                 onChange={(e) => setText(e.target.value)}
                 rows={3}
                 placeholder="e.g. only act on contacts owned by me; never auto-send emails"
+                aria-label="Refine tools and constraints"
                 className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
               />
             </>
@@ -604,6 +609,7 @@ function WizardStepEditor({
                 onChange={(e) => setText(e.target.value)}
                 rows={3}
                 placeholder="sample prompt → expected output"
+                aria-label="Sample prompt and expected outcome"
                 className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
               />
             </>

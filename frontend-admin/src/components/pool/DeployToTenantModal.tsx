@@ -92,6 +92,9 @@ export function DeployToTenantModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } }}
           onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
         >
           <motion.div
@@ -131,12 +134,14 @@ export function DeployToTenantModal({
                     value={tenantSearch}
                     onChange={(e) => setTenantSearch(e.target.value)}
                     className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)] mb-2"
+                    aria-label="Search tenants"
                   />
                   <select
                     value={tenantId}
                     onChange={(e) => setTenantId(e.target.value)}
                     size={Math.min(filtered.length + 1, 6)}
                     className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)]"
+                    aria-label="Target tenant"
                   >
                     <option value="">— select tenant —</option>
                     {filtered.map((t) => (
@@ -151,10 +156,11 @@ export function DeployToTenantModal({
                 {deployType === 'agent' && (
                   <>
                     <div>
-                      <label className="text-xs text-zinc-500 mb-1.5 block">
+                      <label htmlFor="deploy-agent-name" className="text-xs text-zinc-500 mb-1.5 block">
                         Agent Name
                       </label>
                       <input
+                        id="deploy-agent-name"
                         value={agentName}
                         onChange={(e) => setAgentName(e.target.value)}
                         className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-[color:var(--accent-500)]"
@@ -162,10 +168,11 @@ export function DeployToTenantModal({
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs text-zinc-500 mb-1.5 block">
+                        <label htmlFor="deploy-budget" className="text-xs text-zinc-500 mb-1.5 block">
                           Daily Budget ($)
                         </label>
                         <input
+                          id="deploy-budget"
                           type="number"
                           value={budget}
                           onChange={(e) => setBudget(Number(e.target.value))}
@@ -173,10 +180,11 @@ export function DeployToTenantModal({
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-zinc-500 mb-1.5 block">
+                        <label htmlFor="deploy-authority" className="text-xs text-zinc-500 mb-1.5 block">
                           Authority
                         </label>
                         <select
+                          id="deploy-authority"
                           value={authority}
                           onChange={(e) => setAuthority(e.target.value as AgentDeployConfig['authorityLevel'])}
                           className="w-full rounded border border-surface-border bg-surface-overlay text-zinc-200 text-sm px-3 py-2 focus:outline-none focus:border-[color:var(--accent-500)]"
@@ -193,10 +201,11 @@ export function DeployToTenantModal({
                 {/* Department-specific config */}
                 {deployType === 'department' && (
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1.5 block">
+                    <label htmlFor="deploy-item-index" className="text-xs text-zinc-500 mb-1.5 block">
                       Structure Item Index (0-based)
                     </label>
                     <input
+                      id="deploy-item-index"
                       type="number"
                       value={itemIndex}
                       onChange={(e) => setItemIndex(Number(e.target.value))}

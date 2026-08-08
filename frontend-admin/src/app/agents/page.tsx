@@ -90,6 +90,7 @@ export default function AdminAgentFleetPage() {
         {/* ── Toolbar ── */}
         <div className="flex flex-wrap items-center gap-3">
           <input
+            aria-label="Search agents"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search employees or tenants…"

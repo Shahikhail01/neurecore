@@ -163,6 +163,7 @@ export default function RoutinesPage() {
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <div className="relative flex-1 min-w-60">
                 <input
+                  aria-label="Search routines"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search routines…"

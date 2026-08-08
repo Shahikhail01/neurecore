@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { MiniMaxClient } from '../models/services/minimax-client.service';
 import { OfficialAgentGraph } from '../agents/langgraph/langgraph-official';
@@ -26,6 +26,9 @@ import {
 import { TypedParameterExtractor } from '../service-gateway-v2/router/parameter-extractor';
 import { RoutingDecisionsService } from '../routing-decisions/routing-decisions.service';
 import { createHash } from 'crypto';
+import { AGENT_CHAT_DISPATCHER } from '../agent-runtime/runtime/agent-runtime-chat-dispatcher';
+import type { IAgentChatDispatcher } from '../agent-runtime/runtime/agent-runtime-chat-dispatcher';
+import { PHASE_13_OOB_AGENT_IDS } from '../agent-templates/agents.registry';
 
 // PERF-FIX: in-process LRU cache for the tenant-data snapshot used to
 // ground chat replies. Six parallel Postgres queries per chat message
@@ -113,6 +116,9 @@ export class ChatService {
     private readonly routingDecisions: RoutingDecisionsService,
     private readonly tenantLlmGateway: TenantLlmGateway,
     private readonly skillRegistry: import('../skill-registry/skill-registry.service').SkillRegistry,
+    @Optional()
+    @Inject(AGENT_CHAT_DISPATCHER)
+    private readonly agentDispatcher?: IAgentChatDispatcher,
   ) {}
 
   private saveReply(
@@ -382,6 +388,26 @@ export class ChatService {
         skillReply,
       );
       return skillReply;
+    }
+
+    // PHASE 23: AGENT-INTENT — route explicit `/agent <id>: <message>`
+    // commands through the agent runtime (real executor + approval gate).
+    // Additive: when no agent dispatcher is wired (or the message is not
+    // an agent command) this returns null and the normal path continues.
+    const agentReply = await this.tryDispatchAgentIntent(
+      dto,
+      conversationId,
+      tenantIdFromJwt,
+      userIdFromJwt,
+    );
+    if (agentReply) {
+      this.saveReply(
+        conversationId,
+        tenantIdForHistory,
+        userIdForHistory,
+        agentReply,
+      );
+      return agentReply;
     }
 
     // PROJECT-CREATION INTENT: bypass the model entirely and drive a
@@ -1018,6 +1044,80 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
           limits: [reason],
           citations: 0,
         },
+      };
+    }
+  }
+
+  /**
+   * Phase 23 — Agent-intent dispatcher.
+   *
+   * Routes an explicit `/agent <id>: <message>` command through the
+   * agent runtime (real executor + approval gate). Returns a reply
+   * payload when the message is a recognised agent command and an
+   * executor is wired; returns null otherwise so the caller falls
+   * through to the normal chat path.
+   *
+   * Routing grammar:
+   *   - "/agent <agentId>: <message>"  e.g. "/agent CR-AI-0503: score this lead"
+   *
+   * The agentId must be one of the OOB catalog ids; anything else is
+   * ignored (returns null) so the chat path is unaffected.
+   */
+  private async tryDispatchAgentIntent(
+    dto: SendChatMessageDto,
+    conversationId: string,
+    tenantIdFromJwt: string | null | undefined,
+    userIdFromJwt: string | null | undefined,
+  ): Promise<{
+    reply: string;
+    conversationId: string;
+    tokens: { input: number; output: number; total: number };
+    model: string;
+    provider: string;
+  } | null> {
+    if (!this.agentDispatcher) return null;
+    const raw = dto.message ?? '';
+    if (!raw.toLowerCase().startsWith('/agent')) return null;
+    const tenantId = tenantIdFromJwt;
+    if (!tenantId || tenantId === '*') return null;
+
+    // Parse "/agent <id>: <message>"
+    const rest = raw.trim().slice('/agent'.length).trim();
+    const sepIdx = rest.indexOf(':');
+    if (sepIdx <= 0) return null;
+    const agentId = rest.slice(0, sepIdx).trim();
+    const message = rest.slice(sepIdx + 1).trim();
+    if (!(PHASE_13_OOB_AGENT_IDS as readonly string[]).includes(agentId)) {
+      return null;
+    }
+    if (!message) return null;
+
+    try {
+      const out = await this.agentDispatcher.dispatch({
+        agentId: agentId as never,
+        intent: 'chat.agent-intent',
+        message,
+        tenantId,
+        actorUserId: userIdFromJwt ?? 'anonymous',
+        actorRole: 'USER',
+      });
+      if (!out) return null;
+      return {
+        reply: out.reply,
+        conversationId,
+        tokens: { input: 0, output: 0, total: 0 },
+        model: `agent:${agentId}`,
+        provider: 'agent-runtime',
+      };
+    } catch (err) {
+      // Never fake success; surface a typed failure message.
+      const reason = err instanceof Error ? err.message : String(err);
+      return {
+        reply: `Agent \`${agentId}\` failed: ${reason}`,
+        conversationId,
+        tokens: { input: 0, output: 0, total: 0 },
+        model: `agent:${agentId}`,
+        provider: 'agent-runtime',
       };
     }
   }

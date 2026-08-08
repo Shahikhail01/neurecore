@@ -1,13 +1,19 @@
 /**
- * Phase 16 — ActionExtractorService tests.
+ * Phase 16 + Phase 25 — ActionExtractorService tests.
  */
 
 import {
   ActionExtractorService,
   ActionExtractionForbiddenError,
+  type IOwnerResolver,
 } from './action-extractor.service';
 
-const svc = new ActionExtractorService();
+const noopResolver: IOwnerResolver = {
+  resolve: async () => null,
+  candidates: async () => [],
+};
+
+const svc = new ActionExtractorService(noopResolver);
 
 describe('Phase 16 — ActionExtractorService', () => {
   it('refuses wildcard tenantId', () => {

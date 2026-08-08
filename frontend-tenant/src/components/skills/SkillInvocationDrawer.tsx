@@ -134,10 +134,15 @@ export function SkillInvocationDrawer({ skill, onClose }: SkillInvocationDrawerP
       aria-labelledby={`skill-${skill.id}-title`}
       className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center"
       onClick={onClose}
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(); } }}
     >
       <div
         className="bg-background rounded-t-lg md:rounded-lg w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); } }}
       >
         <header className="mb-4">
           <h2 id={`skill-${skill.id}-title`} className="font-semibold text-foreground">

@@ -110,6 +110,7 @@ export default function ThreadInboxPanel() {
             {threads.map((thread) => (
               <motion.button
                 key={thread.id}
+                type="button"
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}

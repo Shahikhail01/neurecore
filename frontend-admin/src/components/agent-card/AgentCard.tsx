@@ -53,10 +53,13 @@ export function AgentCard({ agent, variant = 'full', onAction, selected = false,
   if (variant === 'compact') {
     return (
       <motion.div
+        role="button"
+        tabIndex={0}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className={`flex items-center gap-3 p-3 rounded-xl border border-surface-border bg-surface-raised hover:bg-surface-overlay cursor-pointer transition-colors ${selected ? 'ring-1 ring-status-ops' : ''} ${className}`}
         onClick={() => handleAction('inspect')}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAction('inspect'); } }}
       >
         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotClass}`} />
         <span className="text-sm font-medium text-zinc-200 truncate flex-1">{agent.name}</span>

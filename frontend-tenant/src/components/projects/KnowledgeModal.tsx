@@ -163,6 +163,7 @@ export function KnowledgeModal({
           <input
             type="text"
             placeholder="Search memories…"
+            aria-label="Search memories"
             value={memorySearch}
             onChange={(e) => setMemorySearch(e.target.value)}
             className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"
@@ -174,6 +175,7 @@ export function KnowledgeModal({
               <select
                 value={memoryCategory}
                 onChange={(e) => setMemoryCategory(e.target.value as (typeof MEMORY_CATEGORIES)[number])}
+                aria-label="Memory category"
                 className="px-2 py-1.5 bg-surface text-xs text-zinc-300 rounded border border-surface-border focus:outline-none focus:border-primary"
               >
                 {MEMORY_CATEGORIES.map((c) => (
@@ -183,6 +185,7 @@ export function KnowledgeModal({
               <input
                 type="text"
                 placeholder="What should the project remember?"
+                aria-label="Memory content"
                 value={memoryContent}
                 onChange={(e) => setMemoryContent(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void handleAddMemory()}
@@ -239,21 +242,27 @@ export function KnowledgeModal({
           <div className="space-y-2 p-3 border border-surface-border rounded-lg bg-surface-muted/30">
             <p className="text-xs text-zinc-500 font-medium">Record a Decision</p>
             <input
+              id="decision-title"
               type="text"
               placeholder="Decision title"
+              aria-label="Decision title"
               value={decisionTitle}
               onChange={(e) => setDecisionTitle(e.target.value)}
               className="w-full px-3 py-1.5 bg-surface text-sm text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-primary"
             />
             <textarea
+              id="decision-description"
               placeholder="Description (optional)"
+              aria-label="Decision description"
               value={decisionDesc}
               onChange={(e) => setDecisionDesc(e.target.value)}
               rows={2}
               className="w-full px-3 py-1.5 bg-surface text-sm text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-primary resize-none"
             />
             <textarea
+              id="decision-rationale"
               placeholder="Rationale (optional)"
+              aria-label="Decision rationale"
               value={decisionRationale}
               onChange={(e) => setDecisionRationale(e.target.value)}
               rows={2}

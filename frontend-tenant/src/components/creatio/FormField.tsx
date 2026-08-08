@@ -8,6 +8,7 @@
  */
 
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, ReactNode } from 'react';
+import { useId } from 'react';
 
 const BASE = 'w-full bg-surface-overlay border border-surface-border rounded-md px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition disabled:opacity-50 disabled:cursor-not-allowed';
 
@@ -52,10 +53,12 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   error?: string;
 }
 
-export function TextField({ label, hint, error, required, ...rest }: TextFieldProps) {
+export function TextField({ label, hint, error, required, id, ...rest }: TextFieldProps) {
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
   return (
-    <FieldShell label={label} required={required} hint={hint} error={error}>
-      <input className={BASE} required={required} {...rest} />
+    <FieldShell label={label} required={required} hint={hint} error={error} htmlFor={label ? fieldId : undefined}>
+      <input id={label ? fieldId : undefined} className={BASE} required={required} {...rest} />
     </FieldShell>
   );
 }
@@ -66,10 +69,12 @@ export interface TextAreaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaE
   error?: string;
 }
 
-export function TextAreaField({ label, hint, error, required, rows = 3, ...rest }: TextAreaFieldProps) {
+export function TextAreaField({ label, hint, error, required, rows = 3, id, ...rest }: TextAreaFieldProps) {
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
   return (
-    <FieldShell label={label} required={required} hint={hint} error={error}>
-      <textarea className={`${BASE} resize-y`} rows={rows} required={required} {...rest} />
+    <FieldShell label={label} required={required} hint={hint} error={error} htmlFor={label ? fieldId : undefined}>
+      <textarea id={label ? fieldId : undefined} className={`${BASE} resize-y`} rows={rows} required={required} {...rest} />
     </FieldShell>
   );
 }
@@ -80,10 +85,12 @@ export interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement
   error?: string;
 }
 
-export function SelectField({ label, hint, error, required, children, ...rest }: SelectFieldProps) {
+export function SelectField({ label, hint, error, required, children, id, ...rest }: SelectFieldProps) {
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
   return (
-    <FieldShell label={label} required={required} hint={hint} error={error}>
-      <select className={BASE} required={required} {...rest}>
+    <FieldShell label={label} required={required} hint={hint} error={error} htmlFor={label ? fieldId : undefined}>
+      <select id={label ? fieldId : undefined} className={BASE} required={required} {...rest}>
         {children}
       </select>
     </FieldShell>
@@ -96,10 +103,12 @@ export interface DateFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   error?: string;
 }
 
-export function DateField({ label, hint, error, required, ...rest }: DateFieldProps) {
+export function DateField({ label, hint, error, required, id, ...rest }: DateFieldProps) {
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
   return (
-    <FieldShell label={label} required={required} hint={hint} error={error}>
-      <input type="date" className={BASE} required={required} {...rest} />
+    <FieldShell label={label} required={required} hint={hint} error={error} htmlFor={label ? fieldId : undefined}>
+      <input id={label ? fieldId : undefined} type="date" className={BASE} required={required} {...rest} />
     </FieldShell>
   );
 }

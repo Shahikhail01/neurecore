@@ -162,10 +162,11 @@ export default function AdminBrevoSuppressionsPage() {
       {/* ── Filters + Add ───────────────────────────────────── */}
       <div className="flex flex-wrap gap-2 mb-4 items-end">
         <div className="grow min-w-[180px]">
-          <label className="block text-[11px] uppercase text-zinc-500 mb-1">
+          <label htmlFor="brevo-supp-email" className="block text-[11px] uppercase text-zinc-500 mb-1">
             Email contains
           </label>
           <input
+            id="brevo-supp-email"
             type="search"
             value={email}
             onChange={(e) => {
@@ -177,10 +178,11 @@ export default function AdminBrevoSuppressionsPage() {
           />
         </div>
         <div className="grow min-w-[180px]">
-          <label className="block text-[11px] uppercase text-zinc-500 mb-1">
+          <label htmlFor="brevo-supp-reason" className="block text-[11px] uppercase text-zinc-500 mb-1">
             Reason
           </label>
           <select
+            id="brevo-supp-reason"
             value={reason}
             onChange={(e) => {
               setReason(e.target.value as BrevoSuppressionReason | "");
@@ -197,10 +199,11 @@ export default function AdminBrevoSuppressionsPage() {
           </select>
         </div>
         <div className="grow min-w-[180px]">
-          <label className="block text-[11px] uppercase text-zinc-500 mb-1">
+          <label htmlFor="brevo-supp-tenant" className="block text-[11px] uppercase text-zinc-500 mb-1">
             Tenant
           </label>
           <select
+            id="brevo-supp-tenant"
             value={tenantId}
             onChange={(e) => {
               setTenantId(e.target.value);
@@ -343,10 +346,11 @@ export default function AdminBrevoSuppressionsPage() {
             </h2>
             <div className="space-y-3 text-sm">
               <div>
-                <label className="block text-[11px] uppercase text-zinc-500 mb-1">
+                <label htmlFor="brevo-supp-add-email" className="block text-[11px] uppercase text-zinc-500 mb-1">
                   Email
                 </label>
                 <input
+                  id="brevo-supp-add-email"
                   type="email"
                   value={draft.email}
                   onChange={(e) =>
@@ -357,10 +361,11 @@ export default function AdminBrevoSuppressionsPage() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] uppercase text-zinc-500 mb-1">
+                <label htmlFor="brevo-supp-add-reason" className="block text-[11px] uppercase text-zinc-500 mb-1">
                   Reason
                 </label>
                 <select
+                  id="brevo-supp-add-reason"
                   value={draft.reason}
                   onChange={(e) =>
                     setDraft((d) => ({
@@ -378,10 +383,11 @@ export default function AdminBrevoSuppressionsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] uppercase text-zinc-500 mb-1">
+                <label htmlFor="brevo-supp-add-tenant" className="block text-[11px] uppercase text-zinc-500 mb-1">
                   Tenant (leave blank for global)
                 </label>
                 <select
+                  id="brevo-supp-add-tenant"
                   value={draft.tenantId}
                   onChange={(e) =>
                     setDraft((d) => ({ ...d, tenantId: e.target.value }))

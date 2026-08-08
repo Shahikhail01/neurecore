@@ -57,6 +57,7 @@ export function FieldEditor({
     <div className="rounded-lg border border-surface-border bg-surface-overlay p-3 space-y-2">
       <div className="flex items-center gap-2">
         <input
+          aria-label="Field label"
           value={field.label}
           onChange={(e) => onChange({ label: e.target.value })}
           placeholder="Field label"
@@ -64,6 +65,7 @@ export function FieldEditor({
           className="flex-1 px-2 py-1 bg-surface text-xs text-zinc-200 rounded border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)] disabled:opacity-50"
         />
         <select
+          aria-label="Field type"
           value={field.type}
           onChange={(e) => onChange({ type: e.target.value as FieldType })}
           disabled={readOnly}
@@ -98,6 +100,7 @@ export function FieldEditor({
       </div>
       <div className="flex items-center gap-2">
         <input
+          aria-label="Field key"
           value={field.key}
           onChange={(e) =>
             onChange({ key: e.target.value.toLowerCase().replace(/\s+/g, '_') })
@@ -108,6 +111,7 @@ export function FieldEditor({
         />
         {(field.type === 'SELECT' || field.type === 'MULTI_SELECT') && (
           <input
+            aria-label="Field options"
             value={optionsText}
             onChange={(e) => handleOptionsChange(e.target.value)}
             placeholder="option1, option2, option3"

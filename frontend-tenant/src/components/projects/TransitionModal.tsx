@@ -44,6 +44,7 @@ export function TransitionModal({
         <div className="space-y-1">
           <label className="text-xs text-zinc-500">Transition to</label>
           <select
+            aria-label="Transition to status"
             value={next}
             onChange={(e) => setNext(e.target.value as ProjectStatus)}
             className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"
@@ -59,6 +60,7 @@ export function TransitionModal({
           <div>
             <label className="text-xs text-zinc-500">Reason (required)</label>
             <textarea
+              aria-label="Reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               className="w-full mt-1 px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-primary"

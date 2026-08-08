@@ -130,7 +130,10 @@ export default function TiersPage() {
 function TierCard({ tier, canEdit, onEdit }: { tier: Tier; canEdit: boolean; onEdit: () => void }) {
   return (
     <div
+      role="button"
+      tabIndex={canEdit ? 0 : -1}
       onClick={canEdit ? onEdit : undefined}
+      onKeyDown={(e) => { if (canEdit && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onEdit(); } }}
       className={`relative p-5 rounded-xl border border-surface-border bg-surface-raised ${
         canEdit ? 'cursor-pointer hover:border-accent-500/40' : ''
       } transition`}
@@ -138,7 +141,7 @@ function TierCard({ tier, canEdit, onEdit }: { tier: Tier; canEdit: boolean; onE
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold text-zinc-100">{tier.name}</h3>
+            <h2 className="text-base font-semibold text-zinc-100">{tier.name}</h2>
             {tier.isDefault && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-[color:var(--state-success)]/15 text-[color:var(--state-success)]">
                 Default

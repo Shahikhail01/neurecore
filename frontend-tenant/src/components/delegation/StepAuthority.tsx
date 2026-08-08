@@ -76,6 +76,7 @@ export function StepAuthority({ form, patch }: Props) {
           </label>
           <input
             type="number"
+            aria-label="Approval threshold"
             min={0}
             step={0.01}
             value={form.approvalThreshold ?? ''}

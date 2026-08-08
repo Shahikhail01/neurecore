@@ -334,6 +334,7 @@ export function AgentInspector({ id }: { id: string }) {
               />
               <div className="flex gap-2">
                 <input
+                  id="agent-avatar-file"
                   ref={fileInputRef}
                   type="file"
                   accept={AGENT_AVATAR_UPLOAD.allowedTypes.join(',')}
@@ -367,8 +368,9 @@ export function AgentInspector({ id }: { id: string }) {
               <SectionHeader title="Identity" />
               <div className="space-y-3 pl-4">
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Agent Name</label>
+                  <label htmlFor="agent-edit-name" className="text-xs text-zinc-500 mb-1 block">Agent Name</label>
                   <input
+                    id="agent-edit-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -378,8 +380,9 @@ export function AgentInspector({ id }: { id: string }) {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Description</label>
+                  <label htmlFor="agent-edit-description" className="text-xs text-zinc-500 mb-1 block">Description</label>
                   <textarea
+                    id="agent-edit-description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="w-full px-3 py-2 text-sm text-zinc-200 bg-surface rounded-lg border border-surface-border focus:border-accent-500 outline-none transition resize-y min-h-[60px]"
@@ -395,8 +398,9 @@ export function AgentInspector({ id }: { id: string }) {
               <SectionHeader title="Profile" />
               <div className="space-y-3 pl-4">
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Designation</label>
+                  <label htmlFor="agent-edit-designation" className="text-xs text-zinc-500 mb-1 block">Designation</label>
                   <input
+                    id="agent-edit-designation"
                     type="text"
                     value={designation}
                     onChange={(e) => setDesignation(e.target.value)}
@@ -406,8 +410,9 @@ export function AgentInspector({ id }: { id: string }) {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Bio</label>
+                  <label htmlFor="agent-edit-bio" className="text-xs text-zinc-500 mb-1 block">Bio</label>
                   <textarea
+                    id="agent-edit-bio"
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     className="w-full px-3 py-2 text-sm text-zinc-200 bg-surface rounded-lg border border-surface-border focus:border-accent-500 outline-none transition resize-y min-h-[80px]"
@@ -417,8 +422,9 @@ export function AgentInspector({ id }: { id: string }) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Color</label>
+                    <label htmlFor="agent-edit-color" className="text-xs text-zinc-500 mb-1 block">Color</label>
                     <select
+                      id="agent-edit-color"
                       value={color ?? ''}
                       onChange={(e) => setColor(e.target.value || null)}
                       className="w-full px-3 py-2 text-sm text-zinc-200 bg-surface rounded-lg border border-surface-border focus:border-accent-500 outline-none transition"
@@ -430,8 +436,9 @@ export function AgentInspector({ id }: { id: string }) {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Emoji</label>
+                    <label htmlFor="agent-edit-emoji" className="text-xs text-zinc-500 mb-1 block">Emoji</label>
                     <input
+                      id="agent-edit-emoji"
                       type="text"
                       value={emoji}
                       onChange={(e) => setEmoji(e.target.value)}
@@ -449,8 +456,9 @@ export function AgentInspector({ id }: { id: string }) {
               <SectionHeader title="Configuration" />
               <div className="space-y-3 pl-4">
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">AI Model</label>
+                  <label htmlFor="agent-edit-model" className="text-xs text-zinc-500 mb-1 block">AI Model</label>
                   <select
+                    id="agent-edit-model"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                     className="w-full px-3 py-2 text-sm text-zinc-200 bg-surface rounded-lg border border-surface-border focus:border-accent-500 outline-none transition"
@@ -461,8 +469,9 @@ export function AgentInspector({ id }: { id: string }) {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Department</label>
+                  <label htmlFor="agent-edit-dept" className="text-xs text-zinc-500 mb-1 block">Department</label>
                   <select
+                    id="agent-edit-dept"
                     value={departmentId}
                     onChange={(e) => setDepartmentId(e.target.value)}
                     disabled={loadingDepts}
@@ -475,8 +484,9 @@ export function AgentInspector({ id }: { id: string }) {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Daily Budget ($)</label>
+                  <label htmlFor="agent-edit-budget" className="text-xs text-zinc-500 mb-1 block">Daily Budget ($)</label>
                   <input
+                    id="agent-edit-budget"
                     type="number"
                     value={budgetPerDay}
                     onChange={(e) => setBudgetPerDay(e.target.value)}
@@ -495,8 +505,9 @@ export function AgentInspector({ id }: { id: string }) {
               <SectionHeader title="Instructions" />
               <div className="space-y-3 pl-4">
                 <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Instructions</label>
+                  <label htmlFor="agent-edit-instructions" className="text-xs text-zinc-500 mb-1 block">Instructions</label>
                   <textarea
+                    id="agent-edit-instructions"
                     value={instructions}
                     onChange={(e) => setInstructions(e.target.value)}
                     className="w-full px-3 py-2 text-sm text-zinc-200 bg-surface rounded-lg border border-surface-border focus:border-accent-500 outline-none transition resize-y min-h-[80px]"
@@ -516,8 +527,9 @@ export function AgentInspector({ id }: { id: string }) {
               {showAdvanced && (
                 <div className="space-y-3 pl-4">
                   <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">System Prompt</label>
+                    <label htmlFor="agent-edit-system-prompt" className="text-xs text-zinc-500 mb-1 block">System Prompt</label>
                     <textarea
+                      id="agent-edit-system-prompt"
                       value={systemPrompt}
                       onChange={(e) => setSystemPrompt(e.target.value)}
                       className="w-full px-3 py-2 text-sm text-zinc-200 bg-surface rounded-lg border border-surface-border focus:border-accent-500 outline-none transition resize-y min-h-[100px] font-mono text-xs"

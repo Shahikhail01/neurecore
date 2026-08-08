@@ -1,31 +1,26 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { getActiveLocaleContext } from "@/shared/i18n/active-locale";
+import { localeFormatters } from "@/shared/i18n/locale-formatter.registry";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Additional utility functions used in Paperclip UI
+// Phase 29 (CR-AI-1304) — every helper below renders through the
+// resolved locale context. No hard-coded `en-US`, no hard-coded `$`,
+// no server-time-zone drift.
+
 export function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+  return localeFormatters.format("currency", cents, getActiveLocaleContext());
 }
 
 export function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return localeFormatters.format("date", date, getActiveLocaleContext());
 }
 
 export function formatDateTime(date: Date | string): string {
-  return new Date(date).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return localeFormatters.format("datetime", date, getActiveLocaleContext());
 }
 
 export function relativeTime(date: Date | string): string {

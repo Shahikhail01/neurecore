@@ -86,6 +86,7 @@ function FieldControl({
         <input
           type="text"
           className={baseInput}
+          aria-label={question.label}
           value={(value as string) ?? ''}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
@@ -98,6 +99,7 @@ function FieldControl({
           type="number"
           step="any"
           className={baseInput}
+          aria-label={question.label}
           value={value === '' || value === null || value === undefined ? '' : (value as number)}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
@@ -108,6 +110,7 @@ function FieldControl({
         <input
           type="date"
           className={baseInput}
+          aria-label={question.label}
           value={
             typeof value === 'string'
               ? value.slice(0, 10)
@@ -121,6 +124,7 @@ function FieldControl({
       return (
         <select
           className={baseInput}
+          aria-label={question.label}
           value={value === true || value === 'true' ? 'true' : value === false || value === 'false' ? 'false' : ''}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value === '' ? null : e.target.value === 'true')}
@@ -134,6 +138,7 @@ function FieldControl({
       return (
         <select
           className={baseInput}
+          aria-label={question.label}
           value={(value as string) ?? ''}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value || null)}

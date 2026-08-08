@@ -85,9 +85,9 @@ export default function ReviewsInboxPage() {
               data-testid="reviews-empty"
             >
               <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-400" />
-              <h3 className="mt-4 text-lg font-medium text-zinc-900">
+              <h2 className="mt-4 text-lg font-medium text-zinc-900">
                 All caught up
-              </h3>
+              </h2>
               <p className="mt-1 text-sm text-zinc-500">
                 No pending reviews right now. Refresh after new AI work
                 completes.

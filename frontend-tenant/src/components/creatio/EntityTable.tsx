@@ -183,6 +183,9 @@ export function EntityTable<T extends { id?: string }>({
                       animate={{ opacity: 1 }}
                       transition={{ delay: idx * 0.02, duration: 0.15 }}
                       onClick={() => onRowClick?.(row)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick?.(row); } }}
                       className={`border-b border-surface-border transition-colors ${
                         onRowClick ? 'cursor-pointer hover:bg-surface-overlay' : ''
                       } ${isSelected ? 'bg-accent-500/5' : ''}`}

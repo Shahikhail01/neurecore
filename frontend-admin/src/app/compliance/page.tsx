@@ -144,7 +144,7 @@ function StandardCard({ standard }: { standard: StandardPosture }) {
       className={`rounded-md border p-4 ${STATUS_COLOR[standard.status]}`}
     >
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-base font-semibold">{standard.displayName}</h3>
+        <h2 className="text-base font-semibold">{standard.displayName}</h2>
         <span className="text-xs font-mono">{standard.score}/100</span>
       </div>
       <div className="text-xs mb-2 opacity-80">

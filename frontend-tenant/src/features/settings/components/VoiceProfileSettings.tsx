@@ -120,6 +120,7 @@ export function VoiceProfileSettings() {
                       <select
                         value={profile.language}
                         onChange={(e) => updateLanguage(profile.id, e.target.value as LanguageCode)}
+                        aria-label="Profile language"
                         className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 focus:border-[color:var(--accent-500)] focus:outline-none"
                       >
                         {SUPPORTED_LANGUAGES.map((l) => (
@@ -158,6 +159,7 @@ export function VoiceProfileSettings() {
                         <input
                           type="text"
                           placeholder="Spoken phrase…"
+                          aria-label="Custom phrase"
                           value={newPhrase}
                           onChange={(e) => setNewPhrase(e.target.value)}
                           className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 placeholder-zinc-600 focus:border-[color:var(--accent-500)] focus:outline-none"
@@ -165,6 +167,7 @@ export function VoiceProfileSettings() {
                         <select
                           value={newPhraseAction}
                           onChange={(e) => setNewPhraseAction(e.target.value as VoiceCommandAction)}
+                          aria-label="Command action"
                           className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-[color:var(--accent-500)] focus:outline-none"
                         >
                           {COMMAND_ACTIONS.map((a) => (
@@ -198,6 +201,7 @@ export function VoiceProfileSettings() {
           <input
             type="text"
             placeholder="Profile name…"
+            aria-label="New profile name"
             value={newProfileName}
             onChange={(e) => setNewProfileName(e.target.value)}
             className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:border-[color:var(--accent-500)] focus:outline-none"
@@ -205,6 +209,7 @@ export function VoiceProfileSettings() {
           <select
             value={newProfileLang}
             onChange={(e) => setNewProfileLang(e.target.value as LanguageCode)}
+            aria-label="New profile language"
             className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 focus:border-[color:var(--accent-500)] focus:outline-none"
           >
             {SUPPORTED_LANGUAGES.map((l) => (

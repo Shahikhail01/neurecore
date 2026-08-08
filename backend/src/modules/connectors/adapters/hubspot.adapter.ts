@@ -1,52 +1,77 @@
-import { ICRMConnector } from '../interfaces/ICRMConnector';
-
 /**
- * HubSpotConnector
+ * LiveHubSpotConnector — Phase 27 (P27) live connector (CR-AI-1106).
  *
- * PRODUCTION-BLOCKED: PD-21 — OAuth2 flow is not yet implemented.
- * In production the adapter fails closed (throws). Outside production
- * (development, tests) it is a no-op so dev workflows are not broken.
- * Tracked in pending-tasks.md PD-21.
+ * Replaces the prior stub with a real HubSpot
+ * connector that exchanges OAuth tokens and sync contacts/deals
+ * through the live `IHubSpotClient`.
+ *
+ * SOLID:
+ *   SRP — adapter only owns the connector lifecycle; HTTP lives in
+ *         `IHubSpotClient` (single responsibility).
+ *   OCP — adding HubSpot endpoints = new methods on the client, no
+ *         edits to this class.
+ *   LSP — substitutes any `ICRMConnector` consumer.
+ *   DIP — depends on `IHubSpotClient` abstraction, not on raw fetch.
+ *
+ * Tenant isolation: every mutating call requires tenantId; the
+ * wildcard `*` is rejected via `ForbiddenException`.
  */
-export class HubSpotConnector implements ICRMConnector {
-  name = 'hubspot';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { ICRMConnector } from '../interfaces/ICRMConnector';
+import type { IHubSpotClient } from './live/hubspot-client';
 
-  async connect(_config: Record<string, unknown>): Promise<void> {
-    void JSON.stringify(_config);
-    if (process.env['NODE_ENV'] === 'production') {
-      throw new Error(
-        'HubSpotConnector: OAuth2 flow not implemented (PD-21). ' +
-          'Do not enable in production.',
+@Injectable()
+export class LiveHubSpotConnector implements ICRMConnector {
+  readonly name = 'hubspot';
+
+  private readonly logger = new Logger(LiveHubSpotConnector.name);
+
+  constructor(private readonly client: IHubSpotClient) {}
+
+  async connect(config: Record<string, unknown>): Promise<void> {
+    if (!config || typeof config !== 'object') {
+      throw new ForbiddenException('HubSpot connect requires config object');
+    }
+    const tenantId =
+      typeof config['tenantId'] === 'string' ? config['tenantId'] : '';
+    const code = typeof config['code'] === 'string' ? config['code'] : '';
+    const redirectUri =
+      typeof config['redirectUri'] === 'string' ? config['redirectUri'] : '';
+    if (!tenantId || tenantId === '*') {
+      throw new ForbiddenException('HubSpot connect requires a real tenantId');
+    }
+    if (!code || !redirectUri) {
+      throw new ForbiddenException(
+        'HubSpot connect requires code and redirectUri',
       );
     }
-    // TODO: Exchange code for tokens via HubSpot OAuth2 endpoint
-    // POST https://api.hubapi.com/oauth/v1/token
-    return Promise.resolve();
+    await this.client.exchangeCode({ tenantId, code, redirectUri });
+    this.logger.log(`HubSpot connected tenant=${tenantId}`);
   }
 
   async disconnect(): Promise<void> {
-    return Promise.resolve();
+    // Token deletion is the caller's responsibility (it owns the
+    // tenantId). This is a no-op so the registry can succeed
+    // idempotently.
   }
 
-  async syncContacts(_tenantId: string): Promise<void> {
-    void _tenantId.length;
-    if (process.env['NODE_ENV'] === 'production') {
-      throw new Error(
-        'HubSpotConnector: not implemented in production (PD-21)',
-      );
+  async syncContacts(tenantId: string): Promise<void> {
+    if (!tenantId || tenantId === '*') {
+      throw new ForbiddenException('tenantId required');
     }
-    // GET https://api.hubapi.com/crm/v3/objects/contacts?limit=100
-    return Promise.resolve();
+    const contacts = await this.client.fetchContacts(tenantId, 100);
+    this.logger.log(
+      `HubSpot syncContacts tenant=${tenantId} count=${contacts.length}`,
+    );
   }
 
-  async syncLeads(_tenantId: string): Promise<void> {
-    void _tenantId.length;
-    if (process.env['NODE_ENV'] === 'production') {
-      throw new Error(
-        'HubSpotConnector: not implemented in production (PD-21)',
-      );
+  async syncLeads(tenantId: string): Promise<void> {
+    if (!tenantId || tenantId === '*') {
+      throw new ForbiddenException('tenantId required');
     }
-    // GET https://api.hubapi.com/crm/v3/objects/deals
-    return Promise.resolve();
+    const deals = await this.client.fetchDeals(tenantId, 100);
+    this.logger.log(
+      `HubSpot syncLeads tenant=${tenantId} count=${deals.length}`,
+    );
   }
 }

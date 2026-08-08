@@ -86,11 +86,14 @@ export function DataTable<T extends { id?: string }>({
               data.map((row, i) => (
                 <motion.tr
                   key={(row as { id?: string }).id ?? i}
+                  role={onRowClick ? "button" : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: i * 0.02 }}
                   className={`border-b border-surface-border/60 transition-colors ${onRowClick ? 'cursor-pointer hover:bg-surface-raised' : ''}`}
                   onClick={() => onRowClick?.(row)}
+                  onKeyDown={(e) => { if (onRowClick && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onRowClick(row); } }}
                 >
                   {columns.map((col) => (
                     <td key={col.key} className="px-4 py-3 text-zinc-300">

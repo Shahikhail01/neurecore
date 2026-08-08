@@ -79,10 +79,11 @@ export default function AdminBrevoEventsPage() {
       {/* ── Filters ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
         <div>
-          <label className="block text-[11px] uppercase text-zinc-500 mb-1">
+          <label htmlFor="brevo-events-tenant" className="block text-[11px] uppercase text-zinc-500 mb-1">
             Tenant
           </label>
           <select
+            id="brevo-events-tenant"
             value={tenantId}
             onChange={(e) => {
               setTenantId(e.target.value);
@@ -99,10 +100,11 @@ export default function AdminBrevoEventsPage() {
           </select>
         </div>
         <div>
-          <label className="block text-[11px] uppercase text-zinc-500 mb-1">
+          <label htmlFor="brevo-events-type" className="block text-[11px] uppercase text-zinc-500 mb-1">
             Event type
           </label>
           <select
+            id="brevo-events-type"
             value={eventType}
             onChange={(e) => {
               setEventType(e.target.value as BrevoWebhookEventType | "");
@@ -119,10 +121,11 @@ export default function AdminBrevoEventsPage() {
           </select>
         </div>
         <div>
-          <label className="block text-[11px] uppercase text-zinc-500 mb-1">
+          <label htmlFor="brevo-events-messageid" className="block text-[11px] uppercase text-zinc-500 mb-1">
             Message ID
           </label>
           <input
+            id="brevo-events-messageid"
             type="search"
             value={messageId}
             onChange={(e) => {

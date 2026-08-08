@@ -275,6 +275,7 @@ function DepartmentsTab() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-48">
           <input
+            aria-label="Search departments"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search departments…"
@@ -357,7 +358,7 @@ function DepartmentsTab() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-semibold text-zinc-100 truncate">{dept.name}</h3>
+                        <h2 className="text-sm font-semibold text-zinc-100 truncate">{dept.name}</h2>
                         {dept.harmonyScore != null && (
                           <StatusBadge status={dept.harmonyScore >= 70 ? 'ACTIVE' : 'WARNING'} label={`Harmony ${dept.harmonyScore}%`} />
                         )}

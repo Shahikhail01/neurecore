@@ -133,7 +133,7 @@ export function ContextChips({
               type="button"
               onClick={chip.onRemove}
               aria-label={`Remove ${chip.group} ${chip.label} from context`}
-              className="ml-0.5 rounded-full w-3 h-3 flex items-center justify-center text-[10px] leading-none hover:bg-white/10 focus:outline-none focus:ring-1 focus:ring-white/40"
+              className="ml-0.5 -my-1 rounded-full min-w-6 min-h-6 flex items-center justify-center text-[10px] leading-none hover:bg-white/10 focus:outline-none focus:ring-1 focus:ring-white/40"
             >
               ×
             </button>

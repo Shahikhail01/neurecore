@@ -618,6 +618,7 @@ function AssignUserForm({
     <div className="space-y-4">
       <input
         type="text"
+        aria-label="Search by name or email"
         placeholder="Search by name or email…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}

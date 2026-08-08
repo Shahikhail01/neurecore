@@ -33,10 +33,11 @@ export default function GeneralSettingsPage() {
 
       <div className="space-y-4">
         <div>
-          <label className="text-xs text-zinc-400 mb-1 block">
+          <label htmlFor="settings-platform-name" className="text-xs text-zinc-400 mb-1 block">
             Platform Name
           </label>
           <input
+            id="settings-platform-name"
             value={settings.platformName}
             onChange={(e) =>
               setSettings((s) => ({ ...s, platformName: e.target.value }))
@@ -46,10 +47,11 @@ export default function GeneralSettingsPage() {
         </div>
 
         <div>
-          <label className="text-xs text-zinc-400 mb-1 block">
+          <label htmlFor="settings-support-email" className="text-xs text-zinc-400 mb-1 block">
             Support Email
           </label>
           <input
+            id="settings-support-email"
             type="email"
             value={settings.supportEmail}
             onChange={(e) =>
@@ -61,10 +63,11 @@ export default function GeneralSettingsPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">
+            <label htmlFor="settings-default-language" className="text-xs text-zinc-400 mb-1 block">
               Default Language
             </label>
             <select
+              id="settings-default-language"
               value={settings.defaultLanguage}
               onChange={(e) =>
                 setSettings((s) => ({ ...s, defaultLanguage: e.target.value }))
@@ -78,10 +81,11 @@ export default function GeneralSettingsPage() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">
+            <label htmlFor="settings-default-timezone" className="text-xs text-zinc-400 mb-1 block">
               Default Timezone
             </label>
             <select
+              id="settings-default-timezone"
               value={settings.defaultTimezone}
               onChange={(e) =>
                 setSettings((s) => ({ ...s, defaultTimezone: e.target.value }))
@@ -123,10 +127,11 @@ export default function GeneralSettingsPage() {
 
           {settings.maintenanceMode && (
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">
+              <label htmlFor="settings-maintenance-message" className="text-xs text-zinc-400 mb-1 block">
                 Maintenance Message
               </label>
               <textarea
+                id="settings-maintenance-message"
                 value={settings.maintenanceMessage}
                 onChange={(e) =>
                   setSettings((s) => ({

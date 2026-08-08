@@ -61,7 +61,7 @@ describe('TenantSlashCommands.command integrity', () => {
     for (const c of sc.commands) {
       expect(c.trigger).toMatch(/^\//);
       expect(c.label.length).toBeGreaterThan(0);
-      expect(['agent', 'task', 'workflow', 'system']).toContain(c.context);
+      expect(['agent', 'task', 'workflow', 'system', 'lead', 'deal', 'forecast', 'quote', 'case', 'kb', 'customer', 'twin', 'channel']).toContain(c.context);
       expect(c.suggestions.length).toBeGreaterThan(0);
     }
   });

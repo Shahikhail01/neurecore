@@ -250,7 +250,7 @@ export function UnifiedDataTable<T extends { id?: string | number }>({
                                 <th className="w-10 px-3 py-2 text-left">
                                     <button
                                         onClick={toggleAllSelection}
-                                        className="inline-flex items-center justify-center w-5 h-5 rounded border border-surface-border hover:bg-surface-overlay transition"
+                                        className="inline-flex items-center justify-center min-w-[24px] min-h-[24px] w-5 h-5 rounded border border-surface-border hover:bg-surface-overlay transition"
                                         aria-label="Select all"
                                     >
                                         {isAllSelected ? (
@@ -304,13 +304,16 @@ export function UnifiedDataTable<T extends { id?: string | number }>({
                                     onRowClick ? 'cursor-pointer' : '',
                                 )}
                                 onClick={() => onRowClick?.(row, i)}
+                                onKeyDown={(e) => { if (onRowClick && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onRowClick(row, i); } }}
+                                tabIndex={onRowClick ? 0 : undefined}
+                                role={onRowClick ? 'button' : undefined}
                             >
                                 {/* Checkbox column */}
                                 {selectable && (
-                                    <td className="w-10 px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                    <td className="w-10 px-3 py-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); } }}>
                                         <button
                                             onClick={() => toggleRowSelection(row)}
-                                            className="inline-flex items-center justify-center w-5 h-5 rounded border border-surface-border hover:bg-surface-overlay transition"
+                                            className="inline-flex items-center justify-center min-w-[24px] min-h-[24px] w-5 h-5 rounded border border-surface-border hover:bg-surface-overlay transition"
                                             aria-label={`Select row ${i + 1}`}
                                         >
                                             {isRowSelected(row) && (

@@ -434,6 +434,7 @@ function SpreadSheetDetail({
           <div className="flex items-center gap-2 flex-wrap">
             <Label className="text-xs">Sheet</Label>
             <select
+              aria-label="Select sheet"
               className="bg-background border rounded-md px-2 py-1 text-sm"
               value={activeSheet ?? ''}
               onChange={(e) => setActiveSheet(e.target.value)}

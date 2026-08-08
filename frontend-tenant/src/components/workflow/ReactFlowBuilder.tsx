@@ -133,6 +133,7 @@ export default function ReactFlowBuilder({ workflow, onSave }: Props) {
       {/* Toolbar */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-surface-border bg-surface-raised">
         <input
+          aria-label="Workflow name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="flex-1 max-w-xs rounded-lg border border-surface-border bg-surface-overlay px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-violet-500 transition"

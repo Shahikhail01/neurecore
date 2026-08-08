@@ -129,6 +129,9 @@ export const LearningFeedbackModalComponent: React.FC<
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={onClose}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onClose) { e.preventDefault(); onClose(); } }}
                             className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40"
                         />
 
@@ -150,6 +153,8 @@ export const LearningFeedbackModalComponent: React.FC<
                                     </p>
                                 </div>
                                 <motion.button
+                                    type="button"
+                                    aria-label="Close feedback modal"
                                     whileHover={{ rotate: 90 }}
                                     onClick={onClose}
                                     disabled={isSubmitting}
@@ -249,6 +254,7 @@ export const LearningFeedbackModalComponent: React.FC<
                                     <div className="flex flex-wrap gap-2">
                                         {predefinedReasons[userDecision].map(reason => (
                                             <motion.button
+                                                type="button"
                                                 key={reason}
                                                 whileHover={{ scale: 1.05 }}
                                                 whileTap={{ scale: 0.95 }}
@@ -270,9 +276,11 @@ export const LearningFeedbackModalComponent: React.FC<
                                         Additional Details
                                     </label>
                                     <textarea
+                                        id="feedback-textarea"
                                         value={feedback}
                                         onChange={e => setFeedback(e.target.value)}
                                         placeholder="Tell us more about your decision..."
+                                        aria-label="Additional feedback details"
                                         rows={3}
                                         disabled={isSubmitting}
                                         className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
@@ -283,6 +291,7 @@ export const LearningFeedbackModalComponent: React.FC<
                             {/* Footer */}
                             <div className="sticky bottom-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 px-6 py-4 flex gap-2">
                                 <motion.button
+                                    type="button"
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={onClose}
@@ -292,6 +301,7 @@ export const LearningFeedbackModalComponent: React.FC<
                                     Cancel
                                 </motion.button>
                                 <motion.button
+                                    type="button"
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={handleSubmit}

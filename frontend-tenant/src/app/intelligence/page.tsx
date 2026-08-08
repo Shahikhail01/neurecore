@@ -180,19 +180,22 @@ const RANGE_OPTIONS = [
 // ─── Page ─────────────────────────────────────────────────────────────────
 export default function IntelligencePage() {
   const user = useTenantAuth();
-  const [activeTab, setActiveTab] = useState<IntelTab>('analytics');
-  const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>(null);
+  const [activeTab, setActiveTab] = useState<IntelTab>(() => {
+    if (typeof window === 'undefined') return 'analytics';
+    const t = new URL(window.location.href).searchParams.get('tab') as IntelTab | null;
+    return (t && TABS.find((tab) => tab.id === t)) ? t : 'analytics';
+  });
+  const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>(() => {
+    if (typeof window === 'undefined') return null;
+    const sub = new URL(window.location.href).searchParams.get('settingsSub') as SettingsSubTab;
+    return sub || null;
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    const t = url.searchParams.get('tab') as IntelTab | null;
-    if (t && TABS.find((tab) => tab.id === t)) setActiveTab(t);
-
-    const sub = url.searchParams.get('settingsSub') as SettingsSubTab;
-    if (sub) setSettingsSubTab(sub);
-
     const aiTab = url.searchParams.get('aiTab');
+    const t = url.searchParams.get('tab') as IntelTab | null;
     if (t === 'settings' && aiTab === 'routing') {
       setTimeout(() => {
         document.getElementById('ai-routing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1147,6 +1150,12 @@ function SettingsTab({ subTab, onSetSubTab }: { subTab: SettingsSubTab; onSetSub
         {subTab === 'ai-providers' && <AIProvidersDetail />}
         {subTab === 'apikeys' && <APIKeysDetail />}
         {subTab === 'security' && <SecuritySettingsDetail />}
+        {!['organization', 'profile', 'ai-providers', 'apikeys', 'security'].includes(subTab) && (
+          <div className="card-surface p-8 text-center text-zinc-500 text-sm">
+            Unknown settings section.{' '}
+            <button onClick={() => onSetSubTab(null)} className="text-accent-500 underline cursor-pointer">Go back</button>
+          </div>
+        )}
       </div>
     );
   }
@@ -1412,8 +1421,9 @@ function ProfileDetail({ user, onBack }: { user: ReturnType<typeof useTenantAuth
         <h3 className="text-sm font-semibold text-zinc-200">Personal Information</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-zinc-400 block mb-1">First Name</label>
+            <label htmlFor="profile-first-name" className="text-xs text-zinc-400 block mb-1">First Name</label>
             <input
+              id="profile-first-name"
               type="text"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
@@ -1421,8 +1431,9 @@ function ProfileDetail({ user, onBack }: { user: ReturnType<typeof useTenantAuth
             />
           </div>
           <div>
-            <label className="text-xs text-zinc-400 block mb-1">Last Name</label>
+            <label htmlFor="profile-last-name" className="text-xs text-zinc-400 block mb-1">Last Name</label>
             <input
+              id="profile-last-name"
               type="text"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
@@ -1431,8 +1442,9 @@ function ProfileDetail({ user, onBack }: { user: ReturnType<typeof useTenantAuth
           </div>
         </div>
         <div>
-          <label className="text-xs text-zinc-400 block mb-1">Email</label>
+          <label htmlFor="profile-email" className="text-xs text-zinc-400 block mb-1">Email</label>
           <input
+            id="profile-email"
             type="email"
             value={user?.email ?? ''}
             disabled
@@ -1452,9 +1464,10 @@ function ProfileDetail({ user, onBack }: { user: ReturnType<typeof useTenantAuth
       <div className="card-surface p-5 space-y-4">
         <h3 className="text-sm font-semibold text-zinc-200">Change Password</h3>
         <div>
-          <label className="text-xs text-zinc-400 block mb-1">Current Password</label>
+          <label htmlFor="profile-current-password" className="text-xs text-zinc-400 block mb-1">Current Password</label>
           <div className="relative">
             <input
+              id="profile-current-password"
               type={showCurrent ? 'text' : 'password'}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -1469,9 +1482,10 @@ function ProfileDetail({ user, onBack }: { user: ReturnType<typeof useTenantAuth
           </div>
         </div>
         <div>
-          <label className="text-xs text-zinc-400 block mb-1">New Password</label>
+          <label htmlFor="profile-new-password" className="text-xs text-zinc-400 block mb-1">New Password</label>
           <div className="relative">
             <input
+              id="profile-new-password"
               type={showNew ? 'text' : 'password'}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -1613,8 +1627,9 @@ function AIProvidersDetail() {
           <h3 className="text-sm font-semibold text-zinc-200">New Provider</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-zinc-400 block mb-1">Name</label>
+              <label htmlFor="ai-provider-name" className="text-xs text-zinc-400 block mb-1">Name</label>
               <input
+                id="ai-provider-name"
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -1623,8 +1638,9 @@ function AIProvidersDetail() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 block mb-1">Provider</label>
+              <label htmlFor="ai-provider-type" className="text-xs text-zinc-400 block mb-1">Provider</label>
               <select
+                id="ai-provider-type"
                 value={newProvider}
                 onChange={(e) => setNewProvider(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-surface-border bg-surface-overlay text-sm text-zinc-100 focus:outline-none focus:border-accent-500"
@@ -1636,8 +1652,9 @@ function AIProvidersDetail() {
             </div>
           </div>
           <div>
-            <label className="text-xs text-zinc-400 block mb-1">API Key</label>
+            <label htmlFor="ai-provider-api-key" className="text-xs text-zinc-400 block mb-1">API Key</label>
             <input
+              id="ai-provider-api-key"
               type="password"
               value={newApiKey}
               onChange={(e) => setNewApiKey(e.target.value)}
@@ -1646,8 +1663,9 @@ function AIProvidersDetail() {
             />
           </div>
           <div>
-            <label className="text-xs text-zinc-400 block mb-1">Base URL (optional)</label>
+            <label htmlFor="ai-provider-base-url" className="text-xs text-zinc-400 block mb-1">Base URL (optional)</label>
             <input
+              id="ai-provider-base-url"
               type="text"
               value={newBaseUrl}
               onChange={(e) => setNewBaseUrl(e.target.value)}
@@ -2024,8 +2042,10 @@ function AIRoutingSection() {
               <div className="text-[10px] text-zinc-500">{description}</div>
             </div>
             <select
+              id={`ai-routing-${key}`}
               value={routing[key]}
               onChange={(e) => handleModelChange(key, e.target.value)}
+              aria-label={`Model for ${label}`}
               className="rounded-lg border border-zinc-600 nv-surface-inline px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-[color:var(--accent-500)] min-w-[160px]"
             >
               {AVAILABLE_MODELS.map((model) => (
@@ -2503,6 +2523,7 @@ function CCSecurityPanel({
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value as 'ALL' | 'critical' | 'high' | 'medium' | 'low')}
+            aria-label="Severity filter"
             className="px-2 py-1.5 rounded-md border border-surface-border bg-surface-overlay text-xs text-zinc-200 focus:outline-none focus:border-accent-500"
           >
             <option value="ALL">All severities</option>

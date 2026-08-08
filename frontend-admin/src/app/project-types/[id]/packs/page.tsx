@@ -127,6 +127,7 @@ export default function ProjectTypePacksPage() {
 
         <input
           type="search"
+          aria-label="Search packs"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search packs…"
@@ -152,6 +153,7 @@ export default function ProjectTypePacksPage() {
                     exit={{ opacity: 0 }}
                     disabled={!canEdit}
                     onClick={() => toggle(pack.id)}
+                    onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(pack.id); } }}
                     className={`w-full text-left rounded-xl border p-4 flex items-start gap-3 transition ${
                       isSelected
                         ? 'border-[color:var(--accent-500)] bg-[color:var(--accent-500)]/10'

@@ -1,30 +1,47 @@
 /**
- * Phase 16 — ActionExtractorService.
+ * Phase 25 — ActionExtractorService.
  *
- * Source plan: IMPLEMENTATION-PLAN-PHASE-15-18.md §2.
+ * Source plan: IMPLEMENTATION-PLAN-PHASE-15-18.md §2 + P25 upgrade.
  *
  * Closes CR-AI-0403 — "Action items with owner/due/confidence".
  *
- * Heuristic extractor that turns a transcript + template into typed
- * action items. We do not ship an LLM call in this PR — the
- * heuristic is regex-driven + record-aware:
+ * Phase 25 upgrade: owner auto-resolution. The heuristic still
+ * flags `@name` tokens; the service now also resolves those hints
+ * against the real `User` table (case-insensitive on
+ * firstName / lastName / email local-part). Each extracted item
+ * carries:
+ *   - ownerHint       the raw token from the transcript
+ *   - ownerUserId     the resolved user id (null when no match)
+ *   - ambiguousOwner  true when 2+ candidates OR no match
  *
- *   - sentences ending in "will <verb>" / "should <verb>" → action
- *   - "@name" tokens → owner (the regex returns the first match; the
- *     service flags ambiguousOwner=true when 2+ candidates exist)
- *   - ISO dates / "by Friday" / "next week" → dueDate
- *   - confidencePercent = 60 (heuristic) for regex hits, +10 per
- *     concrete signal (owner + due), capped at 95
- *
- * The Phase 17 PR swaps the heuristic for the production LLM path
- * behind the same interface.
- *
- * SRP — owns ONLY the extract-from-transcript surface. The
- * persistence (write to meeting_action_items) is in
- * CrmLinkerService.
+ * SOLID:
+ *   - SRP — owns ONLY the extract-from-transcript surface.
+ *     Persistence is `CrmLinkerService`; consent is the consent
+ *     service.
+ *   - DIP — depends on injected `IOwnerResolver`; the resolver
+ *     implementation lives in `OwnerResolver` (Prisma-backed).
+ *     Tests can substitute a stub.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+
+export const OWNER_RESOLVER = Symbol('OwnerResolver');
+
+export interface OwnerCandidate {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly email: string | null;
+}
+
+export interface IOwnerResolver {
+  resolve(tenantId: string, hint: string): Promise<OwnerCandidate | null>;
+  /**
+   * Find users whose firstName, lastName, or email local-part
+   * match the hint. Returns 0..n candidates. Used for ambiguous
+   * detection.
+   */
+  candidates(tenantId: string, hint: string): Promise<ReadonlyArray<OwnerCandidate>>;
+}
 
 export class ActionExtractionForbiddenError extends Error {
   constructor(message: string) {
@@ -40,12 +57,6 @@ export interface ExtractInput {
   readonly participants?: ReadonlyArray<{ name?: string; email?: string }>;
 }
 
-/**
- * Legacy envelope — accepts the legacy `MeetingTranscript` shape
- * (which exposes `utterances[]` instead of `transcriptText`). The
- * legacy `meeting.service.ts` calls `extract(transcript)` with that
- * shape.
- */
 export interface ExtractInputLegacy {
   readonly tenantId?: string;
   readonly id?: string;
@@ -75,13 +86,73 @@ const DATE_PHRASE_PATTERN = /\b(?:by|on)\s+(Monday|Tuesday|Wednesday|Thursday|Fr
 export class ActionExtractorService {
   private readonly logger = new Logger(ActionExtractorService.name);
 
+  /**
+   * Back-compat overload — no owner resolution. Existing
+   * synchronous callers (e.g. P16 callers) keep working.
+   */
+  static readonly SYNC_MODE: unique symbol = Symbol('ActionExtractor.sync');
+
+  constructor(
+    @Inject(OWNER_RESOLVER) private readonly ownerResolver: IOwnerResolver,
+  ) {}
+
+  /**
+   * Synchronous shape-preserving extraction. Kept for backward
+   * compatibility with the legacy `meeting.service.ts` and the
+   * Phase 16 callers that did not yet know about owner
+   * resolution.
+   */
   extract(input: ExtractInput | ExtractInputLegacy): ReadonlyArray<ExtractedActionItem> {
+    return this.extractSync(input);
+  }
+
+  /**
+   * Async path with owner auto-resolution. New code MUST call
+   * this. The synchronous `extract()` is retained only for
+   * backward compatibility with Phase 16 callers.
+   */
+  async extractWithOwnerResolution(
+    input: ExtractInput | ExtractInputLegacy,
+  ): Promise<ReadonlyArray<ExtractedActionItem>> {
+    const base = this.extractSync(input);
+    if (base.length === 0) return base;
+    const tenantId = input.tenantId;
+    if (!tenantId || tenantId === '*') {
+      throw new ActionExtractionForbiddenError('tenantId required');
+    }
+    const enriched: ExtractedActionItem[] = [];
+    for (const item of base) {
+      if (!item.ownerHint) {
+        enriched.push(item);
+        continue;
+      }
+      const cands = await this.ownerResolver.candidates(tenantId, item.ownerHint);
+      const best =
+        cands.length === 1
+          ? cands[0]
+          : cands.length > 1
+            ? cands[0]
+            : null;
+      const resolved = best ?? (await this.ownerResolver.resolve(tenantId, item.ownerHint));
+      enriched.push({
+        ...item,
+        ownerUserId: resolved?.userId ?? item.ownerUserId,
+        // ambiguousOwner already includes multi-token; add single-hint
+        // with no resolution → ambiguous. Resolution to exactly 1
+        // candidate clears it.
+        ambiguousOwner:
+          cands.length > 1 || (item.ambiguousOwner && !resolved),
+      });
+    }
+    return enriched;
+  }
+
+  private extractSync(input: ExtractInput | ExtractInputLegacy): ReadonlyArray<ExtractedActionItem> {
     const tenantId = input.tenantId;
     if (!tenantId || tenantId === '*') {
       throw new ActionExtractionForbiddenError('tenantId required');
     }
 
-    // Legacy envelope — utterances[] joined into a single transcript
     let transcriptText: string;
     let transcriptId: string;
     let participants = input.participants;
@@ -108,13 +179,7 @@ export class ActionExtractorService {
       const actorRaw = (m[1] ?? '').trim();
       const actionRaw = (m[2] ?? '').trim();
       const description = `${actorRaw}: ${actionRaw}`;
-
-      // Strip any trailing whitespace/colon from the actor — match may
-      // have started at whitespace or @ (the non-capturing prefix).
       const actor = actorRaw.replace(/^[\s@:]+/, '');
-      // Scan the FULL transcript for owner tokens, not just the partial
-      // match — ambiguous ownership only becomes visible across the
-      // whole turn (e.g. "@charlie and @dana will close this out.").
       const ownerTokens = Array.from(
         transcriptText.matchAll(/@([A-Za-z][\w._-]{1,40})/g),
       ).map((x) => x[1] ?? '');

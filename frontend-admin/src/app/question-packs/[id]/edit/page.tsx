@@ -97,18 +97,20 @@ export default function EditQuestionPackPage() {
             </div>
             <div className="rounded-xl border border-surface-border bg-surface-raised p-5 space-y-4">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1.5">
+                <label htmlFor="qp-edit-name" className="block text-xs text-zinc-400 mb-1.5">
                   Name <span className="text-[color:var(--state-danger)]">*</span>
                 </label>
                 <input
+                  id="qp-edit-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3 py-2 bg-surface text-sm text-zinc-200 rounded-lg border border-surface-border focus:outline-none focus:border-[color:var(--accent-500)]"
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1.5">Description</label>
+                <label htmlFor="qp-edit-description" className="block text-xs text-zinc-400 mb-1.5">Description</label>
                 <textarea
+                  id="qp-edit-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}

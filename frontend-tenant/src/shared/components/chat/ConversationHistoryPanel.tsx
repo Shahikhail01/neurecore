@@ -95,17 +95,19 @@ export function ConversationHistoryPanel({
 
   const handleExport = useCallback(async (row: ConversationRow) => {
     try {
-      const messages = await chatService.getHistory(500);
-      const blob = new Blob(
-        [JSON.stringify({ conversationId: row.id, exportedAt: new Date().toISOString(), messages }, null, 2)],
-        { type: 'application/json' },
-      );
-      const url = URL.createObjectURL(blob);
+      const created = await chatService.createExport({
+        conversationId: row.id,
+        format: 'json',
+        redact: true,
+      });
+      const url = `/api/v1/chat/export/${encodeURIComponent(created.exportId)}/download`;
       const link = document.createElement('a');
       link.href = url;
+      link.rel = 'noopener';
       link.download = `${row.id}.json`;
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(link);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed');
     }

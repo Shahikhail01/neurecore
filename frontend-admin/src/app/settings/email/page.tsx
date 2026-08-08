@@ -75,7 +75,6 @@ export default function EmailSettingsPage() {
   const [deleteTarget, setDeleteTarget] = useState<EmailConfig | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Template modal state
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [editTemplate, setEditTemplate] = useState<EmailTemplate | null>(null);
   const [templateForm, setTemplateForm] = useState({
@@ -86,7 +85,6 @@ export default function EmailSettingsPage() {
     isActive: true,
   });
 
-  // Logs state
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [logsTotal, setLogsTotal] = useState(0);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -174,7 +172,6 @@ export default function EmailSettingsPage() {
     }
   }
 
-  // Template handlers
   function openCreateTemplate() {
     setEditTemplate(null);
     setTemplateForm({
@@ -233,12 +230,10 @@ export default function EmailSettingsPage() {
     await deleteTemplate(id);
   }
 
-  // Load logs
   async function loadLogs(page = 1) {
     setLogsLoading(true);
     try {
       const data = await getLogs({ page, limit: 20 });
-      // Cast items to EmailLog - in real implementation this would be a proper type
       setLogs(data.items as unknown as EmailLog[]);
       setLogsTotal(data.total);
       setLogsPage(page);
@@ -608,7 +603,10 @@ export default function EmailSettingsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            role="button"
+            tabIndex={0}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setModalOpen(false); } }}
             onClick={(e) => e.target === e.currentTarget && setModalOpen(false)}
           >
             <motion.div
@@ -623,10 +621,11 @@ export default function EmailSettingsPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">
+                  <label htmlFor="email-provider" className="text-xs text-zinc-400 mb-1 block">
                     Provider
                   </label>
                   <select
+                    id="email-provider"
                     value={formData.provider}
                     onChange={(e) =>
                       setFormData((f) => ({
@@ -646,10 +645,11 @@ export default function EmailSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">
+                  <label htmlFor="email-from-name" className="text-xs text-zinc-400 mb-1 block">
                     From Name *
                   </label>
                   <input
+                    id="email-from-name"
                     value={formData.settings.fromName}
                     onChange={(e) =>
                       setFormData((f) => ({
@@ -663,10 +663,11 @@ export default function EmailSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">
+                  <label htmlFor="email-from-email" className="text-xs text-zinc-400 mb-1 block">
                     From Email *
                   </label>
                   <input
+                    id="email-from-email"
                     type="email"
                     value={formData.settings.fromEmail}
                     onChange={(e) =>
@@ -681,10 +682,11 @@ export default function EmailSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">
+                  <label htmlFor="email-reply-to" className="text-xs text-zinc-400 mb-1 block">
                     Reply To
                   </label>
                   <input
+                    id="email-reply-to"
                     type="email"
                     value={formData.settings.replyToEmail}
                     onChange={(e) =>
@@ -775,7 +777,10 @@ export default function EmailSettingsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            role="button"
+            tabIndex={0}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setTemplateModalOpen(false); } }}
             onClick={(e) =>
               e.target === e.currentTarget && setTemplateModalOpen(false)
             }
@@ -791,10 +796,11 @@ export default function EmailSettingsPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">
+                  <label htmlFor="tmpl-name" className="text-xs text-zinc-400 mb-1 block">
                     Name *
                   </label>
                   <input
+                    id="tmpl-name"
                     value={templateForm.name}
                     onChange={(e) =>
                       setTemplateForm((f) => ({ ...f, name: e.target.value }))
@@ -805,10 +811,11 @@ export default function EmailSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">
+                  <label htmlFor="tmpl-type" className="text-xs text-zinc-400 mb-1 block">
                     Type
                   </label>
                   <select
+                    id="tmpl-type"
                     value={templateForm.type}
                     onChange={(e) =>
                       setTemplateForm((f) => ({
@@ -827,10 +834,11 @@ export default function EmailSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">
+                  <label htmlFor="tmpl-subject" className="text-xs text-zinc-400 mb-1 block">
                     Subject *
                   </label>
                   <input
+                    id="tmpl-subject"
                     value={templateForm.subject}
                     onChange={(e) =>
                       setTemplateForm((f) => ({
@@ -844,10 +852,11 @@ export default function EmailSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">
+                  <label htmlFor="tmpl-body" className="text-xs text-zinc-400 mb-1 block">
                     Body
                   </label>
                   <textarea
+                    id="tmpl-body"
                     value={templateForm.body}
                     onChange={(e) =>
                       setTemplateForm((f) => ({ ...f, body: e.target.value }))

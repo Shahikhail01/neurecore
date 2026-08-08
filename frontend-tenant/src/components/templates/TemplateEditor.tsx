@@ -267,6 +267,7 @@ export function TemplateEditor({
               <div className="space-y-2">
                 <Label>Period</Label>
                 <select
+                  aria-label="Period"
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={(form.config as { period?: string }).period ?? 'monthly'}
                   onChange={(e) =>
@@ -284,6 +285,7 @@ export function TemplateEditor({
               <div className="space-y-2">
                 <Label>Format</Label>
                 <select
+                  aria-label="Format"
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={(form.config as { format?: string }).format ?? 'dashboard'}
                   onChange={(e) =>

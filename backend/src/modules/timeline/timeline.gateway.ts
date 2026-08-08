@@ -49,7 +49,9 @@ function isSupportedEntityType(value: string): value is SupportedEntityType {
   return (ENTITY_TYPES as readonly string[]).includes(value);
 }
 
-@WebSocketGateway()
+@WebSocketGateway({
+  namespace: '/',
+})
 export class TimelineGateway {
   @WebSocketServer()
   server!: Server;

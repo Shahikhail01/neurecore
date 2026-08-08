@@ -97,6 +97,12 @@ export class AgentsController {
     };
   }
 
+  @Get('orchestration')
+  async getOrchestration(@CurrentUser() user: JwtPayload) {
+    if (!user.tenantId) throw new Error('Tenant ID required');
+    return this.agentsService.getOrchestrationData(user.tenantId);
+  }
+
   @Get(':id')
   async findOne(
     @Param('id', FlexibleIdPipe) id: string,
@@ -329,19 +335,5 @@ export class AgentsController {
   ): Promise<ActionResult<null>> {
     await this.executorService.cancelTask(taskId);
     return { success: true, message: 'Task cancelled' };
-  }
-
-  /**
-   * Get agent orchestration data
-   * SOLID: SRP - Only routing
-   * Returns all agents with their status, current tasks, and performance metrics
-   *
-   * @param user - Current user from JWT
-   * @returns Agent orchestration response with summary
-   */
-  @Get('orchestration')
-  async getOrchestration(@CurrentUser() user: JwtPayload) {
-    if (!user.tenantId) throw new Error('Tenant ID required');
-    return this.agentsService.getOrchestrationData(user.tenantId);
   }
 }

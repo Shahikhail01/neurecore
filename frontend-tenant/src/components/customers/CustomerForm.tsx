@@ -245,10 +245,11 @@ export function CustomerForm({ customer, onClose, onCreated, onUpdated, onSubmit
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
+              <label htmlFor="customer-financial-subtype" className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
                 Sub-Type
               </label>
               <select
+                id="customer-financial-subtype"
                 value={financialSubType}
                 onChange={(e) => setFinancialSubType(e.target.value as CustomerFinancialSubType | '')}
                 className="w-full px-2 py-1.5 text-xs rounded-md border border-input bg-background"
@@ -263,10 +264,11 @@ export function CustomerForm({ customer, onClose, onCreated, onUpdated, onSubmit
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
+              <label htmlFor="customer-lifecycle-stage" className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
                 Lifecycle Stage
               </label>
               <select
+                id="customer-lifecycle-stage"
                 value={lifecycleStage}
                 onChange={(e) => setLifecycleStage(e.target.value as CustomerLifecycleStage | '')}
                 className="w-full px-2 py-1.5 text-xs rounded-md border border-input bg-background"
@@ -280,10 +282,11 @@ export function CustomerForm({ customer, onClose, onCreated, onUpdated, onSubmit
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
+              <label htmlFor="customer-kyc-status" className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
                 KYC Status
               </label>
               <select
+                id="customer-kyc-status"
                 value={kycStatus}
                 onChange={(e) => setKycStatus(e.target.value as CustomerKycStatus | '')}
                 className="w-full px-2 py-1.5 text-xs rounded-md border border-input bg-background"
@@ -296,10 +299,11 @@ export function CustomerForm({ customer, onClose, onCreated, onUpdated, onSubmit
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
+              <label htmlFor="customer-risk-rating" className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
                 Risk Rating
               </label>
               <select
+                id="customer-risk-rating"
                 value={riskRating}
                 onChange={(e) => setRiskRating(e.target.value as CustomerRiskRating | '')}
                 className="w-full px-2 py-1.5 text-xs rounded-md border border-input bg-background"

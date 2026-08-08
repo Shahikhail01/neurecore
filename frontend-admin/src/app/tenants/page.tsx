@@ -133,6 +133,7 @@ export default function TenantsPage() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <input
             type="search"
+            aria-label="Search tenants"
             placeholder="Search tenants…"
             value={search}
             onChange={(e) => {
@@ -142,6 +143,7 @@ export default function TenantsPage() {
             className="rounded-lg border border-[color:var(--accent-500)]/30 bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-500)] min-w-[240px]"
           />
           <select
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="rounded-lg border border-[color:var(--accent-500)]/30 bg-white/5 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--accent-500)]"
@@ -226,8 +228,11 @@ export default function TenantsPage() {
                 filteredSorted.map((t) => (
                   <tr
                     key={t.id}
+                    role="button"
+                    tabIndex={0}
                     className="hover:bg-white/5 transition cursor-pointer"
                     onClick={() => setDrawerTenantId(t.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDrawerTenantId(t.id); } }}
                   >
                     <td className="px-4 py-3 font-medium">{t.name}</td>
                     <td className="px-4 py-3 text-zinc-400">{t.slug}</td>

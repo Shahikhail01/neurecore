@@ -79,10 +79,11 @@ export default function NewQuestionPackPage() {
         <div className="rounded-xl border border-surface-border bg-surface-raised p-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1.5">
+              <label htmlFor="qp-new-key" className="block text-xs text-zinc-400 mb-1.5">
                 Key <span className="text-[color:var(--state-danger)]">*</span>
               </label>
               <input
+                id="qp-new-key"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 placeholder="e.g. compliance"
@@ -91,10 +92,11 @@ export default function NewQuestionPackPage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1.5">
+              <label htmlFor="qp-new-name" className="block text-xs text-zinc-400 mb-1.5">
                 Name <span className="text-[color:var(--state-danger)]">*</span>
               </label>
               <input
+                id="qp-new-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Compliance"
@@ -104,8 +106,9 @@ export default function NewQuestionPackPage() {
             </div>
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1.5">Description</label>
+            <label htmlFor="qp-new-description" className="block text-xs text-zinc-400 mb-1.5">Description</label>
             <textarea
+              id="qp-new-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}

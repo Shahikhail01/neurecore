@@ -14,6 +14,10 @@ import { chatService, slashCommands, jsonExtractor, adminChatConfig } from "@/co
 import { registerAdminCommands } from "@/services/register-commands";
 import { NAV_GROUPS, ALL_NAV_ITEMS } from "@/components/sidebar/navigation.config";
 import { PageShell } from "@neurecore/ui-visual";
+import { SkipLink } from "@/shared/a11y/SkipLink";
+import { MAIN_CONTENT_ID, PRIMARY_NAV_ID } from "@/shared/a11y/landmarks";
+import { AnnouncerProvider } from "@/shared/a11y/Announcer";
+import { LocaleProvider } from "@/shared/i18n/LocaleProvider";
 
 export default function AdminShell({
   user,
@@ -26,6 +30,13 @@ export default function AdminShell({
   const router = useRouter();
   const { logout } = useAuth();
 
+  // Hooks must run on every render, before any early return, or React
+  // sees a different hook order once `user` resolves
+  // (react-hooks/rules-of-hooks).
+  useEffect(() => {
+    return registerAdminCommands(router);
+  }, [router]);
+
   // Auth guard: during static prerender and before the auth store resolves,
   // `user` is null. Render nothing (and rely on the auth hook's redirect to
   // /login) instead of crashing on `user.firstName`. Solid: the guard is
@@ -37,17 +48,16 @@ export default function AdminShell({
     router.push("/login");
   }
 
-  useEffect(() => {
-    return registerAdminCommands(router);
-  }, [router]);
-
   const pageTitle =
     ALL_NAV_ITEMS.find(
       (n) => pathname === n.href || pathname.startsWith(n.href + "/"),
     )?.label ?? "Overview";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface text-zinc-100">
+    <LocaleProvider>
+      <AnnouncerProvider>
+        <SkipLink />
+        <div className="flex h-screen overflow-hidden bg-surface text-zinc-100">
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside className="w-56 shrink-0 border-r border-surface-border flex flex-col bg-surface-raised">
         <div className="px-5 py-4 border-b border-surface-border">
@@ -57,7 +67,11 @@ export default function AdminShell({
           <div className="text-xs text-zinc-500 mt-0.5">Admin Console</div>
         </div>
 
-        <nav className="flex-1 py-3 flex flex-col gap-0.5 px-2 overflow-y-auto">
+        <nav
+          id={PRIMARY_NAV_ID}
+          aria-label="Admin console navigation"
+          className="flex-1 py-3 flex flex-col gap-0.5 px-2 overflow-y-auto"
+        >
           {NAV_GROUPS.map((group) => (
             <div key={group.id} className="flex flex-col gap-0.5">
               <div className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-600 select-none">
@@ -108,7 +122,11 @@ export default function AdminShell({
       {/* ── Content column ───────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar title={pageTitle} />
-        <main className="flex-1 overflow-auto">
+        <main
+          id={MAIN_CONTENT_ID}
+          tabIndex={-1}
+          className="flex-1 overflow-auto"
+        >
           <PageShell variant="compact" noAmbient>
             {children}
           </PageShell>
@@ -125,6 +143,8 @@ export default function AdminShell({
         jsonExtractor={jsonExtractor}
         config={adminChatConfig}
       />
-    </div>
+        </div>
+      </AnnouncerProvider>
+    </LocaleProvider>
   );
 }

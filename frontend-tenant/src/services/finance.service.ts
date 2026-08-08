@@ -33,6 +33,14 @@ export interface PaginatedResult<T> {
   totalPages?: number;
 }
 
+export interface CostSummary {
+  totalCostCents: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  byModel: Record<string, number>;
+  recordCount: number;
+}
+
 class FinanceService {
   async listInvoices(params?: { page?: number; limit?: number }): Promise<PaginatedResult<Invoice>> {
     const res = await api.get('/finance/invoices', { params });
@@ -47,6 +55,23 @@ class FinanceService {
   async listBillingEvents(params?: { page?: number; limit?: number }) {
     const res = await api.get('/finance/billing-events', { params });
     return unwrapItem(res);
+  }
+
+  async getCostSummary(): Promise<CostSummary | null> {
+    const res = await api.get('/costs/summary');
+    return res?.data?.data ?? res?.data ?? null;
+  }
+
+  async getBudgets(): Promise<Record<string, unknown>[]> {
+    const res = await api.get('/costs/budgets');
+    const data = res?.data?.data ?? res?.data ?? null;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getCostIncidents(): Promise<{ id: string; acknowledged?: boolean; [key: string]: unknown }[]> {
+    const res = await api.get('/costs/incidents');
+    const data = res?.data?.data ?? res?.data ?? null;
+    return Array.isArray(data) ? data : [];
   }
 }
 

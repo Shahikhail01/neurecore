@@ -441,7 +441,10 @@ export default function TierSettingsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            role="button"
+            tabIndex={0}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 overflow-y-auto py-8"
+            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setModalOpen(false); } }}
             onClick={(e) => e.target === e.currentTarget && setModalOpen(false)}
           >
             <motion.div
@@ -458,10 +461,11 @@ export default function TierSettingsPage() {
                 {/* Name & Slug */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">
+                    <label htmlFor="tier-name" className="text-xs text-zinc-400 mb-1 block">
                       Name *
                     </label>
                     <input
+                      id="tier-name"
                       value={formData.name}
                       onChange={(e) =>
                         setFormData((f) => ({ ...f, name: e.target.value }))
@@ -471,13 +475,14 @@ export default function TierSettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">
+                    <label htmlFor="tier-slug" className="text-xs text-zinc-400 mb-1 block">
                       Slug{" "}
                       {editTier && (
                         <span className="text-zinc-600">(locked)</span>
                       )}
                     </label>
                     <input
+                      id="tier-slug"
                       value={formData.slug}
                       onChange={(e) =>
                         !editTier &&
@@ -495,10 +500,11 @@ export default function TierSettingsPage() {
 
                 {/* Description */}
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">
+                  <label htmlFor="tier-desc" className="text-xs text-zinc-400 mb-1 block">
                     Description
                   </label>
                   <textarea
+                    id="tier-desc"
                     value={formData.description}
                     onChange={(e) =>
                       setFormData((f) => ({
@@ -515,10 +521,11 @@ export default function TierSettingsPage() {
                 {/* Pricing */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">
+                    <label htmlFor="tier-monthly" className="text-xs text-zinc-400 mb-1 block">
                       Monthly Price
                     </label>
                     <input
+                      id="tier-monthly"
                       type="number"
                       value={formData.pricing.monthlyPrice}
                       onChange={(e) =>
@@ -534,10 +541,11 @@ export default function TierSettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">
+                    <label htmlFor="tier-yearly" className="text-xs text-zinc-400 mb-1 block">
                       Yearly Price
                     </label>
                     <input
+                      id="tier-yearly"
                       type="number"
                       value={formData.pricing.yearlyPrice}
                       onChange={(e) =>
@@ -553,10 +561,11 @@ export default function TierSettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">
+                    <label htmlFor="tier-currency" className="text-xs text-zinc-400 mb-1 block">
                       Currency
                     </label>
                     <select
+                      id="tier-currency"
                       value={formData.pricing.currency}
                       onChange={(e) =>
                         setFormData((f) => ({
@@ -575,13 +584,14 @@ export default function TierSettingsPage() {
 
                 {/* Limits */}
                 <div>
-                  <label className="text-xs text-zinc-400 mb-2 block">
+                  <div className="text-xs text-zinc-400 mb-2 block">
                     Limits
-                  </label>
+                  </div>
                   <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-zinc-800/50">
                     <div>
-                      <label className="text-xs text-zinc-500">Max Users</label>
+                      <label htmlFor="tier-maxusers" className="text-xs text-zinc-500">Max Users</label>
                       <input
+                        id="tier-maxusers"
                         type="number"
                         value={formData.limits.maxUsers}
                         onChange={(e) =>
@@ -597,10 +607,11 @@ export default function TierSettingsPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-zinc-500">
+                      <label htmlFor="tier-maxagents" className="text-xs text-zinc-500">
                         Max Agents
                       </label>
                       <input
+                        id="tier-maxagents"
                         type="number"
                         value={formData.limits.maxAgents}
                         onChange={(e) =>
@@ -616,10 +627,11 @@ export default function TierSettingsPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-zinc-500">
+                      <label htmlFor="tier-maxstorage" className="text-xs text-zinc-500">
                         Max Storage (GB)
                       </label>
                       <input
+                        id="tier-maxstorage"
                         type="number"
                         value={formData.limits.maxStorageGB}
                         onChange={(e) =>
@@ -635,10 +647,11 @@ export default function TierSettingsPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-zinc-500">
+                      <label htmlFor="tier-maxapi" className="text-xs text-zinc-500">
                         Max API Calls
                       </label>
                       <input
+                        id="tier-maxapi"
                         type="number"
                         value={formData.limits.maxApiCalls}
                         onChange={(e) =>
@@ -658,9 +671,9 @@ export default function TierSettingsPage() {
 
                 {/* Features */}
                 <div>
-                  <label className="text-xs text-zinc-400 mb-2 block">
+                  <div className="text-xs text-zinc-400 mb-2 block">
                     Features
-                  </label>
+                  </div>
                   <div className="space-y-2 p-3 rounded-lg bg-zinc-800/50">
                     {formData.features.map((feature) => (
                       <label

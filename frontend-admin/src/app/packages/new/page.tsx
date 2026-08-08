@@ -12,7 +12,7 @@
  * Live preview on the right rail (PackagePreview) updates with each step.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AdminShell from '@/components/AdminShell';
@@ -57,7 +57,7 @@ export default function NewPackagePage() {
 
   // Preview (live totals)
   const [preview, setPreview] = useState({
-    readiness: { score: 0, label: 'NEEDS_REVIEW' as const },
+    readiness: { score: 0, label: 'NEEDS_REVIEW' as 'NEEDS_REVIEW' | 'READY' | 'AT_RISK' },
     totals: { departments: 0, agents: 0, features: 0 },
     missing: { departments: [] as string[], agents: [] as string[], features: [] as string[] },
     categories: {} as Record<string, number>,
@@ -568,10 +568,13 @@ export default function NewPackagePage() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const fieldId = `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Math.random().toString(36).slice(2, 7)}`;
   return (
     <div>
-      <label className="text-xs text-zinc-400 mb-1 block">{label}</label>
-      {children}
+      <label htmlFor={fieldId} className="text-xs text-zinc-400 mb-1 block">{label}</label>
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child) ? React.cloneElement(child as React.ReactHTMLElement<HTMLElement>, { id: fieldId }) : child
+      )}
     </div>
   );
 }
@@ -632,6 +635,7 @@ function PickerGroup({
         onChange={(e) => setFilter(e.target.value)}
         placeholder={`Filter ${title.toLowerCase()}…`}
         className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[color:var(--accent-500)] transition mb-2"
+        aria-label={`Filter ${title.toLowerCase()}`}
       />
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
@@ -659,9 +663,11 @@ function PickerGroup({
             return (
               <label
                 key={i.id}
+                htmlFor={`picker-${i.id}`}
                 className="flex items-center gap-2 px-1 py-1 rounded hover:bg-surface transition cursor-pointer"
               >
                 <input
+                  id={`picker-${i.id}`}
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => onToggle(i.id)}

@@ -180,7 +180,7 @@ function RowActions({
   r: DsrRequest;
   onAdvance: (id: string, op: 'start' | 'complete' | 'reject' | 'cancel') => Promise<void>;
 }) {
-  const buttons: JSX.Element[] = [];
+  const buttons: React.ReactElement[] = [];
   if (r.status === 'OPEN') {
     buttons.push(
       <button
@@ -269,6 +269,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
     <div className="mb-4 rounded-md border border-white/10 p-4 space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <select
+          aria-label="DSR request type"
           value={type}
           onChange={(e) => setType(e.target.value as DsrRequestType)}
           className="rounded bg-black/40 border border-white/10 px-2 py-1 text-sm text-white"
@@ -282,6 +283,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
           )}
         </select>
         <input
+          aria-label="Subject ID"
           type="text"
           placeholder="subject id (user or contact)"
           value={subjectId}
@@ -290,6 +292,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
         />
       </div>
       <textarea
+        aria-label="DSR request reason"
         placeholder="reason (optional)"
         value={reason}
         onChange={(e) => setReason(e.target.value)}
