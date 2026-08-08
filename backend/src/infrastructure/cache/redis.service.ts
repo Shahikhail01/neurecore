@@ -103,8 +103,24 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         url: upstashRestUrl,
         token: upstashRestToken,
       });
-      // The Upstash REST client doesn't maintain persistent connections like ioredis
-      this.isConnected = true;
+      // The Upstash REST client doesn't maintain persistent connections like ioredis.
+      // We deliberately leave isConnected = false here and probe lazily on first
+      // call — otherwise a stale Upstash project (DNS ENOTFOUND, project deleted)
+      // would block every request for the full undici fetch timeout (~4.5s)
+      // and surface as INTERNAL_ERROR. (See 2026-08-08 Contabo incident.)
+      this.isConnected = false;
+      // Best-effort startup probe so the first request doesn't pay the
+      // probe cost; failures are logged and we degrade silently.
+      void this.probeUpstash().then((ok) => {
+        if (ok) {
+          this.logger.log('Upstash REST client probe OK');
+          this.isConnected = true;
+        } else {
+          this.logger.warn(
+            'Upstash REST client probe FAILED at startup — Redis calls will degrade until backend recovers',
+          );
+        }
+      });
       return;
     }
 
@@ -157,12 +173,93 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // Track whether the Upstash REST backend has been verified reachable.
+  // On Contabo (2026-08-08) the configured Upstash project returned
+  // ENOTFOUND; the REST client had previously optimistically set
+  // `isConnected = true` on construction, so every Redis call (login
+  // lockout, rate-limit buckets, JWT blacklist) blocked for ~4.5s on an
+  // undici fetch timeout and surfaced as INTERNAL_ERROR to the user.
+  // We now: (a) probe the REST endpoint once at startup, (b) re-probe on
+  // failure, (c) route every operation through a guarded helper that
+  // throws a known sentinel that callers already catch-and-continue.
+  private upstashHealthy = false;
+  private upstashProbeInFlight: Promise<boolean> | null = null;
+  private upstashProbeAt = 0;
+  private static readonly PROBE_COOLDOWN_MS = 30_000; // 30s between probes
+
+  /**
+   * Probe the Upstash REST endpoint.  Cooldown-gated so the request path
+   * never pays the undici fetch timeout (~4.5s per call) more than once.
+   * After a failed probe we defer 30s; during the cooldown window every
+   * `withUpstash()` guard returns immediately without blocking.
+   */
+  private async probeUpstash(): Promise<boolean> {
+    if (this.upstashProbeInFlight) return this.upstashProbeInFlight;
+
+    // If we already know it's unhealthy AND we probed recently, skip.
+    if (
+      !this.upstashHealthy &&
+      this.upstashProbeAt > 0 &&
+      Date.now() - this.upstashProbeAt < RedisService.PROBE_COOLDOWN_MS
+    ) {
+      return false;
+    }
+
+    this.upstashProbeAt = Date.now();
+    this.upstashProbeInFlight = (async () => {
+      try {
+        const r = await this.upstashClient.get('__nc_healthcheck__');
+        this.upstashHealthy = r !== undefined;
+        if (this.upstashHealthy) this.logger.log('Upstash REST probe OK');
+        return this.upstashHealthy;
+      } catch (err) {
+        this.logger.warn(
+          `Upstash REST probe failed (cooldown ${RedisService.PROBE_COOLDOWN_MS / 1000}s): ${String(err)}`,
+        );
+        this.upstashHealthy = false;
+        return false;
+      } finally {
+        this.upstashProbeInFlight = null;
+      }
+    })();
+    return this.upstashProbeInFlight;
+  }
+
+  /**
+   * Run an Upstash REST call behind a health guard. If the backend is
+   * currently unreachable, surface the typed `UpstashUnavailableError`
+   * synchronously so callers can fall back without paying the undici
+   * fetch timeout (~4.5s) per call.
+   */
+  private async withUpstash<T>(op: () => Promise<T>): Promise<T> {
+    if (!this.upstashHealthy) {
+      const ok = await this.probeUpstash();
+      if (!ok) throw new UpstashUnavailableError();
+    }
+    try {
+      const result = await op();
+      this.upstashHealthy = true;
+      return result;
+    } catch (err) {
+      this.upstashHealthy = false;
+      throw err;
+    }
+  }
+
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
     if (this.upstashClient) {
-      if (ttlSeconds)
-        await this.upstashClient.set(key, value, { ex: ttlSeconds });
-      else await this.upstashClient.set(key, value);
-      return;
+      try {
+        await this.withUpstash(() =>
+          ttlSeconds
+            ? this.upstashClient.set(key, value, { ex: ttlSeconds })
+            : this.upstashClient.set(key, value),
+        );
+        return;
+      } catch (err) {
+        if (err instanceof UpstashUnavailableError) return;
+        this.logger.warn(`Upstash set failed, dropping write: ${String(err)}`);
+        return;
+      }
     }
     if (ttlSeconds) {
       await this.client.set(key, value, 'EX', ttlSeconds);
@@ -173,25 +270,44 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async get(key: string): Promise<string | null> {
     if (this.upstashClient) {
-      const res = await this.upstashClient.get(key);
-      // Upstash returns null or string
-      return res as string | null;
+      try {
+        const res = await this.withUpstash(() => this.upstashClient.get(key));
+        return (res as string | null) ?? null;
+      } catch (err) {
+        if (err instanceof UpstashUnavailableError) return null;
+        this.logger.warn(`Upstash get failed, returning null: ${String(err)}`);
+        return null;
+      }
     }
     return this.client.get(key);
   }
 
   async del(key: string): Promise<void> {
     if (this.upstashClient) {
-      await this.upstashClient.del(key);
-      return;
+      try {
+        await this.withUpstash(() => this.upstashClient.del(key));
+        return;
+      } catch (err) {
+        if (err instanceof UpstashUnavailableError) return;
+        this.logger.warn(`Upstash del failed, dropping: ${String(err)}`);
+        return;
+      }
     }
     await this.client.del(key);
   }
 
   async exists(key: string): Promise<boolean> {
     if (this.upstashClient) {
-      const v = await this.upstashClient.get(key);
-      return v !== null && v !== undefined;
+      try {
+        const v = await this.withUpstash(() => this.upstashClient.get(key));
+        return v !== null && v !== undefined;
+      } catch (err) {
+        if (err instanceof UpstashUnavailableError) return false;
+        this.logger.warn(
+          `Upstash exists failed, returning false: ${String(err)}`,
+        );
+        return false;
+      }
     }
     const count = await this.client.exists(key);
     return count > 0;
@@ -203,8 +319,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async incr(key: string): Promise<number> {
     if (this.upstashClient) {
-      const res = await this.upstashClient.incr(key);
-      return Number(res ?? 0);
+      try {
+        const res = await this.withUpstash(() => this.upstashClient.incr(key));
+        return Number(res ?? 0);
+      } catch (err) {
+        if (err instanceof UpstashUnavailableError) return 0;
+        this.logger.warn(`Upstash incr failed, returning 0: ${String(err)}`);
+        return 0;
+      }
     }
     const res = await this.client.incr(key);
     return Number(res ?? 0);
@@ -215,8 +337,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async expire(key: string, ttlSeconds: number): Promise<void> {
     if (this.upstashClient) {
-      await this.upstashClient.expire(key, ttlSeconds);
-      return;
+      try {
+        await this.withUpstash(() => this.upstashClient.expire(key, ttlSeconds));
+        return;
+      } catch (err) {
+        if (err instanceof UpstashUnavailableError) return;
+        this.logger.warn(`Upstash expire failed, dropping: ${String(err)}`);
+        return;
+      }
     }
     await this.client.expire(key, ttlSeconds);
   }
@@ -237,8 +365,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     count: number,
   ): Promise<[string, string[]]> {
     if (this.upstashClient) {
-      const keys = await this.upstashClient.keys(match);
-      return ['0', (keys as string[] | undefined) ?? []];
+      try {
+        const keys = await this.withUpstash(() => this.upstashClient.keys(match));
+        return ['0', (keys as string[] | undefined) ?? []];
+      } catch (err) {
+        if (err instanceof UpstashUnavailableError) return ['0', []];
+        this.logger.warn(`Upstash scan failed, returning empty: ${String(err)}`);
+        return ['0', []];
+      }
     }
     const result = (await this.client.scan(
       cursor,
@@ -256,8 +390,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async keys(pattern: string): Promise<string[]> {
     if (this.upstashClient) {
-      const keys = await this.upstashClient.keys(pattern);
-      return (keys as string[] | undefined) ?? [];
+      try {
+        const keys = await this.withUpstash(() => this.upstashClient.keys(pattern));
+        return (keys as string[] | undefined) ?? [];
+      } catch (err) {
+        if (err instanceof UpstashUnavailableError) return [];
+        this.logger.warn(`Upstash keys failed, returning []: ${String(err)}`);
+        return [];
+      }
     }
     return this.client.keys(pattern);
   }
@@ -330,5 +470,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.blacklistCache.set(cacheKey, false);
       return false;
     }
+  }
+}
+
+/**
+ * Sentinel error raised when the Upstash REST backend has been
+ * probed and is currently unreachable. Callers in the request path
+ * (lockout, rate-limit, audit, presence) catch this and degrade
+ * gracefully — never let it surface as an INTERNAL_ERROR to the user.
+ */
+export class UpstashUnavailableError extends Error {
+  constructor() {
+    super('Upstash Redis REST backend is unavailable');
+    this.name = 'UpstashUnavailableError';
   }
 }
