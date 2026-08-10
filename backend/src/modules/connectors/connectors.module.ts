@@ -1,4 +1,4 @@
-import { Module, OnModuleInit, Logger } from '@nestjs/common';
+import { Module, OnModuleInit, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConnectorRegistry } from './connector.registry';
 import { ConnectorService } from './services/connector.service';
@@ -92,8 +92,8 @@ export class ConnectorsModule implements OnModuleInit {
 
   constructor(
     private readonly registry: ConnectorRegistry,
-    private readonly hubspotClient: HubSpotClient | null,
-    private readonly salesforceClient: SalesforceClient | null,
+    @Optional() private readonly hubspotClient: HubSpotClient | null,
+    @Optional() private readonly salesforceClient: SalesforceClient | null,
     private readonly tokenStore: PrismaOAuthTokenStore,
     private readonly http: FetchHttpClient,
     private readonly config: ConfigService,
