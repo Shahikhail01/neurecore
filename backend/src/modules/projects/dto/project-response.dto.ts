@@ -33,6 +33,10 @@ export class ProjectResponseDto {
 
   @ApiPropertyOptional({ format: 'uuid', nullable: true })
   @Expose()
+  initiationId?: string | null;
+
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @Expose()
   projectTypeId?: string | null;
 
   @ApiPropertyOptional({ nullable: true })

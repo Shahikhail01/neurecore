@@ -105,6 +105,14 @@ export default function ProjectDetailPage() {
                 <span>{headerSummary.customer}</span>
               ) : null}
               <StatusBadge status={headerSummary?.status ?? 'ACTIVE'} />
+              {project.initiationId ? (
+                <Link
+                  href={`/initiations/${project.initiationId}`}
+                  className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                >
+                  View initiation
+                </Link>
+              ) : null}
             </div>
           </div>
         </header>

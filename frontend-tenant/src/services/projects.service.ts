@@ -22,6 +22,7 @@ export interface Project {
   description?: string | null;
   status: ProjectStatus;
   customerId?: string | null;
+  initiationId?: string | null;
   customer?: { id: string; name: string } | null;
   projectTypeId?: string | null;
   projectTypeVersion?: number | null;

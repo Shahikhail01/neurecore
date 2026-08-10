@@ -1440,6 +1440,11 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
     // Heuristic: a single turn with the creation intent + industry +
     // at least one of {name, customer name, budget, priority, target
     // date} is treated as a complete createProject payload.
+    // NC-SIM04-005 fix: /\bfor\s+[A-Z][a-zA-Z]/ only matched single-word
+    // names ("for Acme") but not multi-word proper nouns
+    // ("for Pinnacle Holdings"). The replacement regex matches one-or-more
+    // capitalized words after "for", which correctly captures company names.
+    const FOR_COMPANY_PATTERN = /\bfor\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*/;
     const hasEnoughContext =
       hasIndustrySlug ||
       (hasIndustryGroup &&
@@ -1449,8 +1454,7 @@ When relevant, include a JSON block (no markdown fences) with keys: chartType, c
           msg.includes('monthly') ||
           msg.includes('quarterly') ||
           msg.includes('annual') ||
-          msg.includes('for ') ||
-          /\bfor\s+[A-Z][a-zA-Z]/.test(dto.message)));
+          FOR_COMPANY_PATTERN.test(dto.message)));
 
     if (hasEnoughContext) return null;
 
