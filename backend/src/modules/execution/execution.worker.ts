@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
   Logger,
@@ -146,6 +146,7 @@ export class ExecutionWorker
             tokensUsed: result.tokensUsed,
             costCents: result.costCents,
             toolCallCount: result.toolCallCount,
+            workRunId: result.workRunId,
           },
           tx,
         );

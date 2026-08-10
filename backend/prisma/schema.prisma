@@ -1355,6 +1355,9 @@ model Agent {
   // Phase 1 — Routines owned by this agent (back-relation)
   ownedRoutines Routine[]    @relation("RoutineOwner")
 
+  // Thin AI Employee core — canonical governed runs executed by this Agent.
+  workRuns WorkRun[] @relation("EmployeeWorkRuns")
+
   // Phase 5 back-relations - Goals
   goals Goal[]
 
@@ -5488,32 +5491,43 @@ model ExtensionPermission {
 
 // 20260714_work_runtime: work_runs
 model WorkRun {
-  id                String        @id @default(cuid()) // nullable=False default=None sql=TEXT
-  tenantId          String // nullable=False default=None sql=TEXT
-  workspaceId       String? // nullable=True default=None sql=TEXT
-  threadId          String? // nullable=True default=None sql=TEXT
-  actorType         String // nullable=False default='HUMAN' sql=TEXT
-  actorId           String // nullable=False default=None sql=TEXT
-  hermesAgentId     String? // nullable=True default=None sql=TEXT
-  request           String // nullable=False default=None sql=TEXT
-  status            WorkRunStatus // nullable=False default='CREATED' sql=WorkRunStatus
-  currentStepIndex  Int           @default(0) // nullable=False default='0' sql=INTEGER
-  contextProvenance Json          @default("{}") // nullable=False default='{}' sql=JSONB
-  planVersion       Int           @default(0) // nullable=False default='0' sql=INTEGER
-  plan              Json? // nullable=True default=None sql=JSONB
-  summary           String? // nullable=True default=None sql=TEXT
-  failureCode       String? // nullable=True default=None sql=TEXT
-  failureReason     String? // nullable=True default=None sql=TEXT
-  version           Int           @default(0) // nullable=False default='0' sql=INTEGER
-  createdAt         DateTime      @default(now()) // nullable=False default='CURRENT_TIMESTAMP' sql=TIMESTAMP(3)
-  startedAt         DateTime? // nullable=True default=None sql=TIMESTAMP(3)
-  pausedAt          DateTime? // nullable=True default=None sql=TIMESTAMP(3)
-  completedAt       DateTime? // nullable=True default=None sql=TIMESTAMP(3)
-  cancelledAt       DateTime? // nullable=True default=None sql=TIMESTAMP(3)
-  failedAt          DateTime? // nullable=True default=None sql=TIMESTAMP(3)
+  id                 String        @id @default(cuid()) // nullable=False default=None sql=TEXT
+  tenantId           String // nullable=False default=None sql=TEXT
+  workspaceId        String? // nullable=True default=None sql=TEXT
+  threadId           String? // nullable=True default=None sql=TEXT
+  actorType          String // nullable=False default='HUMAN' sql=TEXT
+  actorId            String // nullable=False default=None sql=TEXT
+  hermesAgentId      String? // nullable=True default=None sql=TEXT
+  employeeId         String?
+  requestedByActorId String?
+  taskId             String?
+  triggerType        String        @default("USER")
+  triggerSourceId    String?
+  idempotencyKey     String?
+  parentRunId        String?
+  request            String // nullable=False default=None sql=TEXT
+  status             WorkRunStatus // nullable=False default='CREATED' sql=WorkRunStatus
+  currentStepIndex   Int           @default(0) // nullable=False default='0' sql=INTEGER
+  contextProvenance  Json          @default("{}") // nullable=False default='{}' sql=JSONB
+  planVersion        Int           @default(0) // nullable=False default='0' sql=INTEGER
+  plan               Json? // nullable=True default=None sql=JSONB
+  summary            String? // nullable=True default=None sql=TEXT
+  failureCode        String? // nullable=True default=None sql=TEXT
+  failureReason      String? // nullable=True default=None sql=TEXT
+  version            Int           @default(0) // nullable=False default='0' sql=INTEGER
+  createdAt          DateTime      @default(now()) // nullable=False default='CURRENT_TIMESTAMP' sql=TIMESTAMP(3)
+  startedAt          DateTime? // nullable=True default=None sql=TIMESTAMP(3)
+  pausedAt           DateTime? // nullable=True default=None sql=TIMESTAMP(3)
+  completedAt        DateTime? // nullable=True default=None sql=TIMESTAMP(3)
+  cancelledAt        DateTime? // nullable=True default=None sql=TIMESTAMP(3)
+  failedAt           DateTime? // nullable=True default=None sql=TIMESTAMP(3)
 
   workRunContextSnapshot WorkRunContextSnapshot?
+  employee               Agent?                  @relation("EmployeeWorkRuns", fields: [employeeId], references: [id], onDelete: SetNull)
 
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, employeeId, createdAt(sort: Desc)])
+  @@index([tenantId, taskId])
   @@map("work_runs")
 }
 
@@ -6035,6 +6049,7 @@ model ExecutionAttempt {
   toolCallCount            Int                    @default(0)
   lastError                String?                @db.Text
   lastErrorClassification  String?
+  workRunId                String?
   parentAttemptId          String?
   parentAttempt            ExecutionAttempt?      @relation("AttemptLineage", fields: [parentAttemptId], references: [id], onDelete: SetNull)
   childAttempts            ExecutionAttempt[]     @relation("AttemptLineage")
@@ -6054,6 +6069,7 @@ model ExecutionAttempt {
   @@index([agentId])
   @@index([status])
   @@index([status, leaseExpiresAt])
+  @@index([tenantId, workRunId])
   @@map("execution_attempts")
 }
 

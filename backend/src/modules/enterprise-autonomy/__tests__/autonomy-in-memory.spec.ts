@@ -38,7 +38,7 @@ class FakeRepo {
     ).length;
   }
   async createMission(input: any) {
-    const r = { id: `m_${this.rows.length + 1}`, version: 0, workRunIds: [], status: 'CREATED', createdAt: new Date(), ...input };
+    const r = { id: `m_${this.rows.length + 1}`, version: 0, workRunIds: [], status: 'CREATED', createdAt: new Date(), assignedEmployeeId: 'emp-1', ...input };
     this.rows.push(r);
     return r;
   }
@@ -70,7 +70,7 @@ class FakeRepo {
 function buildService(opts: { autoSchedule?: boolean } = {}) {
   const repo = new FakeRepo() as unknown as AutonomyRepository;
   const events: Array<{ eventType: string; tenantId: string }> = [];
-  const runs: Array<{ tenantId: string; actorId: string; actorType: string; request: string }> = [];
+  const runs: Array<{ tenantId: string; requestedBy: { actorId: string; actorType: string }; request: string; trigger: { type: string; sourceId: string } }> = [];
   const governor = new AutonomyGovernor(new AutonomyPolicyEngine());
 
   const plane = {
@@ -93,10 +93,10 @@ function buildService(opts: { autoSchedule?: boolean } = {}) {
       score: { hallucinationRisk: 'VERY_LOW' },
     }),
   };
-  const runtime = {
-    createRun: async (input: any) => {
+  const core = {
+    start: async (input: any) => {
       runs.push(input);
-      return { id: `run_${runs.length}`, status: 'CREATED' };
+      return { id: `run_${runs.length}`, status: 'COMPLETED' };
     },
   };
   const transport = {
@@ -111,7 +111,7 @@ function buildService(opts: { autoSchedule?: boolean } = {}) {
 
   const svc = new EnterpriseAutonomyService(
     cognition as any,
-    runtime as any,
+    core as any,
     transport as any,
     { create: async () => ({} as any), get: async () => null, list: async () => [], adjustWorkload: async () => {} } as any,
     { create: async () => ({} as any), list: async () => [] } as any,
@@ -241,8 +241,9 @@ describe('Audit-trail integrity (human-initiated mission → HUMAN Work Run)', (
       title: 'M', objective: 'o', autoSchedule: true,
     });
     expect(runs).toHaveLength(1);
-    expect(runs[0].actorType).toBe('HUMAN');
-    expect(runs[0].actorId).toBe('alice');
+    expect(runs[0].requestedBy.actorType).toBe('HUMAN');
+    expect(runs[0].requestedBy.actorId).toBe('alice');
+    expect(runs[0].trigger.type).toBe('MISSION');
   });
 
   it('AI-issued mission (SYSTEM actor) attributes Work Run to SYSTEM', async () => {
@@ -252,7 +253,7 @@ describe('Audit-trail integrity (human-initiated mission → HUMAN Work Run)', (
       title: 'M', objective: 'o', autoSchedule: true,
     });
     expect(runs).toHaveLength(1);
-    expect(runs[0].actorType).toBe('SYSTEM');
+    expect(runs[0].requestedBy.actorType).toBe('SYSTEM');
   });
 });
 

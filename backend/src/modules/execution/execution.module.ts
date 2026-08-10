@@ -2,6 +2,7 @@
 import { Inject, Module, OnModuleInit } from '@nestjs/common';
 import { PersistenceModule } from '../../common/persistence/persistence.module';
 import { ReviewsModule } from '../reviews/reviews.module';
+import { AiEmployeeCoreModule } from '../ai-employee-core/ai-employee-core.module';
 import { ExecutionOrchestrator } from './application/execution-orchestrator';
 import { ExecutionController } from './execution.controller';
 import { ExecutionWorker } from './execution.worker';
@@ -22,7 +23,7 @@ import { ExecutionSweeper } from './infrastructure/execution.sweeper';
 export const EXECUTION_CONSUMER_ID = 'execution-task-execution';
 
 @Module({
-  imports: [PersistenceModule, ReviewsModule],
+  imports: [PersistenceModule, ReviewsModule, AiEmployeeCoreModule],
   controllers: [ExecutionController],
   providers: [
     ExecutionOrchestrator,
@@ -69,8 +70,7 @@ export class ExecutionModule implements OnModuleInit {
     this.transport.registerConsumer({
       consumerId: EXECUTION_CONSUMER_ID,
       eventTypes: ['TaskExecutionRequested'],
-      handler: (event: EnterpriseEvent) =>
-        this.handleInboxEvent(event),
+      handler: (event: EnterpriseEvent) => this.handleInboxEvent(event),
     });
   }
 
@@ -119,7 +119,9 @@ export class ExecutionModule implements OnModuleInit {
       processingCount: 0,
     };
     await this.executionWorker.handleTaskExecutionRequested(
-      fakeRecord as unknown as Parameters<ExecutionWorker['handleTaskExecutionRequested']>[0],
+      fakeRecord as unknown as Parameters<
+        ExecutionWorker['handleTaskExecutionRequested']
+      >[0],
     );
   }
 }

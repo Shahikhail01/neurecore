@@ -64,10 +64,10 @@ describe('ArticleDraftSkill', () => {
       content: {
         title: string;
         bodyMarkdown: string;
-        proposedTags: string[];
-        sources: string[];
+        proposedTags: readonly string[];
+        sources: readonly string[];
       };
-      limits: string[];
+      limits: readonly string[];
     };
     expect(parsed.content.title).toBe('Topic');
     expect(parsed.content.bodyMarkdown).toBe('not json at all');
@@ -95,8 +95,8 @@ describe('ArticleDraftSkill', () => {
       content: {
         title: string;
         bodyMarkdown: string;
-        proposedTags: string[];
-        sources: string[];
+        proposedTags: readonly string[];
+        sources: readonly string[];
       };
     };
     expect(parsed.content.title).toBe('A Title');

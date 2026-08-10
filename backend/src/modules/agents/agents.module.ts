@@ -22,6 +22,7 @@ import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { TenantTemplatesModule } from '../tenant-templates/tenant-templates.module';
 import { ChatResponseModule } from '../chat/responses/chat-response.module';
+import { AiEmployeeCoreModule } from '../ai-employee-core/ai-employee-core.module';
 import {
   AgentTenantScopeGuard,
   AGENT_TENANT_SCOPE,
@@ -45,6 +46,7 @@ import {
     MetricsModule,
     TenantTemplatesModule,
     forwardRef(() => ChatResponseModule),
+    forwardRef(() => AiEmployeeCoreModule),
   ],
   controllers: [
     AgentsController,

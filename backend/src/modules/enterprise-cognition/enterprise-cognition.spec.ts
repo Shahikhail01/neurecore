@@ -111,7 +111,12 @@ describe('EnterpriseCognitionService (integration)', () => {
       authContext: { effectiveAuthority: 100, governanceBlocked: false },
       capabilities: { projects: { authorization: { access: 'FULL' }, data: { total: 2 }, unavailable: false } },
     }) };
-    const runtime = { createRun: async (p: any) => { const r = { id: `run_${runsCreated.length + 1}`, status: 'CREATED', ...p }; runsCreated.push(r); return r; }, execute: async () => ({}) };
+    const core = {
+      start: async (p: any) => { const r = { id: `run_${runsCreated.length + 1}`, status: 'COMPLETED', ...p }; runsCreated.push(p); return r; },
+      startDurable: async () => ({ run: {}, created: true }),
+      executeRun: async () => ({}),
+      get: async () => null, list: async () => [], resume: async () => ({}), cancel: async () => ({}),
+    };
     const transport = { publish: async (e: any) => { events.push(e); return { eventId: 'e', deduplicated: false }; }, registerConsumer: () => {} };
     const objectives = { analyze: async () => obj() };
     const decomposer = { decompose: async () => ({ objectiveId: 'o1', goals: [{ id: 'g1', sequence: 1, title: 'Budget', description: '', dependsOn: [], suggestedDepartment: 'finance', executable: true }], reasoning: obj().reasoning }) };
@@ -121,7 +126,7 @@ describe('EnterpriseCognitionService (integration)', () => {
     const strategy = { evaluate: async () => [{ area: 'KPI', finding: 'budget trend rising', priority: 'MEDIUM', reasoning: obj().reasoning }] };
     const evaluator = new CognitiveEvaluator();
     const svc = new EnterpriseCognitionService(
-      contextPlane as never, runtime as never, transport as never,
+      contextPlane as never, core as never, transport as never,
       objectives as never, decomposer as never, selector as never, coordinator as never,
       recommender as never, strategy as never, evaluator as never,
     );
@@ -143,11 +148,20 @@ describe('EnterpriseCognitionService (integration)', () => {
     ]));
   });
 
-  it('hands off to the Work Runtime (governed) only when autoHandoff=true', async () => {
+  it('hands off to AIEmployeeCore (create + execute) only when autoHandoff=true AND an Employee is supplied', async () => {
+    const { svc, runsCreated } = build({ autoHandoff: true });
+    const result = await svc.cognize({ tenantId: 't1', actorId: 'owner', actorType: 'HUMAN', request: 'Prepare budget and create the task.', autoHandoff: true, handoffEmployeeId: 'emp-1' });
+    expect(result.handedOffWorkRunIds).toHaveLength(1);
+    expect(runsCreated).toHaveLength(1); // via core.start (create + execute)
+    expect(runsCreated[0].employeeId).toBe('emp-1');
+    expect(runsCreated[0].trigger.type).toBe('EVENT');
+  });
+
+  it('blocks handoff (no dormant CREATED run) when autoHandoff is true but no Employee is supplied', async () => {
     const { svc, runsCreated } = build({ autoHandoff: true });
     const result = await svc.cognize({ tenantId: 't1', actorId: 'owner', actorType: 'HUMAN', request: 'Prepare budget and create the task.', autoHandoff: true });
-    expect(result.handedOffWorkRunIds).toHaveLength(1);
-    expect(runsCreated).toHaveLength(1); // created via runtime.createRun (runtime governs execution)
+    expect(result.handedOffWorkRunIds).toHaveLength(0);
+    expect(runsCreated).toHaveLength(0); // blocked, never dormant
   });
 
   it('attaches a cognitive score with hallucination risk', async () => {

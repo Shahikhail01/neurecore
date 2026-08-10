@@ -282,6 +282,24 @@ describe('ApprovalPortService', () => {
   });
 
   describe('decide()', () => {
+    it('rejects an AI_AGENT reviewer (self-approval prohibition)', async () => {
+      const wf = makeWorkflowEngine({ getStatus: jest.fn().mockResolvedValue(null) });
+      const govApprovals = makeGovernanceApprovalsService();
+      const gov = makeGovernanceEvaluator();
+      const chain = makeChainService();
+      const events = makeEventTransport();
+
+      const svc = new ApprovalPortService(gov, wf, chain, events, govApprovals);
+      await expect(
+        svc.decide(
+          { approvalId: 'wf_1', decision: 'APPROVED', reason: null, revisionInstructions: null, correlationId: 'corr_1' },
+          { id: 'ai_employee_1', type: 'AI_AGENT', tenantId: 't1' },
+        ),
+      ).rejects.toThrow(/SELF_APPROVAL_FORBIDDEN/);
+      expect(wf.advance).not.toHaveBeenCalled();
+      expect(govApprovals.review).not.toHaveBeenCalled();
+    });
+
     it('routes to workflow engine when approval is a workflow', async () => {
       const wf = makeWorkflowEngine({
         getStatus: jest.fn().mockResolvedValue({ id: 'wf_1', status: 'PENDING', currentStep: 0, totalSteps: 1, steps: [], context: {} }),

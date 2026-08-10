@@ -110,6 +110,21 @@ export class ApprovalsService {
       throw new ForbiddenException(`Approval request is already ${req.status}`);
     }
 
+    // Phase 7 (SOL-02 §7) — self-approval prohibition.
+    // The AI Employee that requested the work-run approval cannot be the
+    // reviewer. This is the authoritative decision boundary; no caller may
+    // bypass it. An empty/undefined reviewerId is never accepted either.
+    if (!reviewerId) {
+      throw new ForbiddenException(
+        'SELF_APPROVAL_FORBIDDEN: reviewerId is required',
+      );
+    }
+    if (req.requestedById && req.requestedById === reviewerId) {
+      throw new ForbiddenException(
+        'SELF_APPROVAL_FORBIDDEN: requester cannot approve their own request',
+      );
+    }
+
     const updated = await this.prisma.approvalRequest.update({
       where: { id },
       data: {

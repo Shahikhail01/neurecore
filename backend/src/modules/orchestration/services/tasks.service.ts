@@ -262,6 +262,9 @@ export class TasksService {
       acceptanceCriteria?: string;
       expectedOutput?: Record<string, unknown>;
       projectId?: string;
+      requiredRole?: string | null;
+      requiredCapabilities?: string[];
+      capabilityTags?: string[];
     },
     tenantId: string,
   ) {
@@ -285,7 +288,63 @@ export class TasksService {
           ? (input.expectedOutput as Prisma.InputJsonValue)
           : Prisma.JsonNull,
         projectId: input.projectId,
+        requiredRole: input.requiredRole ?? null,
+        requiredCapabilities: input.requiredCapabilities ?? [],
+        capabilityTags: input.capabilityTags ?? [],
       },
+    });
+  }
+
+  /**
+   * Phase 6 — assign an eligible Employee to a Task and link the originating
+   * Work Run through the least disruptive available metadata.
+   *
+   * Never trusts planner output alone: callers revalidate Employee eligibility
+   * through the eligibility port BEFORE invoking this. Assigning sets the
+   * executing `agentId` and records the originating `workRunId` in the task's
+   * `input` JSON metadata so the UI can follow Task -> Employee -> Work Run.
+   * Idempotent under retry: re-assigning the same agent with the same run is a
+   * no-op returning the existing task.
+   */
+  async assignToEmployee(
+    id: string,
+    tenantId: string,
+    input: {
+      agentId: string;
+      workRunId?: string | null;
+      rationale?: string;
+      assignedById?: string | null;
+    },
+  ) {
+    await this.assertOwnership(id, tenantId);
+    const existing = await this.prisma.task.findFirst({
+      where: { id, tenantId },
+      select: { id: true, agentId: true, input: true, version: true },
+    });
+    if (!existing) throw new NotFoundException(`Task ${id} not found`);
+
+    // Idempotent replay: already assigned to this agent for this run.
+    if (
+      existing.agentId === input.agentId &&
+      input.workRunId &&
+      (existing.input as Record<string, unknown>)?.workRunId === input.workRunId
+    ) {
+      return existing;
+    }
+
+    const prior = (existing.input ?? {}) as Record<string, unknown>;
+    const nextInput = {
+      ...prior,
+      ...(input.workRunId ? { workRunId: input.workRunId } : {}),
+      ...(input.rationale ? { assignmentRationale: input.rationale } : {}),
+    };
+
+    return this.prisma.task.update({
+      where: { id },
+      data: {
+        agentId: input.agentId,
+        input: nextInput as Prisma.InputJsonValue,
+      } as Prisma.TaskUpdateInput,
     });
   }
 

@@ -41,24 +41,25 @@ describe('Enterprise Autonomy — architecture', () => {
     }
   });
 
-  it('consumes Context Plane + Work Runtime + Event Fabric via ports only', () => {
+  it('consumes Context Plane + AIEmployeeCore + Event Fabric via ports only', () => {
     // Watchers/health use Context Plane (the ONLY org-state source).
     const watchers = read(path.join(EA, 'watchers/watchers.service.ts'));
     expect(watchers).toMatch(/context-plane\/contracts\/context-plane\.interface/);
-    // Orchestrator uses Work Runtime + Event Fabric via their ports.
+    // Orchestrator uses AIEmployeeCore + Event Fabric via their ports.
     const svc = read(path.join(EA, 'enterprise-autonomy.service.ts'));
-    expect(svc).toMatch(/work-runtime\/contracts\/work-runtime\.interface/);
+    expect(svc).toMatch(/ai-employee-core\/ai-employee-core\.tokens/);
     expect(svc).toMatch(/enterprise-events\/contracts\/enterprise-event-transport\.interface/);
     expect(svc).not.toMatch(/WorkRuntimeService/);
   });
 
-  it('never executes capabilities directly — mutation only via Work Runtime createRun', () => {
+  it('never executes capabilities directly — mutation only via AIEmployeeCore.start', () => {
     for (const f of files) {
       const src = read(f);
       expect(src).not.toMatch(/\.transitionStatus\(|\.updateStatus\(|\.record\(/);
     }
     const svc = read(path.join(EA, 'enterprise-autonomy.service.ts'));
-    expect(svc).toMatch(/runtime\.createRun\(/);
+    expect(svc).toMatch(/this\.core\.start\(/);
+    expect(svc).not.toMatch(/runtime\.createRun\(/);
   });
 
   it('does not implement autonomous/self-modifying behavior', () => {

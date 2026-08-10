@@ -106,6 +106,18 @@ export class ApprovalPortService implements IApprovalPort {
       `ApprovalPort.decide() approval=${decision.approvalId} decision=${decision.decision} reviewer=${reviewer.id}`,
     );
 
+    // Phase 7 (SOL-02 §7) — self-approval prohibition at the port boundary.
+    // An AI Employee (or SYSTEM actor) can never decide its own approval;
+    // decisions must come from a HUMAN reviewer with a concrete identity.
+    if (!reviewer || !reviewer.id) {
+      throw new Error('SELF_APPROVAL_FORBIDDEN: reviewer identity is required');
+    }
+    if (reviewer.type === 'AI_AGENT' || reviewer.type === 'SYSTEM') {
+      throw new Error(
+        `SELF_APPROVAL_FORBIDDEN: ${reviewer.type} cannot decide an approval`,
+      );
+    }
+
     const existingWorkflow = await this.workflowEngine.getStatus(
       decision.approvalId,
       reviewer.tenantId,

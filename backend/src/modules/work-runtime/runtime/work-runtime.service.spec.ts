@@ -57,6 +57,12 @@ function build() {
   const steps: Array<Record<string, unknown>> = [];
   const repo = {
     createRun: jest.fn(async () => run),
+    createOrGetByIdempotencyKey: jest.fn(
+      async (input: Record<string, unknown>) => {
+        Object.assign(run, input);
+        return { run, created: true };
+      },
+    ),
     findRun: jest.fn(async (id: string, tenantId: string) =>
       id === run.id && tenantId === run.tenantId ? run : null,
     ),
@@ -171,6 +177,7 @@ function build() {
     contextRepo,
     approvals,
     transport,
+    planner,
   };
 }
 
@@ -260,4 +267,141 @@ describe('WorkRuntimeService context persistence', () => {
       first.repo.createStep.mock.calls[0][0].idempotencyKey,
     );
   });
+
+  it('persists Employee identity separately from the requesting actor', async () => {
+    const { service, repo, transport } = build();
+
+    const result = await service.createRun({
+      tenantId: 'tenant-1',
+      actorId: 'employee-1',
+      actorType: 'AI_AGENT',
+      employeeId: 'employee-1',
+      requestedByActorId: 'human-1',
+      taskId: 'task-1',
+      triggerType: 'TASK',
+      triggerSourceId: 'task-1',
+      idempotencyKey: 'employee-run-1',
+      request: 'Analyze the document',
+    });
+
+    expect(repo.createOrGetByIdempotencyKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 'employee-1',
+        employeeId: 'employee-1',
+        requestedByActorId: 'human-1',
+        taskId: 'task-1',
+        triggerType: 'TASK',
+        idempotencyKey: 'employee-run-1',
+      }),
+    );
+    expect(repo.createRun).not.toHaveBeenCalled();
+    expect(result.employeeId).toBe('employee-1');
+    expect(transport.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ employeeId: 'employee-1' }),
+      }),
+    );
+  });
+
+  it('returns an idempotent replay without duplicating snapshot or events', async () => {
+    const { service, repo, contextRepo, transport, planner } = build();
+    repo.createOrGetByIdempotencyKey.mockResolvedValue({
+      run: { ...build().run, id: 'existing-run', employeeId: 'employee-1' },
+      created: false,
+    } as never);
+
+    const result = await service.createRun({
+      tenantId: 'tenant-1',
+      actorId: 'employee-1',
+      actorType: 'AI_AGENT',
+      employeeId: 'employee-1',
+      requestedByActorId: 'human-1',
+      triggerType: 'USER',
+      idempotencyKey: 'same-key',
+      request: 'Analyze the document',
+    });
+
+    expect(result.id).toBe('existing-run');
+    expect(contextRepo.save).not.toHaveBeenCalled();
+    expect(transport.publish).not.toHaveBeenCalled();
+    expect(planner.plan).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy rows readable with explicit null Employee metadata', async () => {
+    const { service } = build();
+    await expect(service.getRun('run-1', 'tenant-1')).resolves.toMatchObject({
+      id: 'run-1',
+      employeeId: null,
+      requestedByActorId: null,
+      taskId: null,
+      triggerType: 'USER',
+      triggerSourceId: null,
+      parentRunId: null,
+    });
+  });
+
+  it('includes Employee ID in every lifecycle event for an Employee run', async () => {
+    const { service, transport } = build();
+    await service.createRun({
+      tenantId: 'tenant-1',
+      actorId: 'employee-1',
+      actorType: 'AI_AGENT',
+      employeeId: 'employee-1',
+      requestedByActorId: 'human-1',
+      idempotencyKey: 'event-key',
+      triggerType: 'USER',
+      request: 'Analyze the document',
+    });
+    await service.execute('run-1', 'tenant-1');
+
+    expect(transport.publish).toHaveBeenCalled();
+    const published = transport.publish.mock.calls as unknown as Array<
+      [{ payload: Record<string, unknown> }]
+    >;
+    for (const [event] of published) {
+      expect(event.payload).toEqual(
+        expect.objectContaining({ employeeId: 'employee-1' }),
+      );
+    }
+  });
+
+  it.each([
+    [{ employeeId: 'employee-1' }, /requestedByActorId/],
+    [
+      {
+        employeeId: 'employee-1',
+        requestedByActorId: 'human-1',
+        idempotencyKey: 'key',
+        actorId: 'human-1',
+      },
+      /execute as the selected AI employee/,
+    ],
+    [
+      {
+        employeeId: 'employee-1',
+        requestedByActorId: 'human-1',
+        idempotencyKey: 'key',
+        actorId: 'employee-1',
+        actorType: 'AI_AGENT',
+        triggerType: 'INVALID',
+      },
+      /unsupported Employee run trigger/,
+    ],
+  ])(
+    'fails closed on incomplete Employee metadata %p',
+    async (extra, message) => {
+      const { service, repo } = build();
+      await expect(
+        service.createRun({
+          tenantId: 'tenant-1',
+          actorId: 'actor-1',
+          actorType: 'HUMAN',
+          request: 'test',
+          ...extra,
+        } as never),
+      ).rejects.toThrow(message);
+      expect(repo.createRun).not.toHaveBeenCalled();
+      expect(repo.createOrGetByIdempotencyKey).not.toHaveBeenCalled();
+    },
+  );
 });

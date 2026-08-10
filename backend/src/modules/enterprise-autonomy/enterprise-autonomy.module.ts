@@ -7,7 +7,7 @@
 
 import { Module } from '@nestjs/common';
 import { EnterpriseCognitionModule } from '../enterprise-cognition/enterprise-cognition.module';
-import { WorkRuntimeModule } from '../work-runtime/work-runtime.module';
+import { AiEmployeeCoreModule } from '../ai-employee-core/ai-employee-core.module';
 import {
   AI_EMPLOYEE_MANAGER, AI_DEPARTMENT_MANAGER,
   AUTONOMOUS_WATCHER, KPI_MONITOR, OKR_MONITOR, WORKLOAD_BALANCER,
@@ -21,7 +21,7 @@ import { EnterpriseAutonomyService } from './enterprise-autonomy.service';
 import { EnterpriseAutonomyController } from './enterprise-autonomy.controller';
 
 @Module({
-  imports: [EnterpriseCognitionModule, WorkRuntimeModule],
+  imports: [EnterpriseCognitionModule, AiEmployeeCoreModule],
   controllers: [EnterpriseAutonomyController],
   providers: [
     AutonomyRepository,

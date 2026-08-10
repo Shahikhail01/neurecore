@@ -21,7 +21,7 @@ import {
   ResolvedText,
 } from '../knowledge/resolvers/source-ref-resolver.registry';
 import type { SourceRef } from './interfaces/skill.types';
-import type { TenantContext } from '../common/context/tenant-context';
+import type { TenantContext } from '../../common/context/tenant-context';
 
 function ctx(tenantId: string = 'tenant-A'): TenantContext {
   return { tenantId, isCrossTenant: false, actorRole: 'OWNER', actorUserId: 'user-1' };

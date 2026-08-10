@@ -139,7 +139,8 @@ export class RuntimeToolsProvider implements OnApplicationBootstrap {
       {
         name: 'tasks.create',
         capability: 'orchestration',
-        description: 'Create a task.',
+        description:
+          'Create a task. Accepts title (required), description, projectId, goalId, dueDate, acceptanceCriteria, expectedOutput, requiredRole, requiredCapabilities, and capabilityTags.',
         effect: 'INTERNAL_WRITE',
         requiredAuthority: 50,
         approvalSensitive: false,
@@ -148,7 +149,28 @@ export class RuntimeToolsProvider implements OnApplicationBootstrap {
         validateInput: (i) => void req(i, 'title'),
         execute: async (i, ctx): Promise<RuntimeToolResult> => {
           const task = await this.tasks.create(
-            { title: req(i, 'title'), description: (i.description as string) ?? undefined, createdById: ctx.actorId },
+            {
+              title: req(i, 'title'),
+              description: (i.description as string) ?? undefined,
+              createdById: ctx.actorId,
+              projectId: (i.projectId as string) ?? undefined,
+              goalId: (i.goalId as string) ?? undefined,
+              dueDate: (i.dueDate as string) ?? undefined,
+              acceptanceCriteria: (i.acceptanceCriteria as string) ?? undefined,
+              expectedOutput:
+                (i.expectedOutput as Record<string, unknown>) ?? undefined,
+              requiredRole: (i.requiredRole as string) ?? null,
+              requiredCapabilities: Array.isArray(i.requiredCapabilities)
+                ? (i.requiredCapabilities as string[])
+                : [],
+              capabilityTags: Array.isArray(i.capabilityTags)
+                ? (i.capabilityTags as string[])
+                : [],
+              input: {
+                workRunId: ctx.runId,
+                stepId: ctx.stepId,
+              },
+            },
             ctx.tenantId,
           );
           return { ok: true, data: { taskId: (task as { id: string }).id } };

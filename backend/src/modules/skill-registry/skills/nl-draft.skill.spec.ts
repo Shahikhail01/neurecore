@@ -70,7 +70,7 @@ describe('NlDraftSkill', () => {
     );
     const parsed = prompt.parse(
       '{"content": {"draftGraph": {"nodes": [], "edges": [], "inputs": [], "outputs": []}, "explainedIntents": ["intent-1"]}, "limits": []}',
-    ) as { content: { draftGraph: unknown; explainedIntents: string[]; refusedActivation: true } };
+    ) as { content: { draftGraph: unknown; explainedIntents: readonly string[]; refusedActivation: true } };
     expect(parsed.content.refusedActivation).toBe(true);
     expect(parsed.content.explainedIntents).toContain('intent-1');
   });
@@ -80,7 +80,7 @@ describe('NlDraftSkill', () => {
       { naturalLanguage: 'any text', targetMode: 'chat' },
       ctx(),
     );
-    const parsed = prompt.parse('not json') as { content: { draftGraph: { nodes: unknown[]; edges: unknown[] } } };
+    const parsed = prompt.parse('not json') as { content: { draftGraph: { nodes: readonly unknown[]; edges: readonly unknown[] } } };
     expect(parsed.content.draftGraph.nodes).toEqual([]);
     expect(parsed.content.draftGraph.edges).toEqual([]);
   });

@@ -111,10 +111,10 @@ test.describe('Phase 10 live tenant verification — AWL capabilities', () => {
     ).toBeVisible({ timeout: 20_000 });
 
     // 3.1.3 Transactional Outbox — tenant-visible effect is the automation surface.
-    await expect(page.getByLabelText(/project automation status/i)).toBeVisible({
+    await expect(page.getByLabel(/project automation status/i)).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByLabelText(/task board/i)).toBeVisible();
+    await expect(page.getByLabel(/task board/i)).toBeVisible();
     await expect(page.getByText(/automation/i)).toBeVisible();
 
     // 3.1.4 Enterprise Initiation Module — production route must be reachable from the project.

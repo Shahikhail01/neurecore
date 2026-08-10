@@ -106,6 +106,7 @@ function makeChatService(opts: {
     typingExtractor,
     routingDecisions,
     {} as never,
+    {} as never,
   );
 
   // Wire the env flag so the service-gateway fast path activates.

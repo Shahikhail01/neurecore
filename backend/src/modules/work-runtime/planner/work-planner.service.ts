@@ -116,6 +116,11 @@ export class WorkPlanner implements IWorkPlanner {
   /** Safe fallback: a read-only plan (never a write) from authorized read tools. */
   private fallbackPlan(req: PlanRequest): WorkPlan {
     const readTools = req.authorizedTools.filter((t) => t.effect === 'READ');
+    const os = req.organizationSummary as Record<string, unknown> | undefined;
+
+    // Build the best available input from supplied context.
+    const deducedInput = this.deduceFallbackInput(readTools, req, os);
+
     return {
       objective: `Answer: ${req.request}`,
       assumptions: ['LLM planner unavailable; degraded to read-only plan'],
@@ -126,12 +131,50 @@ export class WorkPlanner implements IWorkPlanner {
         description: `Read via ${t.name}`,
         toolName: t.name,
         capability: t.capability,
-        input: {},
+        input: deducedInput,
         dependsOn: [],
         effect: 'READ' as const,
         expectedOutput: 'context data',
       })),
       completionCriteria: ['read-only context returned'],
     };
+  }
+
+  /**
+   * Deduce a minimally valid input for the first eligible READ tool.
+   *
+   * Priority:
+   * 1. Non-skill namespace tools (e.g. approvals.list_pending) accept empty or
+   *    simple inputs natively.
+   * 2. Skill tools are supplied `{ text: req.request }` so the LLM still
+   *    receives the user's request when inline text is acceptable.
+   * 3. Context from the authorized organization summary (projectId, customerId,
+   *    fileIds) is attached when present.
+   */
+  private deduceFallbackInput(
+    readTools: Array<{ name: string; capability: string; description: string }>,
+    req: PlanRequest,
+    orgSummary?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const input: Record<string, unknown> = {};
+
+    // Carried context from the authorized organization summary.
+    if (orgSummary) {
+      const keys = ['projectId', 'customerId', 'taskId', 'fileIds'];
+      for (const k of keys) {
+        const v = orgSummary[k];
+        if (v !== undefined && v !== null) input[k] = v;
+      }
+    }
+
+    // If the first eligible tool is a skill namespace tool, supply inline text.
+    const firstTool = readTools[0];
+    if (firstTool && firstTool.name.startsWith('skill.')) {
+      if (!input['text']) {
+        input['text'] = req.request.slice(0, 10_000);
+      }
+    }
+
+    return input;
   }
 }

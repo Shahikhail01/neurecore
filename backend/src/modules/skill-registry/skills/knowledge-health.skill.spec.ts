@@ -64,7 +64,7 @@ describe('KnowledgeHealthSkill', () => {
     );
     const parsed = prompt.parse('') as {
       content: {
-        findings: Array<unknown>;
+        findings: ReadonlyArray<unknown>;
         recommendedAction: string;
       };
     };

@@ -52,6 +52,7 @@ export class PrismaExecutionAttemptRepository implements IExecutionAttemptReposi
       toolCallCount: row.toolCallCount,
       lastError: row.lastError,
       lastErrorClassification: row.lastErrorClassification,
+      workRunId: row.workRunId,
       parentAttemptId: row.parentAttemptId,
       version: row.version,
     };
@@ -122,6 +123,7 @@ export class PrismaExecutionAttemptRepository implements IExecutionAttemptReposi
           typeof policy.modelVersion === 'string' ? policy.modelVersion : null,
         toolVersion:
           typeof policy.toolVersion === 'string' ? policy.toolVersion : null,
+        workRunId: input.workRunId ?? null,
       },
     });
     return this.toEntity(row);
@@ -148,6 +150,7 @@ export class PrismaExecutionAttemptRepository implements IExecutionAttemptReposi
       'tokensUsed',
       'costCents',
       'toolCallCount',
+      'workRunId',
     ] as const;
     for (const key of optionalKeys) {
       const value = input[key];

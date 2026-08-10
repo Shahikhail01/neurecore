@@ -41,6 +41,7 @@ import { ApplicationFrameworkModule } from './modules/application-framework/appl
 import { EnterpriseAIGovernanceModule } from './modules/enterprise-ai-governance/ai-governance.module';
 import { PlatformEvolutionModule } from './modules/platform-evolution/platform-evolution.module';
 import { AgentsModule } from './modules/agents/agents.module';
+import { AiEmployeeCoreModule } from './modules/ai-employee-core/ai-employee-core.module';
 import { MemoryModule } from './modules/memory/memory.module';
 import { ToolsModule } from './modules/tools/tools.module';
 import { OrchestrationModule } from './modules/orchestration/orchestration.module';
@@ -217,6 +218,7 @@ import { HarnessControlModule } from './harness/phase10/harness-control.module';
 
     // Phase 2 — Agent Runtime
     AgentsModule,
+    AiEmployeeCoreModule, // Thin AI Employee boundary; no behavior cutover in Phase 1
     MemoryModule,
     ToolsModule,
     OrchestrationModule,

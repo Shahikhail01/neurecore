@@ -248,12 +248,12 @@ test.describe('Phase 10 browser pass — capabilities 3.1.3 and 3.1.4', () => {
       'href',
       '/initiations/init-1',
     );
-    await expect(page.getByLabelText(/project automation status/i)).toBeVisible();
+    await expect(page.getByLabel(/project automation status/i)).toBeVisible();
     await expect(page.getByText(/processing/i)).toBeVisible();
     await expect(page.getByText('2')).toBeVisible();
     await expect(page.getByText('6')).toBeVisible();
     await expect(page.getByText('4')).toBeVisible();
-    await expect(page.getByLabelText(/task board/i)).toBeVisible();
+    await expect(page.getByLabel(/task board/i)).toBeVisible();
     await expect(page.getByTestId('task-card-task-1')).toBeVisible();
     await expect(page.getByText(/collect close checklist/i)).toBeVisible();
     await expect(page.getByTestId('timeline-event')).toHaveCount(1);

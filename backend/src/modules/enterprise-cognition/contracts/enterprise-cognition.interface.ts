@@ -236,6 +236,12 @@ export interface CognizeParams {
   scope?: CognitionScope;
   /** If true, executable recommendations are handed to the Work Runtime (governed). Default false. */
   autoHandoff?: boolean;
+  /**
+   * The Employee (tenant Agent UUID) that executes handed-off work. Required
+   * for autoHandoff; if autoHandoff is true but this is absent, the handoff is
+   * BLOCKED (no dormant CREATED WorkRun is created) and the reason recorded.
+   */
+  handoffEmployeeId?: string;
 }
 export interface IEnterpriseCognition {
   cognize(params: CognizeParams): Promise<CognitiveResult>;

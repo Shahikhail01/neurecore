@@ -22,6 +22,7 @@ import {
   TOOL_REGISTRY,
   WORK_PLANNER,
   RUNTIME_GOVERNANCE,
+  type StepWithResult,
 } from '../contracts/work-runtime.interface';
 import type {
   CreateAndRunParams,
@@ -59,6 +60,7 @@ export class WorkRuntimeService implements IWorkRuntime {
   // ── Public API ──────────────────────────────────────────────────────────
 
   async createRun(params: CreateAndRunParams): Promise<WorkRunView> {
+    this.assertEmployeeRunMetadata(params);
     // 1. Assemble authorized org context (fail-safe DENIED if identity unresolved).
     // Context Plane resolves HUMAN vs AI_AGENT identity; SYSTEM actors are treated
     // as AI_AGENT for context resolution purposes.
@@ -87,18 +89,44 @@ export class WorkRuntimeService implements IWorkRuntime {
       };
     }
 
-    const run = await this.repo.createRun({
+    const createInput = {
       tenantId: params.tenantId,
       actorId: params.actorId,
       actorType: params.actorType,
       hermesAgentId: params.hermesAgentId ?? null,
+      employeeId: params.employeeId ?? null,
+      requestedByActorId: params.requestedByActorId ?? null,
+      taskId: params.taskId ?? null,
+      triggerType: params.triggerType ?? 'USER',
+      triggerSourceId: params.triggerSourceId ?? null,
+      idempotencyKey: params.idempotencyKey ?? null,
+      parentRunId: params.parentRunId ?? null,
       workspaceId: params.workspaceId ?? null,
       threadId: params.threadId ?? null,
       request: params.request,
       contextProvenance: provenance,
-    });
+    };
+    const creation = params.idempotencyKey
+      ? await this.repo.createOrGetByIdempotencyKey({
+          ...createInput,
+          idempotencyKey: params.idempotencyKey,
+          employeeId: params.employeeId!,
+          requestedByActorId: params.requestedByActorId!,
+        })
+      : { run: await this.repo.createRun(createInput), created: true };
+    const run = creation.run;
+
+    // Replays return the canonical row before snapshots, events, planning, or
+    // effects can be duplicated. Phase 3 owns create-and-execute orchestration.
+    if (!creation.created) return this.toRunView(run, true);
 
     const organizationSummary = this.summarize(assembled);
+    organizationSummary._request = {
+      projectId: params.scope?.projectId ?? null,
+      customerId: params.scope?.customerId ?? null,
+      taskId: params.taskId ?? null,
+      fileIds: params.scope?.fileIds ?? [],
+    };
     const policySource = Object.values(assembled.capabilities)
       .map((ctx) => ctx.authorization.policySource)
       .sort()
@@ -127,6 +155,7 @@ export class WorkRuntimeService implements IWorkRuntime {
     await this.publish('enterprise.workrun.created', run.id, params.tenantId, {
       runId: run.id,
       actorId: params.actorId,
+      employeeId: params.employeeId ?? null,
     });
 
     return this.toRunView(run);
@@ -258,9 +287,32 @@ export class WorkRuntimeService implements IWorkRuntime {
     return run ? this.toRunView(run) : null;
   }
 
+  async listRuns(
+    tenantId: string,
+    filter?: {
+      employeeId?: string;
+      status?: WorkRunView['status'];
+      taskId?: string;
+    },
+  ): Promise<WorkRunView[]> {
+    const runs = await this.repo.listRuns(tenantId, filter);
+    return runs.map((run) => this.toRunView(run));
+  }
+
   async getSteps(runId: string, tenantId: string): Promise<WorkRunStepView[]> {
     const steps = await this.repo.listSteps(runId, tenantId);
     return steps.map((s) => this.toStepView(s));
+  }
+
+  async getStepResults(
+    runId: string,
+    tenantId: string,
+  ): Promise<StepWithResult[]> {
+    const steps = await this.repo.listSteps(runId, tenantId);
+    return steps.map((s) => ({
+      ...this.toStepView(s),
+      result: (s.result as Record<string, unknown> | null) ?? null,
+    }));
   }
 
   // ── Step execution loop ───────────────────────────────────────────────────
@@ -577,6 +629,42 @@ export class WorkRuntimeService implements IWorkRuntime {
       .digest('hex');
   }
 
+  private assertEmployeeRunMetadata(params: CreateAndRunParams): void {
+    const hasEmployeeMetadata = [
+      params.employeeId,
+      params.requestedByActorId,
+      params.taskId,
+      params.triggerSourceId,
+      params.idempotencyKey,
+      params.parentRunId,
+    ].some((value) => value !== undefined && value !== null);
+    if (!hasEmployeeMetadata) return;
+
+    if (
+      !params.employeeId ||
+      !params.requestedByActorId ||
+      !params.idempotencyKey
+    ) {
+      throw new Error(
+        'employeeId, requestedByActorId, and idempotencyKey are required for Employee-aware WorkRuns',
+      );
+    }
+    if (
+      params.actorType !== 'AI_AGENT' ||
+      params.actorId !== params.employeeId
+    ) {
+      throw new Error(
+        'Employee-aware WorkRuns must execute as the selected AI employee',
+      );
+    }
+    const triggerType = params.triggerType ?? 'USER';
+    if (
+      !['USER', 'TASK', 'SCHEDULE', 'EVENT', 'MISSION'].includes(triggerType)
+    ) {
+      throw new Error(`unsupported Employee run trigger: ${triggerType}`);
+    }
+  }
+
   private logApprovalMismatch(
     runId: string,
     stepId: string,
@@ -701,13 +789,17 @@ export class WorkRuntimeService implements IWorkRuntime {
     attempt = 0,
   ): Promise<void> {
     try {
+      const eventRun = (await this.repo.findRun(runId, tenantId)) as {
+        employeeId?: string | null;
+      } | null;
+      const employeeId = eventRun?.employeeId ?? null;
       await this.transport.publish({
         eventType,
         tenantId,
         actorType: 'SYSTEM',
         idempotencyKey: `${tenantId}:${runId}:${stepId}:${attempt}`,
         sourceModule: 'work-runtime',
-        payload,
+        payload: { ...payload, employeeId },
       });
     } catch (e) {
       this.logger.warn(
@@ -716,25 +808,42 @@ export class WorkRuntimeService implements IWorkRuntime {
     }
   }
 
-  private toRunView(run: {
-    id: string;
-    tenantId: string;
-    actorId: string;
-    actorType: string;
-    status: string;
-    request: string;
-    currentStepIndex: number;
-    planVersion: number;
-    summary: string | null;
-    failureCode: string | null;
-    failureReason: string | null;
-    createdAt: Date;
-  }): WorkRunView {
+  private toRunView(
+    run: {
+      id: string;
+      tenantId: string;
+      actorId: string;
+      actorType: string;
+      employeeId?: string | null;
+      requestedByActorId?: string | null;
+      taskId?: string | null;
+      triggerType?: string;
+      triggerSourceId?: string | null;
+      parentRunId?: string | null;
+      status: string;
+      request: string;
+      currentStepIndex: number;
+      planVersion: number;
+      summary: string | null;
+      failureCode: string | null;
+      failureReason: string | null;
+      createdAt: Date;
+      startedAt?: Date | null;
+      completedAt?: Date | null;
+    },
+    isReplay = false,
+  ): WorkRunView {
     return {
       id: run.id,
       tenantId: run.tenantId,
       actorId: run.actorId,
       actorType: run.actorType as WorkRunView['actorType'],
+      employeeId: run.employeeId ?? null,
+      requestedByActorId: run.requestedByActorId ?? null,
+      taskId: run.taskId ?? null,
+      triggerType: run.triggerType ?? 'USER',
+      triggerSourceId: run.triggerSourceId ?? null,
+      parentRunId: run.parentRunId ?? null,
       status: run.status as WorkRunView['status'],
       request: run.request,
       currentStepIndex: run.currentStepIndex,
@@ -743,6 +852,9 @@ export class WorkRuntimeService implements IWorkRuntime {
       failureCode: run.failureCode,
       failureReason: run.failureReason,
       createdAt: run.createdAt.toISOString(),
+      startedAt: run.startedAt?.toISOString() ?? null,
+      completedAt: run.completedAt?.toISOString() ?? null,
+      isReplay,
     };
   }
 

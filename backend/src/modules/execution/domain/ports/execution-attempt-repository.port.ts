@@ -35,6 +35,7 @@ export interface ExecutionAttemptEntity {
   toolCallCount: number;
   lastError: string | null;
   lastErrorClassification: string | null;
+  workRunId: string | null;
   parentAttemptId: string | null;
   version: number;
 }
@@ -51,6 +52,7 @@ export interface CreateExecutionAttemptInput {
   inputSnapshot?: any;
   projectContextSnapshot?: any;
   parentAttemptId?: string;
+  workRunId?: string;
 }
 
 export interface UpdateExecutionAttemptInput {
@@ -70,6 +72,7 @@ export interface UpdateExecutionAttemptInput {
   tokensUsed?: number;
   costCents?: number;
   toolCallCount?: number;
+  workRunId?: string;
 }
 
 export interface ExecutionClaim {

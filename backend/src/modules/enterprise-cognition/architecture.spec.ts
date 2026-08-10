@@ -39,10 +39,10 @@ describe('Enterprise Cognition — architecture', () => {
     }
   });
 
-  it('consumes Context Plane + Work Runtime + Event Fabric via their ports only', () => {
+  it('consumes Context Plane + AIEmployeeCore + Event Fabric via their ports only', () => {
     const svc = read(path.join(EC, 'enterprise-cognition.service.ts'));
     expect(svc).toMatch(/CONTEXT_PLANE/);
-    expect(svc).toMatch(/WORK_RUNTIME/);
+    expect(svc).toMatch(/ai-employee-core\/ai-employee-core\.tokens/);
     expect(svc).toMatch(/EVENT_TRANSPORT/);
     // Must NOT import the concrete runtime/context service classes (the
     // I-prefixed port interfaces are allowed).
@@ -50,15 +50,16 @@ describe('Enterprise Cognition — architecture', () => {
     expect(svc).not.toMatch(/(?<!I)OrganizationalContextPlane\b/);
   });
 
-  it('never executes capabilities directly — mutation only via Work Runtime createRun', () => {
+  it('never executes capabilities directly — handoff only via AIEmployeeCore.start', () => {
     for (const f of files) {
       const src = read(f);
       // No tool execution, no direct capability command calls.
       expect(src).not.toMatch(/\.transitionStatus\(|\.updateStatus\(|\.create\(.*tenantId.*\)\s*;?\s*\/\/ *execute/);
     }
-    // The only runtime interaction is createRun (handoff).
+    // The only runtime interaction is core.start (handoff that also executes).
     const svc = read(path.join(EC, 'enterprise-cognition.service.ts'));
-    expect(svc).toMatch(/runtime\.createRun\(/);
+    expect(svc).toMatch(/this\.core\.start\(/);
+    expect(svc).not.toMatch(/runtime\.createRun\(/);
   });
 
   it('does not implement autonomous/self-modifying behavior', () => {

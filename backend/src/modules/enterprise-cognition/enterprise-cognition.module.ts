@@ -8,7 +8,7 @@
 
 import { Module } from '@nestjs/common';
 import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
-import { WorkRuntimeModule } from '../work-runtime/work-runtime.module';
+import { AiEmployeeCoreModule } from '../ai-employee-core/ai-employee-core.module';
 
 import {
   OBJECTIVE_ANALYZER,
@@ -30,7 +30,7 @@ import { EnterpriseCognitionService } from './enterprise-cognition.service';
 import { EnterpriseCognitionController } from './enterprise-cognition.controller';
 
 @Module({
-  imports: [AIGatewayModule, WorkRuntimeModule],
+  imports: [AIGatewayModule, AiEmployeeCoreModule],
   controllers: [EnterpriseCognitionController],
   providers: [
     ReasoningEngine,

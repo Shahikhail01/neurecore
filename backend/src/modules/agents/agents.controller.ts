@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { AgentsService } from './services/agents.service';
 import { FlexibleIdPipe } from '../../common/pipes/flexible-id.pipe';
-import { AgentExecutorService } from './services/agent-executor.service';
+import { LegacyAgentDispatchAdapter } from '../ai-employee-core/adapters/legacy-agent-dispatch.adapter';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { DispatchTaskDto } from './dto/dispatch-task.dto';
@@ -57,7 +57,7 @@ class UpdatePermissionsDto {
 export class AgentsController {
   constructor(
     private readonly agentsService: AgentsService,
-    private readonly executorService: AgentExecutorService,
+    private readonly dispatchAdapter: LegacyAgentDispatchAdapter,
   ) {}
 
   @Get()
@@ -302,13 +302,30 @@ export class AgentsController {
     @Param('id', FlexibleIdPipe) agentId: string,
     @Body() dto: DispatchTaskDto,
     @CurrentUser() user: JwtPayload,
-  ): Promise<ActionResult<{ taskId: string; agentId: string }>> {
+  ): Promise<
+    ActionResult<{
+      taskId: string;
+      agentId: string;
+      workRunId: string;
+      runStatus: string;
+    }>
+  > {
     if (!user.tenantId) throw new Error('Tenant ID required');
-    void this.executorService.executeTask(dto.taskId, agentId, user.tenantId);
+    const result = await this.dispatchAdapter.dispatchTask(
+      dto.taskId,
+      agentId,
+      user.tenantId,
+      user.sub,
+    );
     return {
       success: true,
       message: 'Task dispatched',
-      data: { taskId: dto.taskId, agentId },
+      data: {
+        taskId: dto.taskId,
+        agentId,
+        workRunId: result.workRunId,
+        runStatus: result.status,
+      },
     };
   }
 
@@ -318,22 +335,42 @@ export class AgentsController {
     @Param('id', FlexibleIdPipe) agentId: string,
     @Body() dto: DispatchTaskDto,
     @CurrentUser() user: JwtPayload,
-  ): Promise<ActionResult<{ taskId: string; agentId: string }>> {
+  ): Promise<
+    ActionResult<{
+      taskId: string;
+      agentId: string;
+      workRunId: string;
+      runStatus: string;
+    }>
+  > {
     if (!user.tenantId) throw new Error('Tenant ID required');
-    void this.executorService.executeTask(dto.taskId, agentId, user.tenantId);
+    const result = await this.dispatchAdapter.dispatchTask(
+      dto.taskId,
+      agentId,
+      user.tenantId,
+      user.sub,
+    );
     return {
       success: true,
       message: 'Task dispatched',
-      data: { taskId: dto.taskId, agentId },
+      data: {
+        taskId: dto.taskId,
+        agentId,
+        workRunId: result.workRunId,
+        runStatus: result.status,
+      },
     };
   }
 
   @Post(':id/cancel/:taskId')
   @HttpCode(HttpStatus.OK)
   async cancel(
+    @Param('id', FlexibleIdPipe) agentId: string,
     @Param('taskId', FlexibleIdPipe) taskId: string,
+    @CurrentUser() user: JwtPayload,
   ): Promise<ActionResult<null>> {
-    await this.executorService.cancelTask(taskId);
+    if (!user.tenantId) throw new Error('Tenant ID required');
+    await this.dispatchAdapter.cancelTask(user.tenantId, taskId);
     return { success: true, message: 'Task cancelled' };
   }
 }

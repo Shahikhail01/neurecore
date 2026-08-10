@@ -10,7 +10,7 @@ describe('AgentsPoolService — Phase 10 AI Employees Pool', () => {
   let service: AgentsPoolService;
 
   beforeEach(() => {
-    service = new AgentsPoolService({} as never);
+    service = new AgentsPoolService({} as never, {} as never);
   });
 
   it('is an instance of PoolService (Liskov)', () => {

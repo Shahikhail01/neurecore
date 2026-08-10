@@ -55,6 +55,7 @@ function makeChatService(opts: {
     stub('typingExtractor'),
     stub('routingDecisions'),
     tenantLlmGateway,
+    stub('skillRegistry'),
   );
 
   return {

@@ -16,6 +16,8 @@ import {
 import type { ExecutionPolicy } from '../domain/execution-policy';
 import type { ExecutionAttemptStatus, TaskStatus } from '@prisma/client';
 import { ExecutionPolicyEnforcer } from './execution-policy-enforcer';
+import { AI_EMPLOYEE_CORE } from '../../ai-employee-core/ai-employee-core.tokens';
+import type { IAIEmployeeCore } from '../../ai-employee-core/contracts/ai-employee-core.interface';
 
 export interface ExecutionRuntimeResult {
   output: { summary: string; content: string };
@@ -27,6 +29,8 @@ export interface ExecutionRuntimeResult {
   tokensUsed: number;
   costCents: number;
   toolCallCount: number;
+  /** Phase 8: the canonical Employee WorkRun that performed the business execution. */
+  workRunId?: string;
 }
 
 export interface ExecutionContext {
@@ -58,6 +62,7 @@ export class ExecutionOrchestrator {
     @Inject(TASK_REPOSITORY) private readonly taskRepo: ITaskRepository,
     @Inject(OUTBOX_REPOSITORY) private readonly outboxRepo: IOutboxRepository,
     private readonly policyEnforcer: ExecutionPolicyEnforcer,
+    @Inject(AI_EMPLOYEE_CORE) private readonly core: IAIEmployeeCore,
   ) {}
 
   async requestExecution(
@@ -228,7 +233,7 @@ export class ExecutionOrchestrator {
     }
   }
 
-  private runExecution(
+  private async runExecution(
     context: ExecutionContext,
     policy: ExecutionPolicy,
   ): Promise<ExecutionRuntimeResult> {
@@ -238,16 +243,56 @@ export class ExecutionOrchestrator {
       throw new Error('INVALID_INPUT_MISSING_TASK_INSTRUCTIONS');
     if (policy.inputSources.length > 0 && context.approvedInputs.length === 0)
       throw new Error('INVALID_INPUT_MISSING_APPROVED_INPUTS');
-    const content = `Draft execution for: ${context.taskInstructions}`;
-    const tokensUsed = Math.max(1, Math.ceil(content.length / 4));
-    this.policyEnforcer.assertBudget(policy, tokensUsed, 0);
-    return Promise.resolve({
-      output: { summary: 'Draft execution completed', content },
-      evidence: [{ artifactType: 'DRAFT', content, mimeType: 'text/plain' }],
-      tokensUsed,
-      costCents: 0,
-      toolCallCount: 0,
+
+    // Phase 8.4: delegate the actual business execution to the canonical
+    // AIEmployeeCore. The attempt envelope (claim/heartbeat/evidence/review)
+    // is retained by the worker; the WorkRun is now the real executor. The
+    // synthetic "Draft execution for:" completion is removed.
+    const run = await this.core.start({
+      tenantId: context.tenantId,
+      employeeId: context.agentId,
+      requestedBy: { actorId: context.agentId, actorType: 'AI_AGENT' },
+      objective: context.taskInstructions,
+      context: { taskId: context.taskId },
+      trigger: { type: 'TASK', sourceId: context.taskId },
+      idempotencyKey: `execution-attempt:${context.attemptId}`,
     });
+
+    // Honest completion: never report attempt completion unless the canonical
+    // run actually completed.
+    if (run.status !== 'COMPLETED') {
+      const reason =
+        run.failure?.reason ?? run.status ?? 'run did not reach COMPLETED';
+      throw new Error(`EXECUTION_NOT_COMPLETED:${reason}`);
+    }
+
+    const artifacts = run.artifacts ?? [];
+    const evidence = artifacts.map((a) => ({
+      artifactType: 'REPORT' as const,
+      content: run.summary ?? a.name ?? 'Completed',
+      mimeType: 'text/plain',
+    }));
+    const finalEvidence = evidence.length
+      ? evidence
+      : [
+          {
+            artifactType: 'OUTPUT' as const,
+            content: run.summary ?? 'Completed',
+            mimeType: 'text/plain',
+          },
+        ];
+
+    return {
+      output: {
+        summary: run.summary ?? 'Completed',
+        content: run.summary ?? 'Completed',
+      },
+      evidence: finalEvidence,
+      tokensUsed: 0,
+      costCents: 0,
+      toolCallCount: run.steps.length,
+      workRunId: run.id,
+    };
   }
 
   private defaultPolicy(task: { id: string }): ExecutionPolicy {

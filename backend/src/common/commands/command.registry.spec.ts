@@ -30,7 +30,9 @@ describe('CommandRegistry', () => {
       actorId: 'actor-1',
       actorType: 'HUMAN',
       causationId: 'cause-1',
-      timestamp: new Date('2026-08-09T00:00:00.000Z'),
+      idempotencyKey: 'command:test-command:entity-1',
+      occurredAt: '2026-08-09T00:00:00.000Z',
+      schemaVersion: 1,
     };
   });
 
@@ -57,7 +59,7 @@ describe('CommandRegistry', () => {
       success: true,
       data: { id: 'entity-1' },
       correlationId: metadata.correlationId,
-      occurredAt: metadata.timestamp,
+      occurredAt: new Date(metadata.occurredAt),
     });
 
     registerDefinition(handler);
@@ -103,7 +105,7 @@ describe('CommandRegistry', () => {
       success: true,
       data: { id: 'entity-1' },
       correlationId: metadata.correlationId,
-      occurredAt: metadata.timestamp,
+      occurredAt: new Date(metadata.occurredAt),
     });
 
     registerDefinition(handler);

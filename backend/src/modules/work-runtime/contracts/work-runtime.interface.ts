@@ -65,6 +65,12 @@ export interface WorkRunView {
   tenantId: string;
   actorId: string;
   actorType: ActorType;
+  employeeId?: string | null;
+  requestedByActorId?: string | null;
+  taskId?: string | null;
+  triggerType?: string;
+  triggerSourceId?: string | null;
+  parentRunId?: string | null;
   status: WorkRunStatus;
   request: string;
   currentStepIndex: number;
@@ -73,6 +79,10 @@ export interface WorkRunView {
   failureCode: string | null;
   failureReason: string | null;
   createdAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  /** Internal orchestration hint; true when createRun returned an existing row. */
+  isReplay?: boolean;
 }
 
 export interface WorkRunStepView {
@@ -90,6 +100,11 @@ export interface WorkRunStepView {
   errorCode: string | null;
   // input/result are REDACTED in views (sensitive)
 }
+
+export interface StepWithResult extends WorkRunStepView {
+  readonly result: Record<string, unknown> | null;
+}
+
 
 // ── Governance decision (runtime) ───────────────────────────────────────────
 
@@ -171,6 +186,13 @@ export interface CreateRunInput {
   actorId: string;
   actorType: ActorType;
   hermesAgentId?: string | null;
+  employeeId?: string | null;
+  requestedByActorId?: string | null;
+  taskId?: string | null;
+  triggerType?: string;
+  triggerSourceId?: string | null;
+  idempotencyKey?: string | null;
+  parentRunId?: string | null;
   workspaceId?: string | null;
   threadId?: string | null;
   request: string;
@@ -209,12 +231,20 @@ export interface CreateAndRunParams {
   actorId: string;
   actorType: ActorType;
   hermesAgentId?: string | null;
+  employeeId?: string | null;
+  requestedByActorId?: string | null;
+  taskId?: string | null;
+  triggerType?: string;
+  triggerSourceId?: string | null;
+  idempotencyKey?: string | null;
+  parentRunId?: string | null;
   workspaceId?: string | null;
   threadId?: string | null;
   request: string;
   scope?: {
     projectId?: string;
     customerId?: string;
+    fileIds?: string[];
     includeCapabilities?: string[];
   };
 }
@@ -224,5 +254,14 @@ export interface IWorkRuntime {
   resume(runId: string, tenantId: string): Promise<WorkRunView>;
   cancel(runId: string, tenantId: string, reason: string): Promise<WorkRunView>;
   getRun(runId: string, tenantId: string): Promise<WorkRunView | null>;
+  listRuns(
+    tenantId: string,
+    filter?: {
+      employeeId?: string;
+      status?: WorkRunStatus;
+      taskId?: string;
+    },
+  ): Promise<WorkRunView[]>;
   getSteps(runId: string, tenantId: string): Promise<WorkRunStepView[]>;
+  getStepResults(runId: string, tenantId: string): Promise<StepWithResult[]>;
 }
